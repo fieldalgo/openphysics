@@ -1,6 +1,7 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 import {designSummary} from './workspace-shapes.mjs';
+import {downloadAgainName} from './workspace-files.mjs';
 
 // A session file name from the application and the local date-time, e.g.
 // optical-waveguide-session-2026-11-21-1305.json (.json, so Open accepts it).
@@ -135,9 +136,18 @@ export function projectTitle({name=null,models=0,file=null,current=false,recover
  if(!file&&name&&fromFile)return `${title} · changed since ${fromFile}, not saved · ${browser}`;
  if(!file&&opened?.file&&opened.changed)return `${title} · changed since ${opened.file}, not saved · ${browser}`;
  if(!file)return `${title} · ${copyOf?`recovered from a copy of ${copyOf} · `:''}not saved to a file · ${browser}`;
- const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
+ const {word,at}=projectFileWords(file,when);
  if(current)return `${title} · ${file.name} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:'');
  return `${title} · ${file.name} · changed since ${word}${at} · ${browser}`;
+}
+// The project file's word and time: "saved 13:15", "downloaded 13:15", "opened". Round 26 (C3): after
+// Download again (file.again), the time of that download and the name the question said the browser
+// may give it, until the next Save As or Open: "downloaded again 11:45 AM (your browser may have
+// named it design-a-ng (1).json)".
+function projectFileWords(file,when){
+ const at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
+ if(file.how==='download'&&file.again)return {word:'downloaded again',at:`${at} (your browser may have named it ${downloadAgainName(file.name)})`};
+ return {word:PROJECT_WORD[file.how]||'opened',at};
 }
 /** The project name a browser restore brings back from its record's `project` ({name, from}), when
  * no savedFile.projectName names one and the project has no file: {name, nameFrom, recovered:
@@ -162,7 +172,7 @@ export function recoveredProjectName(state,record,{savedFile=null,openedFile=nul
 export function modelInProjectTitle({title,file,inFile=null,current=false,recovery=null},when=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})){
  const head=`${title} · in project ${file.name}`,browser=recoveryWords(recovery)||'not in browser recovery yet';
  if(inFile===false)return `${head} · not saved since it joined · ${browser}`;
- const word=PROJECT_WORD[file.how]||'opened',at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
+ const {word,at}=projectFileWords(file,when);
  return current?`${head} · ${word}${at}`+(PROBLEMS.includes(recovery)?' · '+RECOVERY[recovery]:''):`${head} · changed since ${word}${at} · ${browser}`;
 }
 /** The project line's title text: the "(1)" note on the download path, '' elsewhere. */

@@ -131,7 +131,11 @@ design-a-ng.json again? This browser cannot replace the earlier file and may nam
 design-a-ng (1).json.* with **Download again** (*Downloaded <name> again: … A download cannot
 replace the earlier file, so your browser may add a number such as “ (1)” to its name.*; round 18:
 it named *<name> (1).json* even when a (1) copy already existed), **Save As…** (the name dialog,
-prefilled with the name) and **Cancel** (*Save cancelled; nothing was written.*). The first Save of a
+prefilled with the name) and **Cancel** (*Save cancelled; nothing was written.*). After **Download
+again** the header says when, and under which name the browser may have kept it, until the next Save
+As or Open (round 26, C3): *design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser
+may have named it design-a-ng (1).json)*, or *… · changed since downloaded again 11:45 AM (…) · …*
+after a change. The first Save of a
 project with no file keeps the name dialog, and the browser's save dialog (Chrome, Edge) is
 unchanged. On every project save the name dialog also says what the file
 will hold, each model with its runs: *The file will hold Optical waveguide (2 runs) and Heated

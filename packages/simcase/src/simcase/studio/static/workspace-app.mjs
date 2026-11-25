@@ -2192,6 +2192,9 @@ function deliverProject(makeText,{saveAs}){
    const chosen=await downloadAgainChoice(result.name);
    if(!chosen.name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:chosen.saveAs})};
    downloadFile(new Blob([makeText(chosen.name)],{type:'application/json'}),chosen.name);keep(chosen.name,'download');
+   // round 26 (C3): Download again is said in the header (its time and the name the question gave)
+   // until the next Save As or Open, which keep a new file record
+   if(!chosen.saveAs&&project.file?.scope===scope)project.file.again=true;
    const same=chosen.name===target.name;return {written:true,name:chosen.name,via:'download',again:same,known:same,after:same?' '+downloadAgainNote(chosen.name):''};
   }
   if(result.status==='known'){downloadFile(new Blob([makeText(result.name)],{type:'application/json'}),result.name);keep(result.name,'download');
