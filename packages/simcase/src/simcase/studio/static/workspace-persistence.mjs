@@ -143,10 +143,11 @@ export function projectTitle({name=null,models=0,file=null,current=false,recover
 // The project file's word and time: "saved 13:15", "downloaded 13:15", "opened". Round 26 (C3): after
 // Download again (file.again), the time of that download and the name the question said the browser
 // may give it, until the next Save As or Open: "downloaded again 11:45 AM (your browser may have
-// named it design-a-ng (1).json)".
+// named it design-a-ng (1).json)". Round 29 (L3): the n-th Download again of the same name in this
+// tab (file.repeat) says "(n)"; the first says "(1)" as before.
 function projectFileWords(file,when){
  const at=file.how!=='opened'&&file.savedAt?' '+when(file.savedAt):'';
- if(file.how==='download'&&file.again)return {word:'downloaded again',at:`${at} (your browser may have named it ${downloadAgainName(file.name)})`};
+ if(file.how==='download'&&file.again)return {word:'downloaded again',at:`${at} (your browser may have named it ${downloadAgainName(file.name,file.repeat??1)})`};
  return {word:PROJECT_WORD[file.how]||'opened',at};
 }
 /** The project name a browser restore brings back from its record's `project` ({name, from}), when
