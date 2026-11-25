@@ -536,7 +536,8 @@ print(n)`;
     assert.equal(JSON.stringify(sessionOf(first.text)), JSON.stringify(JSON.parse(c2.text)), 'the project entry is the session file of the same state');
     assert.match(message, /^Downloaded heated-design\.json again: Heated silicon waveguide \(2 runs, the without-heater result\)\. A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
     assert.match(footer, /^heated-design\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
-    assert.match(title, /^heated-design · heated-design\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/);
+    // round 26 (C3): after Download again the header says so until the next Save As or Open
+    assert.match(title, /^heated-design · heated-design\.json · downloaded again \d{1,2}:\d\d(?: [AP]M)? \(your browser may have named it heated-design \(1\)\.json\)$/);
     assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.'); }
   assert.equal(c2.text, c1.text, 'S1: the two-run file byte-identical');
   // the next run is numbered after the highest stored

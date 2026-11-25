@@ -583,7 +583,8 @@ try {
     stage('R17 U8 saved with both models', {both, again, dialogAgain});
     // round 18 (X8): saved with both models, the status bar says so in the header's words
     const savedBoth = {title: await title(), footer: await footer()}; stage('R18 X8 saved', savedBoth);
-    assert.ok(/^Heated silicon waveguide · in project u8-optical\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/.test(savedBoth.footer), savedBoth.footer);
+    // round 26 (C3): after Download again, in the header's words
+    assert.ok(/^Heated silicon waveguide · in project u8-optical\.json · downloaded again \d{1,2}:\d\d(?: [AP]M)? \(your browser may have named it u8-optical \(1\)\.json\)$/.test(savedBoth.footer), savedBoth.footer);
     assert.ok(savedBoth.title.includes(' · u8-optical.json · downloaded '), savedBoth.title);
     // round 18 (X10): on the Library, both models of the project read Return to model
     await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'R18 Library');
