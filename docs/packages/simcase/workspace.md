@@ -1117,8 +1117,8 @@ its runs and Undo stay as they were:
   read as File › Open reads a model file (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 12 is refused by name (“This session file is version 13, newer than this Studio
-reads (versions 6–12). Open it in a newer Studio.”; versions 9 to 12 are
+A version above 13 is refused by name (“This session file is version 14, newer than this Studio
+reads (versions 6–13). Open it in a newer Studio.”; versions 9 to 13 are
 [optical sessions](#optical-session-files-version-9), and a version 8 layout under version 9 is
 refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
