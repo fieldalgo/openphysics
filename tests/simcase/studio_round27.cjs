@@ -1,7 +1,8 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 // Round 27 (HQ decision 2026-11-25-openphysics-studio-round27-choices): D2, the slab question before
-// a closed run whose window would list slab modes first. (D1 is checked in studio_field_encoding_tab.cjs.)
+// a closed run whose window would list slab modes first; D3, the found line of an open run with two
+// searches names the second target. (D1 is checked in studio_field_encoding_tab.cjs.)
 // Plain text comparison only: no RegExp is built from a dynamic string.
 const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');
@@ -63,3 +64,12 @@ test('D2: the page asks before the run, and Run as set runs exactly the same cod
  assert.ok(app.includes("host.append(...edgeWarningButtons('run-edge'));"));
 });
 
+test('D3: the found line of two searches names the second target; one search is unchanged',async()=>{
+ const R=await import(STATIC+'workspace-open-run.mjs');
+ const three={schema:'openphysics.pml-candidates/3',searches:[{target_effective_index:2.46},{target_effective_index:1.95}],candidates:[]};
+ assert.equal(R.runFoundText(3,3,'2.460',three),"Found 3 of 3 modes near n_eff 2.46 and 1.95 (Studio's second search, halfway to the silica index). Move Search near n_eff to find other modes.");
+ assert.equal(R.runFoundText(2,2,'2.460',{schema:'openphysics.pml-candidates/2'}),'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
+ // every result sentence of a run with the second search uses the same words (one helper)
+ assert.equal(R.secondSearchWhere(2.46),"2.46 and 1.95 (Studio's second search, halfway to the silica index). Move Search near n_eff to find other modes.");
+ assert.ok(read('workspace-open-run.mjs').includes("const where=hasSearches(record)?secondSearchWhere(target):"));
+});

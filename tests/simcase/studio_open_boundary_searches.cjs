@@ -102,10 +102,10 @@ test('the words of two searches: field, help, details, Study, found line, the no
  const one=V.boundaryFieldHtml({...R.openChoice(),target:1.465},[STRIP]);
  assert.ok(!one.includes('lower-target')&&one.includes(R.TARGET_HELP)&&one.includes(R.PML_DETAILS+'</p>'),one);
  assert.equal(R.studySummary(R.openChoice(),[STRIP]),'Open boundary · PML 1 µm · searches near 2.46 and 1.95');
- assert.equal(R.runFoundText(1,2,'2.460',three(CANDS())),'Found 1 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+ assert.equal(R.runFoundText(1,2,'2.460',three(CANDS())),"Found 1 of 2 modes near n_eff 2.46 and 1.95 (Studio's second search, halfway to the silica index). Move Search near n_eff to find other modes.");
  assert.equal(R.runFoundText(2,2,'2.460',{schema:'openphysics.pml-candidates/2'}),'Found 2 of 2 modes near n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.');
  const low=three([candidate(1,1,1.44,1e-3,0.9,['selected_descending_real_index']),candidate(2,2,1.43,1e-3,0.9,['outside_requested_count'])]);
- assert.throws(()=>R.openResultValues({summary:{open_boundary:[low]}},[1.44],[1e-3],2.46),{message:'No mode above n = 1.45 was found near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.'});
+ assert.throws(()=>R.openResultValues({summary:{open_boundary:[low]}},[1.44],[1e-3],2.46),{message:"No mode above n = 1.45 was found near n_eff 2.46 and 1.95 (Studio's second search, halfway to the silica index). Move Search near n_eff to find other modes."});
 });
 test('the candidates of two searches: the Search column, duplicates left out and counted',()=>{
  const record=three(CANDS()),rows=R.otherCandidates(record,RE,IM);

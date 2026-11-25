@@ -1466,8 +1466,9 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
 - 표 아래 안내에 “Leakage depends on what lies outside the window: shapes touching an open edge
   continue through the PML.”이 붙습니다. 닫힌 실행의 안내에는 “For leakage, choose Open boundary in
   Physics › Optical modes.”가 붙습니다.
-- 찾은 개수 줄은 늘 보입니다: *Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find
-  other modes.* 검색이 하나인 실행(1.466 미만, 또는 slice P2의 실행)은 이전처럼 *Found 2 of 2 modes near
+- 찾은 개수 줄은 늘 보입니다: *Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio's second search, halfway to
+  the silica index). Move Search near n_eff to find other modes.*(round 27, D3: 두 번째 목표가 무엇인지 밝힘. 1.45 위 모드가
+  없는 결과도 같은 말로 *No mode above n = 1.45 was found near n_eff 2.46 and 1.95 (Studio's second search, …). …*라고 함). 검색이 하나인 실행(1.466 미만, 또는 slice P2의 실행)은 이전처럼 *Found 2 of 2 modes near
   n_eff 2.460. Move Search near n_eff (Physics › Optical modes) to find other modes.*로 읽힙니다.
 - Studio는 엔진의 모드 가운데 Re n_eff가 1.45보다 큰 것만 남깁니다.
 - **Other candidates (n) — not shown as modes**는 탐색했지만 보이지 않는 후보마다 n_eff, 물리 비율, 이유를

@@ -1925,7 +1925,7 @@ try {
     assert.equal(template.caption, 'Modes (open boundary, PML 1 µm)');
     assert.deepEqual(template.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm) absorption + leakage into the PML', 'A_eff (µm²)', 'n_g', 'PML check']);
     assert.equal(template.lossTitle, 'Material absorption (k) and leakage into the PML of the open boundary');
-    assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+    assert.equal(template.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio\'s second search, halfway to the silica index). Move Search near n_eff to find other modes.');
     // pre-registered: both modes below what the open boundary resolves
     assert.deepEqual(template.loss, ['< 0.01 dB/cm', '< 0.01 dB/cm']);
     template.lossTitles.forEach((t, i) => assert.equal(t, template.check[i][0] === 'depends' ? 'This loss changes with the PML; it is not a converged leakage loss.' : 'Below what this open boundary resolves for a 3 × 2.4 µm window (0.01 dB/cm). The mode does not leak measurably here.'));
@@ -2184,7 +2184,7 @@ try {
     assert.equal(withoutTime(third.text), withoutTime(second.text), 'V-P1 (b): byte-identical but for savedAt');
     assert.deepEqual(workspaceSession(third.text).runs.map(r => r.origin), Array(runCount).fill('imported'));
     assert.deepEqual([reopened.neff, reopened.loss, reopened.check], [leak.neff, leak.loss, leak.check], 'the open run reads the same after the open');
-    assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+    assert.equal(leak.found, 'Found 2 of 2 modes near n_eff 2.46 and 1.95 (Studio\'s second search, halfway to the silica index). Move Search near n_eff to find other modes.');
 
     // W1 through the builder (slice T2, pre-registered): the strip over a substrate asking for 8 modes
     // returns all three modes, the one near the cladding index included (1.4864 + 7.92e-3i), with the
@@ -2209,7 +2209,7 @@ try {
     stage('W1 strip over a substrate, 8 modes', {neff: eight.neff, loss: eight.loss, found: eight.found, engine: expectedEight, seconds: eightSeconds});
     assert.deepEqual({neff: eight.neff, loss: eight.loss}, expectedEight, 'the screen strings are the engine run of the same document on this machine');
     assert.equal(eight.neff.length, 3, JSON.stringify(eight.neff));
-    assert.equal(eight.found, 'Found 3 of 8 modes near n_eff 2.46 and 1.95. Move Search near n_eff to find other modes.');
+    assert.equal(eight.found, 'Found 3 of 8 modes near n_eff 2.46 and 1.95 (Studio\'s second search, halfway to the silica index). Move Search near n_eff to find other modes.');
     const cladding = eight.neff.map(t => /^(\d\.\d{8}) ([+−]) (\d\.\d{2}e-\d+)i$/.exec(t)).map(m => ({re: Number(m[1]), im: (m[2] === '−' ? -1 : 1) * Number(m[3])}));
     assert.deepEqual(eight.neff.slice(0, 2), leak.neff, 'TE-like and TM-like first, as with 2 modes');
     assert.ok(Math.abs(cladding[2].re - 1.4864) <= 5e-4 && Math.abs(cladding[2].im / 7.92e-3 - 1) <= 0.05, JSON.stringify(cladding));
@@ -2225,7 +2225,7 @@ try {
     assert.ok(near, 'the near-cladding mode is shown: ' + JSON.stringify(low.neff));
     assert.ok(Math.abs(near.im / 7.92e-3 - 1) <= 0.05, JSON.stringify(near)); assert.ok(Math.abs(Number(near.loss.split(' ')[0]) / 2789 - 1) <= 0.05, JSON.stringify(near));
     // slice T2: the search near 1.600 is paired with one near (1.600 + 1.444) / 2 = 1.52
-    assert.match(low.found, /^Found \d of 4 modes near n_eff 1\.60 and 1\.52\. Move Search near n_eff to find other modes\.$/);
+    assert.match(low.found, /^Found \d of 4 modes near n_eff 1\.60 and 1\.52 \(Studio's second search, halfway to the silica index\)\. Move Search near n_eff to find other modes\.$/);
     // review: choosing the optical model again clears the PML check option with the open boundary
     await toTree('Study', "!!document.getElementById('pml-check')"); await ob.click('#pml-check'); assert.equal(await ob.eval("document.getElementById('pml-check').checked"), true);
     await ob.click('nav [data-page=Applications]'); await ob.until("!!document.querySelector('[data-template=optical]')", 'OB Library');
