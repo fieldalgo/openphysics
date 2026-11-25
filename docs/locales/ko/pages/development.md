@@ -476,10 +476,10 @@ in a closed window its slab modes come first.*, Optical modes에는 전체 문�
 없는지, 1440 × 900과 390 × 844에서, 그리고 Optical modes에는 전체 문장이 있는지(P1); 실행 전 군굴절률을 켜면 *Closed window ·
 group index on (3 solves)*와 **Turn off group index**, 군굴절률 없는 모드 4개 닫힌 실행 뒤에는 *… · about N s*(그 시간의 3배),
 버튼이 선택을 끄는지(*Closed window · last such run m:ss*, 확인란 해제, *Group index off: …*), n_g 닫힌 실행 뒤에는 그 실행의
-시간인지(P3); 모드 4개 또는 2개 실행 다섯(모든 장을 담으면 약 19 MB)이 실행 보관부터 *… Run 1 (…) keeps its values; its
-fields were not kept (16.8 MB limit).*를 Messages에서 넘침 없이 줄바꿈해 보이고, 크기 줄은 없으며, 헤더가 뒤에 아무것도 없는
-*… · kept for recovery in this browser*이고, IndexedDB 기록이 16.8 MB 안에서 Run 5의 장과 새 실행들의 장을 담아 실행 목록이
-*values only*로 표시하지 않은 실행과 정확히 같은지, 값만 있는 실행 열네 개와 여섯 번째 실제 실행(Run 20) 뒤에도 기록이 예산
+시간인지(P3); 모드 4개 또는 2개 실행 다섯(모든 장을 텍스트로 담으면 약 19 MB)이 압축 필드부터 *… Fields are now kept at
+single precision (float32), so more of them fit in 16.8 MB. …*(실행 보관에서는 *… Run 1 (…) keeps its values; its fields were not
+kept (16.8 MB limit).*)를 Messages에서 넘침 없이 줄바꿈해 보이고, 크기 줄은 없으며, 헤더가 뒤에 아무것도 없는 *… · kept for
+recovery in this browser*이고, IndexedDB 기록(버전 14)이 16.8 MB 안에서 실행 목록이 보이는 대로 모든 실행의 장을 담는지, 값만 있는 실행 열네 개와 여섯 번째 실제 실행(Run 20) 뒤에도 기록이 예산
 안에서 Run 20의 장을 담고 탭과 같은지(P2); 실행 20개에서 내보내기 줄, **Pin Run 1**–**Pin Run
 3**, 내보낸 문구, 교환 버튼이 n_g 닫힌 실행(*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), 열린
 실행(*Run 3 (open (PML 1 µm) · …)*), closed-near 실행(*Run 4 (closed near 2.46 · 4 modes · …)*)을 각각 재료 앞까지의 실행 목록
@@ -505,10 +505,19 @@ runs*입니다. 자체 브라우저 컨텍스트의 단계 하나(RT, 실행 보
 4개, closed near 2.46, n_g가 있는 열린 실행)를 실행합니다: 결과마다 IndexedDB 기록이 16 MiB 안이고 File › Export의 텍스트와
 바이트 그대로 같으며(질문 없음), 그 장이 목록에서 *values only*로 표시되지 않은 실행과 정확히 같은지; 장 없는 실행이 Results
 블록을 보이고, 장 내보내기가 *Recompute Run N's fields first*로 기다리며, Compare가 그 모드를 번호 순으로 나열하고, 각각
-1440 × 900과 390 × 844에서 잘리지 않고 줄바꿈되는지(25차 A1부터 그 블록과 실행 목록 안내는 *… When a result or a recompute
-arrives, Studio keeps the selected run's fields first, then pinned runs', then the newest. Selecting a run does not bring its
-fields back; Recompute does.*); **Recompute Run N's fields**가 작업 패널에 *Recomputing Run N's fields*를
-보이고, 일치하며, 장을 같은 실행에 붙이고(실행이 늘지 않음), 장 보기가 다시 그려지고, 기록이 Save의 텍스트와 같은지 봅니다.
+1440 × 900과 390 × 844에서 잘리지 않고 줄바꿈되는지 봅니다. 압축 필드(설계 *Compact field encoding*)부터는 장 열두 개가 모두
+들어갑니다: 장을 모두 텍스트로 담을 수 없게 되는 결과에서 변환 문장이 한 번 나오고, 그 뒤 파일은 버전 14이며, *values only*인
+실행은 없고, Results에 *Field at single precision (float32). The values above are the engine's.*(두 크기에서 잘리지 않음)가,
+실행 목록 안내에 덧붙는 문장이 보입니다. 같은 단계가 F7과 F12를 잽니다: 닫힌 T18 실행 셋의 장 보기(1440 × 900에서 모든 성분,
+모드 1과 마지막 모드; 390 × 844에서 모드 1의 크기), 단면, Export field PNG가 변환 전후에 채널마다 최대 한 단계, 픽셀의 0.1 %
+이하에서만 다르고; 페이지 안에서 T19 크기 장의 인코딩·디코딩과 탭 자신의 세션(변환 전 기록을 다시 읽음)의 변환 시간을 재며,
+변환은 500 ms 안입니다. M4-e(1550 nm 템플릿의 넓은 모드 8개 실행)는 탭에서 장을 내보내는 경우의 브라우저 검사입니다: 변환
+뒤 장이 하나 빠질 때까지 넓은 실행을 더하고(넓은 실행 아홉 개), 내보냄 문구, *values only* 표시, 장 없는 실행이 Results 블록을
+보이는(1440 × 900과 390 × 844에서 잘리지 않고 줄바꿈, 장 내보내기는 *Recompute Run N's fields first*로 기다림; 25차 A1부터 그
+블록과 실행 목록 안내는 *… When a result or a recompute arrives, Studio keeps the selected run's fields first, then pinned runs',
+then the newest. Selecting a run does not bring its fields back; Recompute does.*이고 안내 뒤에 압축 문장이 붙음) 버전 14 파일,
+연 뒤의 4.1 줄과 번호순 Compare를 확인한 뒤, RT에서 옮겨 온 **Recompute Run N's fields**가 작업 패널에 *Recomputing Run N's
+fields*를 보이고, 일치하며, 장을 같은 실행에 단정밀도로 붙이고(실행이 늘지 않음), 장 보기가 다시 그려지는지 봅니다.
 K1(T18 혼합 실행 20개의 크기)과 K5(다시 계산한 장이 원래와 같음) 측정은 서버 자신의 작업으로 T18과 T16 문서를 푸는
 `tools/studio_run_retention.mjs`(`engine`, 그다음 `k1`과 `k5`)입니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 20*과
@@ -596,8 +605,9 @@ Open project를 하면 실행 목록, 내보내기 줄과 **Pin Run 2**, *No nee
 from this browser, not recomputed.*, 헤더 *both-models · recovered from this browser · changed since both-models.json, not
 saved · kept for recovery in this browser*(23차 E5; 전에는 *… · not saved to a file · …*, 복구가 복원한 세션을 보존한 뒤
 읽음)입니다. 다음 변경 뒤에는 *both-models · changed since both-models.json, not saved · kept for recovery in this browser*
-(24차 B2; 전에는 *both-models · not saved to a file · …*), 그다음(R24, 사전 등록 P1) 더 촘촘한 실행이 필드 예산을 채워 결과가 다른 실행의 필드를 내보내면(*… keeps its values; its
-fields were not kept (16.8 MB limit).*, *values only*로 표시된 실행) 헤더는 *both-models · changed since both-models.json, not
+(24차 B2; 전에는 *both-models · not saved to a file · …*), 그다음(R24, 사전 등록 P1) 더 촘촘한 실행이 필드 예산을 채워 결과의 장을 모두 텍스트로 담을 수 없게 되면(*… Fields are now kept
+at single precision (float32), …*; 압축 필드부터, 실행 보관에서는 다른 실행의 필드를 내보냄) Results에 *Field at single
+precision (float32). The values above are the engine's.*가 보이고, *values only*는 값만 있는 가져온 실행 열네 개뿐이며, 헤더는 *both-models · changed since both-models.json, not
 saved · kept for recovery in this browser*입니다(실행 보관 전에는 *… without the fields of Run N*). 연 프로젝트를 다음 실행 전에 바꾸면 *both-models · both-models.json · changed since opened · kept for recovery in this
 browser*입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제
 프로젝트 이름을 밝히고(23차부터 *Heater study · recovered from this browser · changed since heater-study.json, not saved ·
