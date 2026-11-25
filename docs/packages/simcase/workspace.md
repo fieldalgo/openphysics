@@ -2308,7 +2308,9 @@ The job panel shows the submitted dimensions/material, job ID, elapsed time (m:s
 run solves and the result-loading state, for example *Computing job 1a2b3c4d · 12:40 · Open
 boundary · 2 modes · searches near 2.46 and 1.95 · PML check (up to 2 more solves)* or *PML check ·
 mode 1 of 2*. The server
-reports no stage while a job runs, so none is shown. **Stop waiting** stops browser polling only; the optical
+reports no stage while a job runs, so none is shown. Messages repeats each of these states and is
+the one live region that announces them; the job panel's text is not a live region, so a screen
+reader reads each state once (round 25, A6; before, both announced every update). **Stop waiting** stops browser polling only; the optical
 server continues its computation. **Resume job** retrieves that same job with
 its captured inputs, even after editing the current design or reloading the
 same tab. The pending-job record uses session storage, separately from input

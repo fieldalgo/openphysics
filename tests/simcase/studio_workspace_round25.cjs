@@ -139,3 +139,13 @@ test('P4 (A4): open-boundary region notes, measured over the window without the 
  // the page puts them in the modes table with the closed window's notes
  assert.ok(read('workspace-app.mjs').includes("const regions=openRegionNotes(run),edge=new Map([...edgeNotes(run),...regions.filter(n=>n.kind==='edge')].map(n=>[n.mode,n.text])),core=new Map([...coreNotes(run),...regions.filter(n=>n.kind==='core')].map(n=>[n.mode,n.text]))"));
 });
+
+test('P6 (A6): the job panel is not a second live region; Messages carries every job state',()=>{
+ const html=read('workspace.html'),app=read('workspace-app.mjs');
+ assert.ok(html.includes('<span id="job-message"></span>'));
+ assert.ok(!/id="job-message"[^>]*(role|aria-live)=/.test(html));
+ for(const id of ['file-status','status','autosave-status'])assert.equal(html.split(`id="${id}" role="status"`).length-1,1,id);
+ // every job state still reaches Messages (the one live region) and the panel's text
+ assert.ok(app.includes("$('job-message').textContent=state.message;$('job-message').title=state.title||'';"));
+ assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());else notice(state.message);"));
+});

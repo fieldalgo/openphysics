@@ -1707,10 +1707,11 @@ try {
     };
     const toTree = async (name, ready) => { await ob.click('nav [data-page=Model]'); await sleep(200); await ob.clickTreeItem(name); await ob.until(ready, name); };
     const solverDocument = async () => { await toTree('Study', "!!document.querySelector('details.solver-document pre')"); return JSON.parse(await ob.eval("document.querySelector('details.solver-document pre').textContent")); };
-    const obRun = async () => {
+    const obRun = async (during = null) => {
       await ob.until("!document.getElementById('run-optical').disabled", 'OB Run enabled');
       const before = await ob.eval("document.querySelectorAll('.run-item').length");
       const started = Date.now(); await ob.click('#run-optical');
+      if (during) await during();
       await ob.until(`document.querySelectorAll('.run-item').length>${before}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'OB run', 300000);
       return Math.round((Date.now() - started) / 1000);
     };
@@ -1808,7 +1809,35 @@ try {
     assert.equal((await control('checkbox', 'Also compute group index (3 solves)')).checked, 'true');
     const templateDoc = await solverDocument();
     assert.deepEqual(templateDoc.results.group_index, {wavelength_step: '1 nm'}); assert.equal(templateDoc.physics.em1.pml.pml_strength, 3);
-    const templateSeconds = await obRun();
+    // round 25 (A6, P6 re-registered after the repro, before the fix): while the job runs, at
+    // 1440 × 900 and 390 × 844, the job text is announced by exactly one live node (Messages), the
+    // footer's three status lines are one live node each, and no text is announced by two live
+    // nodes at once. The job panel and the dock heading repeat words in the page text by design;
+    // they are not live regions.
+    const liveCheck = async () => {
+      await ob.until("/^Computing job /.test(document.getElementById('job-message').textContent)", 'A6 job running', 60000);
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await obSize(width, height, mobile);
+        const live = await ob.eval(`(()=>{const nodes=[...document.querySelectorAll('[role=status],[role=alert],[role=log],[aria-live],output')].filter(e=>e.getAttribute('aria-live')!=='off'&&e.getClientRects().length);
+          const text=e=>e.textContent.replace(/\\s+/g,' ').trim(),job=text(document.getElementById('job-message'));
+          return {job,withJob:nodes.filter(e=>text(e).startsWith(job.slice(0,22))).map(e=>e.id||e.tagName),ids:['status','file-status','autosave-status'].map(id=>nodes.filter(e=>e.id===id).length),
+           texts:nodes.map(text).filter(Boolean),jobRole:document.getElementById('job-message').getAttribute('role')}})()`);
+        const {nodes: ax} = await ob.call('Accessibility.getFullAXTree');
+        // a status node's text in the accessibility tree: its name, else its descendants' static text
+        const byId = new Map(ax.map(n => [n.nodeId, n])), axText = n => n.role?.value === 'StaticText' ? String(n.name?.value ?? '') : (n.childIds || []).map(id => byId.get(id)).filter(Boolean).map(axText).join('');
+        const named = {count: ax.filter(n => !n.ignored && ['status', 'alert', 'log'].includes(n.role?.value) && (String(n.name?.value || '') || axText(n)).startsWith(live.job.slice(0, 22))).length};
+        const buttons = {stop: (await control('button', 'Stop waiting')).count, resume: (await control('button', 'Resume job')).count};
+        stage('A6 live regions during a job ' + width, {...live, axStatusNamedJob: named.count, buttons});
+        assert.ok(live.job.startsWith('Computing job '), live.job);
+        assert.deepEqual(live.withJob, ['file-status'], 'the job text is announced by Messages only');
+        assert.equal(named.count, 1, 'one status node is named by the job text');
+        assert.deepEqual(live.ids, [1, 1, 1]); assert.equal(live.jobRole, null);
+        assert.equal(new Set(live.texts).size, live.texts.length, 'no text in two live nodes: ' + JSON.stringify(live.texts));
+        assert.deepEqual(buttons, {stop: 1, resume: 1}, 'the job panel controls keep their names');
+      }
+      await obSize(1280, 800);
+    };
+    const templateSeconds = await obRun(liveCheck);
     await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB PML check', 300000);
     const template = await resultsView(); stage('OB template, all open, PML check', {...template, seconds: templateSeconds});
     assert.equal(template.caption, 'Modes (open boundary, PML 1 µm)');
