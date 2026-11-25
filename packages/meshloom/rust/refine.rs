@@ -100,7 +100,7 @@ struct State<'a> {
     /// point on its facet)
     tri_vertex: Vec<bool>,
     /// shape() by sorted vertex set, while flip_improve runs (no vertex moves then)
-    shape_memo: std::cell::RefCell<Option<HashMap<[u32; 4], (f64, f64)>>>,
+    shape_memo: std::cell::RefCell<Option<HashMap<[u32; 4], (f64, f64), FastKey>>>,
     /// per facet: its input vertices, and the input edges of its loops
     fverts: Vec<Vec<u32>>,
     fedges: Vec<Vec<(u32, u32)>>,
@@ -168,6 +168,40 @@ fn ratio_cos(b: f64) -> f64 {
 /// Facet quality bound: a subfacet with a larger radius-edge ratio is split (2D Ruppert's
 /// sqrt(2) with a margin).
 const SUB_RATIO: f64 = 1.5;
+/// A fast hasher for small integer keys (the shape memo), in place of the default SipHash:
+/// the keys are vertex indices, not untrusted input.
+#[derive(Clone, Copy, Default)]
+struct FastKey;
+
+impl std::hash::BuildHasher for FastKey {
+    type Hasher = FastHasher;
+    fn build_hasher(&self) -> FastHasher {
+        FastHasher(0)
+    }
+}
+
+struct FastHasher(u64);
+
+impl std::hash::Hasher for FastHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(b as u64);
+        }
+    }
+    fn write_u32(&mut self, x: u32) {
+        self.write_u64(x as u64);
+    }
+    fn write_u64(&mut self, x: u64) {
+        self.0 = (self.0.rotate_left(5) ^ x).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
+    fn write_usize(&mut self, x: usize) {
+        self.write_u64(x as u64);
+    }
+}
+
 /// Edge removal: the largest ring of tetrahedra around an edge it considers.
 const EDGE_RING_MAX: usize = 7;
 
@@ -819,7 +853,7 @@ impl State<'_> {
     /// subsegment; exact orient3d for every new tetrahedron. Faces and edges are visited in
     /// sorted order (deterministic); up to four passes.
     fn flip_improve(&mut self) {
-        *self.shape_memo.borrow_mut() = Some(HashMap::new());
+        *self.shape_memo.borrow_mut() = Some(HashMap::with_hasher(FastKey));
         self.flip_passes();
         *self.shape_memo.borrow_mut() = None;
     }
