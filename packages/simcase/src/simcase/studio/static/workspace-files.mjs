@@ -95,10 +95,12 @@ export function asksBeforeDownloadAgain(file, {saveAs = false, picker = false} =
 export function downloadAgainQuestion(name) {
   return `Download ${name} again? This browser cannot replace the earlier file and may name the new one ${downloadAgainName(name)}.`;
 }
-/** The name the question says a browser may give the new download: "design-a-ng (1).json". */
-export function downloadAgainName(name) {
+/** The name the question says a browser may give the new download: "design-a-ng (1).json". Round 29
+ * (L3): n, the repeat of the same name in this tab (1 for the first Download again): "design-a-ng
+ * (2).json" for the second. */
+export function downloadAgainName(name, n = 1) {
   const stem = name.replace(/\.json$/i, ''), extension = name.slice(stem.length);
-  return `${stem} (1)${extension}`;
+  return `${stem} (${Number.isInteger(n) && n >= 1 ? n : 1})${extension}`;
 }
 /** Its buttons, in order: download under the same name, the Save As name dialog, nothing written. */
 export const DOWNLOAD_AGAIN_BUTTONS = Object.freeze(['Download again', 'Save As…', 'Cancel']);

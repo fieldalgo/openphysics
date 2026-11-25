@@ -58,3 +58,18 @@ test('L2: the browser copy\'s time is "kept"; a file\'s save time stays "saved"'
  assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM').label,'Restore from this browser · Heated silicon waveguide · Run 1 · 5:30 AM · file x.json, changed since');
  assert.equal(A.cardResumeChoice({...item,fileCurrent:true,fileSavedAt:'S'},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · same as file x.json, saved 9:24 PM');
 });
+
+test('L3: the n-th Download again of a name says "(n)"; the first says "(1)" as before',async()=>{
+ const P=await import(STATIC+'workspace-persistence.mjs'),F=await import(STATIC+'workspace-files.mjs');
+ assert.equal(F.downloadAgainName('design-a-ng.json'),'design-a-ng (1).json');
+ assert.equal(F.downloadAgainName('design-a-ng.json',2),'design-a-ng (2).json');
+ assert.equal(F.downloadAgainName('Heater study.JSON',3),'Heater study (3).JSON');
+ const file=extra=>({...F.rememberFile({name:'design-a-ng.json',how:'download',scope:'s'}),savedAt:'2026-11-25T11:45:00.000Z',again:true,...extra});
+ const title=extra=>P.projectTitle({name:'design-a-ng',models:1,file:file(extra),recovery:'kept',current:true},()=>'11:45 AM');
+ assert.equal(title({}),'design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser may have named it design-a-ng (1).json)');
+ assert.equal(title({repeat:1}),'design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser may have named it design-a-ng (1).json)');
+ assert.equal(title({repeat:2}),'design-a-ng · design-a-ng.json · downloaded again 11:45 AM (your browser may have named it design-a-ng (2).json)');
+ // the page counts the repeats of the same name on the download path; Save As keeps a new record
+ const app=read('workspace-app.mjs');
+ assert.ok(app.includes("if(project.file?.again===true)project.file.repeat=(target.how==='download'&&target.name===chosen.name&&Number.isInteger(target.repeat)?target.repeat:0)+1;"));
+});

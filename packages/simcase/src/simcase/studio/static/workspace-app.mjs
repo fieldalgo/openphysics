@@ -2205,6 +2205,9 @@ function deliverProject(makeText,{saveAs}){
    // round 26 (C3): Download again is said in the header (its time and the name the question gave)
    // until the next Save As or Open, which keep a new file record
    if(!chosen.saveAs&&project.file?.scope===scope)project.file.again=true;
+   // round 29 (L3): the repeat of this name in this tab (the file record before this download had
+   // the count so far); Save As and Open keep a new record, so the count starts again
+   if(project.file?.again===true)project.file.repeat=(target.how==='download'&&target.name===chosen.name&&Number.isInteger(target.repeat)?target.repeat:0)+1;
    const same=chosen.name===target.name;return {written:true,name:chosen.name,via:'download',again:same,known:same,after:same?' '+downloadAgainNote(chosen.name):''};
   }
   if(result.status==='known'){downloadFile(new Blob([makeText(result.name)],{type:'application/json'}),result.name);keep(result.name,'download');
