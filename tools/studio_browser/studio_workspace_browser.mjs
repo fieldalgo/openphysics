@@ -3076,6 +3076,121 @@ try {
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
+  // R24 (round 24, pre-registered P3 and P4 with P2, P5 and P6 above; P1 is the project script's
+  // R24 stage), in a browser context of its own with the optical template: P3 two named runs and
+  // two newer ones: Compare offers "Compare the two newest: Run 3 and Run 4", which shows them; a
+  // pair picked by hand stays after a run and keeps "Compare Run 5 with B". P4 the estimate before an
+  // open run with group index: none when the only open runs came from a session file (they have no
+  // wall time); after an open run in this tab "about N"; a newer open run added from a file, which has
+  // none, is skipped; after a browser restore none again.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R24 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R24 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R24 run done', 600000);
+    };
+    const pressEnter = async () => { for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined}); await sleep(150); };
+    const nameRun = async name => { await r.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.select();return true}', '#run-name-input'); await r.call('Input.insertText', {text: name}); await pressEnter(); };
+    const showRun = async n => { await r.onElement('function(n){const b=[...this.querySelectorAll(".run-item")].find(b=>b.textContent.replace(/^Pinned · /,"").startsWith(n+" · "));b.click();return true}', 'Run ' + n); await sleep(300); };
+    const width = async nm => { await rTree('Geometry', "!!document.querySelector('#shape-w')"); await r.type('#shape-w', nm); await sleep(300); };
+    const modes = async () => rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+    const plan = () => rText('#run-plan');
+    const groupIndex = async on => { await modes(); if (await r.eval("document.getElementById('group-index-check').checked") !== on) { await r.click('#group-index-check'); await sleep(300); } };
+    const pair = () => r.eval("['compare-a','compare-b'].map(id=>document.getElementById(id).selectedOptions[0].textContent.split(' · ')[0])");
+    const setFile = async (selector, path) => {
+      const {root} = await r.call('DOM.getDocument'); const {nodeId} = await r.call('DOM.querySelector', {nodeId: root.nodeId, selector});
+      await r.call('DOM.setFileInputFiles', {nodeId, files: [path]});
+    };
+    const answer = async (done, label) => {
+      const end = Date.now() + 60000;
+      while (!(await r.eval(done))) {
+        assert.ok(Date.now() < end, label + ': ' + await rText('#file-status'));
+        if (await r.eval("!!document.getElementById('leave-confirm')?.open")) await r.click('#leave-go');
+        else if (await r.eval("!!document.getElementById('load-confirm')?.open")) await r.click('#confirm-load');
+        await sleep(150);
+      }
+    };
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R24 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R24 optical model');
+    // P3 (B4): Run 1 and Run 2 named Design A and Design B (kept on Compare as in T18), Runs 3 and 4
+    await width(500); await rRun(); await nameRun('Design A');
+    await width(520); await rRun(); await nameRun('Design B');
+    await width(540); await rRun(); await width(560); await rRun();
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-newer')", 'R24 Compare newer');
+    const p3 = {offered: {pair: await pair(), line: await rText('#compare-newer')}};
+    await rOverflow('P3 offer');
+    await r.click('#compare-newer-button'); await r.until("!document.getElementById('compare-newer')", 'R24 newest pair shown');
+    p3.switched = {pair: await pair(), message: await rText('#file-status')};
+    // picked by hand: Run 1 against Run 2; Run 5 keeps the pair, which offers the round-16 swap
+    for (const [id, n] of [['#compare-a', 1], ['#compare-b', 2]]) await r.choose(id, await r.eval(`[...document.querySelector(${JSON.stringify(id)}).options].find(o=>o.textContent.startsWith('Run ${n} · ')).value`));
+    await width(580); await rRun();
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-newer')", 'R24 Compare picked');
+    p3.picked = {pair: await pair(), line: await rText('#compare-newer')};
+    stage('R24 P3 Compare offers the newest pair', p3);
+    assert.deepEqual(p3.offered, {pair: ['Run 1', 'Run 2'], line: 'Run 4 is newer than this pair · Compare the two newest: Run 3 and Run 4'});
+    assert.deepEqual(p3.switched, {pair: ['Run 3', 'Run 4'], message: 'Compare shows the two newest runs: Run 3 (A) and Run 4 (B).'});
+    assert.deepEqual(p3.picked, {pair: ['Run 1', 'Run 2'], line: 'Run 5 is newer than this pair · Compare Run 5 with B'});
+    await rOverflow('P3 picked pair');
+    // P4 (B5): a session file whose open runs have no wall time (P2's file, f8ece10: two open runs and
+    // a closed one); the open boundary and group index on: no estimate
+    await r.eval("document.getElementById('file-status').textContent=''");
+    await setFile('#session-file', fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-v10-open-f8ece10.json', import.meta.url)));
+    await answer("/^Opened /.test(document.getElementById('file-status').textContent)", 'R24 P4 file opened');
+    if (await r.eval("!!document.getElementById('restore-run-input')")) { await r.click('#restore-run-input'); await sleep(300); }
+    await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
+    await groupIndex(true); const p4 = {fromFile: await plan()};
+    await groupIndex(false); p4.fromFileOff = await plan();
+    // an open run in this tab, measured; then its estimate with group index on
+    await rRun(); await groupIndex(true); p4.measured = await plan();
+    // an open run added from a file (083e151's a0000004): added runs come last, so it is the newest
+    // run; it has no wall time and the estimate skips it
+    await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('import-runs')", 'R24 Results');
+    p4.before = (await r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)")).length;
+    await setFile('#run-import-file', fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-v10-open-full-083e151.json', import.meta.url)));
+    await r.until("!!document.getElementById('run-import-confirm')?.open", 'R24 import dialog'); await r.click('#confirm-run-import');
+    await r.until(`document.querySelectorAll('.run-item').length===${p4.before + 1}`, 'R24 run added from file');
+    p4.items = await r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    p4.added = await plan();
+    // browser recovery: the restored runs have no wall time either
+    await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R24 recovery record', 60000); await sleep(800);
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.getElementById('resume-newest')", 'R24 restore offer', 30000);
+    await r.click('#resume-newest');
+    await answer("/^(?:Recovered|Restored) /.test(document.getElementById('file-status').textContent)", 'R24 restored');
+    p4.restoredMessage = await rText('#file-status');
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length>0", 'R24 restored runs');
+    await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); await groupIndex(true);
+    p4.restored = await plan();
+    stage('R24 P4 estimate and runs without wall time', p4);
+    const NONE = /^Open boundary · [12] searche?s? · group index on \(3 solves\)$/, ABOUT = /^Open boundary · [12] searche?s? · group index on \(3 solves\) · about \d+ (?:s|min)$/;
+    assert.match(p4.fromFile, NONE); assert.match(p4.fromFileOff, /^Open boundary · [12] searche?s?$/);
+    assert.match(p4.measured, ABOUT); assert.equal(p4.added, p4.measured);
+    assert.equal(p4.items.length, p4.before + 1, JSON.stringify(p4.items));
+    assert.match(p4.restored, NONE);
+    await rOverflow('P4 estimate');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
   assert.deepEqual(report.exceptions, [], 'no uncaught page exceptions');
   assert.deepEqual(report.consoleErrors, [], 'no console.error calls');
   await stopServer(server);
