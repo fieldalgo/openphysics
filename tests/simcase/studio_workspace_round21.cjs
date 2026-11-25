@@ -53,10 +53,10 @@ test('W2: Keep Run N swaps with the oldest other unpinned run; none, no button; 
  // no other unpinned run besides the new result: no swap
  const pinned=[run(1),...Array.from({length:19},(_,i)=>run(i+2,{pinned:true}))];
  const after=N.appendRun(pinned,newest);assert.equal(W.swapCandidate(after,newest),null);
- // the heated list keeps six too
+ // the heated list keeps 20 too (run retention, H1)
  const M=await import(STATIC+'workspace-multiphysics-session.mjs');
- const heatedSix=[1,2,3,4,5,6].map(n=>run(n)),heatedNext=M.appendMultiphysicsRun(heatedSix,seventh);
- assert.equal(W.swapDropped(heatedNext,heatedSix[0],W.swapCandidate(heatedNext,seventh)).length,6);
+ const heatedTwenty=Array.from({length:20},(_,i)=>run(i+1)),heatedNext=M.appendMultiphysicsRun(heatedTwenty,newest);
+ assert.equal(W.swapDropped(heatedNext,heatedTwenty[0],W.swapCandidate(heatedNext,newest)).length,20);
 });
 
 test('W2: Run study starts at once; the swap is offered, checked when pressed and stale after the next run',()=>{

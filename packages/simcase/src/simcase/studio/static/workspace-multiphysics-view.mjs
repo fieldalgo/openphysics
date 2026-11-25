@@ -37,7 +37,7 @@ export function createMultiphysicsView(ctx){
  let check={pending:false,diagnostics:[],solve_order:[],run_refusal:null,error:null},messages=[],checkSeq=0,checkTimer=null;
  const treeView=treeState();
  let selection='model',undoStack=[],redoStack=[],announcedMultiphysics=false;
- // runs: up to six completed runs (names, pins); lastRun: the one shown under Results
+ // runs: up to 20 completed runs (names, pins); lastRun: the one shown under Results
  let job=null,runs=[],lastRun=null,runFailure=null,uncoupled={},resultPage=null,indexView='n',resize=null;
  // What a session file and the save indicator know (the optical words, persistenceTitle):
  // sessionFile {name, savedAt, stamp, jobs}: the last session file sent or opened; loaded {kind,
@@ -159,7 +159,7 @@ export function createMultiphysicsView(ctx){
  function runBlock(){
   if(capsError)return 'Studio cannot list the installed physics: '+capsError;
   if(job||starting)return 'Running… (stop it under Study)';
-  if(runs.length>=MULTIPHYSICS_RUN_LIMIT&&runs.every(r=>r.pinned))return 'All six runs are pinned. Unpin a run under Results › Runs before running again.';
+  if(runs.length>=MULTIPHYSICS_RUN_LIMIT&&runs.every(r=>r.pinned))return `All ${MULTIPHYSICS_RUN_LIMIT} runs are pinned. Unpin a run under Results › Runs before running again.`;
   if(check.error)return 'The model could not be checked: '+check.error;
   if(check.pending)return 'Checking the model…';
   return runBlockText(errors().length,check.run_refusal);
@@ -569,12 +569,12 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   host.insertAdjacentHTML('beforeend',`<h2 id="mp-run-list-heading">Runs · ${runs.length} of ${MULTIPHYSICS_RUN_LIMIT} · ${pinned} pinned</h2><div class="mp-run-list">${[...runs].reverse().map(r=>`<button type="button" class="run-item" data-mp-run="${esc(r.job)}" aria-pressed="${r===lastRun}">${esc(runItem(r))}</button>`).join('')}</div>
    <form class="run-name" id="mp-run-name"><label>Run name<input id="mp-run-name-input" type="text" maxlength="80" value="${esc(lastRun.label)}" placeholder="For example: heater 10 mW" aria-describedby="mp-run-name-hint"></label><button id="mp-rename-run" type="submit">Apply name</button><p id="mp-run-name-hint" class="input-hint">Press Enter to apply. Naming a run pins it, so new runs do not replace it; Enter on a named, unpinned run pins it again.</p></form>
    ${lastRun.pinned?'<button type="button" id="mp-unpin-run">Unpin this run</button>':''}
-   <p>Up to six runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file.</p>`);
+   <p>Up to ${MULTIPHYSICS_RUN_LIMIT} runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file.</p>`);
   host.querySelectorAll('[data-mp-run]').forEach(b=>b.onclick=()=>{const r=runs.find(x=>x.job===b.dataset.mpRun);if(!r)return;lastRun=r;ctx.onHistory();ctx.render();notice(`${runTitle(r)} shown under Results; the model is unchanged.`);});
   const input=host.querySelector('#mp-run-name-input'),form=host.querySelector('#mp-run-name'),target=lastRun;
   const apply=()=>nameRun(target,input.value);
   form.onsubmit=e=>{e.preventDefault();apply();};input.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();apply();}};
-  const unpin=host.querySelector('#mp-unpin-run');if(unpin)unpin.onclick=()=>{target.pinned=false;ctx.onHistory();ctx.render();notice('Run unpinned: once six runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.');};
+  const unpin=host.querySelector('#mp-unpin-run');if(unpin)unpin.onclick=()=>{target.pinned=false;ctx.onHistory();ctx.render();notice(`Run unpinned: once ${MULTIPHYSICS_RUN_LIMIT} runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.`);};
  }
  function nameRun(run,value){
   let label;try{label=ctx.validateRunLabel(value);}catch(e){notice(e.message);return;}

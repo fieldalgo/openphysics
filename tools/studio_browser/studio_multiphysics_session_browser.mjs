@@ -470,7 +470,7 @@ print(n)`;
   await runAndWait(1);
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off two runs', 180000);
   await runReady();
-  await page.clickTreeItemLike(/^Runs · \d of 6$/);
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until("!!document.getElementById('mp-run-name-input')", 'run list');
   await page.type('#mp-run-name-input', 'Heater 2e14');
   await page.click('#mp-rename-run');
@@ -483,11 +483,11 @@ print(n)`;
   await page.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'heat settings');
   await page.type('#mp-f-physics-heat1-heat_source_density-heater', '1e14');
   await runAndWait(2);
-  await page.clickTreeItemLike(/^Runs · \d of 6$/);
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===2", 'two runs listed');
   const listedRuns = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.match(listedRuns[0], /^Run 2 · \d{1,2}:\d\d(?: [AP]M)?$/); assert.match(listedRuns[1], /^Pinned · Run 1 · Heater 2e14 · \d{1,2}:\d\d(?: [AP]M)?$/);
-  assert.match(await page.text('#mp-run-list-heading'), /^Runs · 2 of 6 · 1 pinned$/);
+  assert.match(await page.text('#mp-run-list-heading'), /^Runs · 2 of 20 · 1 pinned$/);
   const c1 = await saveSession('two runs');
   assert.match(await notice(), /the model, 2 runs and the without-heater result\.$/);
   await fetchReplies(c1.text);
@@ -508,7 +508,7 @@ print(n)`;
   await page.click('#leave-stay');
   await page.until("document.getElementById('file-status').textContent==='Kept the current project and its runs.'", 'kept');
   await openSession(c1.path);
-  await page.clickTreeItemLike(/^Runs · \d of 6$/);
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===2", 'two runs back');
   const back = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.match(back[0], /^Run 2 · \d{1,2}:\d\d(?: [AP]M)? · from file$/); assert.match(back[1], /^Pinned · Run 1 · Heater 2e14 · \d{1,2}:\d\d(?: [AP]M)? · from file$/);
@@ -562,8 +562,9 @@ print(n)`;
     // version 9 is an optical session since the number of modes: a newer file is version 10, and a
     // multiphysics layout under version 9 is refused by its first key
     // version 10 is the optical open boundary (slice P2), 11 the closed-window search (slice C2), 13 the
-    // optical session of up to 20 runs, 14 its compact fields: version 15 is the newer one
-    ['S7 version 15', d => { d.version = 15; }, /This session file is version 15, newer than this Studio reads \(versions 6–14\)\. Open it in a newer Studio\./],
+    // optical session of up to 20 runs, 14 its compact fields, 15 more than six heated runs (H1):
+    // version 16 is the newer one
+    ['S7 version 16', d => { d.version = 16; }, /This session file is version 16, newer than this Studio reads \(versions 6–15\)\. Open it in a newer Studio\./],
     ['S7 a version 8 layout under version 9', d => { d.version = 9; }, /Unknown key "document" in the session file\./],
     ['S7 another application', d => { d.application = 'other'; }, /This session file holds a “other” model, which this Studio does not read\./],
     ['S7 another result', d => { d.runs[0].result.result = 'multiphysics-run-v2'; }, /Run 1 was saved as result “multiphysics-run-v2”, which this Studio does not read\./],
@@ -589,7 +590,7 @@ print(n)`;
   await clearNotice(); await page.click('#recover-notebook');
   await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'recovered');
   assert.match(await notice(), /^Recovered from this browser \(Browser recovery · .*\), not recomputed\. Last session file .*; changed since\. Input undo starts here\.$/);
-  await page.clickTreeItemLike(/^Runs · \d of 6$/);
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===3", 'three runs recovered');
   const recoveredRuns = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.ok(recoveredRuns.every(t => / · recovered$/.test(t)), JSON.stringify(recoveredRuns));
@@ -814,11 +815,11 @@ print(n)`;
   const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2, 3, 4, 5]}), python: comparePython(big.path)};
   // pinned runs: five pinned, with their maps, are over the limit together
   for (const n of [1, 2, 3, 4, 5]) {
-    await page.clickTreeItemLike(/^Runs · \d of 6$/);
+    await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
     await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'run list for pins');
     await page.click(`[data-mp-run]:nth-last-of-type(${n})`);
     await page.until(`/^Run ${n} shown under Results/.test(document.getElementById('file-status').textContent)`, 'run ' + n + ' shown');
-    await page.clickTreeItemLike(/^Runs · \d of 6$/);
+    await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
     await page.until("!!document.getElementById('mp-run-name-input')", 'run name ' + n);
     await page.type('#mp-run-name-input', 'kept ' + n); await page.click('#mp-rename-run');
     await page.until(`/^Run named “kept ${n}” and pinned/.test(document.getElementById('file-status').textContent)`, 'pinned ' + n);
@@ -838,14 +839,14 @@ print(n)`;
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')&&!document.getElementById('recover-notebook').disabled", 'reload after the limit');
   await clearNotice(); await page.click('#recover-notebook');
   await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'the record before the limit');
-  await page.clickTreeItemLike(/^Runs · \d of 6$/);
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'six runs recovered');
   const recoveredBig = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   // the last record written: four pinned with their maps; runs 5 and 6 values only
   assert.deepEqual(recoveredBig.map(t => [/^Pinned · /.test(t), / · values only$/.test(t)]), [[false, true], [false, true], [true, false], [true, false], [true, false], [true, false]], JSON.stringify(recoveredBig));
   // opened, the saved file's values-only runs say so in the list and on their map pages
   await openSession(big.path);
-  await page.clickTreeItemLike(/^Runs · \d of 6$/);
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'six runs opened');
   const bigList = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.equal(bigList.filter(t => / · values only$/.test(t)).length, 5, JSON.stringify(bigList));
@@ -882,10 +883,13 @@ print(n)`;
   await mouseClick('#run-baseline-time'); y6.note = await baseline();          // on "(about 1 s more)"
   stage('R19 Y6 heater-off label', y6);
   assert.deepEqual(y6, {start: {checked: true, for: 'run-baseline'}, text: {checked: false, for: 'run-baseline'}, note: {checked: true, for: 'run-baseline'}});
-  // R21 (round 21, pre-registered; replaces round 19's Y4 and round 20's Z7 dialog stages): six runs,
+  // R21 (round 21, pre-registered; replaces round 19's Y4 and round 20's Z7 dialog stages): 20 runs (six
+  // before run retention, H1 HK10 c: the run numbers 14 higher),
   // then W5 no drop line while the model equals a run's, W2 Run study starting at once with the line
   // during the run, Pin during the run, the drop when the result arrives and the swap in Messages
-  for (let n = 1; n <= 6; n++) await runAndWait(n);
+  const r21Started = Date.now();
+  for (let n = 1; n <= 20; n++) await runAndWait(n);
+  const twentyRunsSeconds = (Date.now() - r21Started) / 1000;
   const mpDrop = () => page.eval("({hidden:document.getElementById('mp-run-drop').hidden,text:document.getElementById('mp-run-drop-text').textContent,pin:document.getElementById('mp-run-drop-pin').hidden?null:document.getElementById('mp-run-drop-pin').textContent})");
   const w5 = {matched: await mpDrop()};
   await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
@@ -903,30 +907,31 @@ print(n)`;
   await size(1440, 900);
   await page.click('#mp-run-drop-pin'); await sleep(300); w2.pinned = await mpDrop();
   await page.eval('window.__release()');
-  await page.until("/^Run 7 · /.test(document.querySelector('.dock-title>span').textContent)", 'R21 heated run 7', 180000); await runReady();
+  await page.until("/^Run 21 · /.test(document.querySelector('.dock-title>span').textContent)", 'R21 heated run 21', 180000); await runReady();
   await page.until("!!document.querySelector('#file-status [data-keep-run]')", 'R21 heated swap offered', 60000);
   w2.after = {message: await page.text('#file-status'), keep: await page.eval("document.querySelector('#file-status [data-keep-run]').textContent")};
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R21 heated swap button ' + tag); }
   await size(1440, 900);
   await page.click('#file-status [data-keep-run]'); await sleep(300);
   w2.swapped = {message: await page.text('#file-status'), keep: await page.eval("!!document.querySelector('#file-status [data-keep-run]')")};
-  await page.clickTreeItemLike(/^Runs · \d of 6$/); await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'R21 heated run list');
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/); await page.until("document.querySelectorAll('[data-mp-run]').length===20", 'R21 heated run list');
   w2.runs = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent.replace('Pinned · ','').split(' · ')[0])");
-  stage('R21 W2 heated run at once, drop at the result, swap', w2);
+  stage('R21 W2 heated run at once, drop at the result, swap', {...w2, twentyRunsSeconds});
   assert.equal(w2.during.dialog, false); assert.equal(w2.during.run, 'Running… (stop it under Study)');
   assert.equal(w2.during.hidden, false); assert.match(w2.during.text, /^When this run finishes, Run 1 \(run at \d{1,2}:\d\d(?: [AP]M)?\) is dropped$/); assert.equal(w2.during.pin, 'Pin Run 1');
   assert.match(w2.pinned.text, /^When this run finishes, Run 2 \(run at [^)]+\) is dropped$/); assert.equal(w2.pinned.pin, 'Pin Run 2');
   assert.match(w2.after.message, / Run 2 \(run at [^)]+\) was dropped Keep Run 2, drop Run 3 \(run at [^)]+\) instead$/);
   assert.match(w2.after.keep, /^Keep Run 2, drop Run 3 \(run at [^)]+\) instead$/);
   assert.match(w2.swapped.message, /^Run 2 \(run at [^)]+\) is back; Run 3 \(run at [^)]+\) was dropped instead\.$/); assert.equal(w2.swapped.keep, false);
-  assert.deepEqual(w2.runs, ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
+  assert.deepEqual(w2.runs, ['Run 21', ...Array.from({length: 17}, (_, i) => `Run ${20 - i}`), 'Run 2', 'Run 1']);
   // R22 (round 22 V4, pre-registered P4): Pin Run N names the run the next result drops instead; with
   // every other earlier run pinned the result drops the last unpinned one and says why there is no swap
   await page.clickTreeItem('solve order 1 Heat 1 · Heat transfer');
   await page.until("!!document.getElementById('mp-f-physics-heat1-heat_source_density-heater')", 'R22 heat settings');
   await page.type('#mp-f-physics-heat1-heat_source_density-heater', '8e14'); await sleep(600); await runReady();
   const v4 = {line: await mpDrop(), pins: []};
-  for (const n of [2, 4, 5, 6]) {
+  const earlierRuns = [2, ...Array.from({length: 17}, (_, i) => i + 4)];
+  for (const n of earlierRuns) {
     assert.equal((await mpDrop()).pin, `Pin Run ${n}`);
     await page.click('#mp-run-drop-pin'); await sleep(300);
     v4.pins.push({message: await page.text('#file-status'), ...await mpDrop()});
@@ -934,19 +939,19 @@ print(n)`;
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'R22 heated pinned ' + tag); }
   await size(1440, 900);
   await clearNotice(); await page.click('#run-multiphysics');
-  await page.until("/^Run 8 · /.test(document.querySelector('.dock-title>span').textContent)", 'R22 heated run 8', 180000); await runReady();
+  await page.until("/^Run 22 · /.test(document.querySelector('.dock-title>span').textContent)", 'R22 heated run 22', 180000); await runReady();
   await page.until("document.getElementById('file-status').textContent.includes('every other earlier run is pinned')", 'R22 heated no-swap words', 120000);
   v4.after = {message: await page.text('#file-status'), keep: await page.eval("!!document.querySelector('#file-status [data-keep-run]')")};
-  await page.clickTreeItemLike(/^Runs · \d of 6$/); await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'R22 heated run list');
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/); await page.until("document.querySelectorAll('[data-mp-run]').length===20", 'R22 heated run list');
   v4.runs = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent.replace('Pinned · ','').split(' · ')[0])");
   stage('R22 V4 heated pin and no swap', v4);
   assert.match(v4.line.text, /^If you run: drops Run 2 \(run at [^)]+\) · pin it to keep it$/);
-  const order = [2, 4, 5, 6, 7];
+  const order = [...earlierRuns, 21];
   v4.pins.forEach((p, i) => assert.match(p.message, new RegExp(`^Run ${order[i]} pinned\\. If you run: drops Run ${order[i + 1]} \\(run at [^)]+\\) · pin it to keep it$`)));
   assert.equal(v4.pins.at(-1).pin, null);
-  assert.match(v4.after.message, / Run 7 \(run at [^)]+\) was dropped; every other earlier run is pinned, so no other run can be dropped instead$/);
+  assert.match(v4.after.message, / Run 21 \(run at [^)]+\) was dropped; every other earlier run is pinned, so no other run can be dropped instead$/);
   assert.equal(v4.after.keep, false);
-  assert.deepEqual(v4.runs, ['Run 8', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
+  assert.deepEqual(v4.runs, ['Run 22', ...Array.from({length: 17}, (_, i) => `Run ${20 - i}`), 'Run 2', 'Run 1']);
 
   assert.deepEqual(report.exceptions, []); assert.deepEqual(report.consoleErrors, []);
   report.status = 'passed';
