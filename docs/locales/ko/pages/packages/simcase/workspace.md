@@ -314,13 +314,13 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    있던 자리에도 남습니다. 입력
    편집 하나이므로 **Undo**가 Modes to find와 군굴절률 선택까지 모두 되돌리고 **Redo**가 다시 적용합니다. 실행 전에는 *Nothing is
    computed until you press Run*과 *Optical adapter ready · explicit Run required*입니다. 실행 번호는 탭이 열려 있는 동안 바뀌지 않습니다(round 17). 새 실행은 지금까지 쓴 가장 큰 번호 + 1을 받으므로,
-   실행 여섯 개 한도가 가장 오래된 고정되지 않은 실행을 내보내도 나머지는 번호를 유지하고, Messages가 내보낸 실행을
-   밝힙니다(*Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up to six runs are kept; pin a run to keep it.*;
+   실행 20개 한도가 가장 오래된 고정되지 않은 실행을 내보내도 나머지는 번호를 유지하고, Messages가 내보낸 실행을
+   밝힙니다(*Run 3 (closed · 4 modes · 700 × 300 nm) was dropped: up to 20 runs are kept; pin a run to keep it.*;
    Add runs from file도 내보낸 실행을 같은 방식으로 밝힙니다). round 23(E4)부터 내보내기 문구는 모두 실행 목록 라벨과 같은
    부분으로 실행을 부릅니다: 경계(*closed*, *closed near 2.46*, *open (PML 1 µm)*), 2가 아닐 때의 Modes to find, *n_g*, 그리고
    형상. 그래서 *Run 4 (closed · n_g · 600 × 300 nm)*는 목록의 *Run 4 · closed · n_g · 600 × 300 nm · Silicon*입니다(그 전에는
    *Run 4 (600 × 300 nm · 2 modes)*). Run study 옆 줄, 내보낸 문구, 바꾸기 버튼, Pin 알림 모두 그렇고, 가열 모델은 자기 이름을
-   그대로 씁니다. round 18부터 실행 여섯 개가 있고 하나라도 고정되지 않았으면
+   그대로 씁니다. round 18부터 실행 20개가 있고 하나라도 고정되지 않았으면
    **Run study** 옆 상자가 실행 전에 알립니다: *If you run: drops Run 3 (closed · 4 modes · 700 × 300 nm) · pin it to keep it*(round 20;
    전에는 실행이 진행 중인 듯 *Running drops …*였음)와
    **Pin Run 3**. 그 버튼은 그 실행을 고정하고 줄을 다음 고정되지 않은 실행으로 옮기거나 없앱니다. round 22(V4)부터
@@ -339,9 +339,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    실행이 있으면 **Keep Run 3, drop Run 4 (closed · 4 modes · 700 × 300 nm) instead** 버튼을 둡니다(Run 4는 그런 실행 중 가장 오래된
    것). 버튼은 Run 3를 제자리로 되돌리고 Run 4를 내보냅니다: *Run 3 (…) is back; Run 4 (…) was dropped instead.*, 그 뒤 버튼은
    더 없습니다. 앞선 다른 실행이 모두 고정되어 있으면 바꿀 실행이 없고, round 22(V4)부터 문구가 그 까닭을 말합니다: *Run 3 (…)
-   was dropped; every other earlier run is pinned, so no other run can be dropped instead*. 탭은 실행을 여섯 개보다 많이 두지 않습니다. 버튼은 다음 Run study가 시작되거나 실행 목록이 바뀔 때(파일 열기,
+   was dropped; every other earlier run is pinned, so no other run can be dropped instead*. 탭은 실행을 20개보다 많이 두지 않습니다([실행 보관](#실행-보관-값과-필드) 전에는 여섯 개). 버튼은 다음 Run study가 시작되거나 실행 목록이 바뀔 때(파일 열기,
    세션 복원, 파일에서 실행 추가, Start new)까지 동작하고, 지난 버튼은 아무것도 하지 않고 사라집니다. 메모리에만 있습니다.
-   Add runs from file은 내보낸 실행을 여전히 위 문장으로 밝힙니다. 한도 자체는 그대로입니다. [세션 버전 12](#광학-세션-파일버전-12)부터
+   Add runs from file은 내보낸 실행을 여전히 위 문장으로 밝힙니다. 실행 보관부터 한도는 실행 20개이며, 그 필드는 하나의 예산 안에서 보관합니다([실행 보관](#실행-보관-값과-필드)). [세션 버전 12](#광학-세션-파일버전-12)부터
    파일과 브라우저 복구는 번호가 목록 안 자리와 다를 때 번호를 담고, File › Open, Open project, Restore는 그 번호를
    유지합니다: 가장 큰 번호가 8인 파일 뒤의 다음 실행은 Run 9입니다. 이전 버전 파일은 파일 순서대로 1부터 번호를 매기고,
    파일에서 추가한 실행은 가장 큰 번호 다음부터 이어집니다(*Added Run 2 and Run 4 of design-b.json as Run 9 and Run 10.*).
@@ -1626,37 +1626,26 @@ match).*로 거부하며, 모드 수가 8을 넘으면 *Run 1 asks for 9 modes; 
 Studio는 스스로 거부할 파일을 쓰지 않습니다. 버전 6·7 파일에서 읽은 실행의 굴절률이 n = 1.45 위에서 순서대로가 아니면 버전 7 세션에는 남을 수 있지만, 버전 9가 필요한 저장은 그 실행을 밝혀 거부합니다. 수는 버전 8처럼 쓰며, Studio가 읽은 실행(그때 origin은 `imported`)으로 쓴 파일은 다시 써도 바이트 단위로
 같습니다. digest는 손상되거나 손으로 고친 파일을 찾아낼 뿐 인증이 아닙니다.
 
-템플릿 메시(삼각형 2275개)에서 모드 8개인 실행 여섯 개는 약 9.4 MB, 모드당 약 0.2 MB로 16 MiB 한도 안입니다.
-열린 실행은 물리 창만 보존합니다: T16 실행은 3.9 MB(PML 포함 13.4 MB), 모드 3개와 군굴절률을 더한 T16은
-5.6 MB(19.0 MB)이고, 실행 여섯 개(닫힌 스트립 둘, 닫힌 기판 위 스트립, 그 열린 실행 셋)는 16.5 MB(15.8 MiB)로 Save
-session과 브라우저 복구가 모든 장과 함께 보존합니다(이전에는 48.8 MB로 거부). 측정은
-`tools/studio_open_field_size.mjs`입니다.
+템플릿 메시(삼각형 2275개)에서 모드 8개인 실행 여섯 개는 약 9.4 MB, 모드당 약 0.2 MB입니다. 열린 실행은 물리 창만
+보존합니다: T16 실행은 3.9 MB(PML 포함 13.4 MB), 모드 3개와 군굴절률을 더한 T16은 5.6 MB(19.0 MB)입니다. 측정은
+`tools/studio_open_field_size.mjs`입니다. 2026-11-24에 T18(실리콘 기판 위 스트립, 코어 메시 30 nm)로 잰 크기: 모드 2개 닫힌
+실행 2.10 MB, 모드 4개 3.78 MB, 모드 4개 closed near 2.46 3.75 MB, 모드 2개 열린 실행은 n_g와 상관없이 3.94 MB(장이 각각의
+99 %, 장 없는 실행은 3–21 kB)여서, T22의 여섯 번째 실행이 세션을 22 MB로 만들었습니다. [실행 보관](#실행-보관-값과-필드)부터
+광학 모델은 장을 하나의 예산 안에서 보관하므로 세션이 한도를 넘지 않고, Save는 묻지 않으며, 브라우저 복구는 Save와 같은
+텍스트를 씁니다. 아래의 질문, 거부, 복구 규칙은 탭이 파일보다 많이 담는 두 경우(그 절에서 설명)에만 남습니다.
+
 한도를 넘는 세션은 다중물리 세션처럼 먼저 묻습니다. *Keep fields for selected and pinned runs*는 나머지
 실행을 `field` 없이 n_eff·TE 비율·유효 면적과 함께 쓰고, Cancel은 아무것도 쓰지 않으며, 선택·고정 실행만으로도
 한도를 넘으면 선택 실행과 고정 실행을 따로 밝혀 저장을 거부합니다: *The selected run (Run 6) and the pinned runs
 (Run 4, Run 5) are 46 MB with their fields, over the 16 MiB session limit. Unpin some of them.*(고정 실행이 하나면
 *Unpin it.*). 그중 고정 실행이 없으면 *The selected run (Run 6) is 19 MB with its fields, over the 16 MiB session
 limit. Select a different run before saving, so this one is saved without its fields, or run it again with fewer
-modes.*라고 합니다. 복구 오류도 *Recovery snapshot exceeds 16 MiB:* 뒤에 같은 말을 합니다. 새 실행으로 세션이 한도를
-넘으면 그 결과 메시지에 한 줄이 붙습니다: *Session is now 22 MB, over the 16 MiB (16.8 MB) limit. File › Save will ask
-whether to keep the fields of the selected and pinned runs only (Run 6); the other runs keep n_eff, the TE fractions and
-the effective areas. Browser recovery keeps every field but those of Run 1 and Run 2.*(round 23, E2; 전에는 *Session is now 18 MB, over the
-16 MiB limit: File › Save will ask whether to keep the fields of the selected and pinned runs only.*여서 테스터가 무엇을 잃는지,
-브라우저 복구가 여전히 모두 보존하는지 알 수 없었습니다), 저장이 거부될 때는 *Session is now 49 MB, over the 16 MiB (16.8 MB)
-limit, and File › Save will refuse:* 뒤에 거부 문구와 *Browser recovery is off.*(이때 round 18의 복구 줄은 되풀이하지
-않습니다). 이 줄은 Messages에서 줄바꿈됩니다. 전체 텍스트가 한도를 넘으면 브라우저 복구는 묻지 않고 선택·고정 실행의
-장을 보존하고, 그다음(round 23부터, 코디네이터 결정) 나머지 실행의 장을 새것부터(실행 번호가 큰 것부터) 기록이 16 MiB 안에
-머무는 동안 더합니다. 들어가지 않는 장은 빼고 그다음 오래된 것을 시도합니다. 기록 형식은 그대로입니다: 장 없는 실행은 전처럼
-쓰이고, 한도 아래의 기록은 round 22가 쓴 것과 바이트 단위로 같습니다. round 23부터 헤더와 저장 표시가 뺀 실행을 밝힙니다: *… ·
-kept for recovery in this browser without the fields of Run 1 and Run 2*(전에는 선택 실행 말고 모든 장을 빼고도 *kept for
-recovery in this browser*였습니다). 그런 기록을 복원하면 메시지에 *Fields not kept for Run 1 and Run 2; their n_eff, TE
-fractions and effective areas were.*가 붙고, 그 실행의 Results는 장이 브라우저 복구에 보존되지 않았다고 말합니다. File › Save는
-여전히 선택·고정 실행에 대해서만 묻습니다. 한계: 16 MiB를 넘으면 복구가 모든 장을
-보존할 수 없습니다. 더 큰 기록이나 여러 부분으로 된 기록(형식 변경)이 필요하기 때문입니다. 더 적은 실행을 File › Save로 저장하거나
-남길 실행을 고정하면 장이 보존됩니다. 2026-11-24에 T18(실리콘 기판 위 스트립, 코어 메시 30 nm)로 잰 크기: 모드 2개 닫힌 실행
-2.10 MB, 모드 4개 3.78 MB, 모드 4개 closed near 2.46 3.75 MB, 모드 2개 열린 실행은 n_g와 상관없이 3.94 MB(장이 각각의 99 %,
-장 없는 실행은 3–21 kB)여서, T22의 여섯 번째 실행이 세션을 22 MB로, 복구를 새것부터 규칙 전에는 선택 실행의 장만 있는 4.0 MB로 만들었습니다.
-장이 없는 실행은 모드 표를 보이지만 장 보기는 없고, Compare는 그 모드를 겹침으로 짝지을 수 없다고 알립니다.
+modes.*라고 합니다. 복구 오류도 *Recovery snapshot exceeds 16 MiB:* 뒤에 같은 말을 하고, 결과로 세션이 그렇게 되면 결과
+메시지에 *Session is now 19 MB, over the 16 MiB (16.8 MB) limit, and File › Save will refuse:*와 거부 문구, *Browser recovery
+is off.*가 붙습니다. 전체 텍스트가 한도를 넘으면 브라우저 복구는 묻지 않고 선택·고정 실행의 장을 보존하고, 그다음(round
+23) 나머지 실행의 장을 새것부터 기록이 16 MiB 안에 머무는 동안 더하며, 헤더가 뺀 실행을 밝힙니다: *… · kept for recovery
+in this browser without the fields of Run 1 and Run 2*. 장을 뺀 기록을 복원하면 메시지에 *Fields not kept for Run 1 and Run 2;
+their n_eff, TE fractions and effective areas were.*가 붙습니다.
 
 ### 광학 세션 파일(버전 12)
 
@@ -1699,6 +1688,87 @@ fractions and effective areas were.*가 붙고, 그 실행의 Results는 장이 
 거부; K3·K9: main fc654fe가 읽는 결과 `refusals-v12-fc654fe.json`), `tests/simcase/studio_session_numbers_page.cjs`
 (K6: 결과·고정·교환·가져오기·저장·열기·복원 2400 단계의 시드 고정 무작위 순서; K7: 헤더 줄; K10: 버전 7, 11, 12 파일에 번호 문장 없음),
 `tools/studio_browser/studio_project_browser.mjs`의 K4/K5 단계입니다.
+
+### 실행 보관: 값과 필드
+
+실행 보관(설계 *Keeping more runs*, round 24 B1)부터 광학 모델은 실행 최대 20개의 **값**을 보관하고, 그 **필드**는 하나의
+예산 안에서 보관합니다. 예산은 탭, File › Save, 프로젝트 파일의 광학 항목, 브라우저 복구가 함께 쓰므로 탭이 보여 주는 것이
+파일이나 복원이 되돌려 주는 것입니다. 전에는 실행 여섯 개를 통째로 보관했습니다: 일곱 번째 실행은 실행 하나를 값까지 내보냈고,
+16 MiB를 넘는 탭은 Save가 묻고 복구가 빠뜨리는 필드를 보여 주었습니다.
+
+- **값.** 실행의 값은 n_eff(실수부와 허수부), TE 비율, 유효 면적, n_g, 열린 실행의 후보입니다. 모든 실행이 값을 보관합니다.
+  필드 없는 실행은 파일에서 3–21 kB이고, 그런 실행 20개는 0.5 MB보다 작습니다.
+- **예산.** 16 MiB 세션에서 입력용으로 남겨 두는 16 KiB를 뺀 16,760,832바이트이며, 16.8 MB로 말합니다. 세션 텍스트에는 결과
+  사이에 바뀌는 입력, 비교, 보기도 들어 있으므로, 16 KiB는 예산까지 찬 탭이 그런 편집 뒤에도 16 MiB 안에 머물게 합니다.
+- **필드가 빠지는 때.** 필드가 들어올 때만입니다: 새 결과, 다시 계산한 필드, Add runs from file, File › Open이나 Restore,
+  그리고 **Keep Run N, drop … instead**가 실행을 되돌릴 때. 실행을 선택하거나, 고정하거나, 고정을 풀거나, 이름을 붙이거나,
+  비교해도 필드는 빠지지 않습니다. 그래서 탭은 지금 아래 순서가 고를 것보다 많은 필드를 담을 수 있지만, 예산보다 많이 담지는
+  않습니다.
+- **순서.** 필드가 들어오면 선택된 실행, 그다음 방금 필드가 들어온 실행(다시 계산했거나 되돌린 실행이 선택된 실행이 아닐 때),
+  그다음 고정된 실행을 새것부터, 그다음 나머지 실행을 새것부터(실행 번호가 큰 것부터) 보관합니다. 각 필드는 세션이 예산 안에
+  머무는 동안 더하고, 들어가지 않는 필드는 건너뛰고 그다음 오래된 것을 시도합니다. 고정은 실행의 값을 20개 한도의 내보내기에서
+  지키고 그 필드를 고정되지 않은 실행보다 앞에 두지만, 필드를 보장하지는 않습니다.
+- **문구.** 실행 전, 같은 형상·경계·Modes to find의 가장 새 실행이 새 필드의 크기를 알려 줄 때 **Run study** 옆 줄이 값만
+  남을 실행을 밝힙니다: *If you run: Run 3 (closed · 4 modes · 700 × 300 nm) keeps its values, not its fields*와 **Pin Run 3**
+  (둘 이상이면 *… and Run 5 (…) keep their values, not their fields*). 그런 실행이 없으면 아무 말도 하지 않습니다. 실행이
+  계산하는 동안: *When this run finishes, Run 3 (…) keeps its values, not its fields*. 실행이 20개이면 위의 내보내기 문구가
+  그대로입니다. 결과 뒤에는 Messages가 *Run 3 (…) keeps its values; its fields were not kept (16.8 MB limit).*와
+  **Recompute Run 3's fields**를, 고정되지 않고 선택되지 않은 다른 실행의 필드가 그만큼 크면 **Keep Run 3's fields, not Run 4's
+  (…)**를 둡니다. 그 버튼은 *Run 3's fields are back; Run 4 (…) keeps its values, not its fields.*로 답합니다. 고정된 실행의
+  필드가 빠지면: *Run 2 (pinned) keeps its values; its fields were not kept: the selected and pinned runs' fields are 17.4 MB,
+  over the 16.8 MB limit. Unpin a run to keep the newer fields first.* 실행 목록은 그런 실행에 *· values only*를 붙이고, 트리는
+  *Runs · 9 of 20*, 실행 목록 아래 안내는 *Up to 20 runs are kept with their values. Fields are kept up to 16.8 MB: the selected
+  and pinned runs' first, then the newest. A run without its fields can recompute them. Pinned runs stay; when a 21st run arrives,
+  the oldest unpinned run is replaced. …*입니다. 복구가 탭을 그대로 담으므로 헤더는 *… kept for recovery in this browser*입니다.
+- **필드 없는 실행.** Results는 모드 표, 후보, 입력 줄을 보이고, 필드 보기 자리에 *Run 4's fields are not kept: up to 16.8 MB of
+  fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.*
+  (필드 없이 파일에서 읽은 실행은 *Run 4's fields were not kept in the session file. …*)와 **Recompute Run 4's fields**,
+  이 탭에서 계산한 실행이면 *· about 2 min*(그 실행의 경과 시간. 열거나 복원한 실행에는 없음)을 둡니다. 필드 PNG 내보내기는
+  *Recompute Run 4's fields first*라는 제목으로 기다리고, 실행 표 CSV는 동작합니다. Compare는 다른 입력과 모드를 번호 순으로 나열한
+  값 표(*Modes of A and B listed by mode number, not matched by overlap*), *Run 4's fields are not kept, so its modes are listed by
+  number and not plotted.*와 버튼을 보이며, 두 실행 모두 필드가 있으면 그림과 겹침에 따른 Δn_eff가 돌아옵니다. 그런 실행의
+  *No need to run*은 *No need to run: Run 4 already has these values; its fields are not kept. Run study adds a copy with the
+  same values.*이고, **Show Run 4**와 **Recompute Run 4's fields**가 있습니다.
+- **Recompute Run N's fields**는 실행이 계산될 때의 문서를, **Use this run's inputs**가 설정하는 대로(Modes to find, 단계를 포함한
+  군굴절률, 바깥 경계, Search near n_eff) 저장된 입력과 설정으로 다시 만들어 같은 검증·실행 요청으로 보냅니다. 새 실행이 아닙니다:
+  번호를 쓰지 않고 목록에 들어가지 않으며, 현재 입력, Undo, 선택된 실행은 그대로입니다. 작업 패널은 *Recomputing Run 4's fields ·
+  about 2 min*이고, **Stop waiting**은 실행과 같이 동작합니다. 실행이 저장한 모든 값을 다시 계산한 결과와 각각 상대 1e-12(1e-3보다
+  작은 값은 절대 1e-15)로 비교합니다. 일치하면 필드를 job, 번호, 이름, 고정, 시각, 출처가 그대로인 같은 실행에 붙이고(*Run 4's
+  fields recomputed from its stored inputs; its values match.*), 필드가 들어왔으므로 위 순서를 적용합니다. 그렇지 않으면 아무것도
+  바꾸지 않습니다: *Run 4's fields were not recomputed: mode 1 n_eff came out 2.439316630, stored 2.439316632. Run 4 is unchanged.
+  Use this run's inputs and Run study to make a new run.*(버전이 다르면 값 뒤에 *(stored by Studio 0.9.3; this is 0.9.4)*).
+  서버가 이제 거부하는 문서는 *Run 4's fields cannot be recomputed:*와 서버의 말을 보입니다. 다시 계산은 같은 빌드와 같은 스레드
+  설정에서 일치합니다: 그때 풀이는 비트 단위로 재현됩니다(측정: 단일 스레드, 그리고 기본 스레드끼리). 다른 스레드 수로 계산한
+  실행은 일치하지 않을 수 있으며(열린 실행은 스레드 하나와 기본 스레드 사이에 최대 5e-11 달랐음), 그러면 Studio는 실행을 바꾸지
+  않습니다.
+- **탭이 파일보다 많이 담는 경우.** 두 경우이며, Save와 복구는 각각 [버전 9](#광학-세션-파일버전-9)의 질문, 거부, 복구 규칙으로
+  알립니다: 선택된 실행 하나만으로 예산을 넘을 때(모드 8개 열린 실행이 가까이 갈 수 있음) 탭은 그 실행이 선택된 동안 필드를
+  보관합니다. 그리고 마지막으로 필드가 들어온 뒤 세션이 입력용 16 KiB보다 더 커졌을 때입니다. 입력에는 한도가 있으므로(광학 형상
+  8개, Joule 형상 8개, 재료 6개) 두 번째 경우는 드물며, 다음에 필드가 들어오면 예산 안에서 다시 고릅니다.
+- **측정**(2026-11-25, `tools/studio_run_retention.mjs`): T18 혼합 결과 20개(닫힌 모드 2개, 닫힌 모드 4개, closed near 2.46,
+  n_g가 있는 열린 실행; Run 2 고정)는 필드 4개를 보관합니다. 세션은 결과마다 최대 16.6 MB이고, 필드 없는 기록 20개는 0.15 MB입니다.
+
+검사는 `tests/simcase/studio_run_retention_fields.cjs`(순서, 문구, 번호에 대한 2000단계의 시드 고정 순서열, 파일·복구와 탭의
+비교, 위 두 경우), `tests/simcase/studio_run_retention_recompute.cjs`, 도구의 `k1`과 `k5` 명령,
+`tools/studio_browser/studio_workspace_browser.mjs`의 R24 단계입니다.
+
+### 광학 세션 파일(버전 13)
+
+버전 13은 실행을 최대 20개 담는 [버전 12](#광학-세션-파일버전-12)입니다: 실행 기록(`job` 다음의 `number`, 같은 키, 같은
+digest)과 최상위 키가 같습니다. 버전 6~12는 실행을 최대 여섯 개 담습니다.
+
+- **언제 쓰는가.** 세션의 실행이 여섯 개보다 많을 때만 씁니다. 실행이 여섯 개 이하인 세션은 전처럼 버전 12, 11, 10, 9, 7로
+  바이트 그대로 쓰므로 이전 Studio도 그대로 읽습니다. 실행이 여섯 개 이하인 버전 13 파일(손으로 고친 것)도 읽습니다.
+- **읽기.** File › Open, Open project, Restore, Add runs from file은 실행을 최대 20개 읽습니다. 실행 21개인 파일이나 실행 일곱
+  개인 버전 12 파일은 *Unsupported session format or run count.*로 거부합니다. 번호 검사는 버전 12와 같습니다.
+- **이전 Studio.** 버전 12까지 읽는 Studio(main 3f16709)는 실행 수를 세기 전에 버전 13 파일을 이름을 들어 거부합니다: *This
+  session file is version 13, newer than this Studio reads (versions 6–12). Open it in a newer Studio.*(프로젝트 파일의 항목은 앞에
+  *Optical waveguide: *). 그런 파일을 담은 브라우저 복구 기록은 넘겨받지 않습니다. 그런 Studio와 실행을 나누려면 최대 여섯 개를
+  내보내십시오(Export this run, 또는 실행 여섯 개의 세션). 프로젝트 파일은 버전 1 그대로이고, 광학 문서, 어댑터, 결과,
+  다중물리 세션(버전 8), 실행 표 CSV도 그대로입니다.
+
+검사는 `tests/simcase/studio_run_retention_format.cjs`입니다(K2: 이전 고정 파일을 모두 바이트 그대로 다시 씀; K3: 실행 2와
+4~11의 고정 파일 `optical-v13-nine-runs.json`; K4: main 3f16709가 읽는 것, `refusals-v13-3f16709.json`).
 
 ### Compare의 모드 짝짓기
 
