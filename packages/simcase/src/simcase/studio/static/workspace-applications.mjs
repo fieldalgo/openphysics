@@ -186,13 +186,22 @@ function cardSlot(button,offer,key){
 // name, and the field shows the name kept. project: {name, onRename(value) -> accepted}.
 // Round 16: a name taken from a file name follows Save As; a name set here stays.
 export const RENAME_NOTE='The name is written to the project file on the next File › Save. A name set here stays when Save As uses another file name.';
-function projectNameForm(project){
+// Round 25: a re-render of the Library (a browser recovery update, for example) keeps a name being
+// typed, and its focus and selection, instead of putting the stored name back over it.
+function projectNameDraft(doc=globalThis.document){
+ const prior=doc?.getElementById?.('project-name-input');
+ if(!prior||prior.value===prior.dataset.kept)return null;
+ return {value:prior.value,focused:doc.activeElement===prior,start:prior.selectionStart,end:prior.selectionEnd};
+}
+export {projectNameDraft};
+function projectNameForm(project,draft=null){
  const form=document.createElement('form');form.id='project-name-form';form.className='project-name';
  const label=document.createElement('label');label.htmlFor='project-name-input';label.textContent='Project name';
- const input=document.createElement('input');input.id='project-name-input';input.type='text';input.maxLength=80;input.autocomplete='off';input.spellcheck=false;input.placeholder='Untitled project';input.value=project.name||'';input.setAttribute('aria-describedby','project-name-note');
+ const input=document.createElement('input');input.id='project-name-input';input.type='text';input.maxLength=80;input.autocomplete='off';input.spellcheck=false;input.placeholder='Untitled project';input.dataset.kept=project.name||'';input.value=draft?draft.value:project.name||'';input.setAttribute('aria-describedby','project-name-note');
+ if(draft?.focused)queueMicrotask(()=>{if(input.isConnected){input.focus({preventScroll:true});try{input.setSelectionRange(draft.start,draft.end);}catch{}}});
  const button=document.createElement('button');button.type='submit';button.id='project-rename';button.textContent='Rename';
  const note=document.createElement('span');note.id='project-name-note';note.className='visually-hidden';note.textContent=RENAME_NOTE;form.title=RENAME_NOTE;
- form.onsubmit=event=>{event.preventDefault();if(!project.onRename(input.value))input.value=project.name||'';};
+ form.onsubmit=event=>{event.preventDefault();if(!project.onRename(input.value))input.value=project.name||'';else input.dataset.kept=input.value;};
  form.append(label,input,button,note);return form;
 }
 // offers: each model card's resume offer by card id ({optical, 'heated-waveguide'}), each
@@ -203,8 +212,8 @@ function projectNameForm(project){
 export const inProjectText=runs=>`In this project · ${runs} ${runs===1?'run':'runs'}`;
 // returnTo: the cards whose model is in the project, shown or not, with its run count (round 18).
 export function renderApplications(host,resume=null,offers={},{onOpenFile=null,project=null,inProject={},returnTo={}}={}){
- host.replaceChildren();offers={...(offers||{})};
- if(onOpenFile)host.append(libraryFiles(onOpenFile,project?projectNameForm(project):null));
+ const draft=projectNameDraft(host.ownerDocument);host.replaceChildren();offers={...(offers||{})};
+ if(onOpenFile)host.append(libraryFiles(onOpenFile,project?projectNameForm(project,draft):null));
  const card=resume?resumeCard(resume):null;if(card)host.append(card);
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
  const intro=document.createElement('p');intro.textContent='One workspace for model setup, studies and results. Check what can run before you start.';

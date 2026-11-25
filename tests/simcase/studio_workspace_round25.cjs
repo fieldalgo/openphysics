@@ -149,3 +149,17 @@ test('P6 (A6): the job panel is not a second live region; Messages carries every
  assert.ok(app.includes("$('job-message').textContent=state.message;$('job-message').title=state.title||'';"));
  assert.ok(app.includes("if(state.phase==='done')announceResult(state.message,swapAction());else notice(state.message);"));
 });
+
+test('a Library re-render keeps a project name being typed, with its focus and selection',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ const input={value:'both-models',dataset:{kept:'Heater study'},selectionStart:3,selectionEnd:11};
+ const doc=focused=>({getElementById:id=>id==='project-name-input'?input:null,activeElement:focused?input:null});
+ assert.deepEqual(A.projectNameDraft(doc(true)),{value:'both-models',focused:true,start:3,end:11});
+ assert.equal(A.projectNameDraft(doc(false)).focused,false);
+ // the stored name in the field, or no field: nothing to keep
+ assert.equal(A.projectNameDraft({getElementById:()=>({value:'Heater study',dataset:{kept:'Heater study'}})}),null);
+ assert.equal(A.projectNameDraft({getElementById:()=>null}),null);
+ const src=read('workspace-applications.mjs');
+ assert.ok(src.includes("const draft=projectNameDraft(host.ownerDocument);host.replaceChildren();"));
+ assert.ok(src.includes("input.dataset.kept=project.name||'';input.value=draft?draft.value:project.name||'';"));
+});

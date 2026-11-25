@@ -798,6 +798,9 @@ try {
     await openFile(saved); await page.until("/^Opened project Heater study/.test(document.getElementById('file-status').textContent)", 'K4 open heater-study', 60000);
     await page.press('tab', 'Library'); await page.until("!!document.getElementById('project-name-input')", 'K4 project name');
     await page.fill('textbox', 'Project name', 'both-models'); await page.press('button', 'Rename');
+    // round 25: the name typed survives a Library re-render (a browser recovery update after Open),
+    // which on macOS 15 landed between the typing and Rename and put "Heater study" back
+    await page.until("document.getElementById('file-status').textContent==='Project renamed to “both-models”. File › Save writes the new name.'", 'K4 renamed');
     await toOptical('K4 optical');
     // the project's two runs and four more (Runs 1 to 6), the fourteen values-only runs (Runs 7 to 20),
     // then Run 21, which drops Run 1
