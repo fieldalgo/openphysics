@@ -1233,20 +1233,55 @@ try {
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false);
   await page.click('nav [data-page=Results]'); await page.until("/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'restored run is current');
   await toNode('Optical modes'); assert.equal(await page.eval("document.getElementById('mode-count-number').value"), '8', 'Restore sets Modes to find');
-  // M4-e (run retention, design "Keeping more runs"): four more wide runs of 8 modes (seven in all,
-  // about 26 MB with every field; the limit of 20 runs drops none). When a result's field arrives the fields kept stay within
-  // 16.8 MB, so Messages says which runs keep their values only and the run list marks them; File ›
-  // Export › Model with runs and File › Save write at once, asking nothing, and the file holds
-  // exactly the fields the tab shows; the file opened again shows a run without fields by its values
-  // (4.1) and Compare lists its modes by number (4.2).
-  const m4eMessages = [];
-  for (const wl of [1570, 1580, 1590, 1600]) { await toNode('Optical modes'); await page.type('#wavelength-number', wl); await runAndWait(); m4eMessages.push(await text('#file-status')); }
-  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length===7", 'M4-e run list');
+  // M4-e (run retention, design "Keeping more runs"; compact fields, design "Compact field encoding"):
+  // more wide runs of 8 modes (about 3.7 MB each as text; the limit of 20 runs drops none). At the
+  // first result whose fields would not all fit as text every field is kept at single precision, and
+  // Messages says so once; wide runs are added until a field is let go after that (the browser home
+  // of "let go in the tab"). When a result's field arrives the fields kept stay within 16.8 MB, so
+  // Messages says which runs keep their values only and the run list marks them; File › Export ›
+  // Model with runs and File › Save write at once, asking nothing, and the file holds exactly the
+  // fields the tab shows; the file opened again shows a run without fields by its values (4.1),
+  // Compare lists its modes by number (4.2), and Recompute Run N's fields brings its field back.
+  const m4eMessages = [], COMPACT_WORDS = 'Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).';
+  const LET_GO = /Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|(?:and|, ) .*keep their values; their fields were not kept) \(16\.8 MB limit\)\./;
+  const m4eStarted = Date.now();
+  for (const wl of [1570, 1580, 1590, 1600, 1610, 1620, 1630, 1640, 1650, 1660, 1670, 1680]) {
+    await toNode('Optical modes'); await page.type('#wavelength-number', wl); await runAndWait(); m4eMessages.push(await text('#file-status'));
+    if (LET_GO.test(m4eMessages.at(-1))) break;
+  }
+  const m4eCount = 3 + m4eMessages.length;
+  await page.click('nav [data-page=Results]'); await page.until(`document.querySelectorAll('.run-item').length===${m4eCount}`, 'M4-e run list');
   const m4eItems = await page.eval("[...document.querySelectorAll('.run-item')].map(b=>({job:b.dataset.run,text:b.textContent}))");
-  stage('M4-e fields kept', {messages: m4eMessages, items: m4eItems.map(i => i.text)});
-  assert.ok(m4eMessages.some(m => /Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|(?:and|, ) .*keep their values; their fields were not kept) \(16\.8 MB limit\)\./.test(m)), JSON.stringify(m4eMessages));
+  stage('M4-e fields kept', {runs: m4eCount, wideRunsAdded: m4eMessages.length, seconds: Math.round((Date.now() - m4eStarted) / 1000), messages: m4eMessages, items: m4eItems.map(i => i.text)});
+  // the conversion sentence once, at an earlier result than the first field let go
+  assert.equal(m4eMessages.filter(m => m.includes(COMPACT_WORDS)).length, 1, JSON.stringify(m4eMessages));
+  assert.ok(m4eMessages.findIndex(m => m.includes(COMPACT_WORDS)) < m4eMessages.findIndex(m => LET_GO.test(m)), 'the conversion comes before a field is let go');
+  assert.ok(m4eMessages.some(m => LET_GO.test(m)), JSON.stringify(m4eMessages));
   const valuesOnly = m4eItems.filter(i => i.text.endsWith(' · values only'));
-  assert.ok(valuesOnly.length >= 1 && valuesOnly.length < 7, JSON.stringify(m4eItems));
+  assert.ok(valuesOnly.length >= 1 && valuesOnly.length < m4eCount, JSON.stringify(m4eItems));
+  // moved from RT (K10): a run whose field this tab let go, in Results: its block, whole and wrapped at
+  // 1440 × 900 and 390 × 844, and the field export waiting for its fields
+  {
+    const letGo = valuesOnly[0], letGoNumber = Number(/^(?:Pinned · )?Run (\d+)/.exec(letGo.text)[1]);
+    await page.click(`.run-item[data-run="${letGo.job}"]`); await page.until("!!document.getElementById('fields-not-kept')", 'M4-e run whose field went');
+    const visible = () => page.eval(`(()=>{const e=document.getElementById('fields-not-kept'),b=e.getBoundingClientRect();return {text:e.textContent,whole:e.scrollWidth<=e.clientWidth+1&&b.left>=0&&b.right<=innerWidth+1,lines:Math.round(b.height/(parseFloat(getComputedStyle(e).lineHeight)||16))}})()`);
+    const block = {};
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
+      block[width] = {...await visible(), png: await page.eval("({disabled:document.getElementById('export-field').disabled,title:document.getElementById('export-field').title})"), field: await page.eval("!!document.getElementById('optical-field')")};
+    }
+    await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
+    stage('M4-e Results of a run whose field went', block);
+    for (const b of Object.values(block)) {
+      assert.equal(b.text, `Run ${letGoNumber}'s fields are not kept: up to 16.8 MB of fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.`);
+      assert.ok(b.whole, JSON.stringify(b)); assert.equal(b.field, false); assert.deepEqual(b.png, {disabled: true, title: `Recompute Run ${letGoNumber}'s fields first`});
+    }
+    assert.ok(block[390].lines > 1, 'the block wraps at 390 px');
+    await noOverflow('M4-e Results of a run whose field went');
+    // a compact run shows the single-precision line under its field view
+    await page.click(`.run-item[data-run="${m4eItems[0].job}"]`); await page.until("!!document.getElementById('field-precision')", 'M4-e single-precision line');
+    assert.equal(await text('#field-precision'), "Field at single precision (float32). The values above are the engine's.");
+  }
   // no question: Export › Model with runs names the file and writes it
   listed = await listDownloads(); await page.click('#menu-export-session'); await page.until("document.getElementById('save-name-dialog')?.open", 'M4-e name dialog');
   assert.equal(await page.eval("document.getElementById('session-overflow').open"), false, 'Export asks no 16 MiB question');
@@ -1261,8 +1296,9 @@ try {
   const onlyValues = new Set(valuesOnly.map(i => i.job));
   assert.deepEqual(reduced.runs.map(r => 'field' in r), reduced.runs.map(r => !onlyValues.has(r.job)), JSON.stringify(keptFields));
   assert.equal(reduced.runs.find(r => r.job === reduced.selected)?.field !== undefined, true, 'the selected run keeps its field');
-  // seven runs: a session of more than six runs is version 13, which keeps each run's number
-  assert.equal(reduced.version, 13); assert.deepEqual(reduced.runs.map(r => r.number), [1, 2, 3, 4, 5, 6, 7]);
+  // more than six runs with compact fields: version 14, which keeps each run's number
+  assert.equal(reduced.version, 14); assert.deepEqual(reduced.runs.map(r => r.number), Array.from({length: m4eCount}, (_, i) => i + 1));
+  assert.ok(reduced.runs.filter(r => r.field).every(r => r.field.encoding === 'f32-base64-v1'), 'every field kept is compact');
   // File › Save of the project: no question either
   listed = await listDownloads(); await page.click('#save-session'); await sleep(500);
   assert.equal(await page.eval("document.getElementById('session-overflow').open"), false, 'File › Save asks no 16 MiB question');
@@ -1274,7 +1310,7 @@ try {
   await setFile('#session-file', join(downloads, reducedFile));
   await answerDialogs(`/^Opened /.test(document.getElementById('autosave-status').textContent)`, 'M4-e open');
   const bare = reduced.runs.findIndex(r => !('field' in r)), bareNumber = reduced.runs[bare].number;
-  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length===7", 'M4-e run list opened');
+  await page.click('nav [data-page=Results]'); await page.until(`document.querySelectorAll('.run-item').length===${m4eCount}`, 'M4-e run list opened');
   await page.click(`.run-item[data-run="${reduced.runs[bare].job}"]`); await page.until("!!document.getElementById('fields-not-kept')", 'M4-e field-less run');
   const bareView = await page.eval("({rows:document.querySelectorAll('#modes-table tbody tr').length,field:!!document.getElementById('optical-field'),details:document.getElementById('run-details').textContent,line:document.getElementById('fields-not-kept').textContent,png:{disabled:document.getElementById('export-field').disabled,title:document.getElementById('export-field').title},item:document.querySelector('.run-item[aria-pressed=true]').textContent})");
   stage('M4-e field-less run', bareView); assert.equal(bareView.rows, 8); assert.equal(bareView.field, false); assert.match(bareView.details, /saved in the session file; its fields were not kept/);
@@ -1287,6 +1323,29 @@ try {
   assert.equal(await page.eval("!!document.getElementById('compare-field-a')"), false, 'no plots');
   assert.ok(/^Geometry: /.test(await text('#compare-description')));
   await noOverflow('M4-e Compare without fields');
+  // moved from RT (K10): Recompute Run N's fields (R3). The job panel names the run; the result matches
+  // its stored values, its field comes back on the same run, at single precision in this compact tab,
+  // and the field view draws; no run is added and no number taken
+  {
+    await page.click('nav [data-page=Results]'); await page.click(`.run-item[data-run="${reduced.runs[bare].job}"]`); await page.until("!!document.getElementById('recompute-fields')", 'M4-e Recompute button');
+    const items = async () => page.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent.replace(/ · values only$/,''))");
+    const beforeRecompute = await items(), started = Date.now();
+    assert.equal(await text('#recompute-fields'), `Recompute Run ${bareNumber}'s fields`);
+    await page.click('#recompute-fields');
+    await page.until(`/^Recomputing Run ${bareNumber}'s fields/.test(document.getElementById('job-message').textContent)`, 'M4-e recomputing', 60000);
+    const panel = await text('#job-message');
+    await page.until(`document.getElementById('file-status').textContent.startsWith("Run ${bareNumber}'s fields recomputed from its stored inputs; its values match.")&&!document.getElementById('run-optical').disabled`, 'M4-e recomputed', 600000);
+    const message = await text('#file-status');
+    await page.click('nav [data-page=Results]'); await page.click(`.run-item[data-run="${reduced.runs[bare].job}"]`); await page.until("!!document.getElementById('optical-field')", 'M4-e field view after Recompute');
+    const drawn = await page.eval("(()=>{const c=document.getElementById('optical-field');const g=c.getContext('2d');const d=g.getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]||d[i+1]||d[i+2])n++;return {width:c.width,height:c.height,painted:n}})()");
+    const after = await items(), precision = await text('#field-precision');
+    stage('M4-e Recompute', {panel, message, drawn, precision, seconds: Math.round((Date.now() - started) / 1000)});
+    assert.match(panel, new RegExp(`^Recomputing Run ${bareNumber}'s fields`));
+    assert.ok(drawn.painted > 1000, JSON.stringify(drawn));
+    assert.deepEqual(after, beforeRecompute, 'the same runs, numbers and names');
+    assert.equal(precision, "Field at single precision (float32). The values above are the engine's.", 'the recomputed field is compact');
+    await noOverflow('M4-e after Recompute');
+  }
 
   // M5-s (group index; pre-registered): Also compute group index in Study, off by default; a run
   // with it off shows "—" with the help, a run with it on shows the engine's n_g (a real 3-solve job,
@@ -1400,10 +1459,10 @@ try {
   const p1Name = await newDownload(p1Before), p1Session = JSON.parse(await readFile(join(downloads, p1Name), 'utf8'));
   assert.match(p1Name, /^p1-four(?: \(\d\))?\.json$/); assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false);
   stage('P1 session input', {version: p1Session.version, input: p1Session.input.version, modeCount: p1Session.input.model.modeCount});
-  // the tab keeps more than six runs (the 20-run limit dropped none above, M4-e), so the session is
-  // version 13, which keeps the run numbers as version 12 does; its input is still the version 8 file
-  // with Modes to find 4
-  assert.deepEqual([p1Session.version, p1Session.input.version, p1Session.input.model.modeCount], [13, 8, 4]);
+  // the tab keeps more than six runs (the 20-run limit dropped none above, M4-e) with compact fields,
+  // so the session is version 14, which keeps the run numbers as versions 12 and 13 do; its input is
+  // still the version 8 file with Modes to find 4
+  assert.deepEqual([p1Session.version, p1Session.input.version, p1Session.input.model.modeCount], [14, 8, 4]);
   // U3: Use this run's inputs with a run of other Modes to find and box (the M5 run with the box off)
   await page.type('#mode-count-number', 5); await page.click('#group-index-check'); assert.deepEqual(await study(), {modes: '5', box: true});
   await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length>=2", 'P1 run list');
@@ -3030,12 +3089,13 @@ try {
     await rRun();
     await modes(); await r.click('#closed-search-highest'); await sleep(300); await mesh(32);
     await rRun();
-    // P2 (E2, run retention): five runs of the T18 window (about 19 MB with every field). The fields
-    // kept stay within 16.8 MB from the result on: the after-result line says which runs keep their
-    // values only (it wraps), there is no size line, the header reads "kept for recovery in this
-    // browser" with nothing after it, and the record in this browser holds exactly the fields the tab
-    // shows (the runs not marked "values only"), the selected run's and then the newest others'.
-    const record = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>{const s=g.result.session,d=JSON.parse(s);resolve({bytes:new TextEncoder().encode(s).length,fields:d.runs.map((x,i)=>[Number.isInteger(x.number)?x.number:i+1,!!x.field])});};};})`);
+    // P2 (E2, run retention; compact fields): five runs of the T18 window (about 19 MB with every field
+    // as text). At Run 5 the fields would not all fit as text, so they are kept at single precision:
+    // the after-result line says so once (it wraps), there is no size line, the header reads "kept for
+    // recovery in this browser" with nothing after it, and the record in this browser (version 14)
+    // holds exactly the fields the tab shows: every run's (no run "values only"). A field let go in the
+    // tab is M4-e's (reaching one here would take about five more T18 solves).
+    const record = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>{const s=g.result.session,d=JSON.parse(s);resolve({bytes:new TextEncoder().encode(s).length,version:d.version,fields:d.runs.map((x,i)=>[Number.isInteger(x.number)?x.number:i+1,!!x.field])});};};})`);
     const fieldsOf = async () => Object.fromEntries((await runItems()).map(t => [Number(/Run (\d+)/.exec(t)[1]), !t.endsWith(' · values only')]));
     const p2 = {message: await rText('#file-status')};
     await r.until(`/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)&&!/without the fields of/.test(document.getElementById('project').textContent)`, 'R23 header', 30000);
@@ -3044,16 +3104,16 @@ try {
     const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
     p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
     stage('R23 P2 five runs within the field budget', p2);
-    assert.ok(/Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|.* keep their values; their fields were not kept) \(16\.8 MB limit\)\./.test(p2.message), p2.message);
+    assert.ok(p2.message.includes('Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).'), p2.message);
+    assert.ok(!/fields were not kept/.test(p2.message), p2.message);
     assert.ok(!p2.message.includes('Session is now'), p2.message); assert.ok(!p2.message.includes('MiB'), p2.message);
     assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser$/.test(p2.header), p2.header);
     // the record: within the field budget, Run 5 (selected) with its field, the tab's fields
     assert.ok(p2.record.bytes <= 16760832, JSON.stringify(p2.record));
     assert.deepEqual(Object.fromEntries(p2.record.fields), p2.tab);
     assert.equal(p2.record.fields.find(([n]) => n === 5)[1], true);
-    // newest first: every run with a field is newer than every run without one, the selected run apart
-    const kept = p2.record.fields.filter(([n, f]) => f && n !== 5).map(([n]) => n), gone = p2.record.fields.filter(([, f]) => !f).map(([n]) => n);
-    assert.ok(gone.length >= 1 && kept.every(k => gone.every(g => k > g)), JSON.stringify(p2.record.fields));
+    // every field is kept, at single precision (version 14)
+    assert.equal(p2.record.version, 14); assert.ok(p2.record.fields.every(([, f]) => f), JSON.stringify(p2.record.fields));
     for (const w of [p2.wide, p2.phone]) { assert.ok(w.over <= 0 && w.lineOver <= 0 && w.right, JSON.stringify(w)); }
     assert.ok(p2.phone.lines > 1, JSON.stringify(p2.phone));
     await rOverflow('P2 session size');
@@ -3240,9 +3300,10 @@ try {
   // own: twelve runs (eight of the template, core mesh 30 to 44 nm, then four T18 runs: closed 2 modes,
   // closed 4 modes, closed near 2.46 and open with n_g). After each result the browser-recovery record
   // is within 16 MiB and is Save's text, byte for byte (File › Export › Model with runs, asking
-  // nothing), and the runs with fields are those the run list does not mark "values only". Then a run
-  // without fields: its Results block, the field export waiting for its fields, and Compare with it,
-  // the words whole and wrapped at 1440 × 900 and 390 × 844.
+  // nothing), and the runs with fields are those the run list does not mark "values only". With
+  // compact fields (design "Compact field encoding") the twelve fields fit at single precision: the
+  // conversion is said once, the files are version 14 from there on, and Results shows the
+  // single-precision line. A run without fields, its Results block and Recompute are in M4-e.
   {
     const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
     const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
@@ -3311,59 +3372,35 @@ try {
     await mesh(30);
     await rRun(); await afterResult('T18 closed 2 modes');
     await modes(); await r.type('#mode-count-number', 4); await sleep(300); await rRun(); await afterResult('T18 closed 4 modes');
-    await modes(); await r.click('#run-edge-search'); await sleep(400); await rRun(); await afterResult('T18 closed near 2.46');
+    await modes(); await r.click('#run-edge-search'); await sleep(400);
+    await rRun(); await afterResult('T18 closed near 2.46');
     await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); await r.type('#mode-count-number', 2); await sleep(300);
     if (!(await r.eval("document.getElementById('group-index-check').checked"))) await r.click('#group-index-check'); await sleep(300);
     await rRun(); const last = await afterResult('T18 open with n_g');
     stage('RT K10 twelve runs', {records: k10.map(e => [e.label, e.bytes, e.version, e.valuesOnly])});
-    assert.equal(last.items.length, 12); assert.equal(last.doc.version, 13);
-    assert.ok(k10.some(e => e.valuesOnly > 0), 'some runs keep their values only');
-    assert.ok(k10.some(e => /keeps its values; its fields were not kept \(16\.8 MB limit\)\.|keep their values; their fields were not kept \(16\.8 MB limit\)\./.test(e.message)), JSON.stringify(k10.map(e => e.message)));
-    // a run without fields in Results: the block, whole and wrapped, and the field export waiting
-    const bare = last.items.find(i => i.text.endsWith(' · values only')), bareNumber = Number(/^(?:Pinned · )?Run (\d+)/.exec(bare.text)[1]);
-    await r.click(`.run-item[data-run="${bare.job}"]`); await r.until("!!document.getElementById('fields-not-kept')", 'RT run without fields');
-    const visible = id => r.eval(`(()=>{const e=document.getElementById('${id}'),b=e.getBoundingClientRect();return {text:e.textContent,whole:e.scrollWidth<=e.clientWidth+1&&b.left>=0&&b.right<=innerWidth+1,lines:Math.round(b.height/(parseFloat(getComputedStyle(e).lineHeight)||16))}})()`);
-    const block = {};
-    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) { await rSize(width, height, mobile); block[width] = {...await visible('fields-not-kept'), png: await r.eval("({disabled:document.getElementById('export-field').disabled,title:document.getElementById('export-field').title})"), field: await r.eval("!!document.getElementById('optical-field')"), rows: await r.eval("document.querySelectorAll('#modes-table tbody tr').length")}; }
-    await rSize(1440, 900); stage('RT K10 Results without fields', block);
-    for (const b of Object.values(block)) {
-      assert.equal(b.text, `Run ${bareNumber}'s fields are not kept: up to 16.8 MB of fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.`);
-      assert.ok(b.whole, JSON.stringify(b)); assert.equal(b.field, false); assert.ok(b.rows >= 2); assert.deepEqual(b.png, {disabled: true, title: `Recompute Run ${bareNumber}'s fields first`});
+    // compact fields (design "Compact field encoding"): the conversion sentence exactly once, at the
+    // result whose fields would not all fit as text (the first written as version 14); from there on
+    // version 14; every field kept (no run "values only"); the record is Save's text after each result
+    // (above). The let-go words, the Results block of a run without fields and Recompute are in M4-e.
+    const COMPACT_WORDS = 'Fields are now kept at single precision (float32), so more of them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on need this Studio or later (session version 14).';
+    const said = k10.map((e, i) => e.message.includes(COMPACT_WORDS) ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14);
+    assert.deepEqual(said, [first14], JSON.stringify(k10.map(e => [e.label, e.version, e.message])));
+    assert.ok(first14 > 0 && k10.slice(first14).every(e => e.version === 14) && k10.slice(0, first14).every(e => e.version !== 14), JSON.stringify(k10.map(e => e.version)));
+    assert.equal(last.items.length, 12); assert.equal(last.doc.version, 14);
+    assert.ok(k10.every(e => e.valuesOnly === 0), 'no run keeps its values only');
+    assert.ok(last.doc.runs.every(x => x.field?.encoding === 'f32-base64-v1'), 'every field is compact');
+    // a compact run in Results: the single-precision line under its field view, whole at both sizes
+    await r.click(`.run-item[data-run="${last.items[0].job}"]`); await r.until("!!document.getElementById('field-precision')", 'RT single-precision line');
+    const line = {};
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await rSize(width, height, mobile);
+      line[width] = await r.eval("(()=>{const e=document.getElementById('field-precision'),b=e.getBoundingClientRect();return {text:e.textContent,whole:e.scrollWidth<=e.clientWidth+1&&b.left>=0&&b.right<=innerWidth+1,field:!!document.getElementById('optical-field')}})()");
     }
-    assert.ok(block[390].lines > 1, 'the block wraps at 390 px');
-    await rOverflow('K10 Results without fields');
-    // Compare with it: the inputs that differ, its modes listed by number, its line
-    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'RT Compare');
-    await r.choose('#compare-a', last.items[0].job); await sleep(300); await r.choose('#compare-b', bare.job); await r.until("!!document.querySelector('.compare-no-fields')", 'RT Compare without fields');
-    const compare = {line: await rText('.compare-no-fields'), caption: await r.eval("document.querySelector('#compare-neff caption')?.textContent??null"), description: await rText('#compare-description'), plots: await r.eval("!!document.getElementById('compare-field-a')")};
-    stage('RT K10 Compare without fields', compare);
-    assert.equal(compare.line, `Run ${bareNumber}'s fields are not kept, so its modes are listed by number and not plotted.`);
-    assert.equal(compare.caption, 'Modes of A and B listed by mode number, not matched by overlap'); assert.match(compare.description, /^Geometry: /); assert.equal(compare.plots, false);
-    await rOverflow('K10 Compare without fields');
-    // Recompute Run N's fields (R3): the button on Compare and in Results; the job panel names the run;
-    // the result matches its stored values, its field comes back on the same run and the field view
-    // draws; no run is added and no number taken; the record is Save's text again
-    assert.equal(await rText('.compare-no-fields-line button'), `Recompute Run ${bareNumber}'s fields`);
-    await r.click('nav [data-page=Results]'); await r.click(`.run-item[data-run="${bare.job}"]`); await r.until("!!document.getElementById('recompute-fields')", 'R24 Recompute button');
-    const beforeRecompute = (await runItems()).map(i => i.text.replace(/ · values only$/, ''));
-    assert.equal(await rText('#recompute-fields'), `Recompute Run ${bareNumber}'s fields`);
-    await r.click('#recompute-fields');
-    await r.until(`/^Recomputing Run ${bareNumber}'s fields/.test(document.getElementById('job-message').textContent)`, 'R24 recomputing', 60000);
-    const panel = await rText('#job-message');
-    await r.until(`document.getElementById('file-status').textContent.startsWith("Run ${bareNumber}'s fields recomputed from its stored inputs; its values match.")&&!document.getElementById('run-optical').disabled`, 'R24 recomputed', 600000);
-    const recomputed = {panel, message: await rText('#file-status')};
-    await r.click('nav [data-page=Results]'); await r.click(`.run-item[data-run="${bare.job}"]`); await r.until("!!document.getElementById('optical-field')", 'R24 field view after Recompute');
-    const drawn = await r.eval("(()=>{const c=document.getElementById('optical-field');const g=c.getContext('2d');const d=g.getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]||d[i+1]||d[i+2])n++;return {width:c.width,height:c.height,painted:n}})()");
-    recomputed.drawn = drawn; recomputed.items = (await runItems()).map(i => i.text);
-    const saveAfter = await exported('after Recompute'); let recAfter = null; for (let i = 0; i < 80 && recAfter !== saveAfter; i++) { await sleep(500); recAfter = await record(); }
-    recomputed.recordEqual = recAfter === saveAfter; recomputed.withField = 'field' in JSON.parse(saveAfter).runs.find(x => x.job === bare.job);
-    stage('R24 K10 Recompute', recomputed);
-    assert.match(recomputed.panel, new RegExp(`^Recomputing Run ${bareNumber}'s fields`));
-    assert.ok(drawn.painted > 1000, JSON.stringify(drawn));
-    assert.equal(recomputed.items.length, 12); assert.deepEqual(recomputed.items.map(t => t.replace(/ · values only$/, '')), beforeRecompute, 'the same runs, numbers and names');
-    assert.ok(!recomputed.items.find(t => t.includes(`Run ${bareNumber} · `)).endsWith(' · values only'));
-    assert.ok(recomputed.recordEqual, 'the record is Save\'s text'); assert.equal(recomputed.withField, true);
-    await rOverflow('K10 after Recompute');
+    await rSize(1440, 900); stage('RT single-precision line', line);
+    for (const l of Object.values(line)) { assert.equal(l.text, "Field at single precision (float32). The values above are the engine's."); assert.ok(l.whole, JSON.stringify(l)); assert.equal(l.field, true); }
+    // the note under the run list says so once the tab holds a compact field
+    assert.ok((await r.eval("document.getElementById('inspector').textContent")).includes('A run without its fields can recompute them. When fields would not all fit, they are kept at single precision. Pinned runs stay;'), 'the run-list note');
+    await rOverflow('K10 compact runs');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 

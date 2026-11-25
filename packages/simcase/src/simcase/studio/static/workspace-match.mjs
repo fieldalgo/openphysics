@@ -200,9 +200,13 @@ export function unmatchedModes(neffA,neffB){
  * run objects: a run's samples never change. An open run is matched on its physical window
  * (matchSide); one without physical bounds gives unmatchedModes. */
 export function opticalMatch(a,b){
+ // a run's field may be made compact (version 14) or let go in place: the match is kept for the
+ // fields it was computed from
  let byB=cache.get(a);if(!byB){byB=new WeakMap();cache.set(a,byB);}
- if(!byB.has(b)){const A=matchSide(a),B=matchSide(b);byB.set(b,A&&B?matchModes(A,B):unmatchedModes(a.effective_index,b.effective_index));}
- return byB.get(b);
+ const kept=byB.get(b);if(kept&&kept.a===a.field&&kept.b===b.field)return kept.match;
+ const A=matchSide(a),B=matchSide(b),match=A&&B?matchModes(A,B):unmatchedModes(a.effective_index,b.effective_index);
+ byB.set(b,{a:a.field,b:b.field,match});
+ return match;
 }
 /** The polarization words of one unit of a run, as its modes table shows them. */
 export function unitPolarization(run,unit){
