@@ -1953,9 +1953,12 @@ leakage out of the window.
   Substrate (93 % of |E|² in the window, PML excluded), which continues into the PML at the open
   window edge.*, and at a closed edge of the open run *…, which touches the closed bottom edge; its
   n_eff depends on that closed edge. Open it in Geometry › Boundaries to leave it open.* (*…
-  bottom and left edges; … those closed edges. Open them …* for two or more). The notes say where
-  the |E|² lies, not whether a mode is guided or leaks; the loss column says that. Compare's
-  edge-note line and its no-match reason stay closed-window only.
+  bottom and left edges; … those closed edges. Open them …* for two or more). These words say only
+  where the |E|² lies; whether the mode can leak is the [guided or leaky](#guided-or-leaky-open-boundary-modes)
+  text that follows them. Compare's edge-note line and its no-match reason stay closed-window only.
+- **Guided or leaky (open-mode notes).** Each mode of an open run gets one more sentence, after its
+  region note in the same note or as a note of its own. See
+  [Guided or leaky open-boundary modes](#guided-or-leaky-open-boundary-modes).
 - Slice P3: a new open run also keeps the engine's `te_polarization_fraction` and
   `effective_area` (physical window). With the group index it keeps `group_index` as `{"re",
   "im"}` with `group_index_method`. A closed run's `group_index` stays a list. A run written by
@@ -2003,6 +2006,89 @@ candidates, and a run (strength 3) searches 32.” or the open boundary's messag
     in loss, are far inside the default mesh's error of about 3 %;
 - Search near n_eff 1.600 with 4 modes on that case finds the mode near the cladding index,
   *1.48642654 + 7.92e-3i* / *2789 dB/cm*, as registered.
+
+### Guided or leaky open-boundary modes
+
+Each mode of an open-boundary run gets a sentence that says whether it can leak, from data the
+run already stores: Re n_eff, the input shapes, the open edges and the wavelength. It needs no
+field, so a run whose fields were made compact or dropped is classified the same. No session,
+project or run record changes, and a closed run gets no such text (its page is unchanged).
+
+**The rule.** Beyond an open edge the structure does not change along the edge's normal: the
+shapes along that edge continue through the PML, so the layer holds the edge's material profile,
+semi-infinite. A mode can carry power away through the edge exactly when Re n_eff lies below the
+highest transverse cutoff index of that profile. Studio does not solve the profile; it reads two
+bounds off the shapes, with the material indices at the run's wavelength (a frozen physmat table,
+1400 to 1700 nm every 10 nm, linearly interpolated, within 1e-4 of physmat at every nanometre):
+
+- n_hi(e), the largest index on the edge (the extruded profile, silica where no shape covers it,
+  and any shape that touches the edge without continuing through the layer: a circle's chord, a
+  polygon's vertex). The cutoff is at most n_hi(e).
+- n_lo(e), the largest index of a material that fills a half-space beyond the edge (one material
+  along the whole edge) or a quarter-space (the PML corner at an end of the edge whose other edge
+  is also open: the polygon that lies along both edges there, else silica). The cutoff is at least
+  n_lo(e); without either, n_lo(e) is −∞.
+
+With x = Re n_eff and δ = 0.02, over the open edges:
+
+| Category | Condition | Text |
+|---|---|---|
+| leaky into R | some n_lo(e) > x + δ (every such region R, highest index first) | *Mode 2 is a leaky mode: Re n_eff 1.773 is below the index of Substrate (3.478), which reaches the open window edge, so light can leak into Substrate. The loss shown is that leakage; it is part of this structure, not a fault of the solve.* |
+| guided | every n_hi(e) < x − δ | *Mode 1 is guided: Re n_eff 2.443 is above the index of every material at the open window edges (the highest is the silica background, 1.444), so it cannot leak. The loss shown is numerical (mesh and PML), not leakage.* |
+| no claim (layer) | neither, and a material above x + δ reaches an open edge only as a layer, between closed corners | *Mode 1: Re n_eff 2.441 is below the index of Substrate (3.478), which reaches the open left and right edges only as a layer. Whether light can leak into it depends on that layer's own modes, which Studio does not compute; Studio does not say whether this mode is guided or leaky.* |
+| no claim (near) | otherwise: x within δ of an edge index | *Mode 3: Re n_eff 1.460 is within 0.02 of the index of the silica background (1.444) at the open window edge, closer than this solve resolves; Studio does not say whether it is guided or leaky.* |
+
+|x − n| ≤ δ is always on the no-claim side. Re n_eff and the indices are shown to 3 decimals;
+the decision uses the unrounded values. δ is 1.5 × the largest measured mesh error of Re n_eff
+(1.3e-2 low at the coarsest core mesh, 60 nm; coarse meshes read low). The ten Studio materials
+are lossless from 1400 to 1700 nm, so a guided mode's exact Im n_eff is 0 and a leaky mode's loss
+is leakage.
+
+**Placement.** When the mode has a [region note](#open-boundary-in-the-optical-workspace) (the
+core mode, or a mode mostly in a shape touching the window edge), the sentence follows it in the
+same note, its opening reworded: *Mode 1 is the core mode: 64 % of |E|² in the window (PML
+excluded) is in Core, which does not touch the window edge. It is a leaky mode: Re n_eff 2.441 is
+below …* (*It is guided: …*, *Re n_eff … is within …*). Otherwise it is a note row of its own
+under the mode. The loss column, the PML check column, the found line, Compare and the region
+words are unchanged; *leaky* beside *Depends on the PML* is consistent (the channel exists, the
+loss value is not converged).
+
+**Guard.** The text is checked against the loss with the engine's [gain bound](pml_modes.md#the-gain-bound)
+b = max(1e-10, 1e-2 f_pml) max(1, |Re n_eff|), f_pml the stored `pml_l2_fraction` of the mode's
+candidate. A guided mode with Im n_eff > b gets no text (the category and the loss disagree, and
+saying nothing is better than saying something false). A leaky mode with Im n_eff ≤ b keeps its
+first sentence and ends *This solve resolves no leakage loss.*
+
+**What it does not say.** *Guided* does not say the loss shown is small: a near-cutoff guided
+mode whose field reaches the PML can show PML noise (0.80 dB/cm measured, −0.65 dB/cm on the PML
+check, on the strip over a substrate with only the top edge open). *Leaky* does not say the loss
+is converged (mesh refinement and the PML check do) or that the coupling is strong: a channel can
+carry little or, for a symmetry-protected bound state, no power. Neither says where the |E|² lies.
+There is no radiation-mode or PML-mode category: the physical-fraction filter (0.5) already
+removes PML-dominated candidates, and the stored fraction cannot separate a PML mode from a
+physical pole; the PML check is the test of PML dependence.
+
+**Limitations.**
+
+- Bounds, not a 1D solve: a layer that reaches an open edge only sideways gets no claim even when
+  the mode leaks (the strip over a substrate with the bottom edge closed leaks 2.80 dB/cm
+  sideways through the substrate layer).
+- Near cutoff: Studio lists modes above Re 1.45, and every listed mode up to Re 1.464 is within δ
+  of silica, so in a run whose edges are all silica it gets *no claim (near)*.
+- δ covers the measured mesh error with a factor of 1.5; that is a measurement, not a proof.
+- The bound uses the largest index for both polarizations; it does not separate a TE-only or
+  TM-only channel threshold (both lie below n_hi, so *guided* stays sound).
+- Sapphire, lithium niobate and magnesium fluoride are solved as isotropic with the ordinary
+  index, and the rule uses the same index: it agrees with the solve, not with the real crystal.
+- A touching circle or vertex counts in n_hi though it does not continue through the layer, so it
+  can only turn *guided* into *no claim*.
+- An absorbing material would need other words and an absorption estimate in the guard; none of
+  the ten absorbs in the band.
+
+**Validation.** Pre-registered in the design draft (main 2318e5f) before the implementation;
+measured on this branch, Linux:
+
+MEASUREMENTS
 
 ### Mode identity with an open boundary
 
