@@ -101,6 +101,12 @@ struct State<'a> {
     tri_vertex: Vec<bool>,
     /// shape() by sorted vertex set, while flip_improve runs (no vertex moves then)
     shape_memo: std::cell::RefCell<Option<HashMap<[u32; 4], (f64, f64), FastKey>>>,
+    /// While flip_improve runs: faces and edges whose flip was refused, until a tetrahedron
+    /// on them is replaced (a refusal depends only on those tetrahedra)
+    clean_faces: std::collections::HashSet<[u32; 3], FastKey>,
+    clean_e32: std::collections::HashSet<(u32, u32), FastKey>,
+    clean_er: std::collections::HashSet<(u32, u32), FastKey>,
+    track_clean: bool,
     /// per facet: its input vertices, and the input edges of its loops
     fverts: Vec<Vec<u32>>,
     fedges: Vec<Vec<(u32, u32)>>,
@@ -845,6 +851,22 @@ impl State<'_> {
             }
             self.inside[id as usize] = ins;
             self.hsz[id as usize] = hs;
+            self.mark_dirty(v);
+        }
+    }
+
+    /// A new tetrahedron v: while flip_improve runs, its faces and edges may flip again.
+    fn mark_dirty(&mut self, v: [u32; 4]) {
+        if !self.track_clean {
+            return;
+        }
+        for i in 0..4 {
+            self.clean_faces.remove(&key(face(&v, i)));
+            for j in i + 1..4 {
+                let e = ekey(v[i], v[j]);
+                self.clean_e32.remove(&e);
+                self.clean_er.remove(&e);
+            }
         }
     }
 
@@ -854,7 +876,12 @@ impl State<'_> {
     /// sorted order (deterministic); up to four passes.
     fn flip_improve(&mut self) {
         *self.shape_memo.borrow_mut() = Some(HashMap::with_hasher(FastKey));
+        self.track_clean = true;
         self.flip_passes();
+        self.track_clean = false;
+        self.clean_faces.clear();
+        self.clean_e32.clear();
+        self.clean_er.clear();
         *self.shape_memo.borrow_mut() = None;
     }
 
@@ -867,35 +894,13 @@ impl State<'_> {
                 .map(|(k, _)| *k).collect();
             faces.sort_unstable();
             for k in faces {
-                let Some(o) = self.cx.faces.get(&k).copied() else { continue };
-                if o[0] == NONE || o[1] == NONE || self.sub.contains_key(&k) {
-                    continue;
+                if self.clean_faces.contains(&k) {
+                    continue; // rejected before, and no tetrahedron on it changed since
                 }
-                let (t1, t2) = (o[0], o[1]);
-                if !self.inside[t1 as usize] || !self.inside[t2 as usize] || self.hsz[t1 as usize] != self.hsz[t2 as usize] {
-                    continue;
-                }
-                let (v1, v2) = (self.cx.tets[t1 as usize], self.cx.tets[t2 as usize]);
-                let d = *v1.iter().find(|x| !k.contains(x)).unwrap();
-                let e = *v2.iter().find(|x| !k.contains(x)).unwrap();
-                let old = self.worst_shape(&[v1, v2]);
-                if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
-                    continue; // not worth a flip
-                }
-                // the cheap test first: shape (and so accept) does not depend on vertex order;
-                // then each exact orientation once (convex_23 asks the same three)
-                let cand: [[u32; 4]; 3] = std::array::from_fn(|j| [k[j], k[(j + 1) % 3], d, e]);
-                if !self.accept(&[v1, v2], &cand) {
-                    continue;
-                }
-                let o: [i8; 3] = std::array::from_fn(|j| self.orient(cand[j]));
-                if o[0] == 0 || o.iter().any(|&x| x != o[0]) {
-                    continue; // a flat new tetrahedron, or de not through the face (convex_23)
-                }
-                let new: Vec<[u32; 4]> = cand.iter().map(|&c| if o[0] > 0 { c } else { [c[1], c[0], c[2], c[3]] }).collect();
-                if self.rho_ok(&[v1, v2], &new) {
-                    self.replace(&[t1, t2], &new);
+                if self.try_23(k) {
                     done += 1;
+                } else {
+                    self.clean_faces.insert(k);
                 }
             }
             // 3-2 removing an edge with three tetrahedra
@@ -914,54 +919,13 @@ impl State<'_> {
             edges.sort_unstable();
             edges.dedup();
             for (a, b) in edges {
-                if self.seg.contains_key(&(a, b)) {
+                if self.clean_e32.contains(&(a, b)) {
                     continue;
                 }
-                let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
-                    .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
-                if ring.len() != 3 || ring.iter().any(|&t| !self.inside[t as usize] || self.hsz[t as usize] != self.hsz[ring[0] as usize]) {
-                    continue;
-                }
-                // the faces through the edge must not be constraints, and the edge must be interior
-                let mut others: Vec<u32> = Vec::new();
-                let mut bad = false;
-                for &t in &ring {
-                    let v = self.cx.tets[t as usize];
-                    for i in 0..4 {
-                        let k = key(face(&v, i));
-                        if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
-                            bad = true;
-                        }
-                    }
-                    others.extend(v.iter().copied().filter(|&x| x != a && x != b));
-                }
-                others.sort_unstable();
-                others.dedup();
-                if bad || others.len() != 3 {
-                    continue;
-                }
-                let oldv: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
-                let old = self.worst_shape(&oldv);
-                if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
-                    continue;
-                }
-                let tri = [others[0], others[1], others[2]];
-                // the cheap test first (shape does not depend on vertex order), then each exact
-                // orientation once
-                let (c1, c2) = ([tri[0], tri[1], tri[2], a], [tri[0], tri[1], tri[2], b]);
-                if !self.accept(&oldv, &[c1, c2]) {
-                    continue;
-                }
-                // a and b on opposite sides of the triangle: the two new tetrahedra fill the ring
-                let (sa, sb) = (self.orient(c1), self.orient(c2));
-                if sa * sb >= 0 || !self.convex_23(&tri, a, b) {
-                    continue; // the edge must pass through the triangle's interior
-                }
-                let flip = |c: [u32; 4], o: i8| if o > 0 { c } else { [c[1], c[0], c[2], c[3]] };
-                let (n1, n2) = (flip(c1, sa), flip(c2, sb));
-                if self.rho_ok(&oldv, &[n1, n2]) {
-                    self.replace(&ring, &[n1, n2]);
+                if self.try_32(a, b) {
                     done += 1;
+                } else {
+                    self.clean_e32.insert((a, b));
                 }
             }
             done += self.edge_removal();
@@ -970,6 +934,97 @@ impl State<'_> {
                 break;
             }
         }
+    }
+
+    /// One 2-3 flip try across face k (the body of flip_passes' first loop): true when it
+    /// flipped. A refusal depends only on the two tetrahedra on k, so flip_passes skips k
+    /// until a tetrahedron on it is replaced.
+    fn try_23(&mut self, k: [u32; 3]) -> bool {
+        let Some(o) = self.cx.faces.get(&k).copied() else { return false };
+        if o[0] == NONE || o[1] == NONE || self.sub.contains_key(&k) {
+            return false;
+        }
+        let (t1, t2) = (o[0], o[1]);
+        if !self.inside[t1 as usize] || !self.inside[t2 as usize] || self.hsz[t1 as usize] != self.hsz[t2 as usize] {
+            return false;
+        }
+        let (v1, v2) = (self.cx.tets[t1 as usize], self.cx.tets[t2 as usize]);
+        let d = *v1.iter().find(|x| !k.contains(x)).unwrap();
+        let e = *v2.iter().find(|x| !k.contains(x)).unwrap();
+        let old = self.worst_shape(&[v1, v2]);
+        if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
+            return false; // not worth a flip
+        }
+        // the cheap test first: shape (and so accept) does not depend on vertex order;
+        // then each exact orientation once (convex_23 asks the same three)
+        let cand: [[u32; 4]; 3] = std::array::from_fn(|j| [k[j], k[(j + 1) % 3], d, e]);
+        if !self.accept(&[v1, v2], &cand) {
+            return false;
+        }
+        let o: [i8; 3] = std::array::from_fn(|j| self.orient(cand[j]));
+        if o[0] == 0 || o.iter().any(|&x| x != o[0]) {
+            return false; // a flat new tetrahedron, or de not through the face (convex_23)
+        }
+        let new: Vec<[u32; 4]> = cand.iter().map(|&c| if o[0] > 0 { c } else { [c[1], c[0], c[2], c[3]] }).collect();
+        if self.rho_ok(&[v1, v2], &new) {
+            self.replace(&[t1, t2], &new);
+            return true;
+        }
+        false
+    }
+
+    /// One 3-2 flip try removing edge ab (the body of flip_passes' second loop).
+    fn try_32(&mut self, a: u32, b: u32) -> bool {
+        if self.seg.contains_key(&(a, b)) {
+            return false;
+        }
+        let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
+            .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
+        if ring.len() != 3 || ring.iter().any(|&t| !self.inside[t as usize] || self.hsz[t as usize] != self.hsz[ring[0] as usize]) {
+            return false;
+        }
+        // the faces through the edge must not be constraints, and the edge must be interior
+        let mut others: Vec<u32> = Vec::new();
+        let mut bad = false;
+        for &t in &ring {
+            let v = self.cx.tets[t as usize];
+            for i in 0..4 {
+                let k = key(face(&v, i));
+                if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
+                    bad = true;
+                }
+            }
+            others.extend(v.iter().copied().filter(|&x| x != a && x != b));
+        }
+        others.sort_unstable();
+        others.dedup();
+        if bad || others.len() != 3 {
+            return false;
+        }
+        let oldv: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
+        let old = self.worst_shape(&oldv);
+        if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
+            return false;
+        }
+        let tri = [others[0], others[1], others[2]];
+        // the cheap test first (shape does not depend on vertex order), then each exact
+        // orientation once
+        let (c1, c2) = ([tri[0], tri[1], tri[2], a], [tri[0], tri[1], tri[2], b]);
+        if !self.accept(&oldv, &[c1, c2]) {
+            return false;
+        }
+        // a and b on opposite sides of the triangle: the two new tetrahedra fill the ring
+        let (sa, sb) = (self.orient(c1), self.orient(c2));
+        if sa * sb >= 0 || !self.convex_23(&tri, a, b) {
+            return false; // the edge must pass through the triangle's interior
+        }
+        let flip = |c: [u32; 4], o: i8| if o > 0 { c } else { [c[1], c[0], c[2], c[3]] };
+        let (n1, n2) = (flip(c1, sa), flip(c2, sb));
+        if self.rho_ok(&oldv, &[n1, n2]) {
+            self.replace(&ring, &[n1, n2]);
+            return true;
+        }
+        false
     }
 
     /// Edge removal: an interior edge ab (not a subsegment, no subfacet through it) with a
@@ -998,116 +1053,130 @@ impl State<'_> {
         edges.dedup();
         let mut done = 0;
         for (a, b) in edges {
-            if self.seg.contains_key(&(a, b)) {
+            if self.clean_er.contains(&(a, b)) {
                 continue;
             }
-            let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
-                .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
-            let n = ring.len();
-            if n < 4 || n > EDGE_RING_MAX
-                || ring.iter().any(|&t| !self.inside[t as usize] || self.hsz[t as usize] != self.hsz[ring[0] as usize]) {
-                continue;
-            }
-            // the ring polygon in cyclic order: each tetrahedron joins two consecutive vertices
-            let mut pairs: Vec<(u32, u32)> = Vec::with_capacity(n);
-            let mut bad = false;
-            for &t in &ring {
-                let v = self.cx.tets[t as usize];
-                let o: Vec<u32> = v.iter().copied().filter(|&x| x != a && x != b).collect();
-                pairs.push((o[0], o[1]));
-                for i in 0..4 {
-                    let k = key(face(&v, i));
-                    if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
-                        bad = true;
-                    }
-                }
-            }
-            if bad {
-                continue;
-            }
-            let mut poly: Vec<u32> = vec![pairs[0].0, pairs[0].1];
-            let mut used = vec![false; n];
-            used[0] = true;
-            while poly.len() < n {
-                let last = *poly.last().unwrap();
-                let Some(i) = (0..n).find(|&i| !used[i] && (pairs[i].0 == last || pairs[i].1 == last)) else { break };
-                used[i] = true;
-                poly.push(if pairs[i].0 == last { pairs[i].1 } else { pairs[i].0 });
-            }
-            let closes = (0..n).any(|i| !used[i] && {
-                let (x, y) = pairs[i];
-                (x == poly[n - 1] && y == poly[0]) || (y == poly[n - 1] && x == poly[0])
-            });
-            if poly.len() != n || !closes {
-                continue;
-            }
-            let old: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
-            // the sign a must have against every triangle of the polygon, from a fan triangle
-            // of the ring (consecutive vertices keep the orientation of the cycle)
-            let sa = self.orient([poly[0], poly[1], poly[2], a]);
-            if sa == 0 {
-                continue;
-            }
-            // best[i][j]: (worst q, split k) of the polygon chain i..j, triangles (i, k, j)
-            let mut tri_q: HashMap<(usize, usize, usize), f64> = HashMap::new();
-            let mut best = vec![vec![(f64::NEG_INFINITY, usize::MAX); n]; n];
-            for i in 0..n - 1 {
-                best[i][i + 1] = (f64::INFINITY, usize::MAX);
-            }
-            for len in 2..n {
-                for i in 0..n - len {
-                    let j = i + len;
-                    for k in i + 1..j {
-                        let q = *tri_q.entry((i, k, j)).or_insert_with(|| {
-                            let tr = [poly[i], poly[k], poly[j]];
-                            if self.g.orient3d([tr[0], tr[1], tr[2], a]) != sa || self.g.orient3d([tr[0], tr[1], tr[2], b]) != -sa {
-                                return f64::NEG_INFINITY;
-                            }
-                            let ta = if sa > 0 { [tr[0], tr[1], tr[2], a] } else { [tr[1], tr[0], tr[2], a] };
-                            let tb = if sa > 0 { [tr[1], tr[0], tr[2], b] } else { [tr[0], tr[1], tr[2], b] };
-                            self.shape(ta).1.min(self.shape(tb).1)
-                        });
-                        let v = q.min(best[i][k].0).min(best[k][j].0);
-                        if v > best[i][j].0 {
-                            best[i][j] = (v, k);
-                        }
-                    }
-                }
-            }
-            if !(best[0][n - 1].0 > 0.0) {
-                continue;
-            }
-            let mut tris: Vec<[u32; 3]> = Vec::new();
-            let mut st = vec![(0usize, n - 1)];
-            while let Some((i, j)) = st.pop() {
-                if j <= i + 1 {
-                    continue;
-                }
-                let k = best[i][j].1;
-                tris.push([poly[i], poly[k], poly[j]]);
-                st.push((i, k));
-                st.push((k, j));
-            }
-            let mut new: Vec<[u32; 4]> = Vec::with_capacity(2 * tris.len());
-            for tr in &tris {
-                if sa > 0 {
-                    new.push([tr[0], tr[1], tr[2], a]);
-                    new.push([tr[1], tr[0], tr[2], b]);
-                } else {
-                    new.push([tr[1], tr[0], tr[2], a]);
-                    new.push([tr[0], tr[1], tr[2], b]);
-                }
-            }
-            if new.iter().any(|t| self.orient(*t) <= 0) {
-                continue;
-            }
-            if self.accept(&old, &new) && self.rho_ok(&old, &new) {
-                self.replace(&ring, &new);
+            if self.try_er(a, b) {
                 done += 1;
+            } else {
+                self.clean_er.insert((a, b));
             }
         }
         self.stats.edge_removals += done;
         done
+    }
+
+    /// One edge-removal try at ab (the body of edge_removal's loop): true when it replaced the
+    /// ring. A refusal depends only on the ring of tetrahedra around ab.
+    fn try_er(&mut self, a: u32, b: u32) -> bool {
+        if self.seg.contains_key(&(a, b)) {
+            return false;
+        }
+        let ring: Vec<u32> = self.cx.star[a as usize].iter().copied()
+            .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&b)).collect();
+        let n = ring.len();
+        if n < 4 || n > EDGE_RING_MAX
+            || ring.iter().any(|&t| !self.inside[t as usize] || self.hsz[t as usize] != self.hsz[ring[0] as usize]) {
+            return false;
+        }
+        // the ring polygon in cyclic order: each tetrahedron joins two consecutive vertices
+        let mut pairs: Vec<(u32, u32)> = Vec::with_capacity(n);
+        let mut bad = false;
+        for &t in &ring {
+            let v = self.cx.tets[t as usize];
+            let o: Vec<u32> = v.iter().copied().filter(|&x| x != a && x != b).collect();
+            pairs.push((o[0], o[1]));
+            for i in 0..4 {
+                let k = key(face(&v, i));
+                if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
+                    bad = true;
+                }
+            }
+        }
+        if bad {
+            return false;
+        }
+        let mut poly: Vec<u32> = vec![pairs[0].0, pairs[0].1];
+        let mut used = vec![false; n];
+        used[0] = true;
+        while poly.len() < n {
+            let last = *poly.last().unwrap();
+            let Some(i) = (0..n).find(|&i| !used[i] && (pairs[i].0 == last || pairs[i].1 == last)) else { break };
+            used[i] = true;
+            poly.push(if pairs[i].0 == last { pairs[i].1 } else { pairs[i].0 });
+        }
+        let closes = (0..n).any(|i| !used[i] && {
+            let (x, y) = pairs[i];
+            (x == poly[n - 1] && y == poly[0]) || (y == poly[n - 1] && x == poly[0])
+        });
+        if poly.len() != n || !closes {
+            return false;
+        }
+        let old: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
+        // the sign a must have against every triangle of the polygon, from a fan triangle
+        // of the ring (consecutive vertices keep the orientation of the cycle)
+        let sa = self.orient([poly[0], poly[1], poly[2], a]);
+        if sa == 0 {
+            return false;
+        }
+        // best[i][j]: (worst q, split k) of the polygon chain i..j, triangles (i, k, j)
+        let mut tri_q: HashMap<(usize, usize, usize), f64> = HashMap::new();
+        let mut best = vec![vec![(f64::NEG_INFINITY, usize::MAX); n]; n];
+        for i in 0..n - 1 {
+            best[i][i + 1] = (f64::INFINITY, usize::MAX);
+        }
+        for len in 2..n {
+            for i in 0..n - len {
+                let j = i + len;
+                for k in i + 1..j {
+                    let q = *tri_q.entry((i, k, j)).or_insert_with(|| {
+                        let tr = [poly[i], poly[k], poly[j]];
+                        if self.g.orient3d([tr[0], tr[1], tr[2], a]) != sa || self.g.orient3d([tr[0], tr[1], tr[2], b]) != -sa {
+                            return f64::NEG_INFINITY;
+                        }
+                        let ta = if sa > 0 { [tr[0], tr[1], tr[2], a] } else { [tr[1], tr[0], tr[2], a] };
+                        let tb = if sa > 0 { [tr[1], tr[0], tr[2], b] } else { [tr[0], tr[1], tr[2], b] };
+                        self.shape(ta).1.min(self.shape(tb).1)
+                    });
+                    let v = q.min(best[i][k].0).min(best[k][j].0);
+                    if v > best[i][j].0 {
+                        best[i][j] = (v, k);
+                    }
+                }
+            }
+        }
+        if !(best[0][n - 1].0 > 0.0) {
+            return false;
+        }
+        let mut tris: Vec<[u32; 3]> = Vec::new();
+        let mut st = vec![(0usize, n - 1)];
+        while let Some((i, j)) = st.pop() {
+            if j <= i + 1 {
+                continue;
+            }
+            let k = best[i][j].1;
+            tris.push([poly[i], poly[k], poly[j]]);
+            st.push((i, k));
+            st.push((k, j));
+        }
+        let mut new: Vec<[u32; 4]> = Vec::with_capacity(2 * tris.len());
+        for tr in &tris {
+            if sa > 0 {
+                new.push([tr[0], tr[1], tr[2], a]);
+                new.push([tr[1], tr[0], tr[2], b]);
+            } else {
+                new.push([tr[1], tr[0], tr[2], a]);
+                new.push([tr[0], tr[1], tr[2], b]);
+            }
+        }
+        if new.iter().any(|t| self.orient(*t) <= 0) {
+            return false;
+        }
+        if self.accept(&old, &new) && self.rho_ok(&old, &new) {
+            self.replace(&ring, &new);
+            return true;
+        }
+        false
     }
 
     /// Replaces tetrahedra `old` by `new` (labels of old[0]) and returns the new ids.
@@ -1124,6 +1193,7 @@ impl State<'_> {
             }
             self.inside[id as usize] = ins;
             self.hsz[id as usize] = hs;
+            self.mark_dirty(v);
             id
         }).collect()
     }
@@ -2703,7 +2773,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         (0..plc.points.len()).map(|v| all[v] > 0 && all[v] == tri[v]).collect()
     };
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, shape_memo: std::cell::RefCell::new(None), fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, shape_memo: std::cell::RefCell::new(None), clean_faces: std::collections::HashSet::with_hasher(FastKey), clean_e32: std::collections::HashSet::with_hasher(FastKey), clean_er: std::collections::HashSet::with_hasher(FastKey), track_clean: false, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };
