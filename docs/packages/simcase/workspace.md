@@ -449,7 +449,8 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    newest runs as a new run would (*Compare Run 7 with B* is not offered beside it: one action
    reaches the newest pair). The project file stores that pair, and opening
    it shows it again; a pair read from a file that is not the two newest runs is kept as
-   picked. The run
+   picked, unless both its runs are named: such a pair is kept because they are named (round 25,
+   A3), so after a new run Compare offers *Compare the two newest: …* as above. The run
    list shows the newest first, so on Compare the two cards end with a *Compare A* and a *Compare
    B* badge (read out as *· Compare A* and *· Compare B*). A pick whose run is gone sets both back to that pair. Exactly one run card
    reads as selected (the pointer over another card changes only its border). On Compare a click on

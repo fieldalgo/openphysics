@@ -374,7 +374,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    유지된 쌍이면 대신 동작 하나를 제안합니다(round 24, B4): *Run 7 is newer than this pair · Compare the two newest: Run 6
    and Run 7*. 이 버튼은 새 실행이 생겼을 때처럼 가장 새 두 실행을 보여 줍니다(동작 하나로 가장 새 쌍에 닿으므로 그 옆에
    *Compare Run 7 with B*는 두지 않습니다). 프로젝트 파일은 그 쌍을 저장하고 열면 그 쌍을 다시 보여 줍니다. 파일에서
-   읽은 쌍이 가장 새 두 실행이 아니면 고른 쌍으로 봅니다. 실행 목록은 새 실행이 위에 오므로 Compare에서는
+   읽은 쌍이 가장 새 두 실행이 아니면 고른 쌍으로 봅니다. 다만 두 실행 모두 이름이 있으면 이름 때문에 유지되는 쌍으로 보므로
+   (round 25, A3), 새 실행 뒤 Compare는 위와 같이 *Compare the two newest: …*를 제안합니다. 실행 목록은 새 실행이 위에 오므로 Compare에서는
    두 카드 끝에 *Compare A*, *Compare B* 배지가 붙습니다(*· Compare A*, *· Compare B*로 읽힘). 고른 실행이 사라지면 둘 다 그 쌍으로 돌아갑니다.
    고른 것으로 보이는 실행 카드는 정확히
    하나입니다(포인터가 올라간 다른 카드는 테두리만 바뀜). Compare에서 실행 목록의 실행을 누르면 그 실행을

@@ -523,6 +523,16 @@ try {
     stage('R17 U7 Library › Open', {viewed, heated, optical});
     assert.equal(heated.page, 'Results'); assert.equal(heated.top, 0);
     assert.equal(optical.page, 'Results'); assert.equal(optical.top, 0); assert.ok(optical.run && optical.run.replace('Pinned · ', '').startsWith('Run '), optical.run);
+    // round 25 (A3, pre-registered P3): the named pair read from the file is kept because it is
+    // named, not as picked by hand, so after one new run Compare offers the two newest (it read
+    // "Compare Run 4 with B")
+    await page.press('tab', 'Model'); await page.press('treeitem', 'Geometry'); await page.until("!!document.getElementById('shape-w')", 'R25 geometry');
+    await page.fill('spinbutton', 'Width [nm]', 600); await runOptical('R25 run 4');
+    await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", 'R25 Compare');
+    const offered = {pair: await pair(), newer: await page.eval("document.getElementById('compare-newer')?.textContent??null")};
+    stage('R25 A3 newest pair offered after Open', offered);
+    assert.ok(offered.pair[0].startsWith('Run 1 · Design A · ') && offered.pair[1].startsWith('Run 2 · Design B · '), JSON.stringify(offered.pair));
+    assert.equal(offered.newer, 'Run 4 is newer than this pair · Compare the two newest: Run 3 and Run 4');
     await stopBrowser(page);
   }
 

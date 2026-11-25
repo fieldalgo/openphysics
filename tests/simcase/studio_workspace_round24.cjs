@@ -93,8 +93,8 @@ test('P3 (B4): runs newer than a named pair: Compare offers the two newest; a pa
  assert.equal(C.newestPairOffer(runs,['j6','j7'],false),null);
  assert.equal(C.newestPairOffer(runs,['j5','j7'],false),null);
  assert.equal(C.newestPairOffer(runs.slice(0,1),['j1','j1'],false),null);
- // a pair read from a file that is not the default reads as picked (pairChosen), so it is kept too
- assert.equal(C.pairChosen(runs,named),true);
+ // a named pair read from a file is kept because it is named, not as picked (round 25, A3: pairChosen)
+ assert.equal(C.pairChosen(runs,named),false);
  // the page: one action for an unpicked pair, which shows the two newest and leaves the pair unpicked
  const app=read('workspace-app.mjs'),line=body(app,'const newer=newerThanPair(runs,compareIds);','line.append(swap);host.append(line);}');
  assert.ok(line.includes('const offer=newestPairOffer(runs,compareIds,comparePicked);'));
