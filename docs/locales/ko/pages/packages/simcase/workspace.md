@@ -1364,7 +1364,11 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   Run study 옆 상자가 그만큼 커집니다(round 23 전에는 상자에 맞게 잘려서 테스터 다섯 중 넷이 title이나 패널을 봐야 읽었습니다.
   1440 × 900과 390 × 844에서 확인). 두 곳 모두 **Set search near 2.46 · 4 modes**(바로 가기와 같은 목표 어림값,
   (n_max + 1.444)/2)와 **Use Open boundary**를 둡니다. 둘 다 입력만 정하고 아무것도 실행하지 않습니다. Nearest to n_eff나 Open
-  boundary를 고르면 경고가 사라집니다. 풀이 없는 형상과 재료 점검입니다: 형상의 경계가 창에 닿으면 가장자리에 닿는 것이고, 이름은
+  boundary를 고르면 경고가 사라집니다. 경고가 보이는 동안 **Run study**는 실행 전에 한 번 묻습니다(round 27, D2). 대화상자
+  *Slab modes first*: *Substrate touches the window edge, so a closed-window run returns its slab modes first. Search near the
+  core instead?*와 **Set search near 2.46 · 4 modes and run**(경고의 바로 가기를 정한 뒤 실행), **Run as set**(묻지 않았을 때와
+  같은 실행: 같은 문서, 값, 기록), **Cancel**(Escape도 같음, 아무것도 실행하지 않음). 초점은 첫 버튼에서 시작합니다. 형상, 경계,
+  Modes to return이 바뀐 뒤에만 다시 묻고(바꿨다 되돌린 것도 바뀐 것), 그 밖에는 Run study가 곧바로 그대로 실행합니다. 풀이 없는 형상과 재료 점검입니다: 형상의 경계가 창에 닿으면 가장자리에 닿는 것이고, 이름은
   가장자리에 닿는 형상 중 굴절률이 가장 높은 것과 닿지 않는 형상 중 가장 높은 것(같으면 앞의 것)이며, 가장자리에 닿는 형상이 없거나
   모든 형상이 닿으면 경고하지 않습니다. 결과 쪽 가장자리 안내는 그대로이고, 닫힌 탐색의 기본값은 계속 Highest입니다. 한계:
   Studio는 1550 nm 표(physmat)로 비교합니다. 열 가지 재료는 1400–1700 nm의 모든 파장에서 같은 순서이고 같은 값이 없으므로

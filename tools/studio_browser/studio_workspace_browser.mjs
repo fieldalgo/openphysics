@@ -87,6 +87,7 @@ async function addValuesOnlyRuns(p, label) {
   await p.click('#confirm-run-import');
   await p.until("/^Saved runs imported\\./.test(document.getElementById('file-status').textContent)", label + ': fourteen runs added');
 }
+const CLICK = function (selector) { return this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.click();return true}', selector); };
 class Page {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.ws = new WebSocket(url);
@@ -160,7 +161,21 @@ class Page {
       .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
     return (await Promise.all(roles.map(read))).flat();
   }
-  click(selector) { return this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.click();return true}', selector); }
+  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') await this.answerSlabQuestion(); return out; }
+  // Round 27 (D2): Run study in a closed window with the slab warning shown and Highest n_eff asks
+  // once first. The stages written before the question answer Run as set, which runs exactly as
+  // before; each question is checked (its words and buttons) and noted after the last stage name.
+  // A stage that tests the question itself sets slabAsIs = false.
+  async answerSlabQuestion() {
+    if (this.slabAsIs === false) return;
+    const q = await this.eval("(()=>{const d=document.getElementById('slab-question');return d&&d.open?{text:document.getElementById('slab-question-text').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}:null})()");
+    if (!q) return;
+    (report.slabQuestions ??= []).push({after: report.stages.at(-1)?.name ?? null, ...q}); console.log('[slab question] after', JSON.stringify(report.stages.at(-1)?.name ?? null));
+    assert.match(q.text, /^.+ touches the window edge, so a closed-window run returns its slab modes first\. Search near the core instead\?$/);
+    assert.match(q.buttons[0], /^Set search near [\d.]+ · 4 modes and run$/); assert.deepEqual(q.buttons.slice(1), ['Run as set', 'Cancel']);
+    await CLICK.call(this, '#slab-question-run');
+  }
+
   // Typing as a user does: focus, select, insert text, leave the field.
   async type(selector, text) {
     await this.onElement('function(selector){const e=this.querySelector(selector);if(!e)throw Error("missing "+selector);e.focus();e.select();return true}', selector);
@@ -3065,6 +3080,105 @@ try {
     assert.equal(p4.after.keep, false);
     assert.deepEqual(p4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 21', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2', 'Run 1']);
     await rOverflow('P4 no swap');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
+  // R27 D2 (round 27, HQ decision 2026-11-25-openphysics-studio-round27-choices), in a browser of its
+  // own: Run study with a closed window, the slab warning shown and Highest n_eff asks once, in a
+  // dialog; Escape and Cancel run nothing; it asks again only after the geometry, the boundary or
+  // Modes to return changes; Run as set gives the run the question did not change (its values and its
+  // record are those of the same inputs run without the question); the first button sets the
+  // warning's shortcut and runs; the warning and its buttons stay; no page overflow.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready; r.slabAsIs = false;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const open = () => r.eval("document.getElementById('slab-question').open");
+    const QUESTION = 'Substrate touches the window edge, so a closed-window run returns its slab modes first. Search near the core instead?';
+    const BUTTONS = ['Set search near 2.46 · 4 modes and run', 'Run as set', 'Cancel'];
+    // the dialog as a screen reader finds it: one dialog named by its title, described by the question
+    const dialogView = async () => {
+      const {result: document} = await r.call('Runtime.evaluate', {expression: 'document'});
+      const {nodes} = await r.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: 'Slab modes first', role: 'dialog'});
+      const found = nodes.filter(n => !n.ignored);
+      return {dialogs: found.length, modal: found[0]?.properties?.find(p => p.name === 'modal')?.value?.value ?? null,
+        text: await rText('#slab-question-text'), buttons: await r.eval("[...document.querySelectorAll('#slab-question button')].map(b=>b.textContent)"),
+        focus: await r.eval('document.activeElement?.id??null'), described: await r.eval("document.getElementById('slab-question').getAttribute('aria-describedby')")};
+    };
+    const pressRun = async () => { await r.until("!document.getElementById('run-optical').disabled", 'D2 Run enabled'); await r.click('#run-optical'); };
+    const waitRun = async before => r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(JSON.stringify(before))}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'D2 run done', 600000);
+    const asked = async tag => { await pressRun(); await r.until("document.getElementById('slab-question').open", 'D2 asks ' + tag); return dialogView(); };
+    const noRun = async (before, tag) => { await sleep(1500); assert.equal(await open(), false, tag); assert.deepEqual(await runItems(), before, tag + ': nothing run'); assert.equal(await r.eval("document.getElementById('run-optical').textContent"), 'Run study', tag); };
+    const overflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const o = await r.eval("(()=>{const d=document.getElementById('slab-question'),b=d.getBoundingClientRect();return {page:document.documentElement.scrollWidth-document.documentElement.clientWidth,dialog:d.scrollWidth-d.clientWidth,left:b.left,right:b.right-innerWidth,buttons:[...d.querySelectorAll('button')].every(x=>{const q=x.getBoundingClientRect();return q.left>=b.left-1&&q.right<=b.right+1;})}})()");
+        stage('R27 D2 overflow ' + tag, {width, height, ...o});
+        assert.ok(o.page <= 0 && o.dialog <= 0 && o.left >= 0 && o.right <= 0 && o.buttons, `${tag} at ${width} × ${height}: ${JSON.stringify(o)}`);
+      }
+      await rSize(1440, 900);
+    };
+    // the T18 strip: the optical template, a 3000 × 700 silicon substrate spanning the window, 2 modes, Highest
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'D2 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'D2 optical model');
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'D2 slab added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silicon');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')"); await r.type('#mode-count-number', 2); await sleep(400);
+    const d2 = {warning: await r.eval("document.getElementById('run-edge')?.hidden===false?document.getElementById('run-edge-text').textContent:null")};
+    assert.equal(d2.warning, 'Substrate touches the window edge: in a closed window its slab modes come first.');
+    // asked: a modal dialog, focus on its first button; Escape runs nothing
+    let before = await runItems();
+    d2.first = await asked('first'); await overflow('dialog');
+    await r.call('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+    await r.call('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27});
+    await noRun(before, 'Escape');
+    assert.deepEqual(d2.first, {dialogs: 1, modal: true, text: QUESTION, buttons: BUTTONS, focus: 'slab-question-search', described: 'slab-question-text'});
+    // the same state: Run study runs without asking (run B, the run without the question)
+    await pressRun(); await sleep(300); d2.again = await open(); await waitRun(before);
+    const runB = (await runItems()).length; assert.equal(d2.again, false, 'asked once'); assert.equal(runB, 1);
+    // Modes to return changes and back: asked again; Cancel runs nothing
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    await r.click('#closed-search-nearest'); await sleep(400); await r.click('#closed-search-highest'); await sleep(400);
+    before = await runItems(); d2.cancel = await asked('after Modes to return changed'); await r.click('#slab-question-cancel'); await noRun(before, 'Cancel');
+    // the boundary changes and back: asked again; Run as set runs the inputs as they are (run A)
+    await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(400);
+    await rTree('Optical modes', "!!document.getElementById('closed-search-highest')");
+    if (!(await r.eval("document.getElementById('closed-search-highest').checked"))) { await r.click('#closed-search-highest'); await sleep(400); }
+    before = await runItems(); d2.runAsSet = await asked('after the boundary changed'); await r.click('#slab-question-run'); await waitRun(before);
+    // the warning and its buttons stay after the question
+    d2.warningAfter = await r.eval("document.getElementById('run-edge')?.hidden===false?[...document.querySelectorAll('#run-edge button')].map(b=>b.textContent):null");
+    // Run as set = the run without the question: the same values and the same record but for its job, time and number
+    const latest = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>resolve(g.result?.session??null);};})`);
+    let session = null;
+    for (let i = 0; i < 60 && !(session?.runs?.length === 2); i++) { const text = await latest(); session = text ? JSON.parse(text) : null; if (session?.runs?.length !== 2) await sleep(500); }
+    const strip = run => { const {job, completedAt, number, digest, label, pinned, ...rest} = run; return JSON.stringify(rest); };
+    d2.same = session ? strip(session.runs[0]) === strip(session.runs[1]) : null;
+    d2.neff = session ? session.runs.map(x => x.effective_index) : null;
+    // a geometry change and back (the substrate 690 nm high, then 700 again): asked again; the first
+    // button sets the warning's shortcut and runs it: the core mode is mode 3 of 4 (T18, 2.43931663)
+    await rTree('Geometry', "!!document.querySelector('#shape-w')"); await r.click('.shape-item[data-shape="1"]'); await sleep(300);
+    assert.equal(await r.eval("document.getElementById('shape-name').value"), 'Substrate');
+    await r.type('#shape-h', 690); await sleep(400); await r.type('#shape-h', 700); await sleep(400);
+    before = await runItems(); d2.search = await asked('after the geometry changed'); await r.click('#slab-question-search'); await waitRun(before);
+    d2.after = {plan: await rText('#run-plan'), items: (await runItems()).length, found: await rText('#modes-found'), warning: await r.eval("document.getElementById('run-edge')?.hidden===false"),
+      rows: await r.eval("[...document.getElementById('modes-table').tBodies[0].rows].filter(x=>!x.classList.contains('edge-note-row')).map(x=>x.textContent)")};
+    stage('R27 D2 slab question', d2);
+    for (const [tag, v] of [['Cancel', d2.cancel], ['Run as set', d2.runAsSet], ['search', d2.search]]) assert.deepEqual([v.dialogs, v.text, v.buttons, v.focus], [1, QUESTION, BUTTONS, 'slab-question-search'], tag);
+    assert.deepEqual(d2.warningAfter, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
+    assert.equal(d2.same, true, JSON.stringify(d2.neff)); assert.deepEqual(d2.neff[0], d2.neff[1]);
+    assert.match(d2.after.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
+    assert.equal(d2.after.rows.length, 4, JSON.stringify(d2.after.rows)); assert.ok(d2.after.rows[2].includes('2.43931663'), JSON.stringify(d2.after.rows));
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
