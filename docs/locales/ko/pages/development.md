@@ -311,8 +311,9 @@ Studio extra의 고정 버전(`tools/requirements-py312-studio.txt`, 리눅스�
 Compare의 모드 짝짓기(500 → 450 nm: 두 모드가 겹침 0.95 이상으로 짝지어지고 선택 목록이 짝지어진 쌍을 나열), 모드 수(Optical
 modes와 Study의 Modes to find가 0, 9, 2.5를 거부하며 Run을 막고 1과 8을 받음, 8을 요청한 템플릿이 *Found 3 of 8 modes above
 n = 1.45*와 세 행을 보임, 모드 8개인 2000 × 400 nm 코어 두 개가 쌍마다 짝지어지고 템플릿과 비교하면 *no match*, 선택 목록이
-모든 쌍을 나열하며 1440 × 900과 390 × 844에 들어맞음, 엔진 값을 가진 버전 9 세션 저장과 열기, 16 MiB를 넘는 모드 8개 실행
-여섯 개에서 먼저 묻고 Cancel은 아무것도 쓰지 않으며 보존한 파일은 장 없는 실행을 엶), 그다음 Joule 가열
+모든 쌍을 나열하며 1440 × 900과 390 × 844에 들어맞음, 엔진 값을 가진 버전 9 세션 저장과 열기, 모드 8개 실행 일곱 개(모든 장을 담으면
+약 26 MB)가 장을 16.8 MB 안에서 보관하고 File › Export와 File › Save가 묻지 않고 바로 쓰며 그 파일이 장 없는 실행을 값으로
+엶), 그다음 Joule 가열
 애플리케이션: 기본 띠를 Picard와 Newton으로(반복 횟수, 수지, 온도·전위 범위, 두 방법의 1e-6 K 이내 일치. 영역
 메시가 macOS arm64와 다른 플랫폼에서 달라서 메시에 따라 달라지는 값은 이산화 오차 안에서 확인),
 수렴하지 않는 Newton 실행의 거부 문장 표시, 상수 재료(`joule.steady2d`, 균일한 띠의 정확한 전력 20 W/m).
@@ -403,7 +404,7 @@ Left x kept at −1500 nm: centred, the shape would leave the window.*가 나오
 17차부터(사전 등록) 자체 브라우저 컨텍스트의 단계로 끝납니다: 작업 공간 안내와 닫힌 Study 패널이 바깥 경계는 *Physics ›
 Optical modes*에서 고른다고 말하는지, 선택을 켜면 Run study 옆에 군굴절률이 나오고(*Closed window · group index on (3 solves) · …*, 18차의 말) 끄면 빠지는지,
 템플릿 실행 일곱 개(코어 메시 30~42 nm)가 Run 7부터 Run 2로 나열되고 *Run 1 (500 × 220 nm · 2 modes) was dropped: up to
-six runs are kept; pin a run to keep it.*가 나오며 상태 표시줄이 Run 7인지, Run 5와 Run 6에 이름을 붙여 비교한 뒤 여덟 번째
+20 runs are kept; pin a run to keep it.*가 나오며 상태 표시줄이 Run 7인지, Run 5와 Run 6에 이름을 붙여 비교한 뒤 여덟 번째
 실행이 Run 2를 내보내고 *Run 8 is newer than this pair · Compare Run 8 with B*가 나오는지, Compare 선택 목록이 접근성
 트리에서 *Run A*, *Run B*이고 전체 이름을 제목으로 가지며 1440 × 900과 390 × 844에서 실행 번호와 이름이 보이는 너비에
 들어가는지, 닫힌 창에서 T18 기판((−1500, −1200)의 3000 × 700 nm)으로 모드 1과 2 아래에 안내 행(*Mode 1 is mostly in
@@ -428,7 +429,7 @@ Compare의 선택 목록과 제목이 *closed*를 담고 O2의 24 px가 나오�
 **Pin Run 1**을 보이며 1440 × 900과 390 × 844에서 가로 넘침이 없는지; 실행 중 Pin이 줄을 Run 2로 옮기는지; 결과 Run 7이 Run 2를
 내보내고 Messages가 *… Run 2 (500 × 220 nm · 2 modes) was dropped*와 **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes)
 instead**를 보이며, 그 버튼이 Run 2를 되돌리고 Run 3를 내보내는지(*Run 2 (…) is back; Run 3 (…) was dropped instead.*, 버튼은
-더 없음, *Runs · 6 of 6 · 1 pinned*); 이전 결과의 교환 버튼을 다음 실행 뒤에 눌러도 아무것도 바뀌지 않는지; 실행 하나의 두 번째 세션 뒤 Library 상자가 *Restore newest from this browser:
+더 없음, 실행 보관부터 *Runs · 20 of 20 · 15 pinned*); 이전 결과의 교환 버튼을 다음 실행 뒤에 눌러도 아무것도 바뀌지 않는지; 실행 하나의 두 번째 세션 뒤 Library 상자가 *Restore newest from this browser:
 Optical waveguide · 1 run · Run 1 · saved …*(카드가 제안하는 기록)로 시작하고 실행 여섯 개 세션은 *… · older · saved …*인지;
 그 오래된 세션을 복원하면 상자가 숨고, 더 새 세션은 곧바로 마지막 세션으로, 이 탭의 기록이 쓰인 뒤에는 Workspace tools의
 이전 세션으로 제안되며, 복원한 세션은 다시 나오지 않는지. Library의 첫 화면 검사는 이제 카드 위 상자의 가장 새 제안을 보며,
@@ -470,17 +471,29 @@ in a closed window its slab modes come first.*, Optical modes에는 전체 문�
 없는지, 1440 × 900과 390 × 844에서, 그리고 Optical modes에는 전체 문장이 있는지(P1); 실행 전 군굴절률을 켜면 *Closed window ·
 group index on (3 solves)*와 **Turn off group index**, 군굴절률 없는 모드 4개 닫힌 실행 뒤에는 *… · about N s*(그 시간의 3배),
 버튼이 선택을 끄는지(*Closed window · last such run m:ss*, 확인란 해제, *Group index off: …*), n_g 닫힌 실행 뒤에는 그 실행의
-시간인지(P3); 모드 4개 또는 2개 실행 다섯(약 19 MB)이 *… Session is now N MB, over the 16 MiB (16.8 MB) limit. File › Save will
-ask whether to keep the fields of the selected and pinned runs only (Run 5); the other runs keep n_eff, the TE fractions and
-the effective areas. Browser recovery keeps every field but those of Run 1.*를 Messages에서 넘침 없이 줄바꿈해 보이고, 헤더가
-*… · kept for recovery in this browser without the fields of Run 1*이며, IndexedDB 기록이 16 MiB 안에서 Run 5의 장과 새 실행들의
-장을 담고 밝힌 실행만 빠졌는지, 여섯 번째 실행(약 24 MB) 뒤에도 기록이 16 MiB 안에서 Run 6의 장을 담고 헤더가 장 없는 실행을
-정확히 밝히는지(P2); 실행 여섯 개에서 내보내기 줄, **Pin Run 1**–**Pin Run
+시간인지(P3); 모드 4개 또는 2개 실행 다섯(모든 장을 담으면 약 19 MB)이 실행 보관부터 *… Run 1 (…) keeps its values; its
+fields were not kept (16.8 MB limit).*를 Messages에서 넘침 없이 줄바꿈해 보이고, 크기 줄은 없으며, 헤더가 뒤에 아무것도 없는
+*… · kept for recovery in this browser*이고, IndexedDB 기록이 16.8 MB 안에서 Run 5의 장과 새 실행들의 장을 담아 실행 목록이
+*values only*로 표시하지 않은 실행과 정확히 같은지, 값만 있는 실행 열네 개와 여섯 번째 실제 실행(Run 20) 뒤에도 기록이 예산
+안에서 Run 20의 장을 담고 탭과 같은지(P2); 실행 20개에서 내보내기 줄, **Pin Run 1**–**Pin Run
 3**, 내보낸 문구, 교환 버튼이 n_g 닫힌 실행(*Run 2 (closed · 4 modes · n_g · Core 500 × 220 + Substrate 3000 × 700 nm)*), 열린
 실행(*Run 3 (open (PML 1 µm) · …)*), closed-near 실행(*Run 4 (closed near 2.46 · 4 modes · …)*)을 각각 재료 앞까지의 실행 목록
 라벨과 같게 부르는지(P4); 열린 실행과 n_g 실행 아래 줄이 경계, 탐색, Modes to find, n_g를 밝히고 나머지는 *unchanged:*에 두는지(P6);
 1440 × 900과 390 × 844에서 가로 넘침이 없는지.
-광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
+실행 보관(설계 *Keeping more runs*)부터 광학 모델은 실행 20개를 보관하므로, 실행 여섯 개 한도에 닿던 모든 단계(U2, X3, R21,
+R22 P4, R23 P4, 프로젝트 스크립트의 K4)는 한도에 닿는 실행 바로 앞에서 Add runs from file로
+`tests/simcase/studio_session_fixtures/optical-values-only-14.json`을 더합니다: 어느 단계도 계산하지 않는 설계의, 장 없는 고정
+실행 열네 개(`values_only_sessions.mjs`가 씀)입니다. 그보다 오래된 실행은 모두 그 단계 자신의 것이므로 20개 한도의 내보내기,
+Pin, 교환은 전과 같은 실제 실행을 고릅니다. 단계의 이후 실행 번호는 위 번호보다 14 크고(Run 7은 Run 21), 문구는 *up to 20
+runs*입니다. 자체 브라우저 컨텍스트의 단계 하나(R24, 사전 등록 K10)는 템플릿 실행 여덟 개와 T18 실행 네 개(닫힌 모드 2개와
+4개, closed near 2.46, n_g가 있는 열린 실행)를 실행합니다: 결과마다 IndexedDB 기록이 16 MiB 안이고 File › Export의 텍스트와
+바이트 그대로 같으며(질문 없음), 그 장이 목록에서 *values only*로 표시되지 않은 실행과 정확히 같은지; 장 없는 실행이 Results
+블록을 보이고, 장 내보내기가 *Recompute Run N's fields first*로 기다리며, Compare가 그 모드를 번호 순으로 나열하고, 각각
+1440 × 900과 390 × 844에서 잘리지 않고 줄바꿈되는지; **Recompute Run N's fields**가 작업 패널에 *Recomputing Run N's fields*를
+보이고, 일치하며, 장을 같은 실행에 붙이고(실행이 늘지 않음), 장 보기가 다시 그려지고, 기록이 Save의 텍스트와 같은지 봅니다.
+K1(T18 혼합 실행 20개의 크기)과 K5(다시 계산한 장이 원래와 같음) 측정은 서버 자신의 작업으로 T18과 T16 문서를 푸는
+`tools/studio_run_retention.mjs`(`engine`, 그다음 `k1`과 `k5`)입니다.
+광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 20*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.
 이어서 두 번째 스크립트(`tools/studio_browser/studio_multiphysics_browser.mjs`)가 다중물리 모델을
@@ -555,17 +568,17 @@ find 3)이 *Browser recovery updated …*로 쓰이고 헤더나 상태 표시�
 저장 시각과 함께) 제안하는지, 복원과 그 편집 뒤 Modes to find 4의 실행이 실행 목록과 Compare 선택 목록에서 *· closed · 4 modes ·*로 읽히고
 그 태그가 1440과 390 px에서 선택 목록 안에 들어가는지 봅니다.
 [세션 버전 12](packages/simcase/workspace.md#광학-세션-파일버전-12)(안정된 실행 번호, 사전 등록 K4·K5)부터 새
-프로필 하나가 `heater-study.json`을 열고 프로젝트 이름을 *both-models*로 바꾼 뒤 광학 모델을 다섯 번 더 실행하고
-(실행 일곱 개이므로 Run 1이 빠짐) `both-models.json`으로 저장합니다. 브라우저를 닫고 같은 프로필로 다시 시작해
+프로필 하나가 `heater-study.json`을 열고 프로젝트 이름을 *both-models*로 바꾼 뒤 광학 모델을 네 번 더 실행하고, 값만 있는
+실행 열네 개를 더한 뒤 한 번 더 실행하고(실행 21개이므로 Run 1이 빠짐) `both-models.json`으로 저장합니다. 브라우저를 닫고 같은 프로필로 다시 시작해
 Open project를 하면 실행 목록, 내보내기 줄과 **Pin Run 2**, *No need to run: Run 5*, Compare 선택 목록이 전과 같은
-번호를 읽고, 번호 문장은 없으며, 다음 실행은 Run 8입니다. 브라우저를 다시 닫고 **Restore newest from this browser**로
-두 모델을 복원하면 광학과 가열 번호가 같고, *Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run)
+번호를 읽고, 번호 문장은 없으며, 다음 실행은 Run 22입니다. 브라우저를 다시 닫고 **Restore newest from this browser**로
+두 모델을 복원하면 광학과 가열 번호가 같고, *Restored Optical waveguide (20 runs) and Heated silicon waveguide (1 run)
 from this browser, not recomputed.*, 헤더 *both-models · recovered from this browser · changed since both-models.json, not
 saved · kept for recovery in this browser*(23차 E5; 전에는 *… · not saved to a file · …*, 복구가 복원한 세션을 보존한 뒤
 읽음), 다음 변경 뒤에는 보통 헤더입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제
 프로젝트 이름을 밝히고(23차부터 *Heater study · recovered from this browser · changed since heater-study.json, not saved ·
 …*), workspace 스크립트에서 실행이 빠진 뒤의
-여섯 실행 축소 세션은 버전 12이며, 그 round 19 복원은 실행 번호를 유지하고 번호에 대해 말하지 않습니다. 형식
+실행 20개 세션은 버전 13(실행 보관 전에는 버전 12)이며, 그 round 19 복원은 실행 번호를 유지하고 번호에 대해 말하지 않습니다. 형식
 fixture는 `tests/simcase/studio_session_fixtures/optical-v12-numbers.json`(이 Studio가 `numbered_sessions.mjs
 write`로 씀)과 `refusals-v12-fc654fe.json`(main fc654fe가 읽는 결과, 그 커밋의 static 폴더로 임시 worktree에서
 `numbered_sessions.mjs read`로 씀)입니다. session 스크립트의 파일에서 연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.

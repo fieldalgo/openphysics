@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- Studio: **Recompute Run N's fields** brings back the fields of an optical run that keeps its values only, under the same run: in Results, in Compare, in *No need to run* and after the result that let them go. It sends the document the run was computed with, built from its stored inputs and settings (group index included), checks every value the run stores (n_eff, TE fractions, effective areas, n_g and the open-boundary candidates) to 1e-12 relative, and on a match attaches the field to the same run, with its number, name and pin: *Run 4's fields recomputed from its stored inputs; its values match.* It takes no number and adds no run. When a value differs (for example a run computed by another build or with another number of threads) nothing changes and Messages names the value: *Run 4's fields were not recomputed: mode 1 n_eff came out …, stored …. Run 4 is unchanged. Use this run's inputs and Run study to make a new run.* The job panel reads *Recomputing Run 4's fields · about 2 min* and Stop works as for a run. [Workspace](docs/packages/simcase/workspace.md).
+
+## 한국어
+
+- Studio: **Recompute Run N's fields**는 값만 남은 광학 실행의 필드를 같은 실행 아래로 되돌립니다. Results, Compare, *No need to run*, 그리고 필드를 내보낸 결과 뒤에 있습니다. 실행이 계산될 때의 문서를 저장된 입력과 설정(군 굴절률 포함)으로 다시 만들어 보내고, 실행이 저장한 모든 값(n_eff, TE 비율, 유효 면적, n_g, 열린 경계 후보)을 상대 1e-12로 확인한 뒤, 일치하면 필드를 번호, 이름, 고정 상태가 그대로인 같은 실행에 붙입니다: *Run 4's fields recomputed from its stored inputs; its values match.* 번호를 쓰지 않고 실행도 늘리지 않습니다. 값이 다르면(예를 들어 다른 빌드나 다른 스레드 수로 계산한 실행) 아무것도 바꾸지 않고 Messages가 그 값을 알려 줍니다: *Run 4's fields were not recomputed: mode 1 n_eff came out …, stored …. Run 4 is unchanged. Use this run's inputs and Run study to make a new run.* 작업 패널은 *Recomputing Run 4's fields · about 2 min*을 보여 주며, Stop은 실행과 같이 동작합니다. [작업 공간](packages/simcase/workspace.md).
