@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Horizontal reflection of the explicit linear field, split from test_laplace_corner_linear_field.py.
 
-Each case needs its own reflected solve; together with the rest of that module they exceed an
-eighth of the CI suite (tools/tests/test_openphysics_shard.py), so they run as their own file.
+Each case needs its own reflected solve; together with the rest of that module they exceed
+the share of one CI test part (tools/tests/test_openphysics_shard.py), so they run as their own file.
 """
 import pytest
 
