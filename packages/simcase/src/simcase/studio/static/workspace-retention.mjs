@@ -16,8 +16,12 @@
 // a field that does not fit is skipped and the next older one is tried. Selecting, pinning,
 // unpinning, naming or comparing runs removes no field. A run without its field keeps n_eff, the
 // TE fractions, the effective areas, n_g and the open-boundary candidates (its values).
-import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7} from './workspace-notebook.mjs';
+import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget} from './workspace-notebook.mjs';
 import {dropName,dropParts,runTitle,aboutText} from './workspace-workflow.mjs';
+import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
+import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
+import {runChoice} from './workspace-open-run.mjs';
+import {groupIndexStep} from './workspace-modes.mjs';
 
 export {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText};
 export const BUDGET_TEXT=mbText(FIELD_BUDGET_BYTES);
@@ -160,4 +164,76 @@ export function predictedLetGo(input,runs,selected,comparison,view,next,{budget=
  // (the view's mode is the next result's first: the selected run then has at least one mode)
  const {letGo}=chooseFields(input,after,phantom.job,comparison,{...view,mode:0},{budget,bytes:size});
  return letGo.filter(r=>r!==phantom);
+}
+
+// ---- Recompute Run N's fields (section 4.4) ---------------------------------------------------
+/** The tolerance a recomputed value must meet: relative 1e-12, or absolute 1e-15 for a value whose
+ * magnitude is below 1e-3 (both the stored and the recomputed value). */
+export const RECOMPUTE_RELATIVE=1e-12,RECOMPUTE_ABSOLUTE=1e-15,RECOMPUTE_SMALL=1e-3;
+export function sameValue(stored,fresh){
+ if(stored===null||fresh===null)return stored===fresh;
+ if(!Number.isFinite(stored)||!Number.isFinite(fresh))return false;
+ const d=Math.abs(fresh-stored);
+ return Math.max(Math.abs(stored),Math.abs(fresh))<RECOMPUTE_SMALL?d<=RECOMPUTE_ABSOLUTE:d<=RECOMPUTE_RELATIVE*Math.abs(stored);
+}
+// the values a run stores, by name and mode, in the order the check names them
+function storedValues(run){
+ const k=run.effective_index.length,out=[];
+ const each=(name,list)=>{for(let i=0;i<k;i++)out.push({name,mode:i+1,value:list?list[i]??null:null});};
+ each('n_eff',run.effective_index);
+ if(run.effective_index_im)each('Im n_eff',run.effective_index_im);
+ if(run.te_polarization_fraction)each('TE fraction',run.te_polarization_fraction);
+ if(run.effective_area)each('effective area',run.effective_area);
+ if(run.group_index)each('n_g',run.group_index);
+ if(run.group_index_im)each('Im n_g',run.group_index_im);
+ // the open boundary's candidates (each with its n_eff, real and imaginary parts)
+ for(const c of run.open_boundary?.candidates??[]){out.push({name:'candidate '+c.candidate+' n_eff',mode:null,value:c.effective_index.re});out.push({name:'candidate '+c.candidate+' Im n_eff',mode:null,value:c.effective_index.im});}
+ return out;
+}
+/** The first stored value the recomputed run does not reproduce: {name, mode, stored, fresh}, or
+ * null when every value matches (the same modes, keys and candidates, each within the tolerance).
+ * The values compared are those the run stores: Re and Im n_eff of every mode, the TE fractions and
+ * effective areas, n_g when present and the open boundary's candidates when present. */
+export function recomputeMismatch(run,fresh){
+ const a=storedValues(run),b=storedValues(fresh);
+ for(let i=0;i<Math.max(a.length,b.length);i++){
+  const s=a[i],f=b[i];
+  if(!s||!f||s.name!==f.name||s.mode!==f.mode)return {name:(s||f).name,mode:(s||f).mode,stored:s?s.value:null,fresh:f?f.value:null,missing:true};
+  if(!sameValue(s.value,f.value))return {name:s.name,mode:s.mode,stored:s.value,fresh:f.value};
+ }
+ return null;
+}
+// two values as the refusal writes them: enough digits that they differ (n_eff and n_g to at least 8
+// decimals, other quantities to at least 9 significant digits)
+function twoValues(name,a,b){
+ if(a===null||b===null)return [String(a),String(b)];
+ const fixed=/n_eff|n_g/.test(name)&&Math.abs(a)>=1e-3;
+ for(let d=fixed?8:9;d<=17;d++){const x=fixed?a.toFixed(d):a.toPrecision(d),y=fixed?b.toFixed(d):b.toPrecision(d);if(x!==y||d===17)return [x,y];}
+ return [String(a),String(b)];
+}
+export const recomputingText=run=>`Recomputing ${runTitle(run.number,run.label||'')}'s fields${recomputeEstimate(run)}`;
+export const recomputedText=run=>`${runTitle(run.number,run.label||'')}'s fields recomputed from its stored inputs; its values match.`;
+/** "Run 4's fields were not recomputed: mode 1 n_eff came out 2.43931671, stored 2.43931663. Run 4 is
+ * unchanged. Use this run's inputs and Run study to make a new run." With a stored and a current
+ * Studio version that differ, "(stored by Studio 0.9.3; this is 0.9.4)" follows the values. */
+export function notRecomputedText(run,m,{stored=null,current=null}={}){
+ const t=runTitle(run.number,run.label||''),[came,was]=twoValues(m.name,m.fresh,m.stored);
+ const what=m.missing?`${m.mode?`mode ${m.mode} `:''}${m.name} is not in the recomputed result`:`${m.mode?`mode ${m.mode} `:''}${m.name} came out ${came}, stored ${was}`;
+ const versions=stored&&current&&stored!==current?` (stored by Studio ${stored}; this is ${current})`:'';
+ return `${t}'s fields were not recomputed: ${what}${versions}. ${t} is unchanged. Use this run's inputs and Run study to make a new run.`;
+}
+/** A recompute the server refused (its document no longer passes): "Run 4's fields cannot be
+ * recomputed: " and the server's words. */
+export const cannotRecomputeText=(run,words)=>`${runTitle(run.number,run.label||'')}'s fields cannot be recomputed: ${words}`;
+/** "No need to run" for a run of these inputs without its fields (section 4.3). */
+export const valuesAgainText=run=>`No need to run: ${runTitle(run.number,run.label||'')} already has these values; its fields are not kept. Run study adds a copy with the same values`;
+/** The document Recompute Run N's fields sends: the one the run was computed with, built from its
+ * stored inputs and settings as Use this run's inputs sets them (Modes to find, the group index with
+ * its step, the outer boundary, the closed window's Search near n_eff), then the page's builder. */
+export function recomputeDocument(run){
+ const doc=withStudy(run.input,{modeCount:runModeCount(run),groupIndex:run.group_index_method!==undefined,openBoundary:runChoice(run)});
+ const state={...doc.model,...projectStudy(doc),openBoundary:projectBoundary(doc),searchTarget:runSearchTarget(run)};
+ const built=opticalDocument(state,doc.setup);
+ const step=run.group_index_method!==undefined?groupIndexStep(run.group_index_method):null;
+ return step?withGroupIndex(built,step):built;
 }

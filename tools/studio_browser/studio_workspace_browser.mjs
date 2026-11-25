@@ -3215,6 +3215,30 @@ try {
     assert.equal(compare.line, `Run ${bareNumber}'s fields are not kept, so its modes are listed by number and not plotted.`);
     assert.equal(compare.caption, 'Modes of A and B listed by mode number, not matched by overlap'); assert.match(compare.description, /^Geometry: /); assert.equal(compare.plots, false);
     await rOverflow('K10 Compare without fields');
+    // Recompute Run N's fields (R3): the button on Compare and in Results; the job panel names the run;
+    // the result matches its stored values, its field comes back on the same run and the field view
+    // draws; no run is added and no number taken; the record is Save's text again
+    assert.equal(await rText('.compare-no-fields-line button'), `Recompute Run ${bareNumber}'s fields`);
+    await r.click('nav [data-page=Results]'); await r.click(`.run-item[data-run="${bare.job}"]`); await r.until("!!document.getElementById('recompute-fields')", 'R24 Recompute button');
+    const beforeRecompute = (await runItems()).map(i => i.text.replace(/ · values only$/, ''));
+    assert.equal(await rText('#recompute-fields'), `Recompute Run ${bareNumber}'s fields`);
+    await r.click('#recompute-fields');
+    await r.until(`/^Recomputing Run ${bareNumber}'s fields/.test(document.getElementById('job-message').textContent)`, 'R24 recomputing', 60000);
+    const panel = await rText('#job-message');
+    await r.until(`document.getElementById('file-status').textContent.startsWith("Run ${bareNumber}'s fields recomputed from its stored inputs; its values match.")&&!document.getElementById('run-optical').disabled`, 'R24 recomputed', 600000);
+    const recomputed = {panel, message: await rText('#file-status')};
+    await r.click('nav [data-page=Results]'); await r.click(`.run-item[data-run="${bare.job}"]`); await r.until("!!document.getElementById('optical-field')", 'R24 field view after Recompute');
+    const drawn = await r.eval("(()=>{const c=document.getElementById('optical-field');const g=c.getContext('2d');const d=g.getImageData(0,0,c.width,c.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]||d[i+1]||d[i+2])n++;return {width:c.width,height:c.height,painted:n}})()");
+    recomputed.drawn = drawn; recomputed.items = (await runItems()).map(i => i.text);
+    const saveAfter = await exported('after Recompute'); let recAfter = null; for (let i = 0; i < 80 && recAfter !== saveAfter; i++) { await sleep(500); recAfter = await record(); }
+    recomputed.recordEqual = recAfter === saveAfter; recomputed.withField = 'field' in JSON.parse(saveAfter).runs.find(x => x.job === bare.job);
+    stage('R24 K10 Recompute', recomputed);
+    assert.match(recomputed.panel, new RegExp(`^Recomputing Run ${bareNumber}'s fields`));
+    assert.ok(drawn.painted > 1000, JSON.stringify(drawn));
+    assert.equal(recomputed.items.length, 12); assert.deepEqual(recomputed.items.map(t => t.replace(/ · values only$/, '')), beforeRecompute, 'the same runs, numbers and names');
+    assert.ok(!recomputed.items.find(t => t.includes(`Run ${bareNumber} · `)).endsWith(' · values only'));
+    assert.ok(recomputed.recordEqual, 'the record is Save\'s text'); assert.equal(recomputed.withField, true);
+    await rOverflow('K10 after Recompute');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
