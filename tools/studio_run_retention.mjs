@@ -8,7 +8,7 @@
 //
 //   node tools/studio_run_retention.mjs engine <dir> <tag> [--threads default] [--python python] [--only a,b]
 //   node tools/studio_run_retention.mjs k1 <dir> <out>
-//   node tools/studio_run_retention.mjs k5 <dir> <out> [one-b|threads]
+//   node tools/studio_run_retention.mjs k5 <dir> <out> [<tag> [<base tag> [cases]]]   (default: one-b against one-a, every case)
 //
 // writes <dir>/<case>.document.json and <dir>/<case>.<tag>.result.json (the body /api/jobs/<id>/result
 // sends) and appends one line per case to <dir>/<tag>.times.json. By default the solve is single
@@ -157,11 +157,11 @@ async function k1(dir, out) {
 // the field samples' max |Δ| / max |E| recorded, the run's job, number, name, pin and completedAt
 // unchanged. With --threads the same comparison of one-a against the default-thread solve is
 // recorded as measured only.
-async function k5(dir, out, against = 'one-b') {
+async function k5(dir, out, against = 'one-b', base = 'one-a', only = null) {
   const N = await page('workspace-notebook.mjs'), X = await page('workspace-retention.mjs'), RR = await page('workspace-result-run.mjs');
-  const report = {check: 'K5', against, cases: {}, failures: []};
-  for (const name of ['t18closed2', 't18closed4', 't18near', 't16', 't18open']) {
-    const first = JSON.parse(await readFile(join(dir, `${name}.one-a.result.json`), 'utf8'));
+  const report = {check: 'K5', base, against, cases: {}, failures: []};
+  for (const name of only ?? ['t18closed2', 't18closed4', 't18near', 't16', 't18open']) {
+    const first = JSON.parse(await readFile(join(dir, `${name}.${base}.result.json`), 'utf8'));
     const second = JSON.parse(await readFile(join(dir, `${name}.${against}.result.json`), 'utf8'));
     const pending = await pendingOf(name, 'a0000004');
     const run = RR.runOfResult(first, pending, {completedAt: '2026-11-25T04:00:00.000Z'});
@@ -185,20 +185,20 @@ async function k5(dir, out, against = 'one-b') {
     const entry = {documentEqual: document === expected, match: mismatch === null, mismatch, worstRelative: worst, sameMesh, fieldMaxDeltaOverMaxE: maxD / maxE, identityKept: after === identity, attached: run.field === fresh.field,
       modes: run.effective_index.length, values: a.length};
     report.cases[name] = entry; console.log(name, JSON.stringify(entry));
-    if (against === 'one-b') {
+    if (against === 'one-b' && base === 'one-a') {
       if (!entry.documentEqual) report.failures.push(name + ': the recompute document differs from the run\'s');
       if (!entry.match) report.failures.push(name + ': ' + JSON.stringify(mismatch));
       if (!entry.sameMesh) report.failures.push(name + ': node_coordinates or triangles differ');
       if (!entry.identityKept || !entry.attached) report.failures.push(name + ': the run changed identity or the field was not attached');
     }
   }
-  await mkdir(out, {recursive: true}); await writeFile(join(out, `k5-${against}.json`), JSON.stringify(report, null, 1) + '\n');
-  console.log(JSON.stringify({against, failures: report.failures}));
+  await mkdir(out, {recursive: true}); await writeFile(join(out, `k5-${base}-${against}.json`), JSON.stringify(report, null, 1) + '\n');
+  console.log(JSON.stringify({base, against, failures: report.failures}));
   if (report.failures.length) process.exitCode = 1;
 }
 
 const [command, ...rest] = process.argv.slice(2);
 if (command === 'engine') await engine(resolve(rest[0]), rest[1], rest.slice(2));
 else if (command === 'k1') await k1(resolve(rest[0]), resolve(rest[1]));
-else if (command === 'k5') await k5(resolve(rest[0]), resolve(rest[1]), rest[2] ?? 'one-b');
+else if (command === 'k5') await k5(resolve(rest[0]), resolve(rest[1]), rest[2] ?? 'one-b', rest[3] ?? 'one-a', rest[4] ? rest[4].split(',') : null);
 else if (command !== undefined) throw new Error('usage: node tools/studio_run_retention.mjs engine <dir> <tag> [options] | k1 <dir> <out> | k5 <dir> <out> [one-b|threads]');
