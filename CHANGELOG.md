@@ -74,6 +74,8 @@ What each package implements, and its limits, is in the
 
 ## [Unreleased]
 
+- CI: the source and installed test jobs run in twelve time-balanced parts instead of eight (`linux-py312 tests (1/12)` … `(12/12)`, `installed-tests (1/12)` … `(12/12)`). With the boundary- and corner-panel tests the shard table sums to about 338 minutes, about 42 minutes per part in eight against the 45-minute job limit; twelve parts are about 28 minutes each. The shard-table check now compares each file with a twelfth of the suite. Tests and results are unchanged. [Development guide](docs/development.md#what-ci-runs).
+
 - Add an explicit one-active, two-fixed-potential finite guard field with signed induced currents and independent circle and finite-element validation.
 
 - Add an explicit two-active, fixed-potential finite guard field with signed induced currents and independent circle and finite-element validation.
