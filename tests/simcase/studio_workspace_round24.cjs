@@ -105,3 +105,31 @@ test('P4 (B5): runs read from a file or browser recovery carry no wall time; the
  assert.ok(app.includes('{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}'));
  assert.equal(app.split('.duration=').length,2);
 });
+
+test('P5 (B6): one loss column name, "Loss (dB/cm)", with what it counts on the header\'s second line, in Results, Compare and the heated model',async()=>{
+ const M=await import(STATIC+'workspace-modes.mjs');
+ assert.deepEqual({...M.lossColumn({open:false}),note:undefined},{header:'Loss (dB/cm)',qualifier:'absorption only (closed window)',help:M.ABSORPTION_HELP,note:undefined});
+ assert.deepEqual({...M.lossColumn({open:true}),note:undefined},{header:'Loss (dB/cm)',qualifier:'absorption + leakage into the PML',help:M.PML_LOSS_HELP,note:undefined});
+ // the notes stay
+ assert.equal(M.lossColumn({open:false}).note,M.ABSORPTION_NOTE);assert.equal(M.lossColumn({open:false,lossless:true}).note,M.LOSSLESS_NOTE);assert.equal(M.lossColumn({open:true}).note,M.PML_LOSS_NOTE);
+ // the header cell: the name, a space and the qualifier (textContent "Loss (dB/cm) absorption only (closed window)")
+ const el=tag=>({tag,className:'',textContent:''}),doc={createElement:el,createTextNode:t=>({text:t})};
+ const nodes=M.lossHeaderNodes(doc,'Loss (dB/cm)','absorption only (closed window)');
+ assert.deepEqual(nodes.map(n=>[n.className,n.textContent]),[['loss-name','Loss (dB/cm)'],['pol-sep',' '],['loss-qualifier','absorption only (closed window)']]);
+ assert.deepEqual(M.lossHeaderNodes(doc,'Loss (dB/cm)',null),[{text:'Loss (dB/cm)'}]);
+ const app=read('workspace-app.mjs');
+ // Results
+ assert.ok(body(app,'function modesTable(run){','\n}').includes("lossHead(cell('th','',{scope:'col',title:loss.help}),loss.header,loss.qualifier)"));
+ // Compare: the group "Loss (dB/cm)", its qualifier when both sides count the same, the sides "Loss A/B (dB/cm)"
+ const compare=body(app,'// [short header, full label','// one column group per header');
+ assert.ok(compare.includes("['Loss (dB/cm)','Loss',"));assert.ok(!compare.includes('Absorption loss'));
+ assert.ok(compare.includes("if(full==='Loss')lossHead(group,short,isOpenRun(a)===isOpenRun(b)?(isOpenRun(a)?PML_LOSS_QUALIFIER:LOSS_QUALIFIER):null);"));
+ assert.ok(compare.includes("h=full==='Loss'?(isOpenRun(run)?OPEN_LOSS_HELP:ABSORPTION_HELP):help;"));
+ // Compare's note for a closed and an open run stays
+ const OR=await import(STATIC+'workspace-open-run.mjs');
+ assert.equal(OR.COMPARE_LOSS_NOTE,'A counts material absorption only; B also counts leakage. Their difference is not a leakage loss.');
+ // the heated model's table
+ assert.ok(read('workspace-multiphysics-view.mjs').includes('<span class="loss-name">${esc(table.loss.header)}</span><span class="pol-sep"> </span><span class="loss-qualifier">${esc(table.loss.qualifier)}</span>'));
+ // the qualifier is a line of its own that wraps
+ assert.ok(read('workspace.css').includes('.loss-name,.loss-qualifier{display:block}.loss-qualifier{white-space:normal;max-width:11em;font-size:10px;font-weight:400;color:#586c87}.compare-table thead th[scope=colgroup] .loss-qualifier{margin:0 auto}'));
+});

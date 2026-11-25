@@ -953,7 +953,7 @@ shipped [heated slab example](../../../examples/simcase/multiphysics_heated_slab
   below it the maps of its coupled input: the temperature and the refractive index (or its
   change n − n₀ = (dn/dT)(T − T_ref), computed by the server from the document's values) on the
   core. The modes table has the optical application's columns, | Mode | n_eff | Polarization |
-  Absorption loss (dB/cm) | A_eff (µm²) | ([Modes table](#modes-table); *Loss (dB/cm)* for a result with an open boundary), names its rows *Mode 1*, …, and the note under it gives the
+  Loss (dB/cm) | A_eff (µm²) | ([Modes table](#modes-table); the loss header's second line says *absorption only (closed window)*, or *absorption + leakage into the PML* for a result with an open boundary), names its rows *Mode 1*, …, and the note under it gives the
   ranking sentence, “Modes are ranked by effective index.”, and the number of modes the model asks for, “This model asks for 2 modes: Modes 1 ›
   Modes to find” (the template asks for two, so its table shows a TE-like and a TM-like mode), a link to that setting (after an edit, “This run asked for …”). The n_eff table has “n_eff without heater” and “Δn_eff (coupled − without heater)”, signed and
   with the 8 decimals of n_eff (the template gives +0.00215086). The note under the table says
@@ -1163,7 +1163,7 @@ they do not represent optical power or a common physical colour scale.
 
 ### Modes table
 
-Results show one table per run, | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |, in the optical
+Results show one table per run, | Mode | n_eff | Polarization | Loss (dB/cm) | A_eff (µm²) | n_g |, in the optical
 application, and the same table without n_g in a multiphysics model's Modes 1 page. “Modes are ranked by effective index.” (the optical
 application adds “Compare matches them between runs by field overlap.”)
 Every value is defined on the saved centroid field `unnormalized_electric_field`, so Studio, the
@@ -1212,11 +1212,11 @@ engine and older session files give the same number from the same samples:
   not named, while the slab-like modes have *g* 0.087 and more; ribs etched only 20 nm (*g* 0.024 and
   0.046, n_eff moving by about 1e-3 when the window widens) are named. The template, with no shape
   at the window edge, never shows it. Open runs and runs without fields are not checked.
-- **Absorption loss (dB/cm)** comes from Im n_eff: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100 with k0 = 2π / λ0 in
+- **Loss (dB/cm)** comes from Im n_eff: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100 with k0 = 2π / λ0 in
   1/m (exp(−iωt), Im n_eff > 0 is loss), the engine's `propagation_loss = (40π / ln 10) · Im n_eff
   / λ0` in dB/m divided by 100, shown to 4 significant digits (*37.49 dB/cm*). In a closed window
-  the column counts material absorption (k) only, and its header, the help of every cell and the
-  note below the table say so: the help reads “Absorption (material k) only; leakage and
+  the column counts material absorption (k) only, and its header's second line (*absorption only (closed window)*),
+  the help of every cell and the note below the table say so: the help reads “Absorption (material k) only; leakage and
   radiation are not computed in a closed window”, the note “Absorption loss counts material
   absorption (k) only. Leakage and radiation are not computed in a closed window.” Where every
   Im n_eff is exactly 0 each row reads *0 dB/cm*, a lossless run rather than a computed
@@ -1225,12 +1225,15 @@ engine and older session files give the same number from the same samples:
   closed window.” The optical application adds “For leakage, choose Open boundary in Physics ›
   Optical modes.” to the note of a closed run. A run with an
   [open boundary](#open-boundary-in-the-optical-workspace) has its own cells. A multiphysics result with an open boundary (PML) has an Im n_eff that includes
-  leakage into the PML, so its column reads **Loss (dB/cm)**, with the help “Material absorption
+  leakage into the PML, so its header's second line reads *absorption + leakage into the PML*, with the help “Material absorption
   (k) and leakage into the PML of the open boundary” and the note “Loss includes material
   absorption (k) and leakage into the PML of the open boundary. Leakage depends on what lies
-  outside the window: shapes touching an open edge continue through the PML.”; every other table reads
-  **Absorption loss (dB/cm)**. Compare shows the same value as *Absorption loss A (dB/cm)* and
-  *Absorption loss B (dB/cm)*. There is no threshold: a nonzero Im n_eff,
+  outside the window: shapes touching an open edge continue through the PML.” Since round 24 (B6, a
+  coordinator decision) every table names the column **Loss (dB/cm)**, in Results, in Compare and in
+  the heated model; a closed window's column read **Absorption loss (dB/cm)** before. Compare shows
+  the same value as *Loss A (dB/cm)* and *Loss B (dB/cm)* under *Loss (dB/cm)* with the same second
+  line; when one side is closed and the other open the group has no second line, and the note under
+  the table says what each side counts. There is no threshold: a nonzero Im n_eff,
   however small, is shown as it is. The engine returns a complex n_eff only for a material with
   k > 0 or a PML; a lossless problem gives a real n_eff, whose Im is exactly 0. The optical
   application's materials and the heated template are lossless, so they read 0 dB/cm; a
@@ -1742,7 +1745,7 @@ leakage out of the window.
 
 **Compare.**
 
-- Each side's loss header follows its own run (*Absorption loss A (dB/cm)*, *Loss B (dB/cm)*).
+- Each side's loss header follows its own run in its help (*Loss A (dB/cm)*: absorption only, *Loss B (dB/cm)*: with leakage); the group reads *Loss (dB/cm)* without a second line.
 - When the two differ, a note reads “A counts material absorption only; B also counts leakage.
   Their difference is not a leakage loss.”
 - With an open run, the line above the table names each run *(closed)* or *(open, PML 1 µm)*.
@@ -2102,12 +2105,12 @@ overtakes the TM-like one). Matching is on for two closed runs (with an open run
   (word and TE percentage), the overlap to 2 decimals, n_eff of A and B, Δn_eff (B − A) and Δ % of
   A, then A_eff of A and of B in µm² (a matched degenerate pair shows *mean* of its members' values,
   with a tooltip that each member's value is defined only up to a rotation within the pair), then
-  the absorption loss of A and of B (*Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*,
+  the absorption loss of A and of B (*Loss A (dB/cm)*, *Loss B (dB/cm)*,
   on matched and unmatched rows: the modes table's value from the saved indices, *mean* of the
   members' dB/cm for a matched pair; optical runs read *0 dB/cm*, as the optical adapter's
   materials are lossless), then *n_g A* and *n_g B* (the modes table's value, *mean* of the
   members' values for a matched pair, **—** with the modes table's help when a run has none). The
-  headers are short and grouped: *Polarization*, *n_eff*, *A_eff (µm²)*, *Absorption loss (dB/cm)*
+  headers are short and grouped: *Polarization*, *n_eff*, *A_eff (µm²)*, *Loss (dB/cm)*
   and *n_g* each over an **A** and a **B** column, *Modes*, *Overlap*, *Δn_eff (B − A)* and *Δ % (of
   A)* over one; a line above the table names run A and run B. Each Polarization cell has two lines,
   the class and then the share (*TE-like* / *98.2 % TE*). At 1440 × 900 every column fits the table's

@@ -784,7 +784,7 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   nodes)”), 검사 결과(“Passed · max |received − sent| = 0 K”)를 보여 줍니다. Heat 1은 온도 지도를,
   Modes 1은 답인 n_eff 표를 먼저 보여 주고, 그 아래에 결합 입력의 지도인 코어의 온도와 굴절률(또는
   서버가 문서 값으로 계산한 변화 n − n₀ = (dn/dT)(T − T_ref))을 보여 줍니다. 모드 표는 광 애플리케이션과
-  같은 열 | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |([모드 표](#모드-표); 열린 경계 결과는 *Loss (dB/cm)*)를 쓰고 행은 *Mode 1*, …이며, 표 아래
+  같은 열 | Mode | n_eff | Polarization | Loss (dB/cm) | A_eff (µm²) |([모드 표](#모드-표); 손실 머리글 둘째 줄이 *absorption only (closed window)*, 열린 경계 결과는 *absorption + leakage into the PML*)를 쓰고 행은 *Mode 1*, …이며, 표 아래
   문장은 순위 문장 “Modes are ranked by effective index.”와 모델이 요청한 모드 수 “This model asks
   for 2 modes: Modes 1 › Modes to find”(템플릿은 두 모드를 요청하므로 표에 TE-like와 TM-like 모드가 나옴)(그 설정으로 가는 링크, 편집 뒤에는 “This run asked for …”)를 보여 줍니다.
   n_eff 표에는 “n_eff without heater”와 “Δn_eff (coupled − without heater)”가 부호와 n_eff와 같은
@@ -960,7 +960,7 @@ joined*, 아니면 *… · in project heater-study.json · saved 13:15* 또는 *
 
 ### 모드 표
 
-결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) | n_g |가 광 애플리케이션에 나오고,
+결과에는 실행마다 표 하나, | Mode | n_eff | Polarization | Loss (dB/cm) | A_eff (µm²) | n_g |가 광 애플리케이션에 나오고,
 다중물리 모델의 Modes 1 페이지에는 n_g가 없는 같은 표가 나옵니다. “Modes are ranked by effective index.”(광 애플리케이션은 “Compare matches them between runs by field overlap.”을 덧붙임) 모든 값은 저장된 중심 장
 `unnormalized_electric_field`에서 정의되므로 Studio, 엔진, 이전 세션 파일이 같은 샘플에서 같은 값을 얻습니다.
 
@@ -996,22 +996,23 @@ joined*, 아니면 *… · in project heater-study.json · saved 13:15* 또는 *
   1.4e-4~2.5e-3이라 밝히지 않고, 슬랩 같은 모드는 *g*가 0.087 이상입니다. 20 nm만 식각한 리브(*g* 0.024와 0.046, 창을 넓히면
   n_eff가 약 1e-3 움직임)는 밝힙니다. 창 가장자리에 형상이 없는 템플릿에서는 나오지 않습니다. 열린 실행과 장이 없는 실행은
   검사하지 않습니다.
-- **Absorption loss (dB/cm)**는 Im n_eff에서 구합니다: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100, k0 = 2π / λ0(1/m 단위,
+- **Loss (dB/cm)**는 Im n_eff에서 구합니다: dB/cm = 20 · log10(e) · k0 · Im(n_eff) / 100, k0 = 2π / λ0(1/m 단위,
   exp(−iωt), Im n_eff > 0이 손실). 이는 엔진의 `propagation_loss = (40π / ln 10) · Im n_eff / λ0`(dB/m)를
   100으로 나눈 값이며 유효숫자 4자리까지 보입니다(*37.49 dB/cm*). 닫힌 창에서 이 열은 재료 흡수(k)만 세며,
-  열 머리글, 모든 칸의 도움말, 표 아래 안내가 그렇게 밝힙니다: 도움말은 “Absorption (material k) only; leakage
+  열 머리글 둘째 줄(*absorption only (closed window)*), 모든 칸의 도움말, 표 아래 안내가 그렇게 밝힙니다: 도움말은 “Absorption (material k) only; leakage
   and radiation are not computed in a closed window”, 안내는 “Absorption loss counts material absorption (k)
   only. Leakage and radiation are not computed in a closed window.”입니다. 모든 Im n_eff가 정확히 0이면 행마다
   *0 dB/cm*(계산된 누설 0이 아니라 무손실 실행)를 쓰고, 안내는 “Absorption loss counts material absorption (k)
   only: all materials have k = 0 at this wavelength, so it is 0 dB/cm. Leakage and radiation are not computed
   in a closed window.”입니다. 광 애플리케이션은 닫힌 실행의 안내에 “For leakage, choose Open boundary in
   Physics › Optical modes.”를 덧붙입니다. [열린 경계](#광학-작업-공간의-열린-경계)가 있는 실행은 자기 칸을
-  씁니다. 열린 경계(PML)가 있는 다중물리 결과는 Im n_eff가 PML로의 누설을 포함하므로 열이
-  **Loss (dB/cm)**이고, 도움말은 “Material absorption (k) and leakage into the PML of the open boundary”, 안내는
+  씁니다. 열린 경계(PML)가 있는 다중물리 결과는 Im n_eff가 PML로의 누설을 포함하므로 머리글
+  둘째 줄이 *absorption + leakage into the PML*이고, 도움말은 “Material absorption (k) and leakage into the PML of the open boundary”, 안내는
   “Loss includes material absorption (k) and leakage into the PML of the open boundary. Leakage depends
-  on what lies outside the window: shapes touching an open edge continue through the PML.”입니다. 그 밖의 표는 모두
-  **Absorption loss (dB/cm)**입니다. Compare는 같은 값을 *Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*로
-  보입니다. 문턱값은 없습니다:
+  on what lies outside the window: shapes touching an open edge continue through the PML.”입니다. round 24(B6, 코디네이터
+  결정)부터 모든 표가 결과, Compare, 가열 모델에서 열 이름을 **Loss (dB/cm)**로 씁니다(전에는 닫힌 창의 열이 **Absorption loss
+  (dB/cm)**). Compare는 같은 값을 같은 둘째 줄이 붙은 *Loss (dB/cm)* 아래 *Loss A (dB/cm)*, *Loss B (dB/cm)*로 보이며, 한쪽은
+  닫힌 창이고 다른 쪽은 열린 경계이면 묶음에 둘째 줄이 없고 표 아래 안내가 각 쪽이 무엇을 세는지 밝힙니다. 문턱값은 없습니다:
   0이 아닌 Im n_eff는 아무리 작아도 그대로 보입니다. 엔진은 k > 0인 재료나 PML이 있을 때만 복소 n_eff를
   돌려주며, 무손실 문제는 실수 n_eff를 주므로 그 Im은 정확히 0입니다. 광 애플리케이션의 재료와 가열 템플릿은
   무손실이라 0 dB/cm로 읽히고, 다중물리 세션이나 모델 파일은 복소 n_eff(손실 재료나 PML)를 가질 수 있으며 그
@@ -1425,7 +1426,7 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
 
 **Compare.**
 
-- 각 쪽의 손실 머리글은 그 실행을 따릅니다(*Absorption loss A (dB/cm)*, *Loss B (dB/cm)*).
+- 각 쪽의 손실 머리글은 도움말에서 그 실행을 따르고(*Loss A (dB/cm)*: 흡수만, *Loss B (dB/cm)*: 누설 포함), 묶음은 둘째 줄 없이 *Loss (dB/cm)*입니다.
 - 둘이 다르면 안내 “A counts material absorption only; B also counts leakage. Their difference is not a
   leakage loss.”가 붙습니다.
 - 열린 실행이 있으면 표 위 줄이 각 실행을 *(closed)* 또는 *(open, PML 1 µm)*로 부릅니다.
@@ -1731,11 +1732,11 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
   제목은 겹침과 Δn_eff를 덧붙임)로 시작하고, 양쪽의 편광(낱말과 TE 백분율), 소수 2자리
   겹침, A와 B의 n_eff, Δn_eff (B − A), A 대비 Δ %, 그리고 A와 B의 A_eff(µm²)가 나옵니다(짝지어진 축퇴 쌍은
   두 모드 값의 *mean*을 보이며, 도움말은 각 모드의 값이 쌍 안의 회전까지만 정의된다고 밝힙니다), 그 뒤에 A와 B의
-  흡수 손실(*Absorption loss A (dB/cm)*, *Absorption loss B (dB/cm)*)이 짝지어진 행과 짝이 없는 행 모두에 나옵니다:
+  흡수 손실(*Loss A (dB/cm)*, *Loss B (dB/cm)*)이 짝지어진 행과 짝이 없는 행 모두에 나옵니다:
   저장된 지수에서 얻은 모드 표의 값이며, 짝지어진 쌍은 두 모드 dB/cm의 *mean*이고, 광 어댑터의 재료는
   무손실이라 광학 실행은 *0 dB/cm*입니다. 그 뒤에 *n_g A*와 *n_g B*가 나옵니다(모드 표의 값, 짝지어진 쌍은
   두 모드 값의 *mean*, 실행에 값이 없으면 모드 표의 도움말과 함께 **—**). 머리글은 짧게 묶입니다:
-  *Polarization*, *n_eff*, *A_eff (µm²)*, *Absorption loss (dB/cm)*, *n_g*는 각각 **A** 열과 **B** 열 위에,
+  *Polarization*, *n_eff*, *A_eff (µm²)*, *Loss (dB/cm)*, *n_g*는 각각 **A** 열과 **B** 열 위에,
   *Modes*, *Overlap*, *Δn_eff (B − A)*, *Δ % (of A)*는 한 열 위에 있고, 표 위 줄이 실행 A와 B를 밝힙니다.
   Polarization 칸은 두 줄로, 종류 다음에 비율이 나옵니다(*TE-like* / *98.2 % TE*). 1440 × 900에서는 모든 열이
   표 상자에 들어갑니다. 상자가 더 좁으면(휴대폰) 첫 열은 그대로 보이고 나머지 열은 상자 안에서 옆으로 스크롤되며,

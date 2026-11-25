@@ -495,3 +495,5 @@ dialog::backdrop{background:#162a4b66}
 .run-options.edge-warning .run-plan,.run-options.edge-warning.dropping .run-drop-text{-webkit-line-clamp:1}
 @media(max-width:600px){.run-options{width:280px}}
 .closed-edge-warning{margin:8px 0}.closed-edge-warning p{margin:4px 0}.closed-edge-actions{display:flex;flex-wrap:wrap;gap:6px}
+/* round 24 (B6): a loss column header, "Loss (dB/cm)" over what it counts */
+.loss-name,.loss-qualifier{display:block}.loss-qualifier{white-space:normal;max-width:11em;font-size:10px;font-weight:400;color:#586c87}.compare-table thead th[scope=colgroup] .loss-qualifier{margin:0 auto}
