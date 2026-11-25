@@ -11,6 +11,7 @@ import numpy as np
 import scipy.sparse.linalg as spla
 from .assembly import assemble_mass, assemble_stiffness
 from .core.checks import refuse_live
+from .core.eigen import arpack_rng
 
 
 @dataclass(frozen=True)
@@ -129,7 +130,7 @@ def solve_scalar_coordinates(mesh, eps_r, k0, n_target, factors, *, num_modes=6,
     lu = spla.splu((Af-shift*Bf).tocsc())
     op = spla.LinearOperator(Af.shape, matvec=lambda x: lu.solve(Bf@x), dtype=lu.L.dtype)
     val, vec = spla.eigs(op, k=count, which="LM", v0=np.ones(len(free)),
-                         ncv=min(len(free), max(4*count, 40)), maxiter=20000)
+                         ncv=min(len(free), max(4*count, 40)), maxiter=20000, **arpack_rng())
     neff = np.sqrt((shift+1/val).astype(complex))/k0
     indices = np.argsort(-neff.real)
     fields = np.zeros((mesh.num_nodes, count), dtype=complex)

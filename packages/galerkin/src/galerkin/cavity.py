@@ -64,7 +64,7 @@ from .core import live as live_inputs
 from .core import solve as core_solve
 from .core.backend import lift, live_namespace, scatter_add
 from .core.checks import contains_live, positive_integer, positive_real, real_value, triple
-from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (public here)
+from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning, arpack_rng  # noqa: F401 (public here)
 from .core.sparse import CooMatrix
 from ._public import refuse_text
 
@@ -385,7 +385,8 @@ def _solve_cavity_numpy(space, pec, unit_nodes, components, interior_count, coun
             values, vectors = spla.eigsh(
                 stiffness, k=candidates, M=mass, sigma=sigma, which="LM", OPinv=operator,
                 v0=np.random.default_rng(0).standard_normal(len(free)),
-                ncv=min(len(free), max(6 * candidates, 90)), tol=1e-10, maxiter=50000)
+                ncv=min(len(free), max(6 * candidates, 90)), tol=1e-10, maxiter=50000,
+                **arpack_rng("eigsh"))
         if not np.isfinite(values).all() or not np.isfinite(vectors).all():
             raise RuntimeError("cavity eigensolver returned non-finite eigenpairs")
         if np.any(values < -kernel_cutoff):
