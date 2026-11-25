@@ -100,10 +100,16 @@ index >= −b (a gain-like candidate is rejected as `negative_imaginary_index`; 
 [gain bound](#the-gain-bound) b is below). The nearest eligible candidates to the target are
 returned, ordered by descending real index at the seed point. Rejected and
 unselected candidates remain in diagnostics. A nonfinite propagation root
-stops the low-level solve; it is not silently discarded. Roots of the vector
-formulation's static `beta^2 = 0` family with `|beta^2| <= 1e-10 |sigma|` are not
-candidates, and a search of only such roots is refused like any search without
-an eligible candidate ([waveguide formulation](../galerkin/waveguide_formulation.md#3-full-vector-mixed-nédélecnodal-formulation)).
+stops the low-level solve; it is not silently discarded. The vector formulation's
+static `beta^2 = 0` family is never searched: galerkin projects it out of the search
+and keeps the roots nearer the target than that family, so the candidates of a search
+are the roots inside the disk `|lambda - sigma| < |sigma|` (`lambda = -beta^2`,
+`sigma = -(k0 n_target)^2`), at most `pml_search_mode_count`. A search with no such
+root is refused like any search without an eligible candidate. Near a TM cutoff of the
+PEC box (`k0^2` within a relative `1e-5` of an eigenvalue of the nodal block) the search
+is not projected, as before, with galerkin's `StaticFamilyNearCutoffWarning`; there
+roots of the family with `|beta^2| <= 1e-10 |sigma|` are not candidates
+([waveguide formulation](../galerkin/waveguide_formulation.md#3-full-vector-mixed-nédélecnodal-formulation)).
 
 ### Further searches
 
