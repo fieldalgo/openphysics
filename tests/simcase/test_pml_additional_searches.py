@@ -172,9 +172,11 @@ def test_merge_degenerate_span():
 # -- the record ------------------------------------------------------------------------------------
 
 # A pre-existing finding, not from this key (slice T1, W2): the PML wavelength sweep of
-# test_pml_contract's vector document is not bit-reproducible run to run. Its unselected candidates
-# 2-7 of point 0 differ at about 1e-14 between runs of the same code (on main and with this change);
-# the selected values are identical. W2's byte comparison excepts that document for this reason.
+# test_pml_contract's vector document was not bit-reproducible run to run. Its unselected candidates
+# 2-7 of point 0 differed at about 1e-14 between runs of the same code; the selected values were
+# identical, and W2's byte comparison excepted that document. The cause was ARPACK's random start
+# vector. Since its start vector is fixed (#357), the sweep repeats bit for bit, and
+# test_pml_contract.test_units_and_wavelength_tracking compares every candidate exactly.
 
 def test_the_record_with_and_without_the_key():
     plain = run(Document.from_dict(leaky(None)), False).summary()

@@ -1,9 +1,11 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 import copy
+import inspect
 import json
 import numpy as np
 import pytest
+import scipy.sparse.linalg
 from decimal import Decimal
 from simcase import Document, DocumentError, run, examples
 from simcase.results_common import dumps_summary
@@ -68,6 +70,20 @@ def test_units_and_wavelength_tracking(formulation):
         for point in r.open_boundary:
             assert len(point['selected_candidates'])==1
             assert sum(c['selected'] for c in point['candidates'])==1
+        # every candidate, not only the selected one, is the same bit for bit: with the fixed ARPACK
+        # start vector (#357) the sweep repeats in one process. Before it, candidates 2-7 of point 0
+        # differed at 1e-15 to 3e-14 between these three runs with single-threaded BLAS (the W2
+        # exception of slice T1). SciPy before 1.17 has no seed to fix, as pml_modes.md says.
+        if _ARPACK_SEEDED:
+            assert _candidate_indices(r)==_candidate_indices(reference)
+
+
+_ARPACK_SEEDED='rng' in inspect.signature(scipy.sparse.linalg.eigs).parameters
+
+
+def _candidate_indices(result):
+    return [[(c['effective_index']['re'],c['effective_index']['im']) for c in point['candidates']]
+            for point in result.open_boundary]
 
 
 @pytest.mark.parametrize('change,code',[
