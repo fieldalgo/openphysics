@@ -52,13 +52,27 @@ The left matrix is singular: varying the functional with respect to e_z yields a
 constraint, not an eigenvalue equation, so beta^2 = 0 is an eigenvalue of high
 multiplicity (every [0, e_z] satisfies A x = 0). Guided modes sit far away from it,
 at n_clad < beta/k0 < n_core, and shift-inverting near the core index reaches them
-directly. A search for more modes than lie closer to the target than this static
-family reaches it: its computed roots usually have |beta^2| at rounding level
-(about 1e-14 |sigma|, sometimes exactly 0) and E_t = e_t / beta is undefined for
-them. Roots with |beta^2| <= STATIC_ROOT_TOL |sigma|, that is |n_eff| <= 1e-5
-|n_target|, are not returned. When k0^2 is close to an eigenvalue of
-K e_z = lambda M e_z on the free nodes (a TM cutoff of the PEC box), the family is
-ill-conditioned, its computed roots can exceed the tolerance, and they are returned
+directly. The family is exactly degenerate (nu = 1/(lambda - sigma) = -1/sigma for
+all of it), so a search that asked ARPACK for its vectors converged them only
+through rounding: how fast, or whether at all, depended on the last bits of the
+pencil. The search therefore never asks for them. For lambda != 0 the nodal rows of
+A x = lambda B x give G^T x_t + N x_z = 0 (N = K - k0^2 M on the free nodes), so
+    P [x_t; x_z] = [x_t; -N^-1 G^T x_t]
+keeps every other eigenvector, annihilates [0, e_z] and commutes with the
+shift-invert operator; the search runs on P (A - sigma B)^-1 B from P(ones). It then
+also finds roots beyond the family (|nu| |sigma| < 1); only roots nearer the shift
+than the family (|nu| |sigma| > 1) are kept, the roots an undeflated search finds
+before it reaches the family. Roots with |beta^2| <= STATIC_ROOT_TOL |sigma|, that is
+|n_eff| <= 1e-5 |n_target|, are not returned either.
+
+N is nearly singular when k0^2 is close to an eigenvalue of K e_z = mu M e_z on the
+free nodes (a TM cutoff of the PEC box). The relative distance delta = 1/|mu_max|,
+mu_max the largest eigenvalue of N^-1 (k0^2 M), is estimated first; below
+STATIC_DEFLATION_MIN_CUTOFF_DISTANCE (1e-5) the search is not deflated, as before,
+with a StaticFamilyNearCutoffWarning. There a search for more modes than lie closer
+to the target than the family reaches it: its computed roots usually have |beta^2|
+at rounding level and are not returned, but the family is ill-conditioned, its
+roots can exceed the tolerance, and they are returned
 (docs/packages/galerkin/waveguide_formulation.md, section 3).
 
 Solving it
@@ -103,18 +117,26 @@ from .edge import EdgeSpace
 from .core import eigen, forms, kernels
 from .core import live as live_inputs
 from .core import solve as core_solve
-from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning, arpack_rng  # noqa: F401 (galerkin.waveguide re-exports them)
+from .core.eigen import (DEGENERATE_GAP, DegenerateModeWarning,  # noqa: F401 (galerkin.waveguide re-exports them)
+                         StaticFamilyNearCutoffWarning, arpack_rng)
 from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
 from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
 from .core.spaces import TRI_LOCAL_EDGES
 
-__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning"]
+__all__ = ["STATIC_ROOT_TOL", "STATIC_DEFLATION_MIN_CUTOFF_DISTANCE", "assemble_mode_system", "solve_modes",
+           "DegenerateModeWarning", "StaticFamilyNearCutoffWarning"]
 
 #: Relative size |beta^2| / |sigma| at or below which a root belongs to the static
 #: beta^2 = 0 family (module docstring). Measured static roots away from a TM
 #: cutoff of the PEC box: <= 1.2e-14.
 STATIC_ROOT_TOL = 1e-10
+
+#: Relative distance |mu - k0^2| / k0^2 of k0^2 from the nearest eigenvalue mu of K e = mu M e on the
+#: free nodes (a TM cutoff of the PEC box) below which the vector search is not deflated: the
+#: nodal block K - k0^2 M of B, which the projector solves with, is then nearly singular
+#: (module docstring).
+STATIC_DEFLATION_MIN_CUTOFF_DISTANCE = 1e-5
 
 
 def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
@@ -129,6 +151,12 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
     """
     for name, value in (("eps_r", eps_r), ("k0", k0), ("mu_r", mu_r), ("coordinate_factors", coordinate_factors)):
         refuse_live(value, f"assemble_mode_system {name}")
+    A, B, space, _ = _assembled(mesh, eps_r, k0, mu_r, space, coordinate_factors)
+    return A, B, space
+
+
+def _assembled(mesh, eps_r, k0, mu_r, space, coordinate_factors):
+    """(A, B, space, M) of ``assemble_mode_system``, with the nodal mass block M."""
     space = space or EdgeSpace(mesh)
     blocks = {name: m.to_scipy() for name, m in _mode_blocks(np, space, eps_r, mu_r, coordinate_factors).items()}
     S, Mt_eps, Mt_mu, G, K, M = (blocks[n] for n in ("S", "Mt_eps", "Mt_mu", "G", "K", "M"))
@@ -140,7 +168,7 @@ def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
                  [zero_en.T,            zero_nn]]).tocsr()
     B = sp.bmat([[Mt_mu, G],
                  [G.T,   K - k0 ** 2 * M]]).tocsr()
-    return A, B, space
+    return A, B, space, M
 
 
 def _mode_blocks(xp, space, eps_r, mu_r, coordinate_factors):
@@ -666,6 +694,57 @@ def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges, *, 
     return xp, A, B, free
 
 
+def _cutoff_distance(nodal, N, Mk):
+    """delta = 1 / |mu_max|, mu_max the largest eigenvalue of N^-1 Mk (N the factored nodal block
+    ``nodal`` = K - k0^2 M, Mk = k0^2 M, on the free nodes): the relative distance of k0^2 from the
+    nearest TM cutoff of the PEC box. 0 when the estimate does not converge."""
+    m = Mk.shape[0]
+    if m <= 2:
+        mu = la_eig(Mk.toarray(), nodal.toarray(), right=False)
+        return float(1.0 / np.max(np.abs(mu))) if np.all(np.isfinite(mu)) and np.max(np.abs(mu)) > 0 else 0.0
+    dtype = np.result_type(N.L.dtype, Mk.dtype)
+    operator = spla.LinearOperator((m, m), matvec=lambda x: N.solve(Mk @ x), dtype=dtype)
+    mu = eigen.dominant_eigenvalue(operator, tol=1e-3)
+    return float(1.0 / abs(mu)) if mu is not None and np.isfinite(mu) and mu != 0 else 0.0
+
+
+def _static_projector(B, free, n_e, k0, M):
+    """The projector P [x_t; x_z] = [x_t; -N^-1 G^T x_t] (N = K - k0^2 M, G^T the nodal-edge
+    block of B, both on the free DOFs), or None when the search is not deflated.
+
+    P annihilates the static family [0; e_z] and keeps every other eigenvector of the pencil:
+    for lambda != 0 the nodal rows of A x = lambda B x give G^T x_t + N x_z = 0. It commutes
+    with (A - sigma B)^-1 B. None when no node is free, and, with a
+    StaticFamilyNearCutoffWarning, when k0^2 is within STATIC_DEFLATION_MIN_CUTOFF_DISTANCE of a
+    TM cutoff or N cannot be factored.
+    """
+    edges = free < n_e
+    nodes = ~edges
+    if not nodes.any():
+        return None
+    node_ids = free[nodes] - n_e
+    nodal = B[nodes][:, nodes].tocsc()
+    try:
+        N = spla.splu(nodal)
+    except RuntimeError:
+        delta = 0.0
+    else:
+        delta = _cutoff_distance(nodal, N, (k0 ** 2 * M.tocsr()[node_ids][:, node_ids]).tocsc())
+    if not delta >= STATIC_DEFLATION_MIN_CUTOFF_DISTANCE:
+        warnings.warn(f"k0^2 is within a relative {delta:.1e} of a TM cutoff of the PEC box (below "
+                      f"{STATIC_DEFLATION_MIN_CUTOFF_DISTANCE:g}): the static beta^2 = 0 family is not "
+                      f"deflated, and a search for many roots can reach it", StaticFamilyNearCutoffWarning,
+                      stacklevel=4)
+        return None
+    Gt = B[nodes][:, edges].tocsc()
+
+    def project(x):
+        y = np.array(x, copy=True)
+        y[nodes] = -N.solve(Gt @ x[edges])
+        return y
+    return project
+
+
 def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                        num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None,
                        coordinate_factors=None):
@@ -679,7 +758,9 @@ def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                        or coordinate_factors is not None)
     if not complex_problem:
         eps_r, mu_r = eps_r.real, mu_r.real
-    A, B, space = assemble_mode_system(mesh, eps_r, k0, mu_r, coordinate_factors=coordinate_factors)
+    for name, value in (("eps_r", eps_r), ("k0", k0), ("mu_r", mu_r), ("coordinate_factors", coordinate_factors)):
+        refuse_live(value, f"assemble_mode_system {name}")
+    A, B, space, M = _assembled(mesh, eps_r, k0, mu_r, None, coordinate_factors)
     n_e, n_n = space.num_edges, mesh.num_nodes
 
     free = _free_dofs(mesh, space, pec_nodes, pec_edges)
@@ -690,18 +771,29 @@ def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     # Shift-invert as a standard problem: nu = 1 / (lam - sigma), lam = -beta^2
     sigma = -(k0 * n_target) ** 2
     lu = spla.splu((A - sigma * B).tocsc())
-    op = spla.LinearOperator((n, n), matvec=lambda x: lu.solve(B @ x), dtype=lu.L.dtype)
-    nu, vecs = spla.eigs(op, k=num_modes, which="LM", v0=np.ones(n),
+    project = _static_projector(B, free, n_e, k0, M)
+    if project is None:     # no free node, or k0^2 near a TM cutoff: today's search
+        op = spla.LinearOperator((n, n), matvec=lambda x: lu.solve(B @ x), dtype=lu.L.dtype)
+        v0 = np.ones(n)
+    else:                   # the static family is projected out of every Krylov vector
+        op = spla.LinearOperator((n, n), matvec=lambda x: project(lu.solve(B @ x)), dtype=lu.L.dtype)
+        v0 = project(np.ones(n, dtype=lu.L.dtype))
+    nu, vecs = spla.eigs(op, k=num_modes, which="LM", v0=v0,
                          ncv=min(n, max(4 * num_modes, 40)), maxiter=20000, **arpack_rng())
 
     beta2 = -(sigma + 1.0 / nu)
+    if coordinate_factors is not None and not np.isfinite(np.sqrt(beta2.astype(complex))).all():
+        raise RuntimeError("modal coordinate search returned a nonfinite propagation root")
     # Roots of the static beta^2 = 0 family are not modes (module docstring).
     mode = ~(np.abs(beta2) <= STATIC_ROOT_TOL * abs(sigma))
+    if project is not None:
+        # The deflated search returns roots beyond the static family too (|nu| |sigma| < 1);
+        # only those nearer the shift than the family are kept, the roots a search finds
+        # before it reaches the family.
+        mode &= np.abs(nu) * abs(sigma) > 1.0
     if complex_problem:
         beta = np.sqrt(beta2.astype(complex))
         if coordinate_factors is not None:
-            if not np.isfinite(beta).all():
-                raise RuntimeError("modal coordinate search returned a nonfinite propagation root")
             keep = np.flatnonzero(mode)  # let the caller record every candidate and exclusion
         else:
             keep = np.flatnonzero(np.isfinite(beta) & (beta.real > 0) & mode)
