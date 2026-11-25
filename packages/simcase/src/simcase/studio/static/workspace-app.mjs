@@ -1395,7 +1395,9 @@ function refreshDropWarning(){
 }
 // Run retention (section 5): below the run limit, the line says which runs the next result would leave
 // with their values only, from the field bytes of the newest run of the same geometry, boundary and
-// Modes to find; nothing without such a run (the after-result words then say what happened). While a
+// Modes to find, at the sizes the result's arrival applies (a tab whose fields would not all fit as
+// text makes them compact first: arrivalSizes), so the key holds whether each field is compact;
+// nothing without such a run (the after-result words then say what happened). While a
 // run computes, the run's captured inputs are the next result's. Pin Run N puts the run's fields
 // ahead of the unpinned runs'. Kept per state of the runs and inputs, since a render calls it often.
 let fieldWarning={key:null,list:[],risk:false};
@@ -1403,7 +1405,7 @@ function refreshFieldWarning(running,matched){
  if(matched||(running&&!pendingJob))return;
  const job=running?pendingJob:null,model=(job?job.input:current()).model,ob=job?(job.openBoundary?{edges:job.openBoundary.edges}:null):state.openBoundary;
  const next=fieldSizeKey({shapes:model.shapes,coreMesh:model.coreMesh,boundary:signaturePml(ob,model.shapes)?.open_edges??null,modeCount:job?job.modeCount:state.modeCount});
- const key=next+'|'+runs.map(r=>[r.job,r.number,r.pinned,r.label,!!r.field].join()).join(';')+'|'+(solverRun?.job||'')+'|'+compareIds.join()+'|'+running;
+ const key=next+'|'+runs.map(r=>[r.job,r.number,r.pinned,r.label,r.field?(isCompactField(r.field)?'compact':'text'):''].join()).join(';')+'|'+(solverRun?.job||'')+'|'+compareIds.join()+'|'+running;
  if(fieldWarning.key!==key){let list=[],risk=false;try{list=predictedLetGo(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),next);
   // round 25 (A1): no estimate (no run of this key), yet the room left is less than the smallest field kept
   if(!running)risk=unestimatedFieldRisk(inputsFile(),runs,solverRun?.job||null,compareIds,currentView(),next);}catch{}fieldWarning={key,list,risk};}

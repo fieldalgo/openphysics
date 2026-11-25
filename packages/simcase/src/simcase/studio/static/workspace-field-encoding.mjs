@@ -92,6 +92,19 @@ export function compactFieldBytes(record){
  return `"field":{"encoding":"${record.encoding}","counts":{"modes":${c.modes},"nodes":${c.nodes},"triangles":${c.triangles}},"node_coordinates":"","triangles":"","real":"","imag":""},`.length+compactFieldChars(c);
 }
 
+/** The bytes a field would add to its run's record kept compact (compactFieldBytes of its counts), or
+ * null when single precision cannot hold one of its samples (encodeField refuses it: the field would
+ * stay text). Kept per field object; a compact field gives its record's bytes. */
+export function compactBytesOf(field){
+ const record=compactRecord(field);if(record)return compactFieldBytes(record);
+ if(COMPACT_BYTES.has(field))return COMPACT_BYTES.get(field);
+ // encodeField's test, sample by sample: the float32 is finite, and a nonzero sample stays normal
+ const holds=part=>part.every(mode=>mode.every(v=>v.every(x=>{const y=Math.fround(x);return Number.isFinite(y)&&(x===0||Math.abs(y)>=FLOAT32_MIN_NORMAL);})));
+ const bytes=holds(field.real)&&holds(field.imag)?compactFieldBytes({encoding:FIELD_ENCODING,counts:{modes:field.real.length,nodes:field.node_coordinates.length,triangles:field.triangles.length}}):null;
+ COMPACT_BYTES.set(field,bytes);return bytes;
+}
+const COMPACT_BYTES=new WeakMap();
+
 const isObject=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 /** Whether a stored field is a compact record (it names an encoding) rather than nested numbers. */
 export const isCompactRecord=f=>isObject(f)&&Object.hasOwn(f,'encoding');

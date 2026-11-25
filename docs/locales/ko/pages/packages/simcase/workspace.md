@@ -1826,7 +1826,9 @@ Run 1 and Run 2; their n_eff, TE fractions and effective areas were.*가 붙습�
   남을 실행을 밝힙니다: *If you run: Run 3 (closed · 4 modes · 700 × 300 nm) keeps its values, not its fields*와 **Pin Run 3**
   (둘 이상이면 *… and Run 5 (…) keep their values, not their fields*). 그런 실행이 없으면, 16.8 MB에 남은 공간이 지금 유지된
   가장 작은 필드보다 작을 때만 *If you run: older runs' fields may not be kept (16.8 MB limit) · pin a run to keep its fields first*
-  (round 25, A1. 실행을 밝히지 않으므로 Pin 버튼 없음)를 보이고, 그 밖에는 아무 말도 하지 않습니다. 실행이
+  (round 25, A1. 실행을 밝히지 않으므로 Pin 버튼 없음)를 보이고, 그 밖에는 아무 말도 하지 않습니다. 두 줄 모두 결과가 도착할 때
+  적용할 크기로 셉니다: 필드가 아직 텍스트인 탭에서 필드를 모두 텍스트로 담을 수 없게 되는 결과는 먼저 모든 필드를 압축하므로
+  ([압축 필드](#압축-필드단정밀도)), 줄은 단정밀도로도 남지 못할 실행만 밝힙니다(round 26, C1). 실행이
   계산하는 동안: *When this run finishes, Run 3 (…) keeps its values, not its fields*. 실행이 20개이면 위의 내보내기 문구가
   그대로입니다. 결과 뒤에는 Messages가 *Run 3 (…) keeps its values; its fields were not kept (16.8 MB limit).*와
   **Recompute Run 3's fields**를, 고정되지 않고 선택되지 않은 다른 실행의 필드가 그만큼 크면 **Keep Run 3's fields, not Run 4's

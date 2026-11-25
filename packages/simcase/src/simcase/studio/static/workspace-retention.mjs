@@ -17,7 +17,7 @@
 // unpinning, naming or comparing runs removes no field. A run without its field keeps n_eff, the
 // TE fractions, the effective areas, n_g and the open-boundary candidates (its values).
 import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,FIELDS_MOVE_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget,compactRunField,COMPACT_SESSION_VERSION} from './workspace-notebook.mjs';
-import {isCompactField} from './workspace-field-encoding.mjs';
+import {isCompactField,compactBytesOf} from './workspace-field-encoding.mjs';
 import {dropName,dropParts,runTitle,aboutText} from './workspace-workflow.mjs';
 import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
 import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
@@ -196,8 +196,17 @@ export function predictedLetGo(input,runs,selected,comparison,view,next,{budget=
  let after;try{after=appendRun(runs,phantom,RUN_LIMIT);}catch{return [];}
  const size=r=>r===phantom?bytes(like):bytes(r);
  // (the view's mode is the next result's first: the selected run then has at least one mode)
- const {letGo}=chooseFields(input,after,phantom.job,comparison,{...view,mode:0},{budget,bytes:size});
+ const v={...view,mode:0};
+ const {letGo}=chooseFields(input,after,phantom.job,comparison,v,{budget,bytes:arrivalSizes(input,after,phantom.job,comparison,v,{budget,bytes:size})});
  return letGo.filter(r=>r!==phantom);
+}
+/** The field sizes the next arrival applies the order with (chooseFieldsAtArrival): in a tab holding
+ * no compact field whose fields would not all fit as text, every field single precision holds is made
+ * compact first (compactFields), so its compact bytes count; otherwise bytes. size(run) gives a run's
+ * field bytes as it is now (a phantom result: its like-run's); its compact bytes are those of its field. */
+export function arrivalSizes(input,runs,selected,comparison,view,{budget=FIELD_BUDGET_BYTES,bytes=runFieldBytes}={}){
+ if(runs.some(r=>isCompactField(r.field))||chooseFields(input,runs,selected,comparison,view,{budget,bytes}).fits)return bytes;
+ return r=>compactBytesOf(r.field)??bytes(r);
 }
 
 /** Round 25 (A1): before the run, with no run of the same geometry, boundary and Modes to find (no
@@ -209,9 +218,13 @@ export const FIELDS_MAY_GO_TEXT=`If you run: older runs' fields may not be kept 
  * than the smallest kept field's bytes. */
 export function unestimatedFieldRisk(input,runs,selected,comparison,view,next,{budget=FIELD_BUDGET_BYTES,bytes=runFieldBytes}={}){
  if(runs.some(r=>r.field&&runFieldSizeKey(r)===next))return false;
- const {kept,total}=chooseFields(input,runs,selected,comparison,view,{budget,bytes});
- if(!kept.length)return false;
- return budget-total<Math.min(...kept.map(bytes));
+ const risk=size=>{const {kept,total}=chooseFields(input,runs,selected,comparison,view,{budget,bytes:size});
+  return kept.length>0&&budget-total<Math.min(...kept.map(size));};
+ if(!risk(bytes))return false;
+ // the arrival rule: in a tab holding no compact field, an arrival that would not fit as text makes
+ // every field compact first, so the room left and the smallest field are counted at compact sizes
+ if(runs.some(r=>isCompactField(r.field)))return true;
+ return risk(r=>compactBytesOf(r.field)??bytes(r));
 }
 
 // ---- Recompute Run N's fields (section 4.4) ---------------------------------------------------
