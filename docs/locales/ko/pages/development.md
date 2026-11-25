@@ -319,7 +319,7 @@ n = 1.45*와 세 행을 보임, 모드 8개인 2000 × 400 nm 코어 두 개가 
 잡히지 않은 페이지 예외와 `console.error` 호출이 있으면 검사가 실패합니다(그 밖의 브라우저 로그 항목은 모으지 않습니다).
 또 모델 빌더를 키보드만으로 쓰는 ARIA 트리로 확인하고(하나뿐인 탭 정지로 Tab, Up, Down, Home, End, Enter,
 Space, Left, Right), 광학과 Joule 가열 트리의 모든 노드를 브라우저 접근성 트리에서 역할과 접근 가능한 이름으로 찾으며,
-Compare의 흡수 손실 열, 1440 × 900과 1280 × 800에서 코어에 맞춰진 그림과 그 아래의 probe 줄, Compare에서 누른 실행이
+Compare의 손실 열(24차부터 *Loss (dB/cm)* 아래 *absorption only (closed window)*), 1440 × 900과 1280 × 800에서 코어에 맞춰진 그림과 그 아래의 probe 줄, Compare에서 누른 실행이
 Compare에 남고 **Open in Results**를 제안함, 고른 것으로 보이는 실행 카드 하나, 페이지·실행·모드를 골라도 복구 뒤에도
 이름이 남는 세션 파일, 보이던 페이지를 여는 복구를 확인합니다. 11차부터는 Results나 Compare에서 고른 트리 노드가 없고
 포인터가 올라간 노드도 일반 배경을 유지함, 짧은 *(other inputs)*가 Results와 Compare에서만 제목에 붙음, 묻지 않는
@@ -470,9 +470,9 @@ in a closed window its slab modes come first.*, Optical modes에는 전체 문�
 없는지, 1440 × 900과 390 × 844에서, 그리고 Optical modes에는 전체 문장이 있는지(P1); 실행 전 군굴절률을 켜면 *Closed window ·
 group index on (3 solves)*와 **Turn off group index**, 군굴절률 없는 모드 4개 닫힌 실행 뒤에는 *… · about N s*(그 시간의 3배),
 버튼이 선택을 끄는지(*Closed window · last such run m:ss*, 확인란 해제, *Group index off: …*), n_g 닫힌 실행 뒤에는 그 실행의
-시간인지(P3); 모드 4개 또는 2개 실행 다섯(약 19 MB)이 *… Session is now N MB, over the 16 MiB (16.8 MB) limit. File › Save will
-ask whether to keep the fields of the selected and pinned runs only (Run 5); the other runs keep n_eff, the TE fractions and
-the effective areas. Browser recovery keeps every field but those of Run 1.*를 Messages에서 넘침 없이 줄바꿈해 보이고, 헤더가
+시간인지(P3); 모드 4개 또는 2개 실행 다섯(약 19 MB)이 *… Session is now N.N MB, over the 16.8 MB limit. Browser recovery keeps
+every run's values; the field plots of Run 1 are not kept. File › Save will ask whether to keep the field plots of the selected
+and pinned runs only (Run 5).*(24차 B3: 단위 하나, *MiB* 없음)를 Messages에서 넘침 없이 줄바꿈해 보이고, 헤더가
 *… · kept for recovery in this browser without the fields of Run 1*이며, IndexedDB 기록이 16 MiB 안에서 Run 5의 장과 새 실행들의
 장을 담고 밝힌 실행만 빠졌는지, 여섯 번째 실행(약 24 MB) 뒤에도 기록이 16 MiB 안에서 Run 6의 장을 담고 헤더가 장 없는 실행을
 정확히 밝히는지(P2); 실행 여섯 개에서 내보내기 줄, **Pin Run 1**–**Pin Run
@@ -480,6 +480,15 @@ the effective areas. Browser recovery keeps every field but those of Run 1.*를 
 실행(*Run 3 (open (PML 1 µm) · …)*), closed-near 실행(*Run 4 (closed near 2.46 · 4 modes · …)*)을 각각 재료 앞까지의 실행 목록
 라벨과 같게 부르는지(P4); 열린 실행과 n_g 실행 아래 줄이 경계, 탐색, Modes to find, n_g를 밝히고 나머지는 *unchanged:*에 두는지(P6);
 1440 × 900과 390 × 844에서 가로 넘침이 없는지.
+24차부터(사전 등록 P3와 P4; P1은 프로젝트 스크립트의 R24 단계, P2는 R23 단계의 메시지, P5는 위의 손실 머리글) 브라우저
+컨텍스트 하나를 더 쓰는 단계(R24)가 광학 템플릿으로 확인합니다: Run 1과 Run 2에 이름을 붙이고 더 새 실행 둘이 생기면 *Run 4 is
+newer than this pair · Compare the two newest: Run 3 and Run 4*가 나오고 그 버튼이 Run 3과 Run 4를 보이는지, 그다음 직접 고른
+Run 1과 Run 2가 다섯 번째 실행 뒤에도 *Run 5 is newer than this pair · Compare Run 5 with B*와 함께 남는지(P3); 군굴절률을 켠
+열린 실행 앞의 계획 줄이, 열린 실행이 세션 파일(P2의 `optical-v10-open-f8ece10.json`)에서 연 것뿐이면 어림값 없이(*Open
+boundary · … · group index on (3 solves)*), 탭에서 열린 실행 뒤에는 *… · about N s*(또는 *min*), `optical-v10-open-full-083e151.json`
+에서 더 새 열린 실행을 더한 뒤에도 같은 말(시간이 없어 건너뜀), 새로고침, **Restore newest from this browser**, 군굴절률 켜기 뒤에는
+다시 어림값 없이 읽히는지(P4). 세션 파일과 복구 기록에는 실제 시간이 없으므로 파일에서 읽은 실행으로 낸 어림값은 확인하지 않습니다: 형식을
+바꾸지 않고는 생길 수 없습니다. 1440 × 900과 390 × 844에서 가로 넘침이 없는지도 확인합니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 *Compare*는 수준 2, 탭 정지는 Runs), 키보드로(Up으로 그룹, End로 Compare, Enter로 Compare 열기, Runs에서 Enter로
 보이는 실행의 Results 열기) 확인하며, 11차의 표시 검사는 이제 Results에서 Runs만, Compare에서 Compare만 고른 것으로 봅니다.
@@ -517,7 +526,7 @@ Open, 두 모델이 실행 없이 같은 값 문자열을 다시 읽음. 저장,
 파일을 여는 것도 봅니다(손으로만, CI는 주지 않음). 16차부터(사전 등록) 이어서 새 프로필에서 1440 × 900으로 그 파일을
 엽니다: Library › Heated silicon waveguide는 그 Results로, Library › Optical waveguide는 마지막으로 본 실행의 Results로
 돌아가고, *Design A*, *Design B*로 이름 붙인 Run 1과 Run 2는 세 번째 실행이 생겨도 Compare에 남으며(*Run 3 is newer than
-this pair · Compare Run 3 with B*), `design-ab.json`으로 Save As해도 이름 *Heater study*와 그 쌍이 유지되고, 새로고침 뒤
+this pair · Compare the two newest: Run 2 and Run 3*, 24차부터: 직접 고르지 않은 이름 붙은 쌍), `design-ab.json`으로 Save As해도 이름 *Heater study*와 그 쌍이 유지되고, 새로고침 뒤
 두 카드 제안 모두 *same as file design-ab.json*을 말하며(저장할 때 가열 모델은 보이지 않았음), 광학 제안을 복원하면
 헤더가 *Heater study · design-ab.json · saved …*이고 Save As가 `design-ab.json`을 제안하며, 다시 연 파일은 Design A와
 Design B를 비교합니다. 17차부터(사전 등록) Compare에 두고 떠난 광학 모델은 실행 하나가 눌린 Results로 돌아오고, 바꿔 연
@@ -562,7 +571,11 @@ Open project를 하면 실행 목록, 내보내기 줄과 **Pin Run 2**, *No nee
 두 모델을 복원하면 광학과 가열 번호가 같고, *Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run)
 from this browser, not recomputed.*, 헤더 *both-models · recovered from this browser · changed since both-models.json, not
 saved · kept for recovery in this browser*(23차 E5; 전에는 *… · not saved to a file · …*, 복구가 복원한 세션을 보존한 뒤
-읽음), 다음 변경 뒤에는 보통 헤더입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제
+읽음)입니다. 다음 변경 뒤에는 *both-models · changed since both-models.json, not saved · kept for recovery in this browser*
+(24차 B2; 전에는 *both-models · not saved to a file · …*), 그다음(R24, 사전 등록 P1) 더 촘촘한 실행으로 세션이 한도를 넘으면
+*both-models · changed since both-models.json, not saved · kept for recovery in this browser without the fields of Run N*
+입니다. 연 프로젝트를 다음 실행 전에 바꾸면 *both-models · both-models.json · changed since opened · kept for recovery in this
+browser*입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다. 연 파일의 round 19 복원은 이제
 프로젝트 이름을 밝히고(23차부터 *Heater study · recovered from this browser · changed since heater-study.json, not saved ·
 …*), workspace 스크립트에서 실행이 빠진 뒤의
 여섯 실행 축소 세션은 버전 12이며, 그 round 19 복원은 실행 번호를 유지하고 번호에 대해 말하지 않습니다. 형식
