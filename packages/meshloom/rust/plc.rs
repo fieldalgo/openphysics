@@ -236,6 +236,12 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
     let mut by_x: Vec<u32> = (0..pts.len() as u32).collect();
     by_x.sort_unstable_by(|&i, &j| pts[i as usize][0].total_cmp(&pts[j as usize][0]));
     let edge_index: HashMap<(u32, u32), usize> = edges.iter().enumerate().map(|(e, &[a, b])| ((a, b), e)).collect();
+    // the sub-segments at each point, so that a facet visits only those at its members
+    let mut subs_at: Vec<Vec<u32>> = vec![Vec::new(); pts.len()];
+    for (i, &(a, b)) in subs.iter().enumerate() {
+        subs_at[a as usize].push(i as u32);
+        subs_at[b as usize].push(i as u32);
+    }
     for (f, loops) in plc.facets.iter().enumerate() {
         let own: HashSet<u32> = loops.iter().flatten().copied().collect();
         let (lo, hi) = bbox(pts, &own.iter().copied().collect::<Vec<_>>());
@@ -257,8 +263,12 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
             }
         }
         let members: HashSet<u32> = own.iter().copied().chain(extra.iter().copied()).collect();
-        let inner: Vec<(u32, u32)> = subs.iter().copied()
-            .filter(|&(a, b)| members.contains(&a) && members.contains(&b)).collect();
+        // the sub-segments with both ends among the members, in the order of subs
+        let mut at: Vec<u32> = members.iter().flat_map(|&v| subs_at[v as usize].iter().copied())
+            .filter(|&i| { let (a, b) = subs[i as usize]; members.contains(&a) && members.contains(&b) }).collect();
+        at.sort_unstable();
+        at.dedup();
+        let inner: Vec<(u32, u32)> = at.iter().map(|&i| subs[i as usize]).collect();
         let t = facet::triangulate_with(pts, loops, &extra, &inner).map_err(|e| {
             let named = InputError::new(e.witness, format!("facet {f}: {}", e.msg));
             match e.witness {
@@ -392,6 +402,7 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
         if is_seg { bbox(pts, &[subs[i].0, subs[i].1]) } else { bbox(pts, &tri_keys[i]) }
     }).collect();
     let mut found: Option<((bool, usize), (bool, usize))> = None;
+    let tri_cell: Vec<&Vec<Cell>> = tri_keys.iter().map(|k| &tri_cells[k]).collect();
     for_overlapping(&boxes, |x, y| {
         if found.is_some() {
             return;
@@ -404,7 +415,7 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
                 seg_tri_ok(pts, [subs[i].0, subs[i].1], tri_keys[j], &mut n)
             }
             ((false, i), (false, j)) => {
-                let (ci, cj) = (&tri_cells[&tri_keys[i]], &tri_cells[&tri_keys[j]]);
+                let (ci, cj) = (tri_cell[i], tri_cell[j]);
                 if ci.iter().any(|c| cj.contains(c)) {
                     return; // one facet's own triangulation
                 }
