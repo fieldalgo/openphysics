@@ -99,7 +99,7 @@ test('S3: a picked or named pair is kept when new runs come; otherwise the two n
  // a pair whose run is gone is not kept
  assert.deepEqual(C.comparisonAfterRun(plain,['x','b'],true),['b','c']);
  assert.equal(C.newerThanPair(named,['a','b']).job,'e');assert.equal(C.newerThanPair(named,['d','e']),null);assert.equal(C.newerThanPair(named,['e','a']),null);
- assert.equal(C.pairChosen(named,['a','b']),true);assert.equal(C.pairChosen(named,['d','e']),false);
+ assert.equal(C.pairChosen(named,['a','b']),false);assert.equal(C.pairChosen(named,['a','c']),true);assert.equal(C.pairChosen(named,['d','e']),false);
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("compareIds=comparisonAfterRun(runs,compareIds,comparePicked);ui.page='Results';"));
  assert.ok(app.includes("line.append(`Run ${n} is newer than this pair · `)")&&app.includes("swap.textContent=`Compare Run ${n} with B`;"));

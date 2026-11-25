@@ -547,7 +547,9 @@ this pair · Compare the two newest: Run 2 and Run 3*, 24차부터: 직접 고�
 두 카드 제안 모두 *same as file design-ab.json*을 말하며(저장할 때 가열 모델은 보이지 않았음), 광학 제안을 복원하면
 헤더가 *Heater study · design-ab.json · saved …*이고 Save As가 `design-ab.json`을 제안하며, 다시 연 파일은 Design A와
 Design B를 비교합니다. 17차부터(사전 등록) Compare에 두고 떠난 광학 모델은 실행 하나가 눌린 Results로 돌아오고, 바꿔 연
-모델은 스크롤해 두었어도 페이지 맨 위(scrollTop 0)에서 시작하며, 새 프로필에서 광학 모델만으로 내려받아 저장한 프로젝트에
+모델은 스크롤해 두었어도 페이지 맨 위(scrollTop 0)에서 시작하고, 25차부터(A3, 사전 등록) 파일을 연 뒤 실행 하나를 더하면
+*Run 4 is newer than this pair · Compare the two newest: Run 3 and Run 4*가 나오며(파일에서 읽은 이름 붙은 쌍은 직접 고른 쌍이
+아니라 이름 때문에 유지됨), 새 프로필에서 광학 모델만으로 내려받아 저장한 프로젝트에
 가열 모델을 더하면 **Save**가 `u8-optical.json`을 채운 Save As 대화상자와 *This project now holds Optical waveguide and
 Heated silicon waveguide; u8-optical.json holds Optical waveguide. Save under this name or another.*를 보이고, Cancel은
 아무것도 내려받지 않으며, 두 모델로 저장한 뒤의 Save는 바로 내려받습니다. 18차부터(사전 등록) 같은 프로필에서 Save As 줄

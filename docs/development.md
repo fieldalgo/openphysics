@@ -685,7 +685,9 @@ design-ab.json* (the heated model was not shown when it was saved); restoring th
 the header *Heater study · design-ab.json · saved …* and Save As suggests `design-ab.json`; and the
 file opened again shows Design A against Design B. Since round 17 (pre-registered) the optical
 model left on Compare comes back on Results with a run pressed, and each model switched to starts at
-the top of its page (scrollTop 0 after it was scrolled); and in a new profile a project saved by
+the top of its page (scrollTop 0 after it was scrolled), and since round 25 (A3, pre-registered) one
+more run after the file was opened reads *Run 4 is newer than this pair · Compare the two newest: Run
+3 and Run 4* (a named pair from a file is kept because it is named, not picked by hand); and in a new profile a project saved by
 download with the optical model alone, then given the heated model, makes **Save** open the Save
 As dialog prefilled with `u8-optical.json` and *This project now holds Optical waveguide and Heated
 silicon waveguide; u8-optical.json holds Optical waveguide. Save under this name or another.*;

@@ -56,9 +56,15 @@ export function pairKept(runs,[a,b],picked=false){
 }
 // The pair after a run is added: the kept pair, else the default (defaultComparison).
 export function comparisonAfterRun(runs,ids,picked=false){return pairKept(runs,ids,picked)?[...ids]:defaultComparison(runs);}
-// A pair read from a file or browser recovery is kept when it is not the default pair (someone
-// chose it) or when both runs are named.
-export const pairChosen=(runs,ids)=>{const d=defaultComparison(runs);return ids[0]!==d[0]||ids[1]!==d[1];};
+// Whether a pair read from a file or browser recovery counts as picked by hand: a pair that is not
+// the default one (someone chose it). Round 25 (A3): a pair whose two runs are both named is kept
+// because they are named (pairKept), not as picked by hand, so the newest-pair offer still appears
+// (newestPairOffer) once newer runs come.
+export const pairChosen=(runs,ids)=>{
+ const ra=runs.find(r=>r.job===ids[0]),rb=runs.find(r=>r.job===ids[1]);
+ if(ra&&rb&&ids[0]!==ids[1]&&ra.label&&rb.label)return false;
+ const d=defaultComparison(runs);return ids[0]!==d[0]||ids[1]!==d[1];
+};
 // The newest run outside a pair, when it is newer than both runs of the pair (runs oldest first),
 // for the line "Run 5 is newer than this pair · Compare Run 5 with B"; else null.
 export function newerThanPair(runs,[a,b]){
@@ -67,7 +73,7 @@ export function newerThanPair(runs,[a,b]){
 }
 // Round 24 (B4, coordinator decision on the round-24 findings): the pair Compare offers in one action
 // when runs newer than the shown pair exist and the pair was not picked by hand (picked: a pair
-// chosen on Compare, or a pair read from a file or recovery that is not the default one): the two
+// chosen on Compare, or a pair read from a file or recovery that is not the default one and not a named pair, pairChosen): the two
 // newest, [A job, B job] as defaultComparison gives them, for "Compare the two newest: Run 6 and
 // Run 7"; else null (a pair picked by hand keeps "Compare Run 7 with B" and is never replaced).
 export function newestPairOffer(runs,ids,picked=false){
