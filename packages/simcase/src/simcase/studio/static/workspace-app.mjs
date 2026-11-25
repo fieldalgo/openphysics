@@ -45,7 +45,7 @@ import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {ENVELOPE,matchesAgainText} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
-import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,fileHoldsText,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
+import {saveToFile,sanitizeFileName,modelFileName,notWrittenNotice,rememberFile,currentFileFor,suggestedSaveName,downloadAgainNote,asksBeforeDownloadAgain,downloadAgainQuestion,DOWNLOAD_AGAIN_BUTTONS,fileHoldsText,PROJECT_PICKER_DESCRIPTION} from './workspace-files.mjs';
 import {setupMenus} from './workspace-file-menu.mjs';
 
 (()=>{'use strict';const $=id=>document.getElementById(id);
@@ -1671,6 +1671,33 @@ $('save-name-input').oninput=event=>{if(event.isComposing)return;const el=event.
 nameDialog.querySelector('form').onsubmit=event=>{event.preventDefault();nameAnswer?.(sanitizeFileName($('save-name-input').value,$('save-name-input').defaultValue||'session.json'));};
 $('save-name-cancel').onclick=()=>nameAnswer?.(null);
 nameDialog.oncancel=event=>{event.preventDefault();nameAnswer?.(null);};
+// Round 25 (A2): on the download path, Save of a file this tab already downloaded asks first, since a
+// download cannot replace the earlier file: [Download again] [Save As…] [Cancel].
+let againAnswer=null;
+const againDialog=document.createElement('dialog');againDialog.id='download-again';againDialog.setAttribute('aria-labelledby','download-again-title');againDialog.setAttribute('aria-describedby','download-again-description');
+{const [again,saveAs,cancel]=DOWNLOAD_AGAIN_BUTTONS.map(escapeHtml);
+ againDialog.innerHTML=`<h2 id="download-again-title">Download again?</h2><p id="download-again-description"></p><div class="leave-actions"><button type="button" id="download-again-confirm" class="primary">${again}</button> <button type="button" id="download-again-save-as">${saveAs}</button> <button type="button" id="download-again-cancel">${cancel}</button></div>`;}
+document.body.append(againDialog);
+// Resolves 'again', 'saveAs' or null (Cancel or Escape).
+function askDownloadAgain(name){
+ return new Promise(resolve=>{
+  const opener=document.activeElement;
+  againAnswer=value=>{againAnswer=null;if(againDialog.open)againDialog.close();restoreDialogFocus(opener);resolve(value);};
+  $('download-again-description').textContent=downloadAgainQuestion(name);againDialog.showModal();$('download-again-confirm').focus();
+ });
+}
+$('download-again-confirm').onclick=()=>againAnswer?.('again');
+$('download-again-save-as').onclick=()=>againAnswer?.('saveAs');
+$('download-again-cancel').onclick=()=>againAnswer?.(null);
+againDialog.oncancel=event=>{event.preventDefault();againAnswer?.(null);};
+// The question and its answer: {name} to download under (the same name on Download again, the name
+// chosen on Save As…), or {name: null, saveAs} when nothing is to be written.
+async function downloadAgainChoice(name){
+ const answer=await askDownloadAgain(name);
+ if(answer==='again')return {name,saveAs:false};
+ if(answer!=='saveAs')return {name:null,saveAs:false};
+ $('save-name-input').defaultValue=name;return {name:await askFileName(name,{saveAs:true}),saveAs:true};
+}
 // Delivers a session file's text: the picker file (Save with a target, or Save As where the
 // picker works), else the name dialog and a download. Resolves {written, name, via, after} or
 // {written: false, message}. Called inside the click or key press, before anything is awaited.
@@ -1679,7 +1706,13 @@ function deliverSession(text,suggestedName,{saveAs}){
  const keep=(name,how,handle=null)=>{if(fileScopeKey()===scope)currentFile=rememberFile({name,how,handle,scope});};
  return saveToFile(text,{suggestedName:prefill,target,saveAs}).then(async result=>{
   if(result.status==='saved'){keep(result.name,'picker',result.handle);return {written:true,name:result.name,via:'picker',after:''};}
-  // Save with a known name and no picker: downloaded again under it, without asking
+  // Save with a known name and no picker: downloaded under it; a file this tab already downloaded asks first (round 25, A2)
+  if(result.status==='known'&&asksBeforeDownloadAgain(target)){
+   const chosen=await downloadAgainChoice(result.name);
+   if(!chosen.name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:chosen.saveAs})};
+   downloadFile(new Blob([text],{type:'application/json'}),chosen.name);keep(chosen.name,'download');
+   const same=chosen.name===target.name;return {written:true,name:chosen.name,via:'download',again:same,known:same,after:same?' '+downloadAgainNote(chosen.name):''};
+  }
   if(result.status==='known'){downloadFile(new Blob([text],{type:'application/json'}),result.name);keep(result.name,'download');
    return {written:true,name:result.name,via:'download',again:target.how==='download',known:true,after:' '+downloadAgainNote(result.name)};}
   if(result.status!=='unavailable')return {written:false,message:notWrittenNotice(result,{saveAs})};
@@ -2143,6 +2176,13 @@ function deliverProject(makeText,{saveAs}){
    if(!name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:true})};
    downloadFile(new Blob([makeText(name)],{type:'application/json'}),name);keep(name,'download');
    return {written:true,name,via:'download',again:name===target.name&&target.how==='download',known:name===target.name,after:name===target.name?' '+downloadAgainNote(name):''};
+  }
+  // round 25 (A2): a file this tab already downloaded asks first: [Download again] [Save As…] [Cancel]
+  if(result.status==='known'&&asksBeforeDownloadAgain(target)){
+   const chosen=await downloadAgainChoice(result.name);
+   if(!chosen.name)return {written:false,message:notWrittenNotice({status:'cancelled'},{saveAs:chosen.saveAs})};
+   downloadFile(new Blob([makeText(chosen.name)],{type:'application/json'}),chosen.name);keep(chosen.name,'download');
+   const same=chosen.name===target.name;return {written:true,name:chosen.name,via:'download',again:same,known:same,after:same?' '+downloadAgainNote(chosen.name):''};
   }
   if(result.status==='known'){downloadFile(new Blob([makeText(result.name)],{type:'application/json'}),result.name);keep(result.name,'download');
    return {written:true,name:result.name,via:'download',again:target.how==='download',known:true,after:' '+downloadAgainNote(result.name)};}

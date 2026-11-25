@@ -76,7 +76,7 @@ opens the previous menu), Escape closes one level and returns focus, and Tab clo
 | Item | Shortcut | What it does |
 |---|---|---|
 | **Open…** | Ctrl+O (⌘O) | Opens a project file, a session file or a model file of any model. The ribbon's **Open…** (whose accessible name is its visible *Open…* since round 17; it was *Open*) and the Library's **Open file…** are the same. |
-| **Save** | Ctrl+S (⌘S) | Saves the [project file](#project-files): every model of the tab with its runs. After a Save As through the browser's save dialog it writes that file again without asking. Where Studio downloads instead, it downloads again under the project file's name (the name chosen in Save As or Save, or the project file opened) without asking. With no project file it asks, as Save As does. The ribbon's **Save** is the same. |
+| **Save** | Ctrl+S (⌘S) | Saves the [project file](#project-files): every model of the tab with its runs. After a Save As through the browser's save dialog it writes that file again without asking. Where Studio downloads instead, it downloads under the project file's name (the name chosen in Save As or Save, or the project file opened); a file this tab already downloaded asks first, **Download again**, **Save As…** or **Cancel** (round 25). With no project file it asks, as Save As does. The ribbon's **Save** is the same. |
 | **Save As…** | Shift+Ctrl+S (⇧⌘S) | Saves the project file under a name you choose; it starts with the project file's name, else the project name's (`untitled-project.json` for an untitled project). |
 | **Export › Model file…** | | Downloads the model file of the model shown (inputs only), named after the model, for example `optical-waveguide.json`. |
 | **Export › Model with runs (session file)…** | | Saves the model shown with its runs to a session file, which older Studios open; it always asks for the name. |
@@ -124,10 +124,16 @@ hands the file to the browser: Messages then says *Session file <name> sent to y
 Downloads*. Opened by **Save**, the dialog also says that the browser may add “ (1)” when its
 Downloads folder already has a file of that name. Studio cannot know that a download was kept.
 Studio remembers the name as the project's file, as it does the name of a project file opened
-with **File › Open…**: **Save** (and Ctrl+S) then downloads under it again without asking
-(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may add a
-number such as “ (1)” to its name.*; round 18: it named *<name> (1).json* even when a (1) copy already
-existed), and Save As starts with it. On every project save the name dialog also says what the file
+with **File › Open…**: **Save** (and Ctrl+S) then downloads under it, and Save As starts with it.
+A file opened or restored is downloaded by its first Save without a question. Once this tab has
+downloaded the file, Save asks first (round 25, A2), since a download cannot replace it: *Download
+design-a-ng.json again? This browser cannot replace the earlier file and may name the new one
+design-a-ng (1).json.* with **Download again** (*Downloaded <name> again: … A download cannot
+replace the earlier file, so your browser may add a number such as “ (1)” to its name.*; round 18:
+it named *<name> (1).json* even when a (1) copy already existed), **Save As…** (the name dialog,
+prefilled with the name) and **Cancel** (*Save cancelled; nothing was written.*). The first Save of a
+project with no file keeps the name dialog, and the browser's save dialog (Chrome, Edge) is
+unchanged. On every project save the name dialog also says what the file
 will hold, each model with its runs: *The file will hold Optical waveguide (2 runs) and Heated
 silicon waveguide (1 run).* (round 18; a heat or Joule heating model reads *(no runs)*). When the project's models changed since that file
 was written or opened (a model added, such as the heated model after the optical one was saved),

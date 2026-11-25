@@ -67,7 +67,7 @@ Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 �
 | 항목 | 단축키 | 하는 일 |
 |---|---|---|
 | **Open…** | Ctrl+O (⌘O) | 프로젝트 파일, 또는 어느 모델의 세션 파일이나 모델 파일을 엽니다. 리본의 **Open…**(round 17부터 접근성 이름이 보이는 글자 그대로 *Open…*입니다. 전에는 *Open*)과 Library의 **Open file…**도 같습니다. |
-| **Save** | Ctrl+S (⌘S) | [프로젝트 파일](#프로젝트-파일)을 저장합니다: 탭의 모든 모델과 실행. 브라우저의 저장 대화상자로 Save As를 한 뒤에는 묻지 않고 그 파일에 다시 씁니다. Studio가 대신 내려받는 경우에는 프로젝트 파일 이름(Save As나 Save에서 고른 이름, 또는 연 프로젝트 파일)으로 묻지 않고 다시 내려받습니다. 프로젝트 파일이 없으면 Save As처럼 묻습니다. 리본의 **Save**와 같습니다. |
+| **Save** | Ctrl+S (⌘S) | [프로젝트 파일](#프로젝트-파일)을 저장합니다: 탭의 모든 모델과 실행. 브라우저의 저장 대화상자로 Save As를 한 뒤에는 묻지 않고 그 파일에 다시 씁니다. Studio가 대신 내려받는 경우에는 프로젝트 파일 이름(Save As나 Save에서 고른 이름, 또는 연 프로젝트 파일)으로 내려받으며, 이 탭이 이미 내려받은 파일이면 먼저 **Download again**, **Save As…**, **Cancel** 중에서 묻습니다(round 25). 프로젝트 파일이 없으면 Save As처럼 묻습니다. 리본의 **Save**와 같습니다. |
 | **Save As…** | Shift+Ctrl+S (⇧⌘S) | 고른 이름으로 프로젝트 파일을 저장합니다. 프로젝트 파일 이름, 없으면 프로젝트 이름을 딴 이름(이름 없는 프로젝트는 `untitled-project.json`)으로 시작합니다. |
 | **Export › Model file…** | | 보이는 모델의 모델 파일(입력만)을 모델 이름으로 내려받습니다. 예: `optical-waveguide.json`. |
 | **Export › Model with runs (session file)…** | | 보이는 모델과 그 실행을 이전 Studio도 여는 세션 파일로 저장합니다. 늘 이름을 묻습니다. |
@@ -109,10 +109,13 @@ cancelled; nothing was written.*(Save가 열었으면 *Save cancelled; …*), �
 브라우저에 넘깁니다. 그러면 Messages에 *Session file <name> sent to your browser's Downloads*가 나옵니다.
 **Save**로 연 대화상자는 Downloads 폴더에 같은 이름의 파일이 있으면 브라우저가 “ (1)”을 붙일 수 있다고도 알립니다.
 Studio는 다운로드가 보관됐는지 알 수 없습니다. Studio는 그 이름을 **File › Open…**으로 연 프로젝트 파일의
-이름처럼 프로젝트의 파일로 기억합니다. 그러면 **Save**(와 Ctrl+S)는 묻지 않고 그 이름으로 다시 내려받으며
-(*Downloaded <name> again: … A download cannot replace the earlier file, so your browser may add a number
-such as “ (1)” to its name.*; round 18: 전에는 (1) 사본이 이미 있어도 *<name> (1).json*이라 했음), Save As도 그 이름으로
-시작합니다. 프로젝트를 저장할 때마다 이름 대화상자는 파일에 담길 모델과 각 모델의 실행 수도 밝힙니다: *The file will hold
+이름처럼 프로젝트의 파일로 기억합니다. 그러면 **Save**(와 Ctrl+S)는 그 이름으로 내려받고, Save As도 그 이름으로
+시작합니다. 열거나 복원한 파일은 첫 Save가 묻지 않고 내려받습니다. 이 탭이 그 파일을 한 번 내려받은 뒤에는, 다운로드는 그 파일을
+바꿀 수 없으므로 Save가 먼저 묻습니다(round 25, A2): *Download design-a-ng.json again? This browser cannot replace the earlier
+file and may name the new one design-a-ng (1).json.*와 **Download again**(*Downloaded <name> again: … A download cannot replace the
+earlier file, so your browser may add a number such as “ (1)” to its name.*; round 18: 전에는 (1) 사본이 이미 있어도
+*<name> (1).json*이라 했음), **Save As…**(그 이름을 채운 이름 대화상자), **Cancel**(*Save cancelled; nothing was written.*).
+파일이 없는 프로젝트의 첫 Save는 이름 대화상자를 그대로 쓰고, 브라우저의 저장 대화상자(Chrome, Edge)는 바뀌지 않습니다. 프로젝트를 저장할 때마다 이름 대화상자는 파일에 담길 모델과 각 모델의 실행 수도 밝힙니다: *The file will hold
 Optical waveguide (2 runs) and Heated silicon waveguide (1 run).*(round 18; 열 전도나 Joule 가열 모델은 *(no runs)*). 그 파일을 쓰거나 연 뒤로 프로젝트의 모델이 바뀌었으면(광학
 모델을 저장한 뒤 가열 모델을 더한 경우처럼) **Save**는 대신 그 이름을 채운 Save As 이름 대화상자를 열고 까닭을 밝힙니다: *This
 project now holds Optical waveguide and Heated silicon waveguide; study.json holds Optical waveguide. Save under

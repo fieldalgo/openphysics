@@ -84,6 +84,21 @@ export function saveRoute(file, {saveAs = false, picker = false} = {}) {
 /** The Save As name dialog's line on what later saves do (round 14). */
 export const LATER_SAVES_NOTE = 'Later saves download again under this name; your browser may add “ (1)”.';
 
+/** Round 25 (A2): whether Save asks before it downloads a file again: on the download path (no
+ * picker), Save (not Save As) of a file this tab already downloaded (how 'download'). A file opened
+ * or recovered is downloaded at once by its first Save, as before; a picker file is written again. */
+export function asksBeforeDownloadAgain(file, {saveAs = false, picker = false} = {}) {
+  return !!file && file.how === 'download' && saveRoute(file, {saveAs, picker}) === 'download';
+}
+/** The question: "Download design-a-ng.json again? This browser cannot replace the earlier file and
+ * may name the new one design-a-ng (1).json." */
+export function downloadAgainQuestion(name) {
+  const stem = name.replace(/\.json$/i, ''), extension = name.slice(stem.length);
+  return `Download ${name} again? This browser cannot replace the earlier file and may name the new one ${stem} (1)${extension}.`;
+}
+/** Its buttons, in order: download under the same name, the Save As name dialog, nothing written. */
+export const DOWNLOAD_AGAIN_BUTTONS = Object.freeze(['Download again', 'Save As…', 'Cancel']);
+
 /** The sentence after a download under a name already downloaded: the browser cannot replace it.
  * Round 18 (X5): "a number such as (1)", since a browser that already has a (1) copy adds (2). */
 export function downloadAgainNote() {

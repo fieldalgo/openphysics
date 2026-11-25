@@ -289,9 +289,18 @@ try {
     assert.deepEqual([doc.format, doc.version, doc.name, doc.active, doc.models.map(m => [m.id, m.kind, m.title, m.card])],
       ['openphysics-studio-project', 1, 'Heater study', 'm2', [['m1', 'workspace', 'Optical waveguide', 'optical'], ['m2', 'multiphysics', 'Heated silicon waveguide', 'heated-waveguide']]]);
     assert.equal(doc.models[0].session.input.model.modeCount, 4); assert.equal(doc.models[0].session.version, 9); assert.equal(doc.models[1].session.version, 8);
-    // V-P11: Save again downloads under the remembered name with no dialog
+    // V-P11: Save again downloads under the remembered name with no name dialog. Round 25 (A2,
+    // pre-registered P2): it asks first, [Download again] [Save As…] [Cancel] by role and name
     if (tag === 'wide') {
       before = await listDownloads(); await page.press('button', 'File'); await page.press('menuitem', 'Save');
+      await page.until("document.getElementById('download-again')?.open", 'A2 Save asks');
+      const asked = await page.eval("({description:document.getElementById('download-again-description').textContent,buttons:[...document.querySelectorAll('#download-again button')].map(b=>b.textContent)})");
+      stage('A2 Save again asks', asked);
+      assert.deepEqual(asked, {description: 'Download heater-study.json again? This browser cannot replace the earlier file and may name the new one heater-study (1).json.', buttons: ['Download again', 'Save As…', 'Cancel']});
+      await page.press('button', 'Cancel'); await sleep(800);
+      assert.deepEqual(await listDownloads(), before, 'A2 Cancel downloads nothing'); assert.equal(await status(), 'Save cancelled; nothing was written.');
+      await page.press('button', 'File'); await page.press('menuitem', 'Save'); await page.until("document.getElementById('download-again')?.open", 'A2 Save asks again');
+      await page.press('button', 'Download again');
       for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, 'Save: no name dialog'); await sleep(100); }
       const again = await newDownload(before), againMessage = await status();
       stage('V-P11 Save again', {again, message: againMessage, title: await title()});
@@ -538,7 +547,7 @@ try {
 
   // Round 17 (U8, pre-registered), a new profile at 1440 × 900: a project file saved by download with
   // the optical model alone; after the heated model joins, Save asks (Save As, prefilled, saying why);
-  // Cancel writes nothing; saved under that name, the next Save downloads at once
+  // Cancel writes nothing; saved under that name, the next Save downloads (round 25, A2: after Download again)
   {
     page = await startBrowser(); await size(1440, 900, false);
     await page.call('Page.navigate', {url: base + '/workspace'});
@@ -568,7 +577,8 @@ try {
     await page.press('button', 'File'); await page.press('menuitem', 'Save'); await page.until("document.getElementById('save-name-dialog').open", 'R17 Save asks again');
     await page.press('button', 'Download'); const both = await newDownload(before);
     before = await listDownloads();
-    await page.press('button', 'File'); await page.press('menuitem', 'Save'); const again = await newDownload(before);
+    await page.press('button', 'File'); await page.press('menuitem', 'Save'); await page.until("document.getElementById('download-again')?.open", 'A2 R17 Save asks');
+    await page.press('button', 'Download again'); const again = await newDownload(before);
     const dialogAgain = await page.eval("document.getElementById('save-name-dialog').open");
     stage('R17 U8 saved with both models', {both, again, dialogAgain});
     // round 18 (X8): saved with both models, the status bar says so in the header's words

@@ -517,13 +517,17 @@ print(n)`;
   assert.match(c2.name, /^\d\d-heated-silicon-waveguide-session-.*\.json$/, 'Export after Open offers the opened name');
   // P3: the project file follows the same rules. The session file opened made an untitled project:
   // Save As offers untitled-project.json; the name given becomes the project's name; Save then
-  // downloads under it again with no dialog, and the title bar and the footer name the file
+  // downloads under it again with no name dialog (round 25, A2: after Download again), and the title
+  // bar and the footer name the file
   { const before = await listed(); await clearNotice(); await page.click('#menu-save-as'); await page.until("document.getElementById('save-name-dialog')?.open", 'O1 Save As');
     assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'untitled-project.json');
     await page.eval("(()=>{const i=document.getElementById('save-name-input');i.value='heated-design';})()"); await page.click('#save-name-download');
     const first = await nextDownload(before, 'O1 Save As'); assert.equal(first.name, 'heated-design.json');
     assert.match(await page.text('#file-status'), /^Project file heated-design\.json sent to your browser's Downloads: Heated silicon waveguide \(2 runs, the without-heater result\)\.$/);
     const again = await listed(); await clearNotice(); await page.click('#menu-save');
+    await page.until("document.getElementById('download-again')?.open", 'A2 O1 Save asks');
+    assert.equal(await page.text('#download-again-description'), 'Download heated-design.json again? This browser cannot replace the earlier file and may name the new one heated-design (1).json.');
+    await page.click('#download-again-confirm');
     for (let i = 0; i < 5; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, 'O1 Save: no name dialog'); await sleep(100); }
     const second = await nextDownload(again, 'O1 Save'); const message = await page.text('#file-status'), footer = await page.text('#autosave-status'), title = await page.text('#project');
     stage('O1 multiphysics Save after Save As', {first: first.name, second: second.name, message, footer, title});

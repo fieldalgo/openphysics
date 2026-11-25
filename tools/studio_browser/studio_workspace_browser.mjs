@@ -1267,6 +1267,8 @@ try {
   listed = await listDownloads(); await page.click('#save-session'); await sleep(500);
   assert.equal(await page.eval("document.getElementById('session-overflow').open"), false, 'File › Save asks no 16 MiB question');
   if (await page.eval("!!document.getElementById('save-name-dialog')?.open")) await page.click('#save-name-download');
+  // round 25 (A2): a later Save of a file this tab downloaded asks first
+  if (await page.eval("!!document.getElementById('download-again')?.open")) await page.click('#download-again-confirm');
   const projectFile = await newDownload(listed);
   stage('M4-e project saved', {file: projectFile, bytes: (await stat(join(downloads, projectFile))).size});
   // the session file opened: a run without fields shows its modes and its values, the field export
@@ -1584,9 +1586,10 @@ try {
     await page.click('#save-name-download'); const f4Name = await newDownload(before);
     assert.match(f4Name, /^chosen\.json$/); assert.match(await status(), /sent to your browser's Downloads/);
     await page.eval("delete window.showSaveFilePicker");
-    // round 13 (O1; pre-registered): with no picker, Save remembers the Save As name. Save and
-    // Ctrl+S download under it again with no dialog; the header names the file and its state; File ›
-    // Open sets the name to the opened file's; Reset design drops it, so Save asks again
+    // round 13 (O1; pre-registered): with no picker, Save remembers the Save As name; the header
+    // names the file and its state; File › Open sets the name to the opened file's; Reset design
+    // drops it, so Save asks again. Round 25 (A2, pre-registered P2): Save and Ctrl+S of a file this
+    // tab downloaded ask first (they downloaded again with no dialog): [Download again] [Save As…] [Cancel]
     const header = () => page.eval("document.getElementById('project').textContent");
     const noDialog = async label => { for (let i = 0; i < 10; i++) { assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false, label + ': no name dialog'); await sleep(100); } };
     const savedWidth = name => readFile(join(downloads, name), 'utf8').then(t => JSON.parse(t).models.find(m => m.kind === 'workspace').session.input.model.shapes[0].w);
@@ -1604,16 +1607,34 @@ try {
     await toGeometry(); await page.type('#shape-w', 650); await sleep(300);
     const o1Edited = await header(); assert.match(o1Edited, /^design-a-ng · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
     assert.equal(await page.eval("document.getElementById('project').title"), 'Your browser may have added “ (1)” to the file name.');
+    const againView = () => page.eval("(()=>{const d=document.getElementById('download-again');return d&&d.open?{title:document.getElementById('download-again-title').textContent,description:document.getElementById('download-again-description').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent),labelled:d.getAttribute('aria-labelledby'),described:d.getAttribute('aria-describedby')}:null})()");
+    const AGAIN = {title: 'Download again?', description: 'Download design-a-ng.json again? This browser cannot replace the earlier file and may name the new one design-a-ng (1).json.', buttons: ['Download again', 'Save As…', 'Cancel'], labelled: 'download-again-title', described: 'download-again-description'};
+    // Save, then Cancel: the question, and nothing written
     before = await listDownloads(); await page.click('nav [data-page=Model]'); await page.click('#menu-save');
+    await page.until("document.getElementById('download-again')?.open", 'A2 Save asks'); const a2Asked = await againView();
+    await page.click('#download-again-cancel'); await sleep(1500);
+    const a2Cancel = {asked: a2Asked, downloads: (await listDownloads()).length - before.length, message: await status(), open: await page.eval("document.getElementById('download-again').open")};
+    stage('A2 Save of a downloaded file asks; Cancel', a2Cancel);
+    assert.deepEqual(a2Asked, AGAIN); assert.equal(a2Cancel.downloads, 0); assert.equal(a2Cancel.message, 'Save cancelled; nothing was written.'); assert.equal(a2Cancel.open, false);
+    // Save, then Download again: one download under the name, with today's words
+    before = await listDownloads(); await page.click('#menu-save');
+    await page.until("document.getElementById('download-again')?.open", 'A2 Save asks again'); await page.click('#download-again-confirm');
     await noDialog('O1 Save'); const o1Second = await newDownload(before), o1SecondMessage = await status(), o1SecondHeader = await header();
+    assert.equal((await listDownloads()).length - before.length, 1, 'Download again writes one file');
     stage('O1 Save under the Save As name', {first: o1First, edited: o1Edited, second: o1Second, message: o1SecondMessage, header: o1SecondHeader});
     assert.match(o1Second, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Second), 650, 'the second file holds Width 650');
     // round 14 (Q2): Width 650 (650 × 400 nm here) has no run, and the save notice says so
     assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: Optical waveguide \(\d+ runs?(?:, the comparison)?\)(?: and [^.]+)?\.(?: Optical waveguide keeps values only for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
     assert.match(o1SecondHeader, /^design-a-ng · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
-    // Ctrl+S after another edit: the same, no dialog
+    // Ctrl+S after another edit: the same question; Save As… opens the name dialog prefilled with the name
     await toGeometry(); await page.type('#shape-w', 660); await sleep(300); before = await listDownloads();
-    await page.eval("document.activeElement?.blur()"); await key('s', ['Control']); await noDialog('O1 Ctrl+S');
+    await page.eval("document.activeElement?.blur()"); await key('s', ['Control']);
+    await page.until("document.getElementById('download-again')?.open", 'A2 Ctrl+S asks'); const a2Key = await againView();
+    await page.click('#download-again-save-as'); await page.until("document.getElementById('save-name-dialog').open", 'A2 Save As… from the question');
+    const a2SaveAs = {asked: a2Key, title: await page.eval("document.getElementById('save-name-title').textContent"), name: await page.eval("document.getElementById('save-name-input').value")};
+    stage('A2 Ctrl+S asks; Save As…', a2SaveAs);
+    assert.deepEqual(a2Key, AGAIN); assert.equal(a2SaveAs.title, 'Save As'); assert.equal(a2SaveAs.name, 'design-a-ng.json');
+    await page.click('#save-name-download');
     const o1Third = await newDownload(before); assert.match(o1Third, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Third), 660);
     // Save As is prefilled with the current name; Cancel writes nothing
     await key('s', ['Control', 'Shift']); await page.until("document.getElementById('save-name-dialog').open", 'O1 Save As again');
@@ -1630,10 +1651,13 @@ try {
     const o1Fourth = await newDownload(before); assert.match(o1Fourth, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Fourth), 640);
     assert.match(await status(), /^Project file design-a-ng\.json sent to your browser's Downloads: .* A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
     // P3 (intended change): Reset design edits a model of the project, so the project file is
-    // kept: the header still names it, changed, and Save downloads under it with no dialog
+    // kept: the header still names it, changed, and Save downloads under it with no name dialog
+    // (round 25, A2: the Save after Open downloaded it in this tab, so Save asks first: Download again)
     await page.click('#reset'); await sleep(300); const o1Reset = await header();
     assert.match(o1Reset, /^design-a-ng · design-a-ng\.json · changed since downloaded \d{1,2}:\d\d(?: [AP]M)? · /);
-    before = await listDownloads(); await page.click('#menu-save'); await noDialog('O1 Save after reset');
+    before = await listDownloads(); await page.click('#menu-save');
+    await page.until("document.getElementById('download-again')?.open", 'A2 Save after reset asks'); assert.deepEqual(await againView(), AGAIN);
+    await page.click('#download-again-confirm'); await noDialog('O1 Save after reset');
     assert.match(await newDownload(before), /^design-a-ng(?: \(\d\))?\.json$/);
     stage('O1 open and reset', {opened: o1Opened, openedEdited: o1OpenedEdited, fourth: o1Fourth, reset: o1Reset});
     // F2 (round 13): a model file over 64 KiB opened through File › Open is refused by the model reader
@@ -1849,6 +1873,8 @@ try {
       const before = await obStamps(); await ob.click('#save-session'); let saved = null;
       for (let i = 0; i < 600 && !saved; i++) {
         if (await ob.eval("!!document.getElementById('save-name-dialog')?.open")) await ob.click('#save-name-download');
+        // round 25 (A2): a later Save of the downloaded file asks first
+        if (await ob.eval("!!document.getElementById('download-again')?.open")) await ob.click('#download-again-confirm');
         const now = await obStamps(); saved = Object.keys(now).find(n => before[n] !== now[n]) ?? null; if (!saved) await sleep(100);
       }
       assert.ok(saved, label + ': downloaded; ' + await obText('#file-status') + ' · ' + JSON.stringify(await obFiles())); await sleep(500);
@@ -2651,6 +2677,8 @@ try {
       await r.click('#save-session'); let saved = null;
       for (let i = 0; i < 600 && !saved; i++) {
         if (await r.eval("!!document.getElementById('save-name-dialog')?.open")) await r.click('#save-name-download');
+        // round 25 (A2): a later Save of the downloaded file asks first
+        if (await r.eval("!!document.getElementById('download-again')?.open")) await r.click('#download-again-confirm');
         const now = Object.fromEntries(await Promise.all((await cwFiles()).map(async n => [n, (await stat(join(cwDownloads, n))).mtimeMs])));
         saved = Object.keys(now).find(n => before[n] !== now[n]) ?? null; if (!saved) await sleep(100);
       }
