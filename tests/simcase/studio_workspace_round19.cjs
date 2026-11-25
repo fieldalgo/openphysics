@@ -79,15 +79,15 @@ test('Y1: the newest stored session with runs is the first restore offer; every 
  const latest={runs:5,savedAt:at('38'),model:'Optical waveguide',names:[],file:'both-models.json',fileCurrent:false};
  const earlier=[{runs:6,savedAt:at('46'),model:'Optical waveguide',names:[],index:0,file:'both-models.json',fileCurrent:false},{runs:1,savedAt:at('30'),model:'Heated silicon waveguide',names:['Run 1'],index:1}];
  assert.deepEqual(A.resumeChoices(latest,earlier,w),[
-  {kind:'earlier',index:0,newest:true,label:'Restore newest from this browser: Optical waveguide · 6 runs · file both-models.json, changed since · saved 5:46 AM'},
-  {kind:'latest',label:'Restore from this browser: Optical waveguide · 5 runs · file both-models.json, changed since · older · saved 5:38 AM'},
-  {kind:'earlier',index:1,label:'Restore from this browser: Heated silicon waveguide · 1 run · Run 1 · older · saved 5:30 AM'}]);
+  {kind:'earlier',index:0,newest:true,label:'Restore newest from this browser: Optical waveguide · 6 runs · file both-models.json, changed since · kept 5:46 AM'},
+  {kind:'latest',label:'Restore from this browser: Optical waveguide · 5 runs · file both-models.json, changed since · older · kept 5:38 AM'},
+  {kind:'earlier',index:1,label:'Restore from this browser: Heated silicon waveguide · 1 run · Run 1 · older · kept 5:30 AM'}]);
  // a session without runs saved after the newest is not called older
- assert.equal(A.resumeChoices({runs:0,savedAt:at('50')},[{runs:2,savedAt:at('46'),index:0}],t=>t)[1].label,'Restore from this browser: 0 runs · saved '+at('50'));
+ assert.equal(A.resumeChoices({runs:0,savedAt:at('50')},[{runs:2,savedAt:at('46'),index:0}],t=>t)[1].label,'Restore from this browser: 0 runs · kept '+at('50'));
  // a card's offer: the newest keeps its words; another says older with its save time
  const item={runs:1,names:['Run 1'],savedAt:'T',file:'x.json',fileCurrent:false};
  assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM').label,'Restore from this browser · Heated silicon waveguide · Run 1 · 5:30 AM · file x.json, changed since');
- assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM',{older:true}).label,'Restore from this browser · Heated silicon waveguide · Run 1 · older · saved 5:30 AM · file x.json, changed since');
+ assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM',{older:true}).label,'Restore from this browser · Heated silicon waveguide · Run 1 · older · kept 5:30 AM · file x.json, changed since');
  assert.equal(A.cardResumeChoice({...item,fileCurrent:true,fileSavedAt:'S'},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · same as file x.json, saved 9:24 PM');
  assert.equal(A.cardResumeChoice({...item,fileCurrent:true},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · browser copy 9:24 PM · same as file x.json');
  const lib=read('workspace-applications.mjs');

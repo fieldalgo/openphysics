@@ -2712,9 +2712,9 @@ try {
     y1.kept = await offers();
     stage('R19 Y1 restore offers', y1);
     assert.equal(y1.before.box[0].id, 'resume-newest'); assert.equal(y1.before.box[0].record, y1.before.card.record, 'the box leads with the newest, which its card also offers');
-    assert.match(y1.before.box[0].text, /^Restore newest from this browser: Optical waveguide · 1 run · Run 1 · saved \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.match(y1.before.box[0].text, /^Restore newest from this browser: Optical waveguide · 1 run · Run 1 · kept \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.ok(older > 0, JSON.stringify(y1.before.box));
-    assert.match(y1.before.box[older].text, /^Restore from this browser: Optical waveguide · 20 runs · .* · older · saved \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.match(y1.before.box[older].text, /^Restore from this browser: Optical waveguide · 20 runs · .* · older · kept \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.match(y1.before.card.text, /^Restore from this browser · Optical waveguide · Run 1 · \d{1,2}:\d\d(?: [AP]M)?$/);
     // stable run numbers (session versions 12 and 13): the restore keeps them and says nothing about numbering
     assert.ok(!y1.restored.message.includes('numbered from 1'), y1.restored.message); assert.equal(y1.restored.items, 20);

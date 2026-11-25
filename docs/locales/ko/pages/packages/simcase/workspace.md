@@ -438,8 +438,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
    켜면 시작 화면의 **Continue where you left off** 카드에 탭이 가지지 않은 저장된 세션이 모두 최신순으로, 그리고 상자만 닫는
    **Not now (choose a model below)**가 나옵니다. round 19부터 첫째이자 가장 눈에 띄는 제안은 모델과 상관없이 실행이 있는
-   가장 새 세션입니다: *Restore newest from this browser: Optical waveguide · 6 runs · … · saved 5:46 AM*. 나머지는 더
-   오래되었다고 밝힙니다: *Restore from this browser: Optical waveguide · 5 runs · … · older · saved 5:38 AM*(전에는 *Last
+   가장 새 세션입니다: *Restore newest from this browser: Optical waveguide · 6 runs · … · kept 5:46 AM*. 나머지는 더
+   오래되었다고 밝힙니다: *Restore from this browser: Optical waveguide · 5 runs · … · older · kept 5:38 AM*(round 29 L2부터 브라우저 사본의 시각은 *kept*: *saved*이면 테스터들이 파일 저장으로 읽었음; 시각이 파일의 저장 시각이면 *same as file x.json · saved 9:24 PM*처럼 *saved* 그대로)(전에는 *Last
    session in this browser*와 *Restore earlier from this browser: Earlier session*이었고, 더 오래된 세션이 먼저 나올 수
    있었습니다). 탭이 광 실행을 가지는 동안 상자는 숨겨집니다. 복원 뒤에는 복원한 기록이 목록에서 빠지고 나머지는 새로고침
    없이 Workspace tools(*Restore earlier session from this browser · …*)에 남습니다. **Open file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳(그 줄 오른쪽에 프로젝트 이름)에 고정되어
@@ -477,7 +477,7 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    기록 시각 대신 파일을 저장한 시각을 씁니다(*· same as file …json, saved 2:24 PM*). 연 파일과 같은 기록은
    어느 시각인지 밝힙니다(*· browser copy 2:25 PM · same as file …json*). round 19부터 카드 위 상자는 카드가 제안하는
    세션까지 모든 세션을 나열합니다(전에는 어느 카드도 제안하지 않는 세션만). 실행이 있는 가장 새 세션이 아닌 세션을 제안하는
-   카드는 *· older · saved 5:30 AM*이라고 밝힙니다(*· older · same as file …json, saved …*, *· older · browser copy … · same
+   카드는 *· older · kept 5:30 AM*(round 29 전에는 *saved*)이라고 밝힙니다(*· older · same as file …json, saved …*, *· older · browser copy … · same
    as file …json*). round 20부터 상자는 한 기록에 대해 카드와 같은 시각을 밝힙니다: 저장했던 파일과 아직 같은 기록은 둘 다
    그 파일의 저장 시각을 씁니다(프로젝트를 저장하면 보이지 않는 모델의 기록이 파일과 그 저장 시각에 이어지지만 기록 자체는
    더 일찍 쓰였으므로, 카드는 8:31 AM, 상자는 8:30 AM이었음). 새것부터의 순서는 그대로 기록 자신의 시각을 따릅니다.
@@ -490,7 +490,7 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    복원하지 않는다고 적습니다(*· also in this project: Heated silicon waveguide · Run 1 (restored separately)*, 탭이 그
    모델의 실행을 가지고 있으면 *(already in this tab)*). 버튼은 자기 모델만 복원합니다. round 20부터 탭이 두 모델 어느
    쪽의 실행도 가지고 있지 않으면 카드 위 상자의 가장 새 제안이 둘 다 복원합니다: *Restore newest from this browser: Optical
-   waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 8:44 AM*.
+   waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · kept 8:44 AM*.
    가장 새 기록을 그 버튼처럼 복원하고, 그 복원이 끝나면(불러오기 질문에 Replace로 답한 뒤; Cancel은 둘 다 멈춤) 모델,
    시각, 파일로 다시 찾은 다른 모델의 기록을 복원한 다음 가장 새 기록의 모델을 Results에 보입니다. Messages는 *Restored
    Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) from this browser, not recomputed.*입니다(round 19~21이

@@ -75,8 +75,12 @@ function offerTimeWords(item,when,older=false){
  const old=older?' · older':'';
  if(item.file&&item.fileCurrent===true&&item.fileSavedAt)return `${old} · same as file ${item.file}, saved ${when(item.fileSavedAt)}`;
  if(item.file&&item.fileCurrent===true)return `${old} · browser copy ${when(item.savedAt)} · same as file ${item.file}`;
- return `${old} · ${older?'saved ':''}${when(item.savedAt)}${fileWords(item)}`;
+ return `${old} · ${older?'kept ':''}${when(item.savedAt)}${fileWords(item)}`;
 }
+// Round 29 (L2): the word before an offer's time. offerSavedAt is a file's save time for a record
+// that is the same as its file ("saved": a file was saved then); else the browser copy's time,
+// "kept" (P04 and P02 read "saved 8:48 PM" as a file save that never happened).
+const offerTimeWord=item=>item.file&&item.fileCurrent===true&&item.fileSavedAt?'saved':'kept';
 // A model card's offer when the tab holds none of that model's runs and browser recovery holds a
 // session of it: "Restore from this browser · Optical waveguide · design A, design B · 2:25 PM",
 // then the file it names, shown before Start new. item: a recovery entry {runs, names, savedAt,
@@ -126,8 +130,8 @@ export function resumeChoices(latest,earlier=[],when=offerTime){
   // round 21 (W4): an older entry leaves "also in this project" out: it named the other model's
   // newest record, whose runs may be newer than this entry
   return {kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{}),...(e.newest?{newest:true}:{}),...(pair?{pair:true}:{}),
-   label:pair?`${RESTORE_NEWEST_TEXT}: ${pairLine(e.item,pair)}${fileWords(e.item)} · saved ${when(offerSavedAt(e.item))}`
-   :`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(older?{...e.item,also:undefined}:e.item)} · ${older?'older · ':''}saved ${when(offerSavedAt(e.item))}`};
+   label:pair?`${RESTORE_NEWEST_TEXT}: ${pairLine(e.item,pair)}${fileWords(e.item)} · ${offerTimeWord(e.item)} ${when(offerSavedAt(e.item))}`
+   :`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(older?{...e.item,also:undefined}:e.item)} · ${older?'older · ':''}${offerTimeWord(e.item)} ${when(offerSavedAt(e.item))}`};
  });
 }
 // resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),

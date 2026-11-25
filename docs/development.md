@@ -549,8 +549,8 @@ with **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead**, which brings
 Run 3 (*Run 2 (…) is back; Run 3 (…) was dropped instead.*, no further button, *Runs · 20 of 20 · 15
 pinned* since run retention); a swap button kept from an earlier result and pressed after the next run changing nothing;
 and, after a second session of one run, the Library's box leading with *Restore
-newest from this browser: Optical waveguide · 1 run · Run 1 · saved …* (the record the card offers)
-and the six-run session reading *… · older · saved …*; restoring that older one hides the box, the
+newest from this browser: Optical waveguide · 1 run · Run 1 · kept …* (the record the card offers)
+and the six-run session reading *… · older · kept …* (*saved* before round 29, L2); restoring that older one hides the box, the
 newer session stays offered as the last session at once and in Workspace tools' earlier sessions
 once this tab's record is written, and the restored one is not listed again. The Library check of
 the first viewport now reads the box's newest offer, which sits above the cards; since round 21 the
