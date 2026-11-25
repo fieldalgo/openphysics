@@ -1707,14 +1707,6 @@ try {
     assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: Optical waveguide \(\d+ runs?(?:, the comparison)?\)(?: and [^.]+)?\.(?: Optical waveguide keeps values only for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
     // round 26 (C3): the header says Download again, its time and the name the question gave
     assert.match(o1SecondHeader, /^design-a-ng · design-a-ng\.json · downloaded again \d{1,2}:\d\d(?: [AP]M)? \(your browser may have named it design-a-ng \(1\)\.json\)$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
-    // round 29 (L3): the next Download again of the same name in this tab says "(2)" (P05's third
-    // download landed as design-a-ng (2).json while the header said (1))
-    before = await listDownloads(); await page.click('#menu-save');
-    await page.until("document.getElementById('download-again')?.open", 'L3 Save asks'); await page.click('#download-again-confirm');
-    await noDialog('L3 Save'); const l3 = {file: await newDownload(before), header: await header()};
-    stage('R29 L3 third download of design-a-ng.json', l3);
-    assert.equal(await changedSince(before), 1, 'L3: one file');
-    assert.match(l3.header, /^design-a-ng · design-a-ng\.json · downloaded again \d{1,2}:\d\d(?: [AP]M)? \(your browser may have named it design-a-ng \(2\)\.json\)$/);
     // Ctrl+S after another edit: the same question; Save As… opens the name dialog prefilled with the name
     await toGeometry(); await page.type('#shape-w', 660); await sleep(300); before = await listDownloads();
     await page.eval("document.activeElement?.blur()"); await key('s', ['Control']);
@@ -1748,6 +1740,17 @@ try {
     await page.until("document.getElementById('download-again')?.open", 'A2 Save after reset asks'); assert.deepEqual(await againView(), AGAIN);
     await page.click('#download-again-confirm'); await noDialog('O1 Save after reset');
     assert.match(await newDownload(before), /^design-a-ng(?: \(\d\))?\.json$/);
+    // round 29 (L3): the next Download again of the same name in this tab says "(2)", in the question
+    // and in the header (P05's third download landed as design-a-ng (2).json while the header said
+    // (1)); the count started again at Open (the Download again just above was the first, "(1)")
+    before = await listDownloads(); await page.click('#menu-save');
+    await page.until("document.getElementById('download-again')?.open", 'L3 Save asks'); const l3Asked = await againView(); await page.click('#download-again-confirm');
+    await noDialog('L3 Save'); const l3 = {asked: l3Asked, file: await newDownload(before), header: await header()};
+    stage('R29 L3 second Download again of design-a-ng.json', l3);
+    assert.equal(await changedSince(before), 1, 'L3: one file');
+    assert.match(l3.header, /^design-a-ng · design-a-ng\.json · downloaded again \d{1,2}:\d\d(?: [AP]M)? \(your browser may have named it design-a-ng \(2\)\.json\)$/);
+    // the question before it names the same number
+    assert.deepEqual(l3.asked, {...AGAIN, description: 'Download design-a-ng.json again? This browser cannot replace the earlier file and may name the new one design-a-ng (2).json.'});
     stage('O1 open and reset', {opened: o1Opened, openedEdited: o1OpenedEdited, fourth: o1Fourth, reset: o1Reset});
     // F2 (round 13): a model file over 64 KiB opened through File › Open is refused by the model reader
     const bigModel = JSON.parse(await readFile(join(out, 'p1-four.json'), 'utf8')); bigModel.padding = 'x'.repeat(70 * 1024);

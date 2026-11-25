@@ -137,7 +137,8 @@ As or Open (round 26, C3): *design-a-ng · design-a-ng.json · downloaded again 
 may have named it design-a-ng (1).json)*, or *… · changed since downloaded again 11:45 AM (…) · …*
 after a change. Since round 29 (L3) the number counts the Download again of that name in this tab:
 the second says *(your browser may have named it design-a-ng (2).json)*, and so on; Save As or Open
-starts the count again. The question before each Download again still names *(1)*. The first Save of a
+starts the count again. The question before each Download again names the same number (*… may
+name the new one design-a-ng (2).json.*). The first Save of a
 project with no file keeps the name dialog, and the browser's save dialog (Chrome, Edge) is
 unchanged. On every project save the name dialog also says what the file
 will hold, each model with its runs: *The file will hold Optical waveguide (2 runs) and Heated
