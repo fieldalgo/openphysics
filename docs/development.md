@@ -673,8 +673,13 @@ A third script (`tools/studio_browser/studio_multiphysics_session_browser.mjs`) 
 multiphysics session files (version 8): one Save session and one Open session in every model,
 the template, a 0.12 µm mesh and a two-run session saved, opened and saved again (the second
 file byte-identical, every stored array equal to the server's separately fetched reply as
-Float64 bits), six runs of a 0.08 µm mesh against the 16 MiB limit (the question and the
-refusal), the refusals of damaged and newer files, browser recovery after a reload, three
+Float64 bits), six runs of a 0.08 µm mesh against the 16.8 MB budget of run retention (since H1,
+pre-registered HK10, its expected values re-registered after the result: about 3.7 MB of maps a
+run, so four fit; the fifth result lets Run 1's maps go and the sixth Run 2's, each said with
+**Recompute Run N's maps**; the count is also derived from the measured map bytes; the file is
+written without a question; and Recompute Run 1's maps brings them back and lets Run 3's go; before
+H1, the 16 MiB question and the refusal), 20 runs and the 21st run's drop (six
+and the seventh before H1), the refusals of damaged and newer files, browser recovery after a reload, three
 earlier sessions, the conflict of two tabs, and a restart: two optical runs, the heated session
 file opened over them, a reload and the same file opened again. After it, the title keeps
 *Opened …* through tab clicks, the recovery lists show each session once, and the Optical
@@ -744,7 +749,9 @@ drops Run 2 and Messages offers **Keep Run 2, drop Run 3 (run at …) instead**,
 …)*; **Pin Run 2**, 4, 5 and 6 each read *Run N pinned. If you run: drops Run M (run at …) · pin it to
 keep it* in Messages, Pin is hidden for Run 7, and Run 8 drops Run 7 with *… was dropped; every other
 earlier run is pinned, so no other run can be dropped instead* and no swap button, leaving Run 8, 6,
-5, 4, 2 and 1.
+5, 4, 2 and 1. Since run retention of the heated model (H1, pre-registered HK10 c) these stages make
+20 heated runs: the same words with the run numbers 14 higher (Run 21 drops Run 2, the swap leaves
+Runs 21 to 4, 2 and 1; the pins run from Run 2 and 4 to 20, and Run 22 drops Run 21).
 Since round 20 (pre-registered) the project script opens `heater-study.json` in a new profile,
 shows both models, saves `r20-both.json` a minute after the heated record was written, and reloads:
 the box leads with *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon

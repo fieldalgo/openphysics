@@ -535,7 +535,10 @@ results*도 확인합니다.
 세 번째 스크립트(`tools/studio_browser/studio_multiphysics_session_browser.mjs`)는 다중물리 세션 파일(버전 8)을
 확인합니다. 모든 모델의 Save session과 Open session 하나씩, 템플릿·0.12 µm 메시·실행 두 개 세션을 저장하고 열고 다시
 저장(두 번째 파일은 바이트 단위로 같고, 저장된 모든 배열은 따로 받은 서버 응답과 Float64 비트까지 같음), 0.08 µm 메시
-실행 여섯 개로 16 MiB 한도의 질문과 거부, 손상되거나 더 새로운 파일의 거부, 다시 읽기 뒤 브라우저 복구, 이전 세션 세 개,
+실행 여섯 개로 실행 보관의 16.8 MB 예산(H1부터, 사전 등록 HK10, 기댓값은 결과 뒤에 다시 등록: 실행당 맵이 약 3.7 MB라
+넷이 들어감. 다섯 번째 결과가 Run 1의, 여섯 번째가 Run 2의 맵을 놓고 각각 **Recompute Run N's maps**와 함께 그렇게 말하며,
+개수는 측정한 맵 바이트로도 계산함. 파일은 질문 없이 쓰이고, Recompute Run 1's maps가 맵을 되돌리며 Run 3의 맵을 놓음.
+H1 전에는 16 MiB 한도의 질문과 거부), 실행 20개와 21번째 실행의 내보내기(H1 전에는 여섯 개와 일곱 번째), 손상되거나 더 새로운 파일의 거부, 다시 읽기 뒤 브라우저 복구, 이전 세션 세 개,
 두 탭의 충돌, 그리고 다시 켜기입니다: 광학 실행 두 개, 그 위로 가열 세션 파일 열기, 새로고침, 같은 파일 다시 열기. 그 뒤
 제목은 탭을 눌러도 *Opened …*를 유지하고, 복구 목록은 세션마다 한 번씩만 보여 주며, Optical waveguide 카드가 광학
 실행을 제안하고 그 실행은 같은 n_eff로 돌아옵니다. 또 도크와 하단의 이름 붙은 실행(*Run 1 · Heater 2e14 · …*)과,
@@ -583,7 +586,9 @@ Run 7이 Run 2를 내보내고 Messages가 **Keep Run 2, drop Run 3 (run at …)
 남는지 봅니다. 22차부터(사전 등록 P4) 이어서 편집하면 *If you run: drops Run 2 (run at …)*가 나오고, **Pin Run 2**, 4, 5,
 6이 각각 Messages에 *Run N pinned. If you run: drops Run M (run at …) · pin it to keep it*를 보이며 Run 7에는 Pin이 없고,
 Run 8이 Run 7을 내보내며 *… was dropped; every other earlier run is pinned, so no other run can be dropped instead*를 보이고
-교환 버튼 없이 Run 8, 6, 5, 4, 2, 1이 남는지 봅니다. P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
+교환 버튼 없이 Run 8, 6, 5, 4, 2, 1이 남는지 봅니다. 가열 모델의 실행 보관(H1, 사전 등록 HK10 c)부터 이 단계는 가열 실행을
+20개 만듭니다. 문구는 같고 실행 번호가 14 큽니다(Run 21이 Run 2를 내보내고, 교환 뒤 Run 21~4, 2, 1이 남으며, 고정은 Run 2와
+4~20, Run 22가 Run 21을 내보냄). P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
 session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다. 20차부터(사전 등록) project
 스크립트는 새 프로필에서 `heater-study.json`을 열고 두 모델을 보인 뒤 가열 기록이 쓰이고 1분 뒤 `r20-both.json`으로 저장하고
 새로고침합니다: 상자가 *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run) · same

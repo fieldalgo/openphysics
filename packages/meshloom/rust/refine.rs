@@ -99,6 +99,8 @@ struct State<'a> {
     /// input vertex of a triangle surface, which the polygon path would have as a Steiner
     /// point on its facet)
     tri_vertex: Vec<bool>,
+    /// shape() by sorted vertex set, while flip_improve runs (no vertex moves then)
+    shape_memo: std::cell::RefCell<Option<HashMap<[u32; 4], (f64, f64), FastKey>>>,
     /// per facet: its input vertices, and the input edges of its loops
     fverts: Vec<Vec<u32>>,
     fedges: Vec<Vec<(u32, u32)>>,
@@ -166,6 +168,40 @@ fn ratio_cos(b: f64) -> f64 {
 /// Facet quality bound: a subfacet with a larger radius-edge ratio is split (2D Ruppert's
 /// sqrt(2) with a margin).
 const SUB_RATIO: f64 = 1.5;
+/// A fast hasher for small integer keys (the shape memo), in place of the default SipHash:
+/// the keys are vertex indices, not untrusted input.
+#[derive(Clone, Copy, Default)]
+struct FastKey;
+
+impl std::hash::BuildHasher for FastKey {
+    type Hasher = FastHasher;
+    fn build_hasher(&self) -> FastHasher {
+        FastHasher(0)
+    }
+}
+
+struct FastHasher(u64);
+
+impl std::hash::Hasher for FastHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(b as u64);
+        }
+    }
+    fn write_u32(&mut self, x: u32) {
+        self.write_u64(x as u64);
+    }
+    fn write_u64(&mut self, x: u64) {
+        self.0 = (self.0.rotate_left(5) ^ x).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
+    fn write_usize(&mut self, x: usize) {
+        self.write_u64(x as u64);
+    }
+}
+
 /// Edge removal: the largest ring of tetrahedra around an edge it considers.
 const EDGE_RING_MAX: usize = 7;
 
@@ -721,6 +757,21 @@ impl State<'_> {
 
     /// (smallest dihedral angle in degrees, q) of four vertices, positive or not (doubles).
     fn shape(&self, v: [u32; 4]) -> (f64, f64) {
+        let mut key = v;
+        key.sort_unstable();
+        if let Some(m) = self.shape_memo.borrow().as_ref() {
+            if let Some(&r) = m.get(&key) {
+                return r;
+            }
+        }
+        let r = self.shape_of(v);
+        if let Some(m) = self.shape_memo.borrow_mut().as_mut() {
+            m.insert(key, r);
+        }
+        r
+    }
+
+    fn shape_of(&self, v: [u32; 4]) -> (f64, f64) {
         let x = v.map(|i| self.xyz[i as usize]);
         let mut m = 180.0f64;
         for (i, j, k, l) in [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)] {
@@ -802,6 +853,12 @@ impl State<'_> {
     /// subsegment; exact orient3d for every new tetrahedron. Faces and edges are visited in
     /// sorted order (deterministic); up to four passes.
     fn flip_improve(&mut self) {
+        *self.shape_memo.borrow_mut() = Some(HashMap::with_hasher(FastKey));
+        self.flip_passes();
+        *self.shape_memo.borrow_mut() = None;
+    }
+
+    fn flip_passes(&mut self) {
         for _pass in 0..4 {
             let mut done = 0u32;
             // 2-3 across interior faces
@@ -825,17 +882,18 @@ impl State<'_> {
                 if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
                     continue; // not worth a flip
                 }
-                let mut new = Vec::with_capacity(3);
-                for j in 0..3 {
-                    match self.positive([k[j], k[(j + 1) % 3], d, e]) {
-                        Some(t) => new.push(t),
-                        None => break,
-                    }
-                }
-                if new.len() != 3 || !self.convex_23(&k, d, e) {
+                // the cheap test first: shape (and so accept) does not depend on vertex order;
+                // then each exact orientation once (convex_23 asks the same three)
+                let cand: [[u32; 4]; 3] = std::array::from_fn(|j| [k[j], k[(j + 1) % 3], d, e]);
+                if !self.accept(&[v1, v2], &cand) {
                     continue;
                 }
-                if self.accept(&[v1, v2], &new) && self.rho_ok(&[v1, v2], &new) {
+                let o: [i8; 3] = std::array::from_fn(|j| self.orient(cand[j]));
+                if o[0] == 0 || o.iter().any(|&x| x != o[0]) {
+                    continue; // a flat new tetrahedron, or de not through the face (convex_23)
+                }
+                let new: Vec<[u32; 4]> = cand.iter().map(|&c| if o[0] > 0 { c } else { [c[1], c[0], c[2], c[3]] }).collect();
+                if self.rho_ok(&[v1, v2], &new) {
                     self.replace(&[t1, t2], &new);
                     done += 1;
                 }
@@ -888,13 +946,20 @@ impl State<'_> {
                     continue;
                 }
                 let tri = [others[0], others[1], others[2]];
-                let (Some(n1), Some(n2)) = (self.positive([tri[0], tri[1], tri[2], a]), self.positive([tri[0], tri[1], tri[2], b])) else { continue };
+                // the cheap test first (shape does not depend on vertex order), then each exact
+                // orientation once
+                let (c1, c2) = ([tri[0], tri[1], tri[2], a], [tri[0], tri[1], tri[2], b]);
+                if !self.accept(&oldv, &[c1, c2]) {
+                    continue;
+                }
                 // a and b on opposite sides of the triangle: the two new tetrahedra fill the ring
-                let (sa, sb) = (self.orient([tri[0], tri[1], tri[2], a]), self.orient([tri[0], tri[1], tri[2], b]));
+                let (sa, sb) = (self.orient(c1), self.orient(c2));
                 if sa * sb >= 0 || !self.convex_23(&tri, a, b) {
                     continue; // the edge must pass through the triangle's interior
                 }
-                if self.accept(&oldv, &[n1, n2]) && self.rho_ok(&oldv, &[n1, n2]) {
+                let flip = |c: [u32; 4], o: i8| if o > 0 { c } else { [c[1], c[0], c[2], c[3]] };
+                let (n1, n2) = (flip(c1, sa), flip(c2, sb));
+                if self.rho_ok(&oldv, &[n1, n2]) {
                     self.replace(&ring, &[n1, n2]);
                     done += 1;
                 }
@@ -2638,7 +2703,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         (0..plc.points.len()).map(|v| all[v] > 0 && all[v] == tri[v]).collect()
     };
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, shape_memo: std::cell::RefCell::new(None), fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         _p: std::marker::PhantomData,
     };

@@ -804,10 +804,11 @@ Joule 애플리케이션에서 기다립니다. 실행 취소는 진행 중인 �
   이 열은 따로 푼 광 모델(실행 문서에서 결합, 반복, 열광학 키를 뺀 것을 키 정렬로 비교)이 보이는
   실행의 것과 같을 때 유효합니다. 아니면 “(other model)”로 표시하고 Δn_eff를 비우며,
   **Run Modes 1 alone**으로 새로 풉니다. 결과는 자기 실행을 밝히며 모델을 고쳐도 바뀌지 않습니다.
-- **실행.** 실행은 광학과 같은 규칙과 문구로 최대 여섯 개를 보관합니다. Results › Runs에
+- **실행.** 실행은 광학과 같은 규칙과 문구로 최대 20개의 값을 보관하고, 그 맵은 16.8 MB 예산 안에서
+  보관합니다([가열 실행 보관](#가열-실행-보관-값과-맵); H1 전에는 여섯 개). Results › Runs에
   “Run N · 이름 · 시각” 목록, **Run name**(Enter로 고정), **Unpin this run**이 있습니다. 고정한
-  실행은 남고, 새 실행이 오면 고정하지 않은 가장 오래된 실행을 바꿉니다. 실행을 고르면 그 결과와
-  최신 여부 줄이 보이며 모델은 바뀌지 않습니다. 여섯 개가 모두 고정되면 Run이 먼저 하나를 풀라고 합니다.
+  실행은 남고, 21번째 실행이 오면 고정하지 않은 가장 오래된 실행을 바꿉니다. 실행을 고르면 그 결과와
+  최신 여부 줄이 보이며 모델은 바뀌지 않습니다. 20개가 모두 고정되면 Run이 먼저 하나를 풀라고 합니다.
   round 21부터 Run study는 광학 모델처럼 바로 시작합니다(round 19의 질문은 없어짐). 그 옆 줄이 한도가 내보낼 실행을
   밝힙니다: 실행 전 *If you run: drops Run 3 (run at 05:31 AM) · pin it to keep it*, 계산 중 *When this run finishes, Run 3
   (run at 05:31 AM) is dropped*, 그리고 **Pin Run 3**. 그 뒤 Messages는 *Run 7 complete. …*에 *Run 3 (run at 05:31 AM)
@@ -867,7 +868,7 @@ Studio는 이 문서를 `/api/multiphysics/*`(validate, run, 진행 이벤트, s
 
 - `application`은 필수이며 버전 8에서 값은 `"multiphysics"` 하나뿐입니다. `document`는 지금의
   모델이며(어느 실행과도 다를 수 있음) File › Export › Model file이 쓰는 그대로 씁니다.
-- `runs`는 완료 순서대로 최대 여섯 실행입니다. `job`은 서버의 작업 식별자(`mp-`와 16진수 12자리),
+- `runs`는 완료 순서대로 최대 여섯 실행입니다([버전 15](#다중물리-모델의-세션-파일버전-15)는 최대 20). `job`은 서버의 작업 식별자(`mp-`와 16진수 12자리),
   `number`는 화면의 “Run N”이며(다음 실행은 저장된 가장 큰 번호 다음), `label`과 `pinned`는 광학
   규칙(최대 80자, 제어 문자 없음)을 따릅니다. `document`는 그 실행이 푼 문서이고, 그 뒤 모델이
   바뀌었는지는 화면과 같이 키를 정렬해 지금 모델과 비교해 정합니다. `events`는 실행의 진행 이벤트
@@ -903,8 +904,10 @@ Studio는 이 문서를 `/api/multiphysics/*`(validate, run, 진행 이벤트, s
   다이제스트가 없으므로 연 결과는 “Loaded from file, not recomputed. Studio checks that the file is
   well formed, not who made it.”으로 표시합니다.
 - **크기.** 파일은 최대 16 MiB이며 읽기 전에 검사하고, 그 안의 문서는 각각 최대 1 MiB입니다. Save
-  session은 파일이 맞으면 모든 실행을 맵과 함께 씁니다(템플릿 메시 실행 여섯 개는 약 2.5 MB). 맞지
-  않으면 아무것도 쓰지 않고 크기를 밝혀 묻습니다: “Session is 22 MB; the limit is 16 MiB. Keep the
+  session은 파일이 맞으면 모든 실행을 맵과 함께 씁니다(템플릿 메시 실행 여섯 개는 약 2.5 MB). 실행
+  보관부터 탭은 맵을 16.8 MB 예산 안에서 보관하므로([가열 실행 보관](#가열-실행-보관-값과-맵)) Save는 탭을 그대로
+  씁니다. 파일보다 많이 담은 탭(고른 실행 하나가 예산을 넘거나, 마지막 도착 뒤 입력이 16 KiB 넘게 커진 경우)만
+  아직 질문에 닿습니다. 맞지 않으면 아무것도 쓰지 않고 크기를 밝혀 묻습니다: “Session is 22 MB; the limit is 16 MiB. Keep the
   maps of the selected and pinned runs only? …”. **Keep maps for selected and pinned runs**는 나머지를
   `"maps": "not kept"`로 쓰고, **Cancel**은 아무것도 쓰지 않습니다. 고른 실행과 고정한 실행만으로도
   한도를 넘으면 Save session은 거부하고 그 실행을 밝힙니다(“Run 3 alone is 18 MB, over the 16 MiB
@@ -915,7 +918,7 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
 열기는 어떤 실행도 시작하지 않습니다. 모든 검사는 탭의 무엇이든 바꾸기 전에 돌고, 하나라도 실패하면
 검사를 밝힌 메시지로 파일 전체를 거부하며 모델, 실행, 실행 취소는 그대로입니다:
 
-- 크기와 JSON(맨 앞의 바이트 순서 표시는 지움), 실행 최대 여섯, 고유한 작업 식별자와 실행 번호, 올바른
+- 크기와 JSON(맨 앞의 바이트 순서 표시는 지움), 실행 최대 여섯(버전 15는 20), 고유한 작업 식별자와 실행 번호, 올바른
   이름·고정·시각·서버 버전, 저장된 실행인 `selected`, 작업공간이 제공하는 화면 상태;
 - 실행마다 결과와 문서: 물리 이름과 종류, 서버가 문서에서 끌어내는 풀이 순서, 같은 `from`, `to`,
   `transfer`의 결합(Same mesh는 일치하는 메시와 차이 0), `study.loops`의 반복 단계(각각 수렴, 반복
@@ -930,9 +933,9 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 File › Open이 모델 파일을 읽듯이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-14보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 15, newer than this Studio reads
-(versions 6–14). Open it in a newer Studio.”. 버전 9~14는 [광학 세션](#광학-세션-파일버전-9)이며, 버전 9 아래의
-버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
+15보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 16, newer than this Studio reads
+(versions 6–15). Open it in a newer Studio.”. 버전 9~14는 [광학 세션](#광학-세션-파일버전-9), 버전 15는 실행이
+여섯 개보다 많은 다중물리 세션이며, 버전 9 아래의 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
 버전 6과 7 세션 파일은 이전처럼 열리고, 버전 1–5는 이전의 거부를 유지합니다. 버전 8 이전의 Studio는
@@ -941,8 +944,9 @@ this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부�
 
 **브라우저 복구**는 다중물리 모델을 광학 세션과 같은 저장소에 같은 한도로 보관합니다(최신 하나와 이전
 세 개, 각각 최대 16 MiB, 변경 0.7초 뒤 기록, 탭 사이 충돌 규칙). 모델에 실행이 있거나 연 뒤 편집했을
-때부터 Save session이 쓸 버전 8 글로 기록합니다. 16 MiB를 넘으면 대화 상자 없이 고른 실행과 고정한
-실행의 맵만 두고, 표시는 “kept for recovery in this browser without the maps of 2 runs · File › Save
+때부터 Save session이 쓸 글(버전 8, 실행이 여섯 개보다 많으면 15)로 기록합니다. 실행 보관부터 복구는 탭을
+그대로 담습니다. 16 MiB를 넘으면(파일보다 많이 담은 탭) 대화 상자 없이 실행 보관의 순서대로, 곧 고른 실행의 맵,
+그다음 고정한 실행과 나머지 실행의 맵을 최신부터 맞는 만큼 두고(H1 전에는 고른 실행과 고정한 실행의 맵만), 표시는 “kept for recovery in this browser without the maps of 2 runs · File › Save
 keeps them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
 MiB · File › Save keeps your work”) 이전 기록이 남습니다. **Restore last session from this browser**, **Restore earlier session from this
 browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**(Workspace tools)과 Heated silicon
@@ -960,8 +964,90 @@ joined*, 아니면 *… · in project heater-study.json · saved 13:15* 또는 *
 단위로 같게 쓰임). `tests/simcase/test_studio_multiphysics_session.py`는 Python hashlib과 자체 쓰기기로
 다이제스트를 다시 계산합니다. 브라우저 검사는 템플릿, 0.12 µm 메시, 실행 두 개 세션을 저장·열기·다시
 저장하고(두 번째 파일은 바이트 단위로 같고, 모든 배열은 서버 응답과 Float64로 같음), 0.08 µm 메시 실행
-여섯 개로 16 MiB 한도, 거부, 브라우저 복구를 검사합니다. 버전 8에 없는 것: 광학과 다중물리 실행을 섞은
+여섯 개로 16.8 MB 예산과 Recompute Run 1's maps를, 실행 20개와 21번째 실행의 내보내기를, 거부와 브라우저
+복구를 검사합니다. 버전 8에 없는 것: 광학과 다중물리 실행을 섞은
 세션, 실행 사이의 메시 공유, 파일에서 실행 추가, 결합 실행의 모드 장.
+
+### 가열 실행 보관: 값과 맵
+
+실행 보관의 H1 조각(설계 *Keeping more runs* 7절)부터 가열 모델은 실행 최대 20개의 **값**을 보관하고, 그
+**맵**은 광학 모델의 필드와 같은 예산([실행 보관](#실행-보관-값과-필드)) 안에서 보관합니다. 예산은 16 MiB 세션에서
+입력 몫 16 KiB를 뺀 16,760,832바이트이며 16.8 MB라고 말합니다. 탭, File › Save, Export › Model with runs,
+프로젝트 파일의 항목, 브라우저 복구가 같은 맵을 담습니다.
+
+- **값.** n_eff, 결합 검사, 반복 이력, 절점·삼각형 개수입니다. 모든 실행이 보관합니다. 맵 없는 실행은 파일에서
+  약 20 kB(템플릿과 그 고운 메시), 가열 슬래브 예제는 14 kB이며, 그런 실행 20개는 약 0.4 MB입니다.
+- **맵.** 메시, 절점마다의 열 온도, 삼각형마다의 결합 입력(온도, n, k, n − n₀)으로, 열 페이지와 모드 페이지의
+  맵이 그리는 것입니다. 맵 없는 실행은 [버전 8](#다중물리-모델의-세션-파일버전-8)의 기록대로 `"maps": "not kept"`와
+  개수로 씁니다.
+- **언제 맵을 놓는가.** 맵이 도착할 때만: 새 결과, 재계산, File › Open, Open project, Restore, 그리고
+  **Keep Run N, drop … instead**로 돌아오는 실행입니다. 실행 고르기, 고정, 고정 풀기, 이름 짓기, 히터 없는 풀이,
+  Show Run N은 맵을 놓지 않습니다.
+- **순서.** 보관하는 맵은 고른 실행의 것, 방금 맵이 도착한 실행의 것(고른 실행이 아닌 재계산이나 되돌린 실행),
+  고정한 실행의 것(최신부터), 나머지 실행의 것(최신부터) 순으로, 세션이 예산 안에 있는 동안 더합니다. 맞지 않는
+  맵은 건너뛰고 다음으로 오래된 실행을 봅니다. 고른 실행은 혼자 예산을 넘어도 맵을 둡니다. 그러면 Save는 전처럼
+  거부합니다(*Run 3 alone is 18 MB, over the 16 MiB session limit. …*).
+- **문구**는 광학 문구에서 *fields*를 *maps*로, 실행 이름을 가열 모델의 것으로 바꾼 것입니다. **Run study** 옆에서는
+  같은 형상·메시·재료·물리·결합인 최신 실행의 맵 크기로 *If you run: Run 3 (run at 14:02) keeps its values, not its
+  maps*와 **Pin Run 3**을, 그런 실행이 없으면 남은 자리가 보관 중인 가장 작은 맵보다 작을 때 *If you run: older
+  runs' maps may not be kept (16.8 MB limit) · pin a run to keep its maps first*를 보입니다. 계산 중에는 *When this
+  run finishes, Run 3 (run at 14:02) keeps its values, not its maps*, 결과 뒤에는 *Run 3 (run at 14:02) keeps its
+  values; its maps were not kept (16.8 MB limit).*와 **Recompute Run 3's maps**, 그리고 고정하지 않고 고르지 않은 다른
+  실행의 맵이 그만큼 크면 **Keep Run 3's maps, not Run 4's (run at 14:05)**(*Run 3's maps are back; Run 4 (run at
+  14:05) keeps its values, not its maps.*)입니다. 고정한 실행의 맵이 빠지면 *Run 2 (pinned) keeps its values; its maps
+  were not kept: the selected and pinned runs' maps are 17.4 MB, over the 16.8 MB limit. Unpin a run to keep the newer
+  maps first.*입니다. 트리는 *Runs · 9 of 20*, 실행 목록은 *· values only*, 실행 목록 아래 안내는 *Up to 20 runs are
+  kept with their values. Maps are kept up to 16.8 MB. When a result or a recompute arrives, Studio keeps the selected
+  run's maps first, then pinned runs', then the newest. Selecting a run does not bring its maps back; Recompute does.
+  Pinned runs stay; when a 21st run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one
+  file.*입니다.
+- **맵 없는 실행.** Results는 n_eff 표와, 저장된 개수와 범위로 된 결합 검사를 보이고, 맵 자리에 *Run 4's maps are
+  not kept; its n_eff, coupling check and iteration history are kept. Maps are kept up to 16.8 MB. …*(맵 없이 파일에서
+  읽은 실행은 *Maps not kept in this file: n_eff, the coupling check and the iteration history are.*)와 **Recompute
+  Run 4's maps**를, 이 탭에서 계산한 실행이면 *· about 10 s*도 보입니다. 그런 실행의 *No need to run*은 *No need to
+  run: Run 4 already has these values; its maps are not kept. Run study adds a copy with the same values*이며
+  **Show Run 4**와 **Recompute Run 4's maps**가 붙습니다.
+- **Recompute Run N's maps**는 실행이 푼 문서를 같은 실행 요청으로 보냅니다. 새 실행이 아닙니다: 번호를 받지 않고
+  목록에 들어가지 않으며 모델, Undo, 고른 실행, 히터 없는 결과를 그대로 둡니다. 도크와 상태 표시는 *Recomputing Run
+  4's maps · about 10 s*이고 **Stop run**이 동작합니다(*Recompute of Run 4's maps stopped; Run 4 is unchanged.*).
+  절점·삼각형 개수가 같아야 하고, 모든 모드의 n_eff(실수부와 허수부), 열 물리마다의 온도 범위, 결합마다의 max
+  |received − sent|와 보존 잔차, 반복 단계마다의 잔차가 상대 1e-12(1e-3 미만은 절대 1e-15) 안에서 같아야 하며, 메시
+  검사와 반복 횟수는 정확히 같아야 합니다. 맞으면 맵을 같은 실행에 붙이고, 실행은 작업·번호·이름·고정·시각·저장된
+  값을 그대로 둡니다: *Run 4's maps recomputed from its stored model; its values match.* 그리고 맵이 도착했으므로 위
+  순서를 적용합니다. 아니면 아무것도 바꾸지 않습니다: *Run 4's maps were not recomputed: Modes 1 mode 1 n_eff came out
+  2.44565014, stored 2.44565013. Run 4 is unchanged; Run study makes a new run from the current model.*(버전이 다르면
+  *(stored by Studio 0.9.3; this is 0.9.4)*가 붙음). 서버가 이제 거부하는 문서는 *Run 4's maps cannot be recomputed:*
+  와 서버의 말입니다. 가열 풀이는 단일 스레드에서 비트 단위로 재현됩니다(측정: 템플릿, 그 4모드·0.12 µm 변형, 슬래브
+  예제를 각각 두 번 풀어 맵이 비트까지 같았음).
+- **측정**(2026-11-25, `tools/studio_heated_retention.mjs`, 단일 스레드): 실행당 텍스트 맵은 템플릿(절점 1,726개,
+  삼각형 3,334개, 모드 2개나 4개) 0.37 MB, 0.12 µm 메시 1.49 MB, 0.08 µm 2.79 MB, 가열 슬래브 예제 2.53 MB입니다.
+  결과 20개에서 예산은 템플릿 실행 20개 모두(7.7 MB), 0.12 µm 10개, 슬래브 6개, 0.08 µm 5개의 맵을 최신부터
+  보관합니다. 압축(단정밀도) 맵은 H1에 들어 있지 않습니다.
+
+검사는 `tests/simcase/studio_heated_retention.cjs`(HK2~HK4, HK6~HK9, HK12~HK14: 형식, 시드 고정 2000단계 순서열,
+순서, 문구, 재계산 거부, 복구), 엔진 결과가 있을 때의 `tests/simcase/studio_heated_retention_engine.cjs`(HK1, HK5),
+`tools/studio_browser/studio_multiphysics_session_browser.mjs`의 S5와 R21 단계(HK10)입니다.
+
+### 다중물리 모델의 세션 파일(버전 15)
+
+버전 15는 실행을 최대 20개 담는 [버전 8](#다중물리-모델의-세션-파일버전-8)입니다. 최상위 키, 실행 기록(맵 보관, 또는
+`"maps": "not kept"`와 `counts`), 다이제스트, 숫자 규칙, 검사가 같습니다. 버전 8은 실행을 최대 여섯 개 담습니다.
+
+- **언제 쓰는가.** 세션의 실행이 여섯 개보다 많을 때만 씁니다. 실행이 여섯 개 이하인 세션은 전처럼 버전 8로 바이트
+  그대로 쓰므로 이전 Studio도 그대로 읽습니다. 실행이 여섯 개 이하인 버전 15 파일(손으로 고친 것)은 읽고, 다시 쓸
+  때는 버전 8로 씁니다.
+- **읽기.** File › Open, Open project, Restore는 실행을 최대 20개 읽습니다. 실행 21개인 파일이나 실행 일곱 개인
+  버전 8 파일은 *Unsupported session format or run count.*로 거부합니다. `application`이 `"multiphysics"`가 아닌
+  버전 15 파일은 버전 8처럼 거부합니다(*This session file holds a “optical” model, which this Studio does not read.*).
+- **이전 Studio.** 버전 14까지 읽는 Studio(main ddb09a1)는 실행을 세기 전에 버전 15 파일을 이름을 밝혀 거부합니다:
+  *This session file is version 15, newer than this Studio reads (versions 6–14). Open it in a newer Studio.*(프로젝트
+  파일의 항목이면 앞에 *Heated silicon waveguide: *). 그런 파일을 담은 브라우저 복구 기록은 넘겨받지 않습니다. 그런
+  Studio와 실행을 나누려면 최대 여섯 개를 저장하십시오. 프로젝트 파일은 버전 1 그대로이며(다중물리 항목은 버전 8이나
+  15), 광학 세션, 문서, 서버 응답, 결과는 바뀌지 않습니다.
+
+검사는 `tests/simcase/studio_heated_retention.cjs`에 있습니다(HK2: main ddb09a1의 버전 8 세션
+`multiphysics-v8-ddb09a1.json`을 바이트 그대로 다시 씀, HK3: 실행 2와 4~15의 고정 파일
+`multiphysics-v15-thirteen-runs.json`, HK4: main ddb09a1이 읽는 것 `refusals-v15-ddb09a1.json`).
 
 ## 결과와 파일
 

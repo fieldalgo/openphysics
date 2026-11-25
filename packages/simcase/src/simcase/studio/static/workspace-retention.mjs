@@ -23,21 +23,15 @@ import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
 import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
 import {runChoice} from './workspace-open-run.mjs';
 import {groupIndexStep} from './workspace-modes.mjs';
+import {budgetOrder,budgetChoose,RECOMPUTE_RELATIVE,RECOMPUTE_ABSOLUTE,RECOMPUTE_SMALL,sameValue,valuePair} from './workspace-budget.mjs';
 
 export {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText};
 export const BUDGET_TEXT=mbText(FIELD_BUDGET_BYTES);
 const utf8Bytes=text=>new TextEncoder().encode(text).length;
-const newestFirst=(a,b)=>b.number-a.number;
 
 /** The runs with fields in the order their fields are kept (see the top of this file). first: the
  * jobs whose fields arrived and are not the selected run's. */
-export function fieldOrder(runs,selected,first=[]){
- const withField=runs.filter(r=>r.field);
- const chosen=withField.filter(r=>r.job===selected);
- for(const job of first){const r=withField.find(x=>x.job===job);if(r&&!chosen.includes(r))chosen.push(r);}
- const rest=withField.filter(r=>!chosen.includes(r));
- return [...chosen,...rest.filter(r=>r.pinned).sort(newestFirst),...rest.filter(r=>!r.pinned).sort(newestFirst)];
-}
+export const fieldOrder=(runs,selected,first=[])=>budgetOrder(runs.filter(r=>r.field),selected,first);
 
 /** The fields the budget keeps: {kept, letGo, total, base, fits}. kept and letGo: runs with fields;
  * total: the bytes of the session text with the kept fields (base: with none). fits: every field is
@@ -50,10 +44,8 @@ export function chooseFields(input,runs,selected,comparison,view,{first=[],budge
  // the text of every field may be of version 7 (smaller than the sum, which counts version 9 records)
  const seven=runs.length<=PREVIOUS_RUN_LIMIT&&runs.every(fitsVersion7);
  if(sum<=budget||(seven&&utf8Bytes(sessionText(input,runs,selected,comparison,view))<=budget))return {kept:withField,letGo:[],total:sum,base,fits:true};
- let total=base;const kept=[],letGo=[];
- fieldOrder(runs,selected,first).forEach((r,i)=>{const b=bytes(r);
-  // the selected run keeps its field even alone over the budget (section 3.4: Save then refuses)
-  if(total+b<=budget||(i===0&&r.job===selected)){kept.push(r);total+=b;}else letGo.push(r);});
+ // the selected run keeps its field even alone over the budget (section 3.4: Save then refuses)
+ const {kept,letGo,total}=budgetChoose(fieldOrder(runs,selected,first),{base,bytes,selected,budget});
  return {kept,letGo,total,base,fits:false};
 }
 
@@ -240,13 +232,7 @@ export function unestimatedFieldRisk(input,runs,selected,comparison,view,next,{b
 // ---- Recompute Run N's fields (section 4.4) ---------------------------------------------------
 /** The tolerance a recomputed value must meet: relative 1e-12, or absolute 1e-15 for a value whose
  * magnitude is below 1e-3 (both the stored and the recomputed value). */
-export const RECOMPUTE_RELATIVE=1e-12,RECOMPUTE_ABSOLUTE=1e-15,RECOMPUTE_SMALL=1e-3;
-export function sameValue(stored,fresh){
- if(stored===null||fresh===null)return stored===fresh;
- if(!Number.isFinite(stored)||!Number.isFinite(fresh))return false;
- const d=Math.abs(fresh-stored);
- return Math.max(Math.abs(stored),Math.abs(fresh))<RECOMPUTE_SMALL?d<=RECOMPUTE_ABSOLUTE:d<=RECOMPUTE_RELATIVE*Math.abs(stored);
-}
+export {RECOMPUTE_RELATIVE,RECOMPUTE_ABSOLUTE,RECOMPUTE_SMALL,sameValue};
 // the values a run stores, by name and mode, in the order the check names them
 function storedValues(run){
  const k=run.effective_index.length,out=[];
@@ -274,14 +260,8 @@ export function recomputeMismatch(run,fresh){
  }
  return null;
 }
-// two values as the refusal writes them: enough digits that they differ (n_eff and n_g to at least 8
-// decimals, other quantities to at least 9 significant digits)
-function twoValues(name,a,b){
- if(a===null||b===null)return [String(a),String(b)];
- const fixed=/n_eff|n_g/.test(name)&&Math.abs(a)>=1e-3;
- for(let d=fixed?8:9;d<=17;d++){const x=fixed?a.toFixed(d):a.toPrecision(d),y=fixed?b.toFixed(d):b.toPrecision(d);if(x!==y||d===17)return [x,y];}
- return [String(a),String(b)];
-}
+// two values as the refusal writes them (workspace-budget.mjs, shared with the heated model's maps)
+const twoValues=valuePair;
 export const recomputingText=run=>`Recomputing ${runTitle(run.number,run.label||'')}'s fields${recomputeEstimate(run)}`;
 export const recomputedText=run=>`${runTitle(run.number,run.label||'')}'s fields recomputed from its stored inputs; its values match.`;
 /** "Run 4's fields were not recomputed: mode 1 n_eff came out 2.43931671, stored 2.43931663. Run 4 is

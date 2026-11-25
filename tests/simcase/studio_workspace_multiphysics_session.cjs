@@ -180,9 +180,9 @@ test('S7 module: newer versions, another application and another result are refu
  const text=M.writeMultiphysicsSession(stateOf()).text;
  const change=f=>{const d=JSON.parse(text);f(d);return M.sessionJson(redigest(d));};
  // version 9 is now an optical session (application "optical"): a version 8 layout under it is refused, and the
- // newer-version refusal names version 14 (version 10 is the optical open boundary since slice P2, 11 the closed-window search since C2, 12 the run numbers, 13 more than six runs); a Studio
+ // newer-version refusal names version 16 (version 10 is the optical open boundary since slice P2, 11 the closed-window search since C2, 12 the run numbers, 13 more than six runs, 14 compact fields, 15 more than six heated runs); a Studio
  // before version 9 refused version 9 with the same template
- assert.throws(()=>N.parseSession(change(d=>{d.version=15;})),{message:'This session file is version 15, newer than this Studio reads (versions 6–14). Open it in a newer Studio.'});
+ assert.throws(()=>N.parseSession(change(d=>{d.version=16;})),{message:'This session file is version 16, newer than this Studio reads (versions 6–15). Open it in a newer Studio.'});
  assert.equal(N.newerVersionText(9,8),'This session file is version 9, newer than this Studio reads (versions 6–8). Open it in a newer Studio.');
  assert.throws(()=>N.parseSession(change(d=>{d.version=9;})),{message:'Unknown key "document" in the session file.'});
  assert.throws(()=>N.parseSession(change(d=>{d.application='other';})),{message:'This session file holds a “other” model, which this Studio does not read.'});
@@ -193,10 +193,11 @@ test('S7 module: newer versions, another application and another result are refu
  // a byte order mark is removed from a version 8 file
  assert.equal(N.parseSession('﻿'+text).runs.length,1);
 });
-test('the run list keeps six runs: pinned runs stay, a new run replaces the oldest unpinned one; the next number follows the highest',()=>{
- let runs=[];for(let i=1;i<=8;i++)runs=M.appendMultiphysicsRun(runs,runOf(i,'mp-'+String(i).padStart(12,'0'),{pinned:i===1}));
- assert.deepEqual(runs.map(r=>r.number),[1,4,5,6,7,8]);assert.equal(M.nextRunNumber(runs),9);
- const all=runs.map(r=>({...r,pinned:true}));assert.throws(()=>M.appendMultiphysicsRun(all,runOf(9,'mp-000000000009')),/All six runs are pinned/);
+test('the run list keeps 20 runs: pinned runs stay, a new run replaces the oldest unpinned one; the next number follows the highest',()=>{
+ // run retention (H1): the heated model keeps 20 runs, as the optical one
+ let runs=[];for(let i=1;i<=22;i++)runs=M.appendMultiphysicsRun(runs,runOf(i,'mp-'+String(i).padStart(12,'0'),{pinned:i===1}));
+ assert.deepEqual(runs.map(r=>r.number),[1,...Array.from({length:19},(_,i)=>i+4)]);assert.equal(M.nextRunNumber(runs),23);
+ const all=runs.map(r=>({...r,pinned:true}));assert.throws(()=>M.appendMultiphysicsRun(all,runOf(23,'mp-000000000023')),/All 20 runs are pinned/);
  assert.equal(M.multiphysicsRunName({number:2,label:'Heater 10 mW',pinned:true}),'Run 2 Heater 10 mW (pinned)');
  assert.equal(M.modelSlug('Heated silicon waveguide'),'heated-silicon-waveguide');assert.equal(M.modelSlug('2 µm ✓'),'m');assert.equal(M.modelSlug('…'),'multiphysics');
  assert.equal(P.sessionFileName(M.modelSlug('Heated silicon waveguide'),new Date(2026,10,22,10,15)),'heated-silicon-waveguide-session-2026-11-22-1015.json');

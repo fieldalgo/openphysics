@@ -4,18 +4,30 @@
 // Session file version 8: a multiphysics model with its runs (docs/packages/simcase/workspace.md,
 // "Session files"). One JSON object {format, version: 8, application: "multiphysics", document,
 // runs, baselines, selected, view}. Optical sessions stay version 7 (workspace-notebook.mjs).
+// Version 15 (run retention, design "Keeping more runs" section 7): version 8 with 0 to 20 runs,
+// written only when the session has more than six runs; a session of six or fewer is version 8, byte
+// for byte. The maps of the runs are kept within the field budget (workspace-budget.mjs) when a map
+// arrives: a new result, a recompute, or an opened or restored session.
 //
 // Every number is written in its shortest round-trip form, as JSON.stringify writes it, except
 // negative zero, which is written -0.0 so that it reads back as negative zero; NaN and the
 // infinities are refused. Each run and each without-heater result carries a SHA-256 digest of
 // itself without the digest, as sorted-key JSON with the same number rules. The digest detects a
 // damaged or hand-edited file; it is not an authentication: whoever edits a file can recompute it.
-import {ENVELOPE,uncoupledDocument,canonicalJson,physicsLabel,materialUses} from './workspace-multiphysics.mjs';
+import {ENVELOPE,uncoupledDocument,canonicalJson,physicsLabel,materialUses,couplingTitle} from './workspace-multiphysics.mjs';
+import {FIELD_BUDGET_BYTES,budgetOrder,budgetChoose,sameValue,valuePair} from './workspace-budget.mjs';
 import {validateRunLabel} from './workspace-notebook.mjs';
 
 export const SESSION_FORMAT='openphysics-studio-session';
 export const MULTIPHYSICS_VERSION=8;
-export const MULTIPHYSICS_RUN_LIMIT=6;
+export const RUNS_MULTIPHYSICS_VERSION=15;
+export const MULTIPHYSICS_RUN_LIMIT=20;
+/** The most runs a version 8 file holds. */
+export const PREVIOUS_MULTIPHYSICS_RUN_LIMIT=6;
+/** The version a session of these runs is written as: 15 above six runs, else 8. */
+export const multiphysicsVersion=runs=>runs.length>PREVIOUS_MULTIPHYSICS_RUN_LIMIT?RUNS_MULTIPHYSICS_VERSION:MULTIPHYSICS_VERSION;
+/** The session versions of a multiphysics model. */
+export const MULTIPHYSICS_VERSIONS=Object.freeze([MULTIPHYSICS_VERSION,RUNS_MULTIPHYSICS_VERSION]);
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const MAX_DOCUMENT_BYTES=1024*1024;
 export const RESULT_FORMAT='multiphysics-run-v1';
@@ -84,18 +96,18 @@ export function sizeText(bytes){const mb=bytes/1e6;return `${mb<10?Number(mb.toF
 
 // ---- runs -------------------------------------------------------------------------------------
 /** The run list: a run of the same job replaces itself (keeping its name and pin); a new run
- * replaces the oldest unpinned one once six are kept. Throws when all six are pinned. */
+ * replaces the oldest unpinned one once 20 are kept. Throws when all 20 are pinned. */
 export function appendMultiphysicsRun(runs,run){
  const previous=runs.find(r=>r.job===run.job);
  const next=[...runs.filter(r=>r.job!==run.job),previous?{...run,label:previous.label||run.label,pinned:previous.pinned||run.pinned}:run];
- while(next.length>MULTIPHYSICS_RUN_LIMIT){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error('All six runs are pinned. Unpin a run before running again.');next.splice(oldest,1);}
+ while(next.length>MULTIPHYSICS_RUN_LIMIT){const oldest=next.findIndex(r=>!r.pinned&&r.job!==run.job);if(oldest<0)throw new Error(`All ${MULTIPHYSICS_RUN_LIMIT} runs are pinned. Unpin a run before running again.`);next.splice(oldest,1);}
  return next;
 }
 export const nextRunNumber=runs=>runs.reduce((n,r)=>Math.max(n,r.number),0)+1;
 export function multiphysicsRunName(run){return `Run ${run.number}${run.label?' '+run.label:''}${run.pinned?' (pinned)':''}`;}
 
 // The reply of a run without its arrays: what a run keeps when its maps are not kept.
-function valuesOnly(result){
+export function valuesOnly(result){
  const {mesh,...rest}=result,physics={};
  for(const [name,p] of Object.entries(result.physics||{})){
   if(p.type==='thermal.steady2d'){const {temperature,...kept}=p;physics[name]={...kept,temperature:{unit:temperature?.unit,location:temperature?.location}};}
@@ -136,13 +148,13 @@ function sessionBaselines(state){
 /** The session object. state: {document, runs, baselines: {name: {job, completedAt, document,
  * result}}, selected: job or null, view}; keep: the jobs whose maps are kept (default all). */
 export function createMultiphysicsSession(state,keep=null){
- return {format:SESSION_FORMAT,version:MULTIPHYSICS_VERSION,application:'multiphysics',document:state.document,runs:state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true).record),
+ return {format:SESSION_FORMAT,version:multiphysicsVersion(state.runs),application:'multiphysics',document:state.document,runs:state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true).record),
   baselines:sessionBaselines(state),selected:state.selected??null,view:state.view};
 }
 // The file as parts: sessionJson(createMultiphysicsSession(state, keep)) is head + the run texts
 // joined by commas + tail; its size is counted without building the text.
 function fileParts(state,keep,baselines=sessionBaselines(state)){
- const head=`{"format":${sessionJson(SESSION_FORMAT)},"version":${MULTIPHYSICS_VERSION},"application":"multiphysics","document":${sessionJson(state.document)},"runs":[`;
+ const head=`{"format":${sessionJson(SESSION_FORMAT)},"version":${multiphysicsVersion(state.runs)},"application":"multiphysics","document":${sessionJson(state.document)},"runs":[`;
  const pieces=state.runs.map(r=>runPiece(r,keep?keep.has(r.job):true));
  const tail=`],"baselines":${sessionJson(baselines)},"selected":${sessionJson(state.selected??null)},"view":${sessionJson(state.view)}}`;
  const bytes=byteLength(head)+byteLength(tail)+pieces.reduce((n,p)=>n+p.bytes,0)+Math.max(0,pieces.length-1);
@@ -168,11 +180,146 @@ export function writeMultiphysicsSession(state,{keepSelected=false,limit=MAX_SES
  return {ok:false,bytes:full.bytes,reduced:null,refusal:`The selected and pinned runs (${kept.map(r=>'Run '+r.number).join(', ')}) are ${sizeText(reduced.bytes)} with their maps, over the 16 MiB session limit. Unpin some of them.`};
 }
 export function overflowQuestion(bytes){return `Session is ${sizeText(bytes)}; the limit is 16 MiB. Keep the maps of the selected and pinned runs only? The other runs keep n_eff, the coupling check and the iteration history, but not their maps.`;}
-/** Browser recovery (§4): the file, or the selected and pinned maps only, without a dialog. */
+/** Browser recovery (§4): the file, or, over the limit, the maps in the order of run retention
+ * (the selected run's, then pinned newest first, then the others newest first) within the limit,
+ * without a dialog (HK13). Throws when even the selected run's maps alone are over it. */
 export function recoveryText(state,limit=MAX_SESSION_BYTES){
- const out=writeMultiphysicsSession(state,{keepSelected:true,limit,name:false});
- if(!out.ok)throw Object.assign(new Error('browser recovery unavailable: session over 16 MiB'),{code:'recovery-over-limit'});
+ const baselines=sessionBaselines(state),full=fileParts(state,null,baselines);
+ if(full.bytes<=limit)return {ok:true,text:full.text(),bytes:full.bytes,notKept:state.runs.filter(r=>r.maps==='not kept').map(r=>r.number),baselines:full.baselines};
+ const withMaps=state.runs.filter(r=>r.maps!=='not kept'),base=fileParts(state,new Set(),baselines).bytes;
+ const {kept}=budgetChoose(budgetOrder(withMaps,state.selected??null),{base,bytes:mapBytes,selected:state.selected??null,budget:limit});
+ const keep=new Set(kept.map(r=>r.job)),out=fileParts(state,keep,baselines);
+ if(out.bytes>limit)throw Object.assign(new Error('browser recovery unavailable: session over 16 MiB'),{code:'recovery-over-limit'});
+ return {ok:true,text:out.text(),bytes:out.bytes,notKept:state.runs.filter(r=>!keep.has(r.job)).map(r=>r.number),baselines:out.baselines};
+}
+
+// ---- run retention: the maps within the budget (design "Keeping more runs", section 7) -----------
+/** The bytes a run's maps add to a session file: its record with its maps less its record without
+ * them (both texts cached while the run is unchanged); 0 for a run without maps. */
+export function mapBytes(run){return run.maps==='not kept'?0:runPiece(run,true).bytes-runPiece(run,false).bytes;}
+/** The session file's bytes with no run's maps (the base of the budget). */
+export const sessionBytesWithoutMaps=state=>fileParts(state,new Set()).bytes;
+/** The session text with the maps of the runs in keep only (for checks; null: every run's). */
+export const sessionText=(state,keep=null)=>fileParts(state,keep).text();
+/** The maps the budget keeps (state: the session state, its selected run): {kept, letGo, total,
+ * base, fits}. kept and letGo: runs with maps; total: the file bytes with the kept maps (null when no
+ * run has maps); fits: every map is kept. first: the jobs whose maps arrived (a recompute, a swap). */
+export function chooseMaps(state,{first=[],budget=FIELD_BUDGET_BYTES,bytes=mapBytes}={}){
+ const withMaps=state.runs.filter(r=>r.maps!=='not kept');
+ if(!withMaps.length)return {kept:[],letGo:[],total:null,base:null,fits:true};
+ const base=sessionBytesWithoutMaps(state),sum=withMaps.reduce((t,r)=>t+bytes(r),base),selected=state.selected??null;
+ if(sum<=budget)return {kept:withMaps,letGo:[],total:sum,base,fits:true};
+ const {kept,letGo,total}=budgetChoose(budgetOrder(withMaps,selected,first),{base,bytes,selected,budget});
+ return {kept,letGo,total,base,fits:false};
+}
+/** chooseMaps, with the maps of letGo let go (in place): what the tab does when a map arrives. */
+export function keepMapsAtArrival(state,options={}){
+ const out=chooseMaps(state,options);for(const r of out.letGo)letGoMaps(r);return out;
+}
+/** The bytes of the session with the maps of the selected and pinned runs only (the words when a
+ * pinned run's maps go). */
+export const selectedAndPinnedMapBytes=(state,base)=>state.runs.filter(r=>r.maps!=='not kept'&&(r.pinned||r.job===state.selected)).reduce((t,r)=>t+mapBytes(r),base);
+const HELD=Symbol('held maps'),LET_GO=Symbol('maps let go in this tab');
+/** A run's maps let go in the tab (in place: the run keeps its job, number, name and pin): the run
+ * becomes what a file writes of it without its maps, "not kept" with its counts and its values. */
+export function letGoMaps(run){
+ if(run.maps==='not kept')return run;
+ Object.defineProperty(run,HELD,{value:{result:run.result,bytes:mapBytes(run)},enumerable:false,configurable:true,writable:true});
+ Object.defineProperty(run,LET_GO,{value:true,enumerable:false,configurable:true,writable:true});
+ run.counts=meshCounts(run.result);run.result=valuesOnly(run.result);run.maps='not kept';
+ return run;
+}
+/** Whether this tab let the run's maps go (else the run came without maps from a file or record). */
+export const mapsLetGoHere=run=>run.maps==='not kept'&&run[LET_GO]===true;
+/** Whether a run's let-go maps are still held for Keep Run N's maps. */
+export const heldMaps=run=>run.maps==='not kept'&&!!run[HELD];
+/** The run's let-go maps back, as they were (Keep Run N's maps). */
+export function takeBackMaps(run){
+ const held=run[HELD];if(!held||run.maps!=='not kept')return false;
+ run.result=held.result;run.maps='kept';delete run.counts;delete run[HELD];delete run[LET_GO];return true;
+}
+/** The held maps are dropped (at the next arrival the swap is stale, and memory is freed). */
+export function forgetHeldMaps(runs){for(const r of runs)if(r[HELD])delete r[HELD];}
+/** The run Keep Run N's maps lets go instead (letGo: one unpinned run): the oldest unpinned,
+ * unselected run with maps at least as large, or null. */
+export function mapSwapCandidate(runs,letGo,selected){
+ if(letGo.length!==1||letGo[0].pinned||!heldMaps(letGo[0]))return null;
+ const need=letGo[0][HELD].bytes;
+ return runs.find(r=>r!==letGo[0]&&r.maps!=='not kept'&&!r.pinned&&r.job!==selected&&mapBytes(r)>=need)||null;
+}
+
+// ---- Recompute Run N's maps (section 7) ---------------------------------------------------------
+const nodesText=n=>n.toLocaleString('en-US');
+const countsOf=run=>run.maps==='not kept'?run.counts:meshCounts(run.result);
+// the values a run stores and a recompute checks, in the order the refusal names them: each item
+// {name, stored, fresh, exact}
+function checkedValues(run,fresh){
+ const out=[],s=run.result,f=fresh||{},doc=run.doc||{};
+ const value=(name,a,b,exact=false)=>out.push({name,stored:a,fresh:b,exact});
+ for(const [name,p] of Object.entries(s.physics||{})){
+  const q=f.physics?.[name],label=physicsLabel(name);
+  if(p.type==='em.modes2d'){
+   const series=p.effective_index||{},other=q?.effective_index||{},complex=Array.isArray(series.re),rows=complex?series.re:series.values||[];
+   rows.forEach((row,i)=>row.forEach((v,m)=>{
+    const where=`${label}${rows.length>1?` point ${i+1}`:''} mode ${m+1}`;
+    value(`${where} n_eff`,v,(complex?other.re:other.values)?.[i]?.[m]);
+    if(complex)value(`${where} Im n_eff`,series.im[i][m],other.im?.[i]?.[m]);}));
+  }else if(p.type==='thermal.steady2d'&&p.range){value(`${label} minimum temperature`,p.range.min,q?.range?.min);value(`${label} maximum temperature`,p.range.max,q?.range?.max);}
+ }
+ for(const [name,c] of Object.entries(s.couplings||{})){
+  const k=f.couplings?.[name],title=`coupling ${couplingTitle(doc,name)}`;
+  value(`${title} mesh check`,c.mesh_signature,k?.mesh_signature,true);
+  value(`${title} max |received − sent|`,c.max_abs_difference?.value??null,k?k.max_abs_difference?.value??null:undefined);
+  value(`${title} conservation residual`,c.conservation_residual??null,k?k.conservation_residual??null:undefined);
+ }
+ (s.loops||[]).forEach((l,i)=>{
+  const k=(f.loops||[])[i],title=`iteration step ${(l.physics||[]).map(physicsLabel).join(' ⇄ ')}`;
+  value(`${title} iterations`,l.iterations,k?.iterations,true);
+  (l.residuals||[]).forEach((r,j)=>value(`${title} residual ${j+1}`,r?.value,k?.residuals?.[j]?.value));
+ });
  return out;
+}
+/** The first value the recomputed result does not reproduce, as the refusal says it ("Modes 1 mode
+ * 1 n_eff came out 2.44565014, stored 2.44565013"), or null when every checked value matches: the
+ * counts exactly, then n_eff (real and imaginary) of every physics, point and mode, each heat
+ * physics' temperature range, each coupling's mesh check (exactly), max |received − sent| and
+ * conservation residual, and each iteration step's count (exactly) and residuals, each value to 1e-12
+ * relative (1e-15 absolute below 1e-3). */
+export function recomputeMapsMismatch(run,fresh){
+ const a=countsOf(run);let b=null;try{b=fresh?.mesh?meshCounts(fresh):null;}catch{}
+ if(!b)return 'the mesh is not in the recomputed result';
+ if(a.nodes!==b.nodes||a.triangles!==b.triangles)return `the mesh came out ${nodesText(b.nodes)} nodes and ${nodesText(b.triangles)} triangles, stored ${nodesText(a.nodes)} nodes and ${nodesText(a.triangles)} triangles`;
+ for(const v of checkedValues(run,fresh)){
+  if(v.fresh===undefined)return `${v.name} is not in the recomputed result`;
+  if(v.exact){if(v.stored!==v.fresh){if(/ iterations$/.test(v.name))return `${v.name.replace(/ iterations$/,'')} came out ${v.fresh} iterations, stored ${v.stored}`;return `${v.name} came out ${JSON.stringify(v.fresh)}, stored ${JSON.stringify(v.stored)}`;}continue;}
+  if(typeof v.stored!=='number'&&v.stored!==null)continue;
+  if(!sameValue(v.stored,typeof v.fresh==='number'||v.fresh===null?v.fresh:NaN)){const [came,was]=valuePair(v.name,v.fresh,v.stored);return `${v.name} came out ${came}, stored ${was}`;}
+ }
+ // the recomputed result has the arrays of the run's physics
+ for(const [name,p] of Object.entries(run.result.physics||{})){
+  const q=fresh.physics?.[name];
+  if(p.type==='thermal.steady2d'&&!Array.isArray(q?.temperature?.values))return `${physicsLabel(name)} temperature map is not in the recomputed result`;
+  if(p.type==='em.modes2d'&&p.coupled&&!q?.coupled)return `${physicsLabel(name)} coupled input map is not in the recomputed result`;
+ }
+ return null;
+}
+/** The recomputed maps attached to their run (after recomputeMapsMismatch gave null): the run keeps
+ * its stored result and gains the mesh, the heat temperatures with their range (the minimum and
+ * maximum of those temperatures) and the coupled input maps, in the layout of the server's reply; its
+ * job, number, name, pin, time, document and events stay. Returns true. */
+export function attachMaps(run,fresh){
+ const stored=run.result,result={};
+ for(const k of Object.keys(fresh)){
+  if(k==='mesh')result.mesh=fresh.mesh;
+  else if(k==='physics'){result.physics={};for(const [name,q] of Object.entries(fresh.physics)){const p=stored.physics[name],out={};
+   for(const key of Object.keys(q))out[key]=(p.type==='thermal.steady2d'&&(key==='temperature'||key==='range'))||(p.type==='em.modes2d'&&key==='coupled')?q[key]:p[key];
+   for(const key of Object.keys(p))if(!(key in out))out[key]=p[key];
+   result.physics[name]=out;}}
+  else result[k]=stored[k];
+ }
+ for(const k of Object.keys(stored))if(!(k in result))result[k]=stored[k];
+ run.result=result;run.maps='kept';delete run.counts;delete run[HELD];delete run[LET_GO];
+ return true;
 }
 
 // ---- reading (§3) -----------------------------------------------------------------------------
@@ -258,7 +405,9 @@ export function readMultiphysicsSession(doc,{recovered=false}={}){
  if(doc.application!=='multiphysics')fail(`This session file holds a “${typeof doc.application==='string'?doc.application:'unnamed'}” model, which this Studio does not read.`);
  documentSize(doc.document,'The session');
  if(typeof doc.document.openphysics!=='string')fail('The session model has no "openphysics" version.');
- if(!Array.isArray(doc.runs)||doc.runs.length>MULTIPHYSICS_RUN_LIMIT)fail('Unsupported session format or run count.');
+ // version 8 holds up to six runs, version 15 up to 20
+ const limit=doc.version===RUNS_MULTIPHYSICS_VERSION?MULTIPHYSICS_RUN_LIMIT:PREVIOUS_MULTIPHYSICS_RUN_LIMIT;
+ if(!Array.isArray(doc.runs)||doc.runs.length>limit)fail('Unsupported session format or run count.');
  const jobs=new Set(),numbers=new Set(),runs=[],documents=[{what:'The session model',doc:doc.document,current:true}];
  doc.runs.forEach((raw,i)=>{
   const r=runName(raw,i);

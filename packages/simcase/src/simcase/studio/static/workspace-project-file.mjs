@@ -13,7 +13,7 @@
 // and edits; it is not an authentication. name, savedAt, studio, title and card are for display
 // only and are in no digest.
 import {parseSession,OPTICAL_SESSION_VERSIONS,SESSION_VERSION,MAX_SESSION_BYTES} from './workspace-notebook.mjs';
-import {MULTIPHYSICS_VERSION,sessionJson,sha256Hex,byteLength,sizeText} from './workspace-multiphysics-session.mjs';
+import {MULTIPHYSICS_VERSIONS,sessionJson,sha256Hex,byteLength,sizeText} from './workspace-multiphysics-session.mjs';
 
 export const PROJECT_FORMAT='openphysics-studio-project';
 export const PROJECT_FILE_VERSION=1;
@@ -32,7 +32,7 @@ export const UNTITLED_PROJECT='Untitled project';
 export const NAME_LIMIT=80;
 /** The session versions each kind holds: an optical session (parseSession's own list) or a
  * multiphysics one. */
-export const KIND_VERSIONS=Object.freeze({workspace:OPTICAL_SESSION_VERSIONS,multiphysics:Object.freeze([MULTIPHYSICS_VERSION])});
+export const KIND_VERSIONS=Object.freeze({workspace:OPTICAL_SESSION_VERSIONS,multiphysics:MULTIPHYSICS_VERSIONS});
 const CONTROL=/[\u0000-\u001f\u007f-\u009f]/;
 const ID=/^m\d{1,3}$/;
 const DIGEST=/^sha256:[0-9a-f]{64}$/;
