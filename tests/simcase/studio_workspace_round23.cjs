@@ -189,7 +189,9 @@ test('P2 (c) (E2): the record round-trips; a restore keeps the kept fields and n
  // the page: a browser restore appends it after its message; the Results line says where
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("if(pending.source!=='file'&&pending.session){const missing=fieldsNotKeptText(runs);if(missing)$('file-status').append(missing);}"));
- assert.ok(app.includes("solverRun.origin==='recovered'?'This run’s fields were not kept in browser recovery (over 16 MiB): n_eff, the TE fractions and the effective areas were.'"));
+ // run retention (section 4.1): the Results line says the run keeps its values (a run read from a
+ // file without fields: the file left them out)
+ assert.ok(app.includes("none.textContent=fieldsNotKeptResultsText(solverRun,solverRun.origin==='imported'&&!fieldLetGoHere(solverRun));"));
 });
 
 test('P2 (d) (E2): below the limit recovery writes the same bytes as before',async()=>{

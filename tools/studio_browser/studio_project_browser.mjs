@@ -27,6 +27,7 @@ import {mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile} from 'node:fs/pr
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {endScript, launchBrowser} from './browser_launch.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
@@ -76,6 +77,19 @@ async function stopProcess(child) {
   if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await Promise.race([child.done, sleep(5000)]); }
 }
 
+// Run retention (design "Keeping more runs"): the optical model keeps 20 runs. K4 adds fourteen pinned
+// runs without fields (a design no stage computes) by Add runs from file right before the run that
+// reaches the limit, so every older run is the stage's own and the limit drops the same run as at
+// six runs; the later runs are numbered 14 higher.
+const VALUES_ONLY_RUNS = fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-values-only-14.json', import.meta.url));
+async function addValuesOnlyRuns(p, label) {
+  const {root} = await p.call('DOM.getDocument');
+  const {nodeId} = await p.call('DOM.querySelector', {nodeId: root.nodeId, selector: '#run-import-file'});
+  await p.call('DOM.setFileInputFiles', {nodeId, files: [VALUES_ONLY_RUNS]});
+  await p.until("document.getElementById('run-import-confirm')?.open", label + ': add runs question');
+  await p.eval("document.getElementById('confirm-run-import').click()");
+  await p.until("/^Saved runs imported\\./.test(document.getElementById('file-status').textContent)", label + ': fourteen runs added');
+}
 class Page {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.ws = new WebSocket(url); this.events = [];
@@ -739,14 +753,14 @@ try {
       await page.eval("document.getElementById('file-status').textContent=''");
       await width(560); await page.until("!!document.getElementById('match-offer')", label + ': No need to run');
       const need = await page.eval("({text:document.getElementById('match-offer').textContent,show:document.querySelector('#match-offer button').textContent})");
-      await page.press('tab', 'Results'); await page.until("document.querySelectorAll('.run-item').length===6", label + ': six runs');
+      await page.press('tab', 'Results'); await page.until("document.querySelectorAll('.run-item').length===20", label + ': 20 runs');
       const items = await runItems();
       await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", label + ': Compare');
       const compare = await page.eval("[...document.getElementById('compare-a').options].map(o=>o.textContent)");
       await noOverflow(label + ' 1440'); await size(390, 844, true); await sleep(400); await noOverflow(label + ' 390'); await size(1440, 900, false);
       // a run read from a file or recovered ends with its origin (· from file, · recovered): left out,
       // since the numbers and the runs are what is compared
-      const plain = list => list.map(t => t.replace(/ · (?:from file|recovered)$/, ''));
+      const plain = list => list.map(t => t.replace(/ · (?:from file|recovered)( · values only)?$/, '$1'));
       return {items: plain(items), drop, need, compare: plain(compare)};
     };
     const heatedItems = async label => {
@@ -765,7 +779,9 @@ try {
     await page.press('tab', 'Library'); await page.until("!!document.getElementById('project-name-input')", 'K4 project name');
     await page.fill('textbox', 'Project name', 'both-models'); await page.press('button', 'Rename');
     await toOptical('K4 optical');
-    for (const w of [520, 540, 560, 580, 620]) { await width(w); await runOptical('K4 run at ' + w); }
+    // the project's two runs and four more (Runs 1 to 6), the fourteen values-only runs (Runs 7 to 20),
+    // then Run 21, which drops Run 1
+    for (const w of [520, 540, 560, 580, 620]) { if (w === 620) await addValuesOnlyRuns(page, 'K4'); await width(w); await runOptical('K4 run at ' + w); }
     const k4 = {before: await numbersNow('K4 before')};
     await recorded('K4 optical record'); const before = await listDownloads();
     await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'K4 Save As');
@@ -787,12 +803,12 @@ try {
     await clearRecorded(); await runOptical('K4 next run'); await recorded('K4 next run recorded'); await page.press('tab', 'Results'); k4.next = await runItems();
     stage('K4 numbers after Open project', k4);
     assert.deepEqual(k4.after, k4.before);
-    assert.deepEqual(k4.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
+    assert.deepEqual(k4.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
     assert.deepEqual(k4.before.drop, {hidden: false, text: k4.before.drop.text, pin: 'Pin Run 2'}); assert.match(k4.before.drop.text, /^If you run: drops Run 2 \(/);
     assert.match(k4.before.need.text, /No need to run: Run 5 /); assert.equal(k4.before.need.show, 'Show Run 5');
-    assert.deepEqual(k4.before.compare.map(t => t.split(' · ')[0]), ['Run 2', 'Run 3', 'Run 4', 'Run 5', 'Run 6', 'Run 7']);
+    assert.deepEqual(k4.before.compare.map(t => t.split(' · ')[0]), ['Run 2', 'Run 3', 'Run 4', 'Run 5', 'Run 6', 'Run 7', 'Run 8', 'Run 9', 'Run 10', 'Run 11', 'Run 12', 'Run 13', 'Run 14', 'Run 15', 'Run 16', 'Run 17', 'Run 18', 'Run 19', 'Run 20', 'Run 21']);
     assert.doesNotMatch(k4.opened, /numbered from 1/); assert.match(k4.opened, /^Opened project both-models \(both-models\.json\): /);
-    assert.equal(k4.next[0].split(' · ')[0], 'Run 8'); assert.equal(k4.next.length, 6);
+    assert.equal(k4.next[0].split(' · ')[0], 'Run 22'); assert.equal(k4.next.length, 20);
     assert.equal(k4.changedTitle, 'both-models · both-models.json · changed since opened · kept for recovery in this browser');
     // K5: the browser closed and started again; Restore newest restores both models with their numbers
     await clearRecorded(); const k5 = {before: await numbersNow('K5 before')}; await recorded('K5 record');
@@ -802,7 +818,7 @@ try {
     await page.eval("document.getElementById('file-status').textContent=''");
     await page.click('#resume-newest');
     for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
-    await page.until("/^Restored Optical waveguide \\(6 runs\\) and Heated silicon waveguide \\(1 run\\) from this browser/.test(document.getElementById('file-status').textContent)", 'K5 both restored', 60000);
+    await page.until("/^Restored Optical waveguide \\(20 runs\\) and Heated silicon waveguide \\(1 run\\) from this browser/.test(document.getElementById('file-status').textContent)", 'K5 both restored', 60000);
     // round 23 (E5): the record no longer matched both-models.json, opened from disk: the header says so,
     // read once browser recovery has kept the restored session
     await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'K5 header kept', 30000);
@@ -812,10 +828,10 @@ try {
     k5.after = await numbersNow('K5 after');
     stage('K5 numbers after Restore newest', k5);
     assert.equal(k5.offer.pair, 'true', JSON.stringify(k5.offer));
-    assert.equal(k5.message, 'Restored Optical waveguide (6 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
+    assert.equal(k5.message, 'Restored Optical waveguide (20 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
     assert.equal(k5.title, 'both-models · recovered from this browser · changed since both-models.json, not saved · kept for recovery in this browser');
     assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated.map(t => t.replace(/ · (?:from file|recovered)$/, '')), k4.heated.map(t => t.replace(/ · (?:from file|recovered)$/, ''))); assert.match(k5.heated[0], /^Run 1 /);
-    assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
+    assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 22', 'Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
     // after a change the header leaves "recovered" (the drop-line check above ends on the restored
     // inputs, 560 nm, so the header still reads as recovered there, as loadedSession does); round 24
     // (B2): it keeps naming both-models.json (it read "both-models · not saved to a file · …")
@@ -824,10 +840,10 @@ try {
     await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'K5 header kept after a change', 30000);
     k5.changed = await title(); stage('K5 header after a change', {title: k5.changed});
     assert.equal(k5.changed, 'both-models · changed since both-models.json, not saved · kept for recovery in this browser');
-    // R24 P1 (B2): the same recovered project, changed, goes over the limit with 8-mode runs of a
-    // 2800 nm wide core on a fine mesh (the field grows with the core's triangles, as R23's substrate
-    // does): browser recovery leaves fields out and the header keeps naming both-models.json, with
-    // those runs
+    // R24 P1 (B2): the same recovered project, changed, with 8-mode runs of a 2800 nm wide core on a
+    // fine mesh (the field grows with the core's triangles, as R23's substrate does) until a result's
+    // field takes others' fields (run retention: the fields kept stay within 16.8 MB, and recovery
+    // holds the tab); the header keeps naming both-models.json
     const r24 = {runs: []};
     await width(2800);
     await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R24 Optical modes');
@@ -835,12 +851,16 @@ try {
     for (const nm of [20, 21, 22, 23, 24, 25]) {
       await page.press('tab', 'Model'); await page.press('treeitem', 'Mesh'); await page.until("!!document.getElementById('core-mesh-number')", 'R24 mesh ' + nm);
       await page.fill('spinbutton', 'Core mesh size [nm]', nm); await runOptical('R24 run at ' + nm); r24.runs.push(nm);
-      try { await page.until("/ · kept for recovery in this browser without the fields of Run \\d+/.test(document.getElementById('project').textContent)", 'R24 fields left out', 30000); break; } catch {}
+      if (/keeps its values; its fields were not kept \(16\.8 MB limit\)\.|keep their values; their fields were not kept \(16\.8 MB limit\)\./.test(await status())) break;
     }
+    await page.until("/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)", 'R24 header kept', 30000);
     r24.title = await title(); r24.message = await status();
-    await noOverflow('R24 P1 fields left out 1440'); await size(390, 844, true); await sleep(400); await noOverflow('R24 P1 fields left out 390'); await size(1440, 900, false);
-    stage('R24 P1 header with fields left out', r24);
-    assert.match(r24.title, /^both-models · changed since both-models\.json, not saved · kept for recovery in this browser without the fields of Run \d+(?:(?:, | and )Run \d+)*$/);
+    await page.press('tab', 'Results'); await page.until("!!document.querySelector('.run-item')", 'R24 run list'); r24.items = await runItems();
+    await noOverflow('R24 P1 header after fields went 1440'); await size(390, 844, true); await sleep(400); await noOverflow('R24 P1 header after fields went 390'); await size(1440, 900, false);
+    stage('R24 P1 header after fields went', r24);
+    assert.match(r24.message, /keeps its values; its fields were not kept \(16\.8 MB limit\)\.|keep their values; their fields were not kept \(16\.8 MB limit\)\./);
+    assert.ok(r24.items.some(t => t.endsWith(' · values only')), JSON.stringify(r24.items));
+    assert.match(r24.title, /^both-models · changed since both-models\.json, not saved · kept for recovery in this browser$/);
     await stopBrowser(page);
   }
 
