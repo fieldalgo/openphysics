@@ -284,7 +284,6 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
         if unknown or missing:
             raise ValueError(f"h names regions {names!r}; unknown {unknown!r}, missing {missing!r}")
         label_h = [float(region_h[n]) for n in names]
-    check_plc(p, s, facets)  # an invalid PLC raises InvalidPLC with its witness
     locked = None
     if locked_facets is not None:
         locked = []
@@ -300,6 +299,9 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
         out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds, float(h or 0.0),
                                      float(ratio or 0.0), float(alpha), int(max_points), label_h, locked)
     except ValueError as e:
+        if len(e.args) == 4:  # the kernel's PLC check, as in check_plc
+            msg, wtype, wkind, wids = e.args
+            raise InvalidPLC(msg, wtype, _witness(wtype, wkind, list(wids), p)) from None
         if len(e.args) != 3:
             raise
         kind, msg, ids = e.args
