@@ -33,7 +33,9 @@ import하는 소스 옆에 확장 모듈을 둡니다. 빌드하지 않으면 `t
 선언하고, CI는 Python 3.12만 시험합니다. 하한 numpy 1.26, scipy 1.11.2, shapely 2.0.2,
 matplotlib 3.8은 Python 3.12 휠이 있는 첫 릴리스입니다. 정확히 그 버전들로 slow가 아닌
 시험 전체를 손으로 한 번 통과시켰고(2026-10-21, Linux, Python 3.12), CI는 고정 버전만
-시험합니다.
+시험합니다. SciPy 1.17 이상에서 galerkin과 simcase는 ARPACK 재시작 벡터에 고정 생성기
+(`rng=np.random.default_rng(0)`, 시그니처로 한 번 확인)를 넘깁니다. 1.17 미만의 eigs와 eigsh에는
+`rng`가 없으므로, 거기서는 겹친 무리에 닿는 탐색이 실행마다 다를 수 있습니다.
 
 `galerkin[jax]`와 `galerkin[torch]`용 선택 배열 라이브러리는 따로 고정합니다. PyPI의 Linux torch
 휠은 CUDA 패키지를 끌어오므로 CI는 torch CPU 빌드를 먼저 설치합니다.

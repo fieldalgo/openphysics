@@ -246,7 +246,9 @@ grey. Scalar is exact for the invariant-axis TE slab polarization, an
 approximation for general 2D high-contrast guides. Variable curvature, 3D open
 modes, automatic PML convergence certification and non-Hermitian degenerate
 subspace tracking are outside this contract. The [gain bound](#the-gain-bound) that separates
-PML noise from gain is empirical.
+PML noise from gain is empirical. From SciPy 1.17, ARPACK's restart vector is seeded with a
+fixed value, so results are reproducible on one build; with older SciPy, a search that reaches
+the static cluster can differ from run to run.
 
 Validation uses independent outgoing slab transfer roots, complex-order
 cylindrical J/Y/Hankel matching, three meshes, independent PML/window variation,
