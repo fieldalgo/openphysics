@@ -1690,7 +1690,8 @@ try {
     assert.match(o1Second, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Second), 650, 'the second file holds Width 650');
     // round 14 (Q2): Width 650 (650 × 400 nm here) has no run, and the save notice says so
     assert.match(o1SecondMessage, /^Downloaded design-a-ng\.json again: Optical waveguide \(\d+ runs?(?:, the comparison)?\)(?: and [^.]+)?\.(?: Optical waveguide keeps values only for [^.]+\.)? Current inputs \(650 × 400 nm\) have no run yet\. A download cannot replace the earlier file, so your browser may add a number such as “ \(1\)” to its name\.$/);
-    assert.match(o1SecondHeader, /^design-a-ng · design-a-ng\.json · downloaded \d{1,2}:\d\d(?: [AP]M)?$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
+    // round 26 (C3): the header says Download again, its time and the name the question gave
+    assert.match(o1SecondHeader, /^design-a-ng · design-a-ng\.json · downloaded again \d{1,2}:\d\d(?: [AP]M)? \(your browser may have named it design-a-ng \(1\)\.json\)$/); assert.doesNotMatch(o1SecondHeader, /Unsaved inputs/);
     // Ctrl+S after another edit: the same question; Save As… opens the name dialog prefilled with the name
     await toGeometry(); await page.type('#shape-w', 660); await sleep(300); before = await listDownloads();
     await page.eval("document.activeElement?.blur()"); await key('s', ['Control']);
