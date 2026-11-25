@@ -456,7 +456,8 @@ try {
     const kept = {pair: await pair(), newer: await page.eval("document.getElementById('compare-newer')?.textContent??null")};
     stage('R16 S3 kept pair', kept);
     assert.ok(kept.pair[0].startsWith('Run 1 · Design A · ') && kept.pair[1].startsWith('Run 2 · Design B · '), JSON.stringify(kept.pair));
-    assert.equal(kept.newer, 'Run 3 is newer than this pair · Compare Run 3 with B');
+    // round 24 (B4): a named pair, not picked by hand, is offered the two newest (it read "Compare Run 3 with B")
+    assert.equal(kept.newer, 'Run 3 is newer than this pair · Compare the two newest: Run 2 and Run 3');
     await noOverflow('R16 Compare with the newer line');
     // S5 and S6: Save As design-ab.json with the optical model shown; the name set in the file
     // (Heater study, not the file's stem) stays

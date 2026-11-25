@@ -65,6 +65,15 @@ export function newerThanPair(runs,[a,b]){
  const last=runs.at(-1),ia=runs.findIndex(r=>r.job===a),ib=runs.findIndex(r=>r.job===b);
  return last&&ia>=0&&ib>=0&&runs.length-1>Math.max(ia,ib)?last:null;
 }
+// Round 24 (B4, coordinator decision on the round-24 findings): the pair Compare offers in one action
+// when runs newer than the shown pair exist and the pair was not picked by hand (picked: a pair
+// chosen on Compare, or a pair read from a file or recovery that is not the default one): the two
+// newest, [A job, B job] as defaultComparison gives them, for "Compare the two newest: Run 6 and
+// Run 7"; else null (a pair picked by hand keeps "Compare Run 7 with B" and is never replaced).
+export function newestPairOffer(runs,ids,picked=false){
+ if(picked||!newerThanPair(runs,ids))return null;
+ const d=defaultComparison(runs);return d[0]===d[1]?null:d;
+}
 // The side a run card names on Compare: "A", "B", "A and B" (one run on both sides) or ''.
 export function compareSide(job,[a,b]){return job===a&&job===b?'A and B':job===a?'A':job===b?'B':'';}
 // n_eff everywhere (results, mode select, Compare): 8 decimals.
