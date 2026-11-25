@@ -30,7 +30,7 @@ import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
-import {chooseFieldsAtArrival,COMPACT_TEXT,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
+import {chooseFieldsAtArrival,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
@@ -690,18 +690,18 @@ function keepFieldsInstead(offer){
 // workspace-retention.mjs; nothing else lets a field go. Returns the Messages words ('' when every
 // field stays). first: the jobs whose fields arrived and are not the selected run's.
 // Compact fields (design "Compact field encoding"): at the first arrival where the fields would not all
-// fit as text, every field is made compact first (chooseFieldsAtArrival), and Messages says so once.
-let fieldSwap=null,fieldsLetGo=[],compactSaid=false;
+// fit as text, every field is made compact first (chooseFieldsAtArrival). Round 27 (D1): Messages says
+// nothing of it; the run-list note and the Results line under a compact field say it where it applies.
+let fieldSwap=null,fieldsLetGo=[];
 function applyFieldBudget(first=[],{loaded=false}={}){
  forgetHeldFields(runs);fieldSwap=null;fieldsLetGo=[];
  const selected=solverRun?.job||null;let out;
  try{out=chooseFieldsAtArrival(inputsFile(),runs,selected,compareIds,currentView(),{first,loaded});}catch{return '';}
- const compactWords=out.started&&!compactSaid?COMPACT_TEXT:'';if(compactWords)compactSaid=true;
- if(!out.letGo.length)return compactWords;
+ if(!out.letGo.length)return '';
  const pinned=out.letGo.filter(r=>r.pinned),plain=out.letGo.filter(r=>!r.pinned),pinnedBytes=pinned.length?selectedAndPinnedBytes(runs,selected,out.base):0;
  for(const r of out.letGo)letGoField(r);fieldsLetGo=out.letGo;
  const other=fieldSwapCandidate(runs,plain,selected);if(other)fieldSwap={back:plain[0],other,list:runs};
- return [compactWords,plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
+ return [plain.length?fieldsNotKeptAfterText(plain):'',pinned.length?pinnedFieldsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
 }
 function keepDroppedRun(offer){
  const button=$('file-status').querySelector('[data-keep-run]');

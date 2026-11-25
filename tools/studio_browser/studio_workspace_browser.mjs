@@ -1242,7 +1242,7 @@ try {
   // Model with runs and File › Save write at once, asking nothing, and the file holds exactly the
   // fields the tab shows; the file opened again shows a run without fields by its values (4.1),
   // Compare lists its modes by number (4.2), and Recompute Run N's fields brings its field back.
-  const m4eMessages = [], COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
+  const m4eMessages = [], COMPACT_WORDS = 'More field plots now fit';
   const LET_GO = /Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|(?:and|, ) .*keep their values; their fields were not kept) \(16\.8 MB limit\)\./;
   const m4eStarted = Date.now();
   for (const wl of [1570, 1580, 1590, 1600, 1610, 1620, 1630, 1640, 1650, 1660, 1670, 1680]) {
@@ -1253,9 +1253,9 @@ try {
   await page.click('nav [data-page=Results]'); await page.until(`document.querySelectorAll('.run-item').length===${m4eCount}`, 'M4-e run list');
   const m4eItems = await page.eval("[...document.querySelectorAll('.run-item')].map(b=>({job:b.dataset.run,text:b.textContent}))");
   stage('M4-e fields kept', {runs: m4eCount, wideRunsAdded: m4eMessages.length, seconds: Math.round((Date.now() - m4eStarted) / 1000), messages: m4eMessages, items: m4eItems.map(i => i.text)});
-  // the conversion sentence once, at an earlier result than the first field let go
-  assert.equal(m4eMessages.filter(m => m.includes(COMPACT_WORDS)).length, 1, JSON.stringify(m4eMessages));
-  assert.ok(m4eMessages.findIndex(m => m.includes(COMPACT_WORDS)) < m4eMessages.findIndex(m => LET_GO.test(m)), 'the conversion comes before a field is let go');
+  // round 27 (D1): the conversion writes no Messages sentence (the record below is version 14, every
+  // field kept compact; the Results line and the run-list note say it)
+  assert.ok(m4eMessages.every(m => !m.includes(COMPACT_WORDS) && !m.includes('single precision')), JSON.stringify(m4eMessages));
   assert.ok(m4eMessages.some(m => LET_GO.test(m)), JSON.stringify(m4eMessages));
   const valuesOnly = m4eItems.filter(i => i.text.endsWith(' · values only'));
   assert.ok(valuesOnly.length >= 1 && valuesOnly.length < m4eCount, JSON.stringify(m4eItems));
@@ -3190,7 +3190,8 @@ try {
     const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
     p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
     stage('R23 P2 five runs within the field budget', p2);
-    assert.ok(p2.message.includes('More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.'), p2.message);
+    // round 27 (D1): no Messages sentence at the conversion
+    assert.ok(!p2.message.includes('More field plots now fit') && !p2.message.includes('single precision'), p2.message);
     assert.ok(!/fields were not kept/.test(p2.message), p2.message);
     assert.ok(!p2.message.includes('Session is now'), p2.message); assert.ok(!p2.message.includes('MiB'), p2.message);
     assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser$/.test(p2.header), p2.header);
@@ -3530,9 +3531,9 @@ try {
     // result whose fields would not all fit as text (the first written as version 14); from there on
     // version 14; every field kept (no run "values only"); the record is Save's text after each result
     // (above). The let-go words, the Results block of a run without fields and Recompute are in M4-e.
-    const COMPACT_WORDS = 'More field plots now fit in 16.8 MB: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.';
-    const said = k10.map((e, i) => e.message.includes(COMPACT_WORDS) ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14);
-    assert.deepEqual(said, [first14], JSON.stringify(k10.map(e => [e.label, e.version, e.message])));
+    // round 27 (D1): no result's Messages says it
+    const said = k10.map((e, i) => e.message.includes('More field plots now fit') || e.message.includes('single precision') ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14);
+    assert.deepEqual(said, [], JSON.stringify(k10.map(e => [e.label, e.version, e.message])));
     assert.ok(first14 > 0 && k10.slice(first14).every(e => e.version === 14) && k10.slice(0, first14).every(e => e.version !== 14), JSON.stringify(k10.map(e => e.version)));
     assert.equal(last.items.length, 12); assert.equal(last.doc.version, 14);
     assert.ok(k10.every(e => e.valuesOnly === 0), 'no run keeps its values only');

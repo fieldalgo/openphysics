@@ -74,10 +74,8 @@ export function chooseFieldsAtArrival(input,runs,selected,comparison,view,option
  const {converted,started}=compactFields(input,runs,selected,comparison,view,options);
  return {...chooseFields(input,runs,selected,comparison,view,options),converted,started};
 }
-/** Messages, at the tab's first conversion (once per tab). */
-// (round 26: in the words of what the reader gains and what still opens; the session version is in
-// the docs, not here)
-export const COMPACT_TEXT=`More field plots now fit in ${mbText(FIELD_BUDGET_BYTES)}: Studio keeps them at single precision from now on. n_eff, TE fractions and effective areas are unchanged. Files saved from now on open in this Studio or later; files you already have still open.`;
+// Round 27 (D1, HQ decision 2026-11-25-openphysics-studio-round27-choices): the conversion writes no
+// Messages sentence (round 26's COMPACT_TEXT is gone); COMPACT_NOTE and COMPACT_RESULTS_TEXT say it.
 /** The sentence after the note under the run list. */
 export const COMPACT_NOTE='When fields would not all fit, they are kept at single precision.';
 /** Results, under the field view of a run whose field is compact. */
