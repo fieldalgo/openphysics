@@ -23,21 +23,15 @@ import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
 import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
 import {runChoice} from './workspace-open-run.mjs';
 import {groupIndexStep} from './workspace-modes.mjs';
+import {budgetOrder,budgetChoose} from './workspace-budget.mjs';
 
 export {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText};
 export const BUDGET_TEXT=mbText(FIELD_BUDGET_BYTES);
 const utf8Bytes=text=>new TextEncoder().encode(text).length;
-const newestFirst=(a,b)=>b.number-a.number;
 
 /** The runs with fields in the order their fields are kept (see the top of this file). first: the
  * jobs whose fields arrived and are not the selected run's. */
-export function fieldOrder(runs,selected,first=[]){
- const withField=runs.filter(r=>r.field);
- const chosen=withField.filter(r=>r.job===selected);
- for(const job of first){const r=withField.find(x=>x.job===job);if(r&&!chosen.includes(r))chosen.push(r);}
- const rest=withField.filter(r=>!chosen.includes(r));
- return [...chosen,...rest.filter(r=>r.pinned).sort(newestFirst),...rest.filter(r=>!r.pinned).sort(newestFirst)];
-}
+export const fieldOrder=(runs,selected,first=[])=>budgetOrder(runs.filter(r=>r.field),selected,first);
 
 /** The fields the budget keeps: {kept, letGo, total, base, fits}. kept and letGo: runs with fields;
  * total: the bytes of the session text with the kept fields (base: with none). fits: every field is
@@ -50,10 +44,8 @@ export function chooseFields(input,runs,selected,comparison,view,{first=[],budge
  // the text of every field may be of version 7 (smaller than the sum, which counts version 9 records)
  const seven=runs.length<=PREVIOUS_RUN_LIMIT&&runs.every(fitsVersion7);
  if(sum<=budget||(seven&&utf8Bytes(sessionText(input,runs,selected,comparison,view))<=budget))return {kept:withField,letGo:[],total:sum,base,fits:true};
- let total=base;const kept=[],letGo=[];
- fieldOrder(runs,selected,first).forEach((r,i)=>{const b=bytes(r);
-  // the selected run keeps its field even alone over the budget (section 3.4: Save then refuses)
-  if(total+b<=budget||(i===0&&r.job===selected)){kept.push(r);total+=b;}else letGo.push(r);});
+ // the selected run keeps its field even alone over the budget (section 3.4: Save then refuses)
+ const {kept,letGo,total}=budgetChoose(fieldOrder(runs,selected,first),{base,bytes,selected,budget});
  return {kept,letGo,total,base,fits:false};
 }
 

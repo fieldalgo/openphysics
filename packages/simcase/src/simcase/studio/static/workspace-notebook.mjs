@@ -9,7 +9,8 @@ import {isCompactRecord,decodeField,encodeField,compactRecord,isCompactField,mar
 import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,MULTIPHYSICS_VERSIONS,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
-export const MAX_SESSION_BYTES=16*1024*1024;
+import {MAX_SESSION_BYTES,FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText} from './workspace-budget.mjs';
+export {MAX_SESSION_BYTES};
 // Run retention (design "Keeping more runs"): up to 20 runs keep their values in the tab, in files and
 // in browser recovery; their fields are kept within the 16 MiB session (workspace-retention.mjs).
 // A session file of versions 6 to 12 holds at most six runs (PREVIOUS_RUN_LIMIT): a session of more
@@ -17,11 +18,9 @@ export const MAX_SESSION_BYTES=16*1024*1024;
 export const RUN_LIMIT=20;
 export const PREVIOUS_RUN_LIMIT=6;
 // The fields of the runs are kept within the session less 16 KiB kept for the inputs (the field
-// budget, workspace-retention.mjs): 16,760,832 bytes, "16.8 MB".
-export const FIELD_HEADROOM_BYTES=16*1024;
-export const FIELD_BUDGET_BYTES=MAX_SESSION_BYTES-FIELD_HEADROOM_BYTES;
-/** A size in MB with one decimal ("16.8 MB"), as every limit of run retention is said. */
-export const mbText=bytes=>`${(bytes/1e6).toFixed(1)} MB`;
+// budget, workspace-retention.mjs): 16,760,832 bytes, "16.8 MB" (workspace-budget.mjs, shared with
+// the heated model's maps).
+export {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText};
 // The run limit and the field budget, from RUN_LIMIT and FIELD_BUDGET_BYTES themselves, so the run
 // list's note and the model tree's "Runs · N of M" never disagree (round 14); in digits.
 // Round 25 (A1): the words say when fields move (only when a result or a recompute arrives) and that

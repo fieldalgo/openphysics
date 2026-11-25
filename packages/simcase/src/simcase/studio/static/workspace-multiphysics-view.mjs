@@ -17,7 +17,9 @@ import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsName
 import {curvePath,loopPath} from './workspace-graph.mjs';
 import {persistenceTitle,persistenceHint,sessionFileName} from './workspace-persistence.mjs';
 import {appendMultiphysicsRun,nextRunNumber,multiphysicsRunName,meshCounts,writeMultiphysicsSession,recoveryText,overflowQuestion,savedNotice,modelSlug,
- MULTIPHYSICS_RUN_LIMIT,MAPS_NOT_KEPT,VIEW_PAGES,readMultiphysicsView} from './workspace-multiphysics-session.mjs';
+ MULTIPHYSICS_RUN_LIMIT,MAPS_NOT_KEPT,VIEW_PAGES,readMultiphysicsView,chooseMaps,letGoMaps,mapsLetGoHere,heldMaps,takeBackMaps,forgetHeldMaps,mapSwapCandidate,selectedAndPinnedMapBytes} from './workspace-multiphysics-session.mjs';
+import {MP_RUNS_KEPT_TEXT,mpRunsNodeLabel,ALL_PINNED_TEXT,UNPINNED_TEXT,mapsKeepValuesText,mapsKeepValuesWhileRunningText,MAPS_MAY_GO_TEXT,mapsNotKeptAfterText,keepMapsInsteadLabel,mapsBackText,pinnedMapsText,
+ mapsNotKeptResultsText,predictedMapsLetGo,unestimatedMapRisk} from './workspace-multiphysics-retention.mjs';
 
 const clone=x=>JSON.parse(JSON.stringify(x));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -87,8 +89,10 @@ export function createMultiphysicsView(ctx){
   ctx.ui.page=v.page==='Results'&&!lastRun?'Model':v.page;validate(true);ctx.onHistory();
   loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp(),file:sourceFile,fileCurrent:source==='file'||openedMatch};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
   openedStamp=source==='file'||openedMatch?loaded.stamp:null;
+  // run retention: an opened or restored session is an arrival of maps (section 3.2)
+  dropSwap=null;noSwapNote='';const mapWords=applyMapBudget();
   ctx.onHistory();ctx.render();
-  notice(source==='file'?`Opened ${label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${label}), not recomputed. `+(savedFile?`Last session file ${savedFile.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'));
+  notice((source==='file'?`Opened ${label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${label}), not recomputed. `+(savedFile?`Last session file ${savedFile.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'))+(mapWords?' '+mapWords:''),'',swapAction());
  }
  // A file is read by the server's reader first: a duplicate key or text that is not JSON is
  // refused with the reader's words, never resolved silently by the browser's JSON.parse.
@@ -159,7 +163,7 @@ export function createMultiphysicsView(ctx){
  function runBlock(){
   if(capsError)return 'Studio cannot list the installed physics: '+capsError;
   if(job||starting)return 'Running… (stop it under Study)';
-  if(runs.length>=MULTIPHYSICS_RUN_LIMIT&&runs.every(r=>r.pinned))return `All ${MULTIPHYSICS_RUN_LIMIT} runs are pinned. Unpin a run under Results › Runs before running again.`;
+  if(runs.length>=MULTIPHYSICS_RUN_LIMIT&&runs.every(r=>r.pinned))return ALL_PINNED_TEXT;
   if(check.error)return 'The model could not be checked: '+check.error;
   if(check.pending)return 'Checking the model…';
   return runBlockText(errors().length,check.run_refusal);
@@ -212,7 +216,7 @@ export function createMultiphysicsView(ctx){
   if(done.alone){delete baselineErrors[done.alone];const part=result.physics[done.alone];uncoupled[done.alone]={rows:effectiveIndexRows(part),key:done.key,completedAt:new Date().toISOString(),job:done.id,document:done.doc,
     result:{type:part.type,effective_index:part.effective_index,vacuum_wavelength:part.vacuum_wavelength,summary:part.summary}};refreshRun();ctx.render();ctx.onHistory();
    // the drop of the coupled run is said again, with its swap, once the heater-off solves are done
-   if(!nextBaseline())ctx.announceResult(`${physicsLabel(done.alone)} without heater finished; its n_eff and Δn_eff are shown beside the coupled one.`+(dropSwap?' '+dropSwap.note:noSwapNote?' '+noSwapNote:''),swapAction());return;}
+   if(!nextBaseline())ctx.announceResult(`${physicsLabel(done.alone)} without heater finished; its n_eff and Δn_eff are shown beside the coupled one.`+(mapNote?' '+mapNote:'')+(dropSwap?' '+dropSwap.note:noSwapNote?' '+noSwapNote:''),swapAction());return;}
   const completed={job:done.id,number:nextRunNumber(runs),label:'',pinned:false,completedAt:new Date().toISOString(),serverVersion:ctx.serverVersion?.()??null,doc:done.doc,events:done.events,order:result.solve_order,result,maps:'kept',origin:'local'};
   const before=runs;
   try{runs=appendMultiphysicsRun(runs,completed);}catch(e){notice(e.message);refreshRun();ctx.render();return;}
@@ -223,11 +227,13 @@ export function createMultiphysicsView(ctx){
   const droppedWords=!dropped.length?'':swapCandidate(runs,completed)?droppedAfterText(dropped,dropName):droppedNoSwapText(dropped,dropName);
   noSwapNote=dropped.length&&!swapCandidate(runs,completed)?droppedWords:'';
   lastRun=completed;runFailure=null;
+  // run retention: the maps kept within the budget now that a map arrived (section 3.2)
+  const mapWords=applyMapBudget();
   resultPage=resultPages(result).find(p=>p.id.startsWith('results:')&&result.physics[p.id.slice(8)]?.coupled)?.id||resultPages(result)[0].id;
   selection=resultPage;ctx.ui.page='Results';
   // the heater-off comparison: solved only when no column of the same content is kept
   baselineQueue=baselineOption&&!stopAsked?baselinePhysics(lastRun.doc).filter(n=>uncoupled[n]?.key!==baselineKey(lastRun.doc,n)):[];
-  refreshRun();ctx.render();ctx.onHistory();ctx.announceResult(`Run ${lastRun.number} complete. Its results belong to that run; editing the model does not change them.`+(baselineQueue.length?' Solving without heater…':'')+(droppedWords?' '+droppedWords:''),swapAction());
+  refreshRun();ctx.render();ctx.onHistory();ctx.announceResult(`Run ${lastRun.number} complete. Its results belong to that run; editing the model does not change them.`+(baselineQueue.length?' Solving without heater…':'')+(mapWords?' '+mapWords:'')+(droppedWords?' '+droppedWords:''),swapAction());
   nextBaseline();
  }
  // Starts the next heater-off solve of the last run; false when none is left.
@@ -243,12 +249,28 @@ export function createMultiphysicsView(ctx){
   const running=!!job&&!job.alone||starting&&!job,list=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT);
   // round 21 (W5): before a run, hidden while the model equals a kept run's ("No need to run")
   const matched=!running&&runs.some(x=>runFreshness(x,doc)==='current'),r=active&&!matched?list[0]||null:null;
-  host.hidden=!r;if(!r)return;
+  host.hidden=!r;if(!r){if(active&&!matched)refreshMapWarning(host,running);return;}
   const text=running?dropWhileRunningText(list,dropName):dropWarningText(list.length>1?list:r,dropName);$('mp-run-drop-text').textContent=text;$('mp-run-drop-text').title=text;
   const pin=$('mp-run-drop-pin');pin.textContent=`Pin Run ${r.number}`;pin.dataset.pinRun=String(r.number);pin.hidden=runs.filter(x=>!x.pinned).length<=list.length;
   pin.onclick=()=>{if(!runs.includes(r)||r.pinned||runs.filter(x=>!x.pinned).length<=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT).length)return;r.pinned=true;ctx.onHistory();ctx.render();
    // round 22 (V4): the drop moves to the next unpinned run: Messages names it
    const next=droppedBy(runs,MULTIPHYSICS_RUN_LIMIT);notice(next.length?pinnedDropText(r,next,!!job&&!job.alone||starting&&!job,dropName):'Run pinned: new runs will not replace it. File › Save keeps it in a file.');};
+ }
+ // Run retention (section 7): below the run limit, the line names the runs whose maps the next result
+ // would let go, from the map bytes of the newest run with maps of the same geometry, mesh, materials,
+ // physics and couplings; with no such run, "older runs' maps may not be kept" when the room left is
+ // less than the smallest map kept; else nothing. Kept per state, since a render calls it often.
+ let mapWarning={key:null,list:[],risk:false};
+ function refreshMapWarning(host,running){
+  const next=running?job?.doc:doc;if(!next||(running&&!job))return;
+  const key=JSON.stringify([next,runs.map(r=>[r.job,r.number,r.pinned,r.label,r.maps]),lastRun?.job||null,running]);
+  if(mapWarning.key!==key){let list=[],risk=false;const state=sessionState();try{list=predictedMapsLetGo(state,next);if(!running)risk=unestimatedMapRisk(state,next);}catch{}mapWarning={key,list,risk};}
+  const list=mapWarning.list.filter(r=>runs.includes(r)&&r.maps!=='not kept'),pin=$('mp-run-drop-pin'),line=$('mp-run-drop-text');
+  if(!list.length&&!(mapWarning.risk&&!running))return;
+  host.hidden=false;
+  const text=list.length?(running?mapsKeepValuesWhileRunningText(list,dropName):mapsKeepValuesText(list,dropName)):MAPS_MAY_GO_TEXT;line.textContent=text;line.title=text;
+  const r=list.find(x=>!x.pinned);pin.hidden=!r;if(!r)return;pin.textContent=`Pin Run ${r.number}`;pin.dataset.pinRun=String(r.number);
+  pin.onclick=()=>{if(!runs.includes(r)||r.pinned)return;r.pinned=true;ctx.onHistory();ctx.render();notice('Run pinned: new runs will not replace it. File › Save keeps it in a file.');};
  }
  // After a result dropped Run N: [Keep Run N, drop Run M (…) instead] when another unpinned run exists
  // besides the new result (M the oldest such run); until the next run starts or the run list is
@@ -256,16 +278,45 @@ export function createMultiphysicsView(ctx){
  // round 22 (V4): the no-swap words of the last result (set at each result), said again when its
  // without-heater solves finish
  let dropSwap=null,noSwapNote='';
+ // Run retention: after a result let one unpinned run's maps go, [Keep Run N's maps, not Run M's
+ // (run at …)] when another unpinned, unselected run has maps at least as large (M: the oldest such
+ // run), until the next arrival or run.
+ let mapSwap=null,mapsLetGo=[],mapNote='';
  function swapAction(){
-  const offer=dropSwap;if(!offer)return null;
-  return {label:keepInsteadLabel(offer.kept,offer.other,dropName),data:{keepRun:String(offer.kept.number)},run:()=>keepDroppedRun(offer)};
+  const offer=dropSwap,maps=mapSwap,actions=[];
+  if(offer)actions.push({label:keepInsteadLabel(offer.kept,offer.other,dropName),data:{keepRun:String(offer.kept.number)},run:()=>keepDroppedRun(offer)});
+  if(maps)actions.push({label:keepMapsInsteadLabel(maps.back,maps.other,runTime),data:{keepMaps:String(maps.back.number)},run:()=>keepMapsInstead(maps)});
+  return actions.length>1?actions:actions[0]||null;
+ }
+ // When maps arrive (a result, a recompute, an opened or restored session, a dropped run kept
+ // instead), the maps kept are chosen within the budget in the order of workspace-budget.mjs; nothing
+ // else lets maps go. Returns the Messages words ('' when every map stays). first: the jobs whose maps
+ // arrived and are not the selected run's.
+ function applyMapBudget(first=[]){
+  forgetHeldMaps(runs);mapSwap=null;mapsLetGo=[];mapNote='';
+  const state=sessionState();let out;try{out=chooseMaps(state,{first});}catch{return '';}
+  if(!out.letGo.length)return '';
+  const pinned=out.letGo.filter(r=>r.pinned),plain=out.letGo.filter(r=>!r.pinned),pinnedBytes=pinned.length?selectedAndPinnedMapBytes(state,out.base):0;
+  for(const r of out.letGo)letGoMaps(r);mapsLetGo=out.letGo;
+  const other=mapSwapCandidate(runs,plain,state.selected);if(other)mapSwap={back:plain[0],other,list:runs};
+  mapNote=[plain.length?mapsNotKeptAfterText(plain,dropName):'',pinned.length?pinnedMapsText(pinned,pinnedBytes):''].filter(Boolean).join(' ');
+  return mapNote;
+ }
+ function keepMapsInstead(offer){
+  const button=$('file-status')?.querySelector('[data-keep-maps]');
+  const fresh=offer===mapSwap&&runs===offer.list&&runs.includes(offer.back)&&runs.includes(offer.other)&&heldMaps(offer.back)&&offer.other.maps!=='not kept'&&!offer.other.pinned&&offer.other.job!==lastRun?.job&&!job&&!starting;
+  mapSwap=null;if(!fresh){button?.remove();return;}
+  letGoMaps(offer.other);takeBackMaps(offer.back);forgetHeldMaps(runs);mapsLetGo=[offer.other];
+  ctx.onHistory();ctx.render();notice(mapsBackText(offer.back,offer.other,dropName));
  }
  function keepDroppedRun(offer){
   const button=$('file-status')?.querySelector('[data-keep-run]');
   const fresh=offer===dropSwap&&runs===offer.list&&runs.includes(offer.newest)&&!runs.includes(offer.kept)&&swapCandidate(runs,offer.newest)===offer.other&&!job&&!starting;
   dropSwap=null;if(!fresh){button?.remove();return;}
   runs=swapDropped(runs,offer.kept,offer.other);if(lastRun===offer.other)lastRun=offer.newest;
-  refreshRun();ctx.onHistory();ctx.render();notice(keptInsteadText(offer.kept,offer.other,dropName));
+  // run retention: the run kept comes back with its maps, which arrive (first after the selected run's)
+  const words=applyMapBudget([offer.kept.job]);
+  refreshRun();ctx.onHistory();ctx.render();notice(keptInsteadText(offer.kept,offer.other,dropName)+(words?' '+words:''),'',swapAction());
  }
  function runAlone(name){return run(uncoupledDocument(lastRun.doc,name),{alone:name,key:baselineKey(lastRun.doc,name)});}
  async function stop(){if(!job)return;baselineQueue=[];stopAsked=true;const alone=job.alone;try{await ctx.request('POST',`/api/multiphysics/jobs/${job.id}/stop`);notice(alone?`Stopping ${physicsLabel(alone)} without heater; the coupled run stays under Results.`:'Stopping after the physics being solved finishes; no result will be kept.');}catch(e){notice('Stop failed: '+e.message);}}
@@ -303,7 +354,7 @@ export function createMultiphysicsView(ctx){
   const couplings=couplingNames(doc).map(c=>item('coupling:'+c,couplingTitle(doc,c),MARK.coupling)).join('')||`<div role="treeitem" aria-level="2" aria-disabled="true" tabindex="-1" class="muted tree-empty">No couplings</div>`;
   const loops=(Array.isArray(doc.study?.loops)?doc.study.loops:[]).map((l,i)=>item('loop:'+i,`Iteration step ${i+1} · ${(l.physics||[]).map(physicsLabel).join(' ⇄ ')}`,MARK.loop,'',true)).join('');
   const materials=materialUses(doc).map(u=>item('material:'+u.ref,u.label,'·','',true)).join('');
-  const results=lastRun?[{id:'results:runs',label:`Runs · ${runs.length} of ${MULTIPHYSICS_RUN_LIMIT}`},...resultPages(lastRun.result)].map(p=>item(p.id,p.label,MARK.results,'',true,2)).join(''):'';
+  const results=lastRun?[{id:'results:runs',label:mpRunsNodeLabel(runs.length)},...resultPages(lastRun.result)].map(p=>item(p.id,p.label,MARK.results,'',true,2)).join(''):'';
   return `<div class="pane-title"><span>Model builder</span><span class="pane-detail">${multi?'Multiphysics model':'Model 1'}</span></div>${treeOpen()}<div class="model-root" role="none"><button type="button" data-mp-node="model" ${itemAttributes(1,shown('model'))}><span aria-hidden="true">▾ ◇</span><strong>${esc(doc.name||'Untitled model')}</strong></button></div>`+
    `<section class="tree-group" role="none">${group('Component 1')}${item('geometry','Geometry 1',MARK.geometry,'',false)}${item('materials','Materials',MARK.materials)}${materials}${item('mesh',multi?'Mesh 1 · shared':'Mesh 1',MARK.mesh)}</section>`+
    `<section class="tree-group" role="none">${group('Physics')}${physics}</section>`+
@@ -516,7 +567,7 @@ export function createMultiphysicsView(ctx){
   if(!lastRun){host.innerHTML=`<h2>No result in this tab</h2><p>Press Run to solve every physics in solve order. File › Save keeps the model and its runs in one file.</p>${runFailure?`<p class="validation-warning">${esc(runFailure.status==='stopped'?'The last run was stopped; no result was kept.':failureText(runFailure.error,runFailure.doc))}</p>`:''}`;return [];}
   const r=lastRun.result,pages=[{id:'results:runs',label:'Runs'},...resultPages(r)];if(!pages.find(p=>p.id===resultPage))resultPage=pages[1].id;
   const same=JSON.stringify(lastRun.doc)===signature(),kept=lastRun.maps!=='not kept',counts=kept?meshCounts(r):lastRun.counts;
-  host.innerHTML=`<div class="toolbar mp-result-tabs" role="tablist">${pages.map(p=>`<button role="tab" data-mp-node="${esc(p.id)}" aria-selected="${p.id===resultPage}">${esc(p.label)}</button>`).join('')}</div><p class="muted" data-mp-run-line>${esc(runTitle(lastRun))} · ${new Date(lastRun.completedAt).toLocaleTimeString()} · ${same?'the current model':'the model changed since this run; this result is unchanged'}.${runFailure?' The last run failed; this is the previous complete run.':''}${originNote(lastRun)}</p>`+(kept?'':`<p class="validation-warning" data-mp-values-only>${esc(MAPS_NOT_KEPT)}</p>`);
+  host.innerHTML=`<div class="toolbar mp-result-tabs" role="tablist">${pages.map(p=>`<button role="tab" data-mp-node="${esc(p.id)}" aria-selected="${p.id===resultPage}">${esc(p.label)}</button>`).join('')}</div><p class="muted" data-mp-run-line>${esc(runTitle(lastRun))} · ${new Date(lastRun.completedAt).toLocaleTimeString()} · ${same?'the current model':'the model changed since this run; this result is unchanged'}.${runFailure?' The last run failed; this is the previous complete run.':''}${originNote(lastRun)}</p>`+(kept?'':`<p class="validation-warning" data-mp-values-only>${esc(noMapsText(lastRun))}</p>`);
   const id=resultPage.slice(8),maps=[];
   if(id==='runs'){runList(host);return maps;}
   if(id==='check'){
@@ -527,7 +578,7 @@ export function createMultiphysicsView(ctx){
   }
   const p=r.physics[id];
   if(p.type==='thermal.steady2d'){
-   host.insertAdjacentHTML('beforeend',`<h2>${esc(physicsLabel(id))} · temperature</h2>${kept?'<div class="mp-plot"><canvas data-mp-map="temperature" role="img"></canvas></div>':`<p class="mp-no-maps" data-mp-no-maps>${esc(MAPS_NOT_KEPT)}</p>`}${pair('Minimum T',p.range.min.toFixed(3)+' K')}${pair('Maximum T',p.range.max.toFixed(3)+' K')}${pair('Nodes',counts.nodes.toLocaleString('en-US'))}${pair('Triangles',counts.triangles.toLocaleString('en-US'))}${kept?'<p class="muted">Each triangle is coloured by the mean of its node temperatures.</p>':''}`);
+   host.insertAdjacentHTML('beforeend',`<h2>${esc(physicsLabel(id))} · temperature</h2>${kept?'<div class="mp-plot"><canvas data-mp-map="temperature" role="img"></canvas></div>':`<p class="mp-no-maps" data-mp-no-maps>${esc(noMapsText(lastRun))}</p>`}${pair('Minimum T',p.range.min.toFixed(3)+' K')}${pair('Maximum T',p.range.max.toFixed(3)+' K')}${pair('Nodes',counts.nodes.toLocaleString('en-US'))}${pair('Triangles',counts.triangles.toLocaleString('en-US'))}${kept?'<p class="muted">Each triangle is coloured by the mean of its node temperatures.</p>':''}`);
    if(kept)maps.push(['temperature',()=>drawMap(host.querySelector('[data-mp-map=temperature]'),r,p.temperature.values,{nodal:true,label:'Temperature in K'})]);
   }else{
    const rows=effectiveIndexRows(p),alone=uncoupled[id],coupled=p.coupled;
@@ -546,7 +597,7 @@ export function createMultiphysicsView(ctx){
     `<p class="muted" data-mp-area-note>A_eff: ${esc(identity.areaHelp)}${identity.areaSource?'; '+esc(SOURCE_TEXT[identity.areaSource]):identity.areaMissing?' · '+esc(identity.areaMissing):''}.</p>`+(table.rows.length&&table.rows.every(r=>r.lossless)?`<p class="muted" data-mp-lossless>${esc(table.loss.note)}</p>`:`<p class="muted" data-mp-loss-note>${esc(table.loss.note)}</p>`)+
     (coupled?`<p class="mp-baseline" id="mp-baseline-note">${note}${valid||solving?'':` <button type="button" id="mp-run-alone" ${job||starting?'disabled':''}>Run ${esc(physicsLabel(id))} alone</button>`}</p>`:'')+pair('Vacuum wavelength',wavelengthText(p.vacuum_wavelength)));
    // the answer first, then the coupled input it was solved from
-   if(coupled&&!kept)host.insertAdjacentHTML('beforeend',`<p class="mp-no-maps" data-mp-no-maps>${esc(MAPS_NOT_KEPT)}</p>`);
+   if(coupled&&!kept)host.insertAdjacentHTML('beforeend',`<p class="mp-no-maps" data-mp-no-maps>${esc(noMapsText(lastRun))}</p>`);
    else if(coupled){const region=r.mesh.region_names.includes('core')?'core':null,dn=coupled.index_change;
     host.insertAdjacentHTML('beforeend',`<div class="mp-maps"><figure><figcaption>Temperature per triangle [K]${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="T" role="img"></canvas></div></figure><figure><figcaption><label>Show <select id="mp-index-view"><option value="n" ${indexView==='n'?'selected':''}>refractive index n</option>${dn?`<option value="dn" ${indexView==='dn'?'selected':''}>change n − n₀</option>`:''}</select></label>${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="n" role="img"></canvas></div></figure></div><p class="muted">The coupled input as the optical solve used it: the mean of each triangle's 3 node temperatures, and n = n₀ + (dn/dT)(T − T_ref). The change is (dn/dT)(T − T_ref) of each triangle's material.</p>`);
     maps.push(['T',()=>drawMap(host.querySelector('[data-mp-map=T]'),r,coupled.temperature.values,{region,label:'Temperature in K'})]);
@@ -559,6 +610,8 @@ export function createMultiphysicsView(ctx){
  }
 const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
  const runTitle=run=>`Run ${run.number}${run.label?' · '+run.label:''}`;
+ // a run without its maps: let go in this tab (S9), or read so from a file or record
+ const noMapsText=run=>mapsLetGoHere(run)?mapsNotKeptResultsText(run):MAPS_NOT_KEPT;
  // round 14 (Q5): the plain words, with what the checksum does not show as the title text
  const CHECKSUM_HELP='The checksum detects a damaged or hand-edited file; it does not show who made the file: whoever edits a file can recompute it.';
  const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed. <span data-mp-checksum title="'+CHECKSUM_HELP+'">Results match the file\'s checksum.</span>';
@@ -566,15 +619,15 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  // Results › Runs: the run list, in the optical words; selecting a run shows it, the model stays
  function runList(host){
   const pinned=runs.filter(r=>r.pinned).length;
-  host.insertAdjacentHTML('beforeend',`<h2 id="mp-run-list-heading">Runs · ${runs.length} of ${MULTIPHYSICS_RUN_LIMIT} · ${pinned} pinned</h2><div class="mp-run-list">${[...runs].reverse().map(r=>`<button type="button" class="run-item" data-mp-run="${esc(r.job)}" aria-pressed="${r===lastRun}">${esc(runItem(r))}</button>`).join('')}</div>
+  host.insertAdjacentHTML('beforeend',`<h2 id="mp-run-list-heading">${mpRunsNodeLabel(runs.length)} · ${pinned} pinned</h2><div class="mp-run-list">${[...runs].reverse().map(r=>`<button type="button" class="run-item" data-mp-run="${esc(r.job)}" aria-pressed="${r===lastRun}">${esc(runItem(r))}</button>`).join('')}</div>
    <form class="run-name" id="mp-run-name"><label>Run name<input id="mp-run-name-input" type="text" maxlength="80" value="${esc(lastRun.label)}" placeholder="For example: heater 10 mW" aria-describedby="mp-run-name-hint"></label><button id="mp-rename-run" type="submit">Apply name</button><p id="mp-run-name-hint" class="input-hint">Press Enter to apply. Naming a run pins it, so new runs do not replace it; Enter on a named, unpinned run pins it again.</p></form>
    ${lastRun.pinned?'<button type="button" id="mp-unpin-run">Unpin this run</button>':''}
-   <p>Up to ${MULTIPHYSICS_RUN_LIMIT} runs are kept. Pinned runs stay; when a new run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file.</p>`);
+   <p data-mp-runs-kept>${esc(MP_RUNS_KEPT_TEXT)}</p>`);
   host.querySelectorAll('[data-mp-run]').forEach(b=>b.onclick=()=>{const r=runs.find(x=>x.job===b.dataset.mpRun);if(!r)return;lastRun=r;ctx.onHistory();ctx.render();notice(`${runTitle(r)} shown under Results; the model is unchanged.`);});
   const input=host.querySelector('#mp-run-name-input'),form=host.querySelector('#mp-run-name'),target=lastRun;
   const apply=()=>nameRun(target,input.value);
   form.onsubmit=e=>{e.preventDefault();apply();};input.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();apply();}};
-  const unpin=host.querySelector('#mp-unpin-run');if(unpin)unpin.onclick=()=>{target.pinned=false;ctx.onHistory();ctx.render();notice(`Run unpinned: once ${MULTIPHYSICS_RUN_LIMIT} runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.`);};
+  const unpin=host.querySelector('#mp-unpin-run');if(unpin)unpin.onclick=()=>{target.pinned=false;ctx.onHistory();ctx.render();notice(UNPINNED_TEXT);};
  }
  function nameRun(run,value){
   let label;try{label=ctx.validateRunLabel(value);}catch(e){notice(e.message);return;}
