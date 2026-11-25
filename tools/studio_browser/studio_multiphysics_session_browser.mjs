@@ -558,8 +558,8 @@ print(n)`;
     // version 9 is an optical session since the number of modes: a newer file is version 10, and a
     // multiphysics layout under version 9 is refused by its first key
     // version 10 is the optical open boundary (slice P2), 11 the closed-window search (slice C2), 13 the
-    // optical session of up to 20 runs: version 14 is the newer one
-    ['S7 version 14', d => { d.version = 14; }, /This session file is version 14, newer than this Studio reads \(versions 6–13\)\. Open it in a newer Studio\./],
+    // optical session of up to 20 runs, 14 its compact fields: version 15 is the newer one
+    ['S7 version 15', d => { d.version = 15; }, /This session file is version 15, newer than this Studio reads \(versions 6–14\)\. Open it in a newer Studio\./],
     ['S7 a version 8 layout under version 9', d => { d.version = 9; }, /Unknown key "document" in the session file\./],
     ['S7 another application', d => { d.application = 'other'; }, /This session file holds a “other” model, which this Studio does not read\./],
     ['S7 another result', d => { d.runs[0].result.result = 'multiphysics-run-v2'; }, /Run 1 was saved as result “multiphysics-run-v2”, which this Studio does not read\./],
