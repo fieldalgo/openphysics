@@ -123,14 +123,17 @@ def test_f5_the_compact_fixture_holds_numpy_strings_of_its_decoded_values():
     assert compact[0] == {"encoding": "f32-base64-v1", "counts": compact[0]["counts"], **_numpy(source)}
 
 
-@pytest.mark.skipif(not os.environ.get("STUDIO_RETENTION_RESULTS"), reason="needs tools/studio_run_retention.mjs engine results")
-def test_f5_t18_results_have_the_same_strings_in_studio_and_numpy(tmp_path):
-    folder = Path(os.environ["STUDIO_RETENTION_RESULTS"])
-    files = []
-    for case in ["t18closed2", "t18closed4", "t18near", "t16", "t18open"]:
-        result = _load(next(folder.glob(f"{case}.*.result.json")).read_text(encoding="utf-8"))
-        f = result["vector_fields"][0]
-        path = tmp_path / f"{case}.json"
-        path.write_text(json.dumps({"node_coordinates": result["node_coordinates"], "triangles": result["triangles"], "real": f["real"], "imag": f["imag"]}), encoding="utf-8")
-        files.append(path)
-    assert len(_compare(files)) == 5
+# Defined only with engine results to compare (as test_units_batch_equivalence.py defines its
+# harness tests), so a run without them, such as the installed-package suite, records no skip.
+if os.environ.get("STUDIO_RETENTION_RESULTS"):
+
+    def test_f5_t18_results_have_the_same_strings_in_studio_and_numpy(tmp_path):
+        folder = Path(os.environ["STUDIO_RETENTION_RESULTS"])
+        files = []
+        for case in ["t18closed2", "t18closed4", "t18near", "t16", "t18open"]:
+            result = _load(next(folder.glob(f"{case}.*.result.json")).read_text(encoding="utf-8"))
+            f = result["vector_fields"][0]
+            path = tmp_path / f"{case}.json"
+            path.write_text(json.dumps({"node_coordinates": result["node_coordinates"], "triangles": result["triangles"], "real": f["real"], "imag": f["imag"]}), encoding="utf-8")
+            files.append(path)
+        assert len(_compare(files)) == 5
