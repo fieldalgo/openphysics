@@ -3180,13 +3180,24 @@ try {
     await r.type('#shape-h', 690); await sleep(400); await r.type('#shape-h', 700); await sleep(400);
     before = await runItems(); d2.search = await asked('after the geometry changed'); await r.click('#slab-question-search'); await waitRun(before);
     d2.after = {plan: await rText('#run-plan'), items: (await runItems()).length, found: await rText('#modes-found'), warning: await r.eval("document.getElementById('run-edge')?.hidden===false"),
-      rows: await r.eval("[...document.getElementById('modes-table').tBodies[0].rows].filter(x=>!x.classList.contains('edge-note-row')).map(x=>x.textContent)")};
+      rows: await r.eval("[...document.getElementById('modes-table').tBodies[0].rows].filter(x=>!x.classList.contains('edge-note-row')).map(x=>x.textContent)"),
+      neff: await r.eval("[...document.querySelectorAll('#modes-table [data-neff]')].map(c=>c.textContent)"),
+      edge: await r.eval("[...document.querySelectorAll('#modes-table td[data-edge-note]')].map(n=>[n.dataset.edgeNote,n.textContent])"),
+      core: await r.eval("[...document.querySelectorAll('#modes-table td[data-core-note]')].map(n=>[n.dataset.coreNote,n.textContent])")};
     stage('R27 D2 slab question', d2);
     for (const [tag, v] of [['Cancel', d2.cancel], ['Run as set', d2.runAsSet], ['search', d2.search]]) assert.deepEqual([v.dialogs, v.text, v.buttons, v.focus], [1, QUESTION, BUTTONS, 'slab-question-search'], tag);
     assert.deepEqual(d2.warningAfter, ['Set search near 2.46 · 4 modes', 'Use Open boundary']);
     assert.equal(d2.same, true, JSON.stringify(d2.neff)); assert.deepEqual(d2.neff[0], d2.neff[1]);
     assert.match(d2.after.plan, /^Closed window · near n_eff 2\.46(?: · last such run \d+:\d\d)?$/); assert.equal(d2.after.items, 3); assert.equal(d2.after.warning, false);
-    assert.equal(d2.after.rows.length, 4, JSON.stringify(d2.after.rows)); assert.ok(d2.after.rows[2].includes('2.43931663'), JSON.stringify(d2.after.rows));
+    // the core mode is mode 3 of 4: TE-like (TE >= 98 %), the core note on mode 3 and the substrate
+    // note on modes 1, 2 and 4, and its n_eff within 1e-4 of 2.43931663. The value differs between
+    // machines by up to 1.9e-5 (the CPU-dependent mesh: the runners give 2.43929738 on Linux and
+    // Windows, 2.43930543 on macOS); the next mode is 3.9e-2 away.
+    assert.equal(d2.after.neff.length, 4, JSON.stringify(d2.after)); assert.equal(d2.after.rows.length, 4, JSON.stringify(d2.after.rows));
+    const te3 = /TE-like · (\d+(?:\.\d+)?) % TE/.exec(d2.after.rows[2]); assert.ok(te3 && Number(te3[1]) >= 98, d2.after.rows[2]);
+    assert.equal(d2.after.core.length, 1, JSON.stringify(d2.after.core)); assert.equal(d2.after.core[0][0], '3'); assert.ok(d2.after.core[0][1].startsWith('Mode 3 is the core mode: '), d2.after.core[0][1]);
+    assert.deepEqual(d2.after.edge.map(n => n[0]), ['1', '2', '4'], JSON.stringify(d2.after.edge)); assert.ok(d2.after.edge.every(n => n[1].includes('is mostly in Substrate')), JSON.stringify(d2.after.edge));
+    assert.ok(Math.abs(Number(d2.after.neff[2]) - 2.43931663) <= 1e-4, JSON.stringify(d2.after.neff));
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
