@@ -14,7 +14,9 @@ def test_registered_geometry_and_stored_independent_reference(row,record_propert
         panels_per_edge=256,interpolation_degree=row["degree"])
     c0=epsilon_0*result.capacitance_per_permittivity
     q=np.concatenate((result.current_gram[:-2],result.current_gram[-2:].sum(axis=0)[None]))
-    np.testing.assert_array_equal(c0,row["panel"]["C0"])
+    # Not bit for bit: the dense solve's last bits follow the runner's CPU and BLAS kernel
+    # (relative 1.1e-15 to 2.5e-15 on an EPYC 7763 runner, Validate run 45466696066).
+    np.testing.assert_allclose(c0,row["panel"]["C0"],rtol=1e-13,atol=0)
     np.testing.assert_allclose(q,row["panel"]["Q"],rtol=1e-10,atol=0)
     ref=row["reference"];rq=np.asarray(ref["Q"])
     if rq.ndim==4:rq=rq[0]
