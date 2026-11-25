@@ -1696,7 +1696,11 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   closed-window run returns its slab modes first. Search near the core instead?* with **Set search
   near 2.46 · 4 modes and run** (the warning's shortcut, then the run), **Run as set** (the run as
   without the question: the same document, values and record) and **Cancel** (Escape too; nothing is
-  run). Focus starts on the first button. It asks again only after the geometry, the boundary or
+  run). Since round 28 (G3), when a run already has the shortcut's results (Nearest to n_eff 2.46,
+  Modes to find 4 and the other current inputs: the rule of the panel button's *No need to run*), the
+  first button reads **Set search near 2.46 · 4 modes · show Run 6**: it sets the shortcut's inputs,
+  with the panel button's message, and shows Run 6 under Results without running a copy; Run as set
+  and Cancel are unchanged. Focus starts on the first button. It asks again only after the geometry, the boundary or
   Modes to return changes (a change and back counts); otherwise Run study runs as set at once. It is a geometry and material check with no solve: a
   shape touches the edge when its bounds reach the window, the shape names are those of the
   highest-index edge shape and the highest-index shape away from it (the first of equal ones), and no

@@ -79,8 +79,11 @@ export function closedResultValues(result,re,t){
 /** "Substrate touches the window edge, so a closed-window run returns its slab modes first. Search
  * near the core instead?" (risk: edgeSlabRisk's {edge, core}). */
 export const slabQuestionText=risk=>`${risk.edge} touches the window edge, so a closed-window run returns its slab modes first. Search near the core instead?`;
-/** Its buttons, in order: "Set search near 2.46 · 4 modes and run", "Run as set", "Cancel". */
-export const slabQuestionButtons=t=>[`${shortcutText(t)} and run`,'Run as set','Cancel'];
+/** Its buttons, in order: "Set search near 2.46 · 4 modes and run", "Run as set", "Cancel". Round 28
+ * (G3): with shown, the number of a run that already has the shortcut's results (shortcutRun in
+ * workspace-workflow.mjs), the first reads "Set search near 2.46 · 4 modes · show Run 6": it sets the
+ * shortcut and shows that run, running nothing. */
+export const slabQuestionButtons=(t,shown=null)=>[shown==null?`${shortcutText(t)} and run`:`${shortcutText(t)} · show Run ${shown}`,'Run as set','Cancel'];
 /** What the question is asked for: the geometry (shapes), the boundary and Modes to return. */
 export const slabQuestionKey=({shapes,openBoundary=null,searchTarget=null})=>JSON.stringify([shapes,openBoundary??null,searchTarget??null]);
 /** The question's memory: asked(key) once it is answered (any answer, Escape included); seen(key) on
