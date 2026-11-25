@@ -2665,10 +2665,31 @@ core dimensions and materials with links back to their editors.
 The job panel shows the submitted dimensions/material, job ID, elapsed time (m:ss), what the
 run solves and the result-loading state, for example *Computing job 1a2b3c4d · 12:40 · Open
 boundary · 2 modes · searches near 2.46 and 1.95 · PML check (up to 2 more solves)* or *PML check ·
-mode 1 of 2*. The server
-reports no stage while a job runs, so none is shown. Messages repeats each of these states and is
-the one live region that announces them; the job panel's text is not a live region, so a screen
-reader reads each state once (round 25, A6; before, both announced every update). **Stop waiting** stops browser polling only; the optical
+mode 1 of 2*. While an optical job computes, the text then names the step the server reports
+(round 25, A5): the solve and the search the engine is at, from the latest `search_started` event of
+`simcase.run`'s `on_event` (`step` of `GET /api/jobs/{id}`, see the
+[HTTP API](overview.md#the-http-api)), right after the time, for example *Computing job 1a2b3c4d · 1:52 ·
+solve 2 of 3 (group index) · search 1 of 2 · Open boundary · 2 modes · searches near 2.46 and 1.95*.
+The time and the step are never cut; what the run solves is cut with an ellipsis when the panel is
+short of room. Where the time and the longest step cannot share the tab's line (below 661 px, and
+from 1001 to 1279 px, where the side panes stand beside the view), the job panel takes a line of its
+own below the view's title while it names a step and wraps between its parts, so the tab grows
+taller only while a job runs. The words are
+*solve s of S* when the run has more than one solve (the group index adds solves 2 and 3, *(group
+index)*), *search k of K* when each solve has more than one search (an open boundary's second
+search), both when both hold, and none for a job of one step in all (a closed run without the group
+index, an open run of one search, a PML check job) or a server that reports no step. A Recompute
+job reads *Recomputing Run 4's fields · about 3 min · solve 2 of 3 (group index) · search 1 of 2*.
+The words count steps, not time: the searches of a solve take different times (on 2026-11-25 a
+T16-like open run with the group index took 207.9 s, searches of 40 s and 26 s), so no percent is
+shown. The time estimate stays on the run-plan line (*about 3 min*, round 24 B5). Messages repeats
+each of these states and is the one live region that announces them; the job panel's text is not a
+live region, so a screen reader reads each state once (round 25, A6; before, both announced every
+update). While a job computes, Messages carries the job panel's words without the time
+(*Computing job 1a2b3c4d · Open boundary · … · solve 2 of 3 (group index) · search 1 of 2*, and
+*· no answer from the server; still checking* while the server does not answer) and is written only
+when they change: a screen reader hears the start, each step, a silence and its end, and the job's
+end, never the time (before round 25, A5, the time changed the live text about once a second). **Stop waiting** stops browser polling only; the optical
 server continues its computation. **Resume job** retrieves that same job with
 its captured inputs, even after editing the current design or reloading the
 same tab. The pending-job record uses session storage, separately from input

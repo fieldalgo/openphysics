@@ -2332,18 +2332,29 @@ const DONE_BANNER_MS=6000;let doneBannerTimer=0;
 function dismissDoneBanner(){clearTimeout(doneBannerTimer);doneBannerTimer=0;if(jobPhase!=='done')return;jobPhase='idle';refreshJobControls();}
 for(const type of ['pointerdown','keydown','click'])document.addEventListener(type,()=>{if(jobPhase==='done')dismissDoneBanner();},true);
 const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
- // run retention: a recompute's job reads "Recomputing Run N's fields · about …", and when done says
- // what its result did
+ // run retention: a recompute's job reads "Recomputing Run N's fields · about …" (then the step, job
+ // progress: "· solve 2 of 3 (group index) · search 1 of 2"; it has no time, so Messages reads the
+ // same), and when done says what its result did
  {const rc=state.pending?.recompute,run=rc?runs.find(r=>r.job===rc.job):null;
-  if(rc&&['running','loading'].includes(state.phase))state={...state,message:run?recomputingText({...run,number:runNumber(run)}):state.message};
+  if(rc&&run&&['running','loading'].includes(state.phase)){const lead=recomputingText({...run,number:runNumber(run)}),text=lead+(state.phase==='running'&&state.step?' · '+state.step:'');state={...state,message:text,parts:{lead,rest:''},...(state.phase==='running'?{live:text}:{})};}
   if(rc&&state.phase==='done'){state={...state,message:recomputeNote||state.message};recomputeNote='';}}
  // the runs this result dropped (the run limit) are named after the run's own message (round 17, U2)
  if(state.phase==='done'&&droppedNote){state={...state,message:state.message+' '+droppedNote};droppedNote='';}else if(state.phase==='done')dropSwap=null;
  const wasBusy=solverBusy;if(state.canResume===false)jobResumeBlocked=true;jobPhase=state.phase;solverBusy=['running','loading'].includes(state.phase);
  clearTimeout(doneBannerTimer);doneBannerTimer=0;
  $('job-message').textContent=state.message;$('job-message').title=state.title||''; // round 17 (U11): the job id of a loading result is its title
+ // job progress (round 25 A5, J9 layout): with a step, the job panel reads time · step · what in spans
+ // of their own; the step and the time never shrink, what takes the ellipsis. Where they cannot share
+ // the tab's line (workspace.css), the panel takes a line of its own and wraps between them.
+ {const parts=state.phase==='running'&&state.step&&state.parts?state.parts:null;
+  if(parts){$('job-message').textContent=parts.lead;$('job-step').textContent=' · '+state.step;$('job-what').textContent=parts.rest?' · '+parts.rest:'';}
+  else{$('job-step').textContent='';$('job-what').textContent='';}
+  $('job-panel').classList.toggle('has-step',!!parts);$('job-panel').title=parts?state.message:'';}
  if(state.phase==='done')setPending(null);
- if(state.phase==='done')announceResult(state.message,swapAction());else notice(state.message);if(state.phase==='done'&&sessionSizePending)postSessionSize();if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
+ // job progress: while a job runs, Messages (the one live region) carries state.live, the job panel's
+ // words without the time, and is written only when its text changes, so a screen reader hears the
+ // start, each step, a silence of the server and its end, never the time
+ if(state.phase==='done')announceResult(state.message,swapAction());else if(state.live===undefined)notice(state.message);else if($('file-status').textContent!==state.live)notice(state.live);if(state.phase==='done'&&sessionSizePending)postSessionSize();if(state.phase==='done'||wasBusy!==solverBusy)render();refreshJobControls();
  // the 6 s start once the banner is written and the page rendered: started before the render, the
  // banner was shown for 6 s minus the render of the result page (5.87 s on a macOS runner)
  doneBannerTimer=state.phase==='done'?setTimeout(dismissDoneBanner,DONE_BANNER_MS):0;
@@ -2380,6 +2391,7 @@ function refreshJobControls(){
  $('job-panel').hidden=!pendingJob&&!solverBusy&&jobPhase==='idle';
  // round 20 (Z7): a hidden panel keeps no message ("complete" or "Computing" in the tree while hidden)
  if($('job-panel').hidden){$('job-message').textContent='';$('job-message').title='';}
+ if($('job-panel').hidden){$('job-step').textContent='';$('job-what').textContent='';$('job-panel').classList.remove('has-step');$('job-panel').title='';} // job progress: the step spans too
  $('stop-waiting').disabled=!pendingJob||!solverBusy||!jobMonitor.busy;
  $('resume-job').disabled=!pendingJob||solverBusy||!connection.ready||jobResumeBlocked;
  $('forget-job').disabled=!pendingJob||solverBusy;

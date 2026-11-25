@@ -2163,9 +2163,23 @@ HTTP 자산을 다룹니다. 배포 검사에서도 설치 자산을 복사해 �
 
 작업 패널은 제출한 치수·재료, 작업 ID, 경과 시간(m:ss), 실행이 푸는 것, 결과 로딩 상태를 표시합니다. 예:
 *Computing job 1a2b3c4d · 12:40 · Open boundary · 2 modes · searches near 2.46 and 1.95 · PML check (up to 2 more solves)*, *PML check · mode 1 of 2*.
-서버는 작업 중 단계를 보고하지 않으므로 단계는 보이지 않습니다. Messages가 이 상태를 모두 되풀이하며 그것을 알리는
-유일한 라이브 영역입니다. 작업 패널의 문구는 라이브 영역이 아니므로 화면 낭독기는 상태마다 한 번만 읽습니다(round 25, A6;
-전에는 둘 다 갱신마다 알렸음).
+광학 작업이 계산하는 동안 문구는 이어서 서버가 알리는 단계를 이름합니다(round 25, A5). 엔진이 있는 풀이와 탐색이며,
+`simcase.run`의 `on_event`가 낸 최신 `search_started` 이벤트(`GET /api/jobs/{id}`의 `step`, [HTTP API](overview.md#http-api) 참조)에서 옵니다.
+단계는 시간 바로 뒤에 옵니다. 예: *Computing job 1a2b3c4d · 1:52 · solve 2 of 3 (group index) · search 1 of 2 · Open boundary · 2 modes · searches near 2.46 and 1.95*.
+시간과 단계는 잘리지 않고, 패널에 자리가 모자라면 실행이 푸는 것이 말줄임표로 잘립니다. 시간과 가장 긴 단계가 탭의 한 줄에
+함께 들어가지 못하는 곳(661 px 미만, 그리고 옆 패널이 보기 옆에 서는 1001~1279 px)에서는 단계를 보이는 동안 작업 패널이
+보기 제목 아래 자기 줄을 차지하고 그 부분들 사이에서 줄을 바꾸므로, 탭은 작업이 도는 동안에만 높아집니다.
+실행에 풀이가 둘 이상이면 *solve s of S*(군굴절률이 풀이 2와 3을 더하며 *(group index)*가 붙음), 풀이마다 탐색이 둘 이상이면
+*search k of K*(열린 경계의 두 번째 탐색), 둘 다면 둘 다이고, 단계가 모두 하나인 작업(군굴절률 없는 닫힌 실행, 탐색 하나인
+열린 실행, PML 검사 작업)이나 단계를 알리지 않는 서버에서는 없습니다. Recompute 작업은
+*Recomputing Run 4's fields · about 3 min · solve 2 of 3 (group index) · search 1 of 2*로 읽힙니다.
+문구는 시간이 아니라 단계를 셉니다. 풀이의 탐색마다 시간이 다르므로(2026-11-25에 T16과 비슷한 군굴절률 열린 실행이 207.9 s,
+탐색 40 s와 26 s) 백분율은 보이지 않습니다. 시간 추정은 실행 계획 줄에 남습니다(*about 3 min*, round 24 B5).
+Messages가 이 상태를 모두 되풀이하며 그것을 알리는 유일한 라이브 영역입니다. 작업 패널의 문구는 라이브 영역이 아니므로
+화면 낭독기는 상태마다 한 번만 읽습니다(round 25, A6; 전에는 둘 다 갱신마다 알렸음). 작업이 계산하는 동안 Messages는 작업
+패널의 문구를 시간 없이 보이고(*Computing job 1a2b3c4d · Open boundary · … · solve 2 of 3 (group index) · search 1 of 2*, 서버가
+답하지 않는 동안 *· no answer from the server; still checking*), 문구가 바뀔 때만 씁니다. 화면 낭독기는 시작, 단계마다, 무응답과
+그 끝, 작업의 끝을 듣고 시간은 듣지 않습니다(round 25, A5 전에는 시간 때문에 라이브 문구가 대략 1초마다 바뀌었음).
 **Stop waiting**은 브라우저의 조회만 중단하며 서버 계산은 계속될 수 있습니다.
 **Resume job**은 현재 설계를 수정하거나 같은 탭을 새로고침한 뒤에도 실행 당시
 입력에 연결된 같은 작업을 회수합니다. 대기 작업은 입력 자동 복구 및 세션 파일과

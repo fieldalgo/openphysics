@@ -1932,8 +1932,67 @@ try {
         assert.deepEqual(buttons, {stop: 1, resume: 0}, 'the job panel controls keep their names');
       }
       await obSize(1280, 800);
+      // job progress (round 25 A5, pre-registered J9): the job panel names the step from the server,
+      // solve 1 of 3 · search 1 of 2 and later a group-index solve, fully visible with no horizontal
+      // scroll at 1440 × 900 and 390 × 844 (screenshots job-progress-<step>-<width>.png). The step has
+      // a span of its own right after the time (#job-step); where the two cannot share the tab's line
+      // the panel takes a line of its own (the tab's height is recorded)
+      for (const [words, tag] of [['solve 1 of 3 · search 1 of 2', 'solve1'], ['(group index) · search', 'group-index']]) {
+        await ob.until(`document.getElementById('job-step').textContent.includes(${JSON.stringify(words)})`, 'J9 ' + words, 300000);
+        const checking = Date.now();
+        for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+          await obSize(width, height, mobile);
+          // at 390 × 844 the view stands below the fold (the panes stack): it is scrolled into view
+          // vertically, as a reader would, and the scroll positions are put back after the check
+          await ob.eval(`(()=>{window.__j9Scroll=[];for(let a=document.getElementById('job-panel');a;a=a.parentElement)window.__j9Scroll.push([a,a.scrollTop,a.scrollLeft]);window.__j9Scroll.push([null,scrollX,scrollY]);
+            document.getElementById('job-panel').scrollIntoView({block:'nearest',inline:'nearest'});return true})()`);
+          await sleep(200);
+          const shown = await ob.eval(`(()=>{const whole=id=>{const e=document.getElementById(id),r=e.getBoundingClientRect();
+            let clipped=false;for(let a=e.parentElement;a&&a!==document.documentElement;a=a.parentElement){const s=getComputedStyle(a);if(s.overflowX!=='visible'||s.overflowY!=='visible'){const q=a.getBoundingClientRect();if(r.left<q.left-0.5||r.right>q.right+0.5||r.top<q.top-0.5||r.bottom>q.bottom+0.5)clipped=true;}}
+            return {text:e.textContent,inView:r.width>0&&r.height>0&&r.left>=-0.5&&r.right<=innerWidth+0.5&&r.top>=-0.5&&r.bottom<=innerHeight+0.5,clipped,own:e.scrollWidth>e.clientWidth+1};};
+            return {step:whole('job-step'),time:whole('job-message'),panel:document.getElementById('job-panel').textContent,tabHeight:Math.round(document.querySelector('.document-tab').getBoundingClientRect().height),
+             over:document.documentElement.scrollWidth-document.documentElement.clientWidth}})()`);
+          await ob.screenshot(`job-progress-${tag}-${width}`);
+          await ob.eval(`(()=>{for(const [a,top,left] of window.__j9Scroll){if(a){a.scrollTop=top;a.scrollLeft=left;}else window.scrollTo(top,left);}return true})()`);
+          stage('J9 job progress ' + tag + ' ' + width, shown);
+          assert.ok(shown.step.text.includes(words), shown.step.text);
+          for (const part of ['step', 'time'])
+            assert.ok(shown[part].inView && !shown[part].clipped && !shown[part].own, `the ${part} words are not fully visible at ${width} × ${height}: ${JSON.stringify(shown)}`);
+          assert.match(shown.time.text, /^Computing job [0-9a-f]{8} · \d+:\d\d$/);
+          assert.ok(shown.over <= 0, `the page overflows by ${shown.over}px at ${width} × ${height}`);
+        }
+        await obSize(1280, 800);
+        progressChecking += Date.now() - checking;
+      }
     };
+    // job progress (round 25 A5, pre-registered J10): every write of Messages (#file-status) while
+    // the template run computes; at most start + steps + 2 per silence + end, none between steps,
+    // never the time (an m:ss) in a live node
+    await ob.eval(`(()=>{const host=document.getElementById('file-status');window.__liveWrites=[];
+      new MutationObserver(()=>window.__liveWrites.push(host.textContent.replace(/\\s+/g,' ').trim())).observe(host,{childList:true,subtree:true,characterData:true});return true})()`);
+    let progressChecking = 0;
     const templateSeconds = await obRun(liveCheck);
+    {
+      const writes = await ob.eval('window.__liveWrites');
+      const job = (writes.find(w => /^Computing job [0-9a-f]{8} /.test(w)) || '').slice(14, 22);
+      const running = writes.filter(w => w.startsWith('Computing job ' + job + ' '));
+      const first = writes.findIndex(w => w.startsWith('Computing job ' + job + ' '));
+      const end = writes.slice(first).findIndex(w => !w.startsWith('Computing job ' + job + ' '));
+      const window_ = writes.slice(first, end < 0 ? undefined : first + end);
+      const steps = new Set(running.map(w => (w.match(/ · ((?:solve|search) \d.*?)(?: · no answer.*)?$/) || [])[1]).filter(Boolean)).size;
+      const silences = running.filter(w => w.endsWith('; still checking')).length;
+      const between = window_.filter((w, i) => i > 0 && w === window_[i - 1]).length;
+      const timed = writes.filter(w => /\b\d+:\d\d\b/.test(w));
+      // J9's own time, its resizes, reads and screenshots: at most what it adds to the stage (its
+      // waits for a step fall inside the run, which the stage waits for anyway)
+      stage('J10 Messages writes during the template run', {job, writes: window_, running: running.length, steps, silences, between, timed,
+        templateSeconds, j9CheckSeconds: Math.round(progressChecking / 100) / 10});
+      assert.ok(job, 'the template job was written to Messages');
+      assert.equal(steps, 6, 'the six searches of the template run were named');
+      assert.ok(window_.length <= 1 + steps + 2 * silences + 1, `Messages changed ${window_.length} times: ${JSON.stringify(window_)}`);
+      assert.equal(between, 0, 'Messages is not rewritten between steps');
+      assert.deepEqual(timed, [], 'no time in the live region');
+    }
     await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB PML check', 300000);
     const template = await resultsView(); stage('OB template, all open, PML check', {...template, seconds: templateSeconds});
     // open-mode notes (slice S3, pre-registered G2 on the page): the template's TE-like mode is guided, a
@@ -2316,6 +2375,43 @@ try {
       if (await ob.eval("!!document.getElementById('restore-run-input')")) { await ob.click('#restore-run-input'); await sleep(300); }
       const again = await solverDocument(); stage('T2 (a) the P2 run\'s inputs, run again', {target: again.physics.em1.target_effective_index, searches: again.physics.em1.pml.pml_additional_searches});
       assert.equal(JSON.stringify(again), p1Leak, 'running the P2 run again sends the document of both searches');
+    }
+    // job progress (round 25 A5, pre-registered J11): Recompute of the template run (open, two
+    // searches, group index): the job panel reads the recompute words and then the step, and the
+    // recomputed values match. The run is made values only (field null) in a session file this
+    // Studio's own writer makes from the saved version 10 session, which is then opened.
+    {
+      const N = await import(new URL('../../packages/simcase/src/simcase/studio/static/workspace-notebook.mjs', import.meta.url));
+      const read = N.parseSession(JSON.stringify(v10)), templateRun = {...read.runs[0], field: null};
+      const path = join(obDownloads, 'j11-values-only.json');
+      await writeFile(path, N.sessionText(read.input, [templateRun], templateRun.job, [templateRun.job, null], read.view), 'utf8');
+      await ob.eval("document.getElementById('file-status').textContent=''");
+      const {root} = await ob.call('DOM.getDocument'); const {nodeId} = await ob.call('DOM.querySelector', {nodeId: root.nodeId, selector: '#session-file'});
+      await ob.call('DOM.setFileInputFiles', {nodeId, files: [path]});
+      const end = Date.now() + 60000;
+      while (!(await ob.eval("/^Opened /.test(document.getElementById('file-status').textContent)"))) {
+        assert.ok(Date.now() < end, 'J11 file: ' + await obText('#file-status'));
+        if (await ob.eval("!!document.getElementById('leave-confirm')?.open")) await ob.click('#leave-go');
+        else if (await ob.eval("!!document.getElementById('load-confirm')?.open")) await ob.click('#confirm-load');
+        await sleep(150);
+      }
+      await ob.click('nav [data-page=Results]'); await ob.click(`.run-item[data-run="${templateRun.job}"]`);
+      await ob.until("!!document.getElementById('recompute-fields')", 'J11 Recompute button');
+      const started = Date.now(), seen = [];
+      await ob.click('#recompute-fields');
+      while (!(await ob.eval(`document.getElementById('file-status').textContent.startsWith("Run 1's fields recomputed from its stored inputs; its values match.")&&!document.getElementById('run-optical').disabled`))) {
+        assert.ok(Date.now() - started < 600000, 'J11 recompute: ' + await obText('#file-status'));
+        const panel = (await ob.eval("['job-message','job-step','job-what'].map(id=>document.getElementById(id).textContent).join('')")).replace(/\s+/g, ' ').trim(); if (panel && seen.at(-1) !== panel) seen.push(panel);
+        await sleep(500);
+      }
+      const message = await obText('#file-status');
+      stage('J11 Recompute of the template run', {seen, message, seconds: Math.round((Date.now() - started) / 1000)});
+      const words = seen.filter(t => t.startsWith("Recomputing Run 1's fields"));
+      assert.ok(words.length, JSON.stringify(seen));
+      for (const t of words) assert.match(t, /^Recomputing Run 1's fields( · about [^·]+)?( · solve [123] of 3( \(group index\))? · search [12] of 2)?$/);
+      assert.ok(words.some(t => t.endsWith(' · solve 1 of 3 · search 1 of 2')), 'the first step is named: ' + JSON.stringify(words));
+      assert.ok(words.some(t => / · solve [23] of 3 \(group index\) · search [12] of 2$/.test(t)), 'a group-index solve is named: ' + JSON.stringify(words));
+      assert.ok(message.startsWith("Run 1's fields recomputed from its stored inputs; its values match."), message);
     }
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
