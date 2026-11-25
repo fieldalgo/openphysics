@@ -32,7 +32,7 @@ test('Q9: the node of the page shown is the selected one',()=>{
 });
 test('Q9: "Runs · N of M" and "Up to six runs are kept" both come from RUN_LIMIT',()=>{
  // run retention: the limit is 20, written in digits
- assert.equal(N.RUN_LIMIT,20);assert.equal(N.RUNS_KEPT_TEXT,'Up to 20 runs are kept.');
+ assert.equal(N.RUN_LIMIT,20);assert.equal(N.RUNS_KEPT_TEXT,"Up to 20 runs are kept with their values. Fields are kept up to 16.8 MB: the selected and pinned runs' first, then the newest. A run without its fields can recompute them.");
  assert.equal(N.runsNodeLabel(2),`Runs · 2 of ${N.RUN_LIMIT}`);
  const app=read('workspace-app.mjs');
  assert.match(app,/limit\.textContent=RUNS_KEPT_TEXT\+' Pinned runs stay;/);

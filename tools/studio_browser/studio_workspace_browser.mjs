@@ -74,6 +74,19 @@ async function stopServer(child) {
   return {exit: child.exitCode, signal: child.signalCode, ms: Date.now() - started};
 }
 
+// Run retention (design "Keeping more runs"): the optical model keeps 20 runs. A stage that reaches
+// the run limit adds fourteen runs without fields (a design no stage computes) by Add runs from file
+// right before the step that reaches it, so every older run is the stage's own and the limit drops
+// the same run as at six runs; the stage's later runs are numbered 14 higher.
+const VALUES_ONLY_RUNS = fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-values-only-14.json', import.meta.url));
+async function addValuesOnlyRuns(p, label) {
+  const {root} = await p.call('DOM.getDocument');
+  const {nodeId} = await p.call('DOM.querySelector', {nodeId: root.nodeId, selector: '#run-import-file'});
+  await p.call('DOM.setFileInputFiles', {nodeId, files: [VALUES_ONLY_RUNS]});
+  await p.until("document.getElementById('run-import-confirm')?.open", label + ': add runs question');
+  await p.click('#confirm-run-import');
+  await p.until("/^Saved runs imported\\./.test(document.getElementById('file-status').textContent)", label + ': fourteen runs added');
+}
 class Page {
   constructor(url) {
     this.id = 0; this.pending = new Map(); this.ws = new WebSocket(url);
@@ -550,7 +563,7 @@ try {
   await page.click('#open-in-results'); await page.until("!!document.getElementById('optical-field')", 'Open in Results');
   assert.deepEqual(await pressedPage(), ['Results']); assert.match(await page.eval("document.querySelector('.dock-title>span').textContent"), /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/);
   // round 10 (K6): on Results the tree marks no model node, not Study; since round 14 (Q9) it marks Results › Runs
-  assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.selected === true).map(n => n.name), ['Runs · 2 of 6']);
+  assert.deepEqual((await page.axTree()).filter(n => n.role === 'treeitem' && n.selected === true).map(n => n.name), ['Runs · 2 of 20']);
   assert.deepEqual(await cardLook(), {pressed: 1, looks: 1, hovered: 1});
   // round 10 (K10): a run with other inputs than the current ones is information: the step bar is neutral
   const tone = await page.eval("(()=>{const b=[...document.querySelectorAll('#workflow .workflow-step')][4];return {tone:b.dataset.tone,state:b.dataset.state,color:getComputedStyle(b.querySelector('span')).color,muted:getComputedStyle(document.querySelector('.muted')||document.body).color}})()");
@@ -669,9 +682,9 @@ try {
   // round 11 (L6): on Results no tree node is marked, and a node under the pointer does not look selected
   await treeMarks('Results');
   // round 14 (Q9; pre-registered): the optical tree has a Results group, as the multiphysics tree:
-  // Runs · N of 6 (the run limit) and, with two runs, Compare, in the same ARIA tree and keys
-  const q9Items = await checkTree('optical with runs', [...opticalNodes, 'Results · run 1', 'Runs · 2 of 6', 'Compare']);
-  assert.deepEqual(q9Items.slice(-3).map(i => [i.name, i.level, i.selected === true]), [['Results · run 1', 1, false], ['Runs · 2 of 6', 2, true], ['Compare', 2, false]]);
+  // Runs · N of 20 (the run limit) and, with two runs, Compare, in the same ARIA tree and keys
+  const q9Items = await checkTree('optical with runs', [...opticalNodes, 'Results · run 1', 'Runs · 2 of 20', 'Compare']);
+  assert.deepEqual(q9Items.slice(-3).map(i => [i.name, i.level, i.selected === true]), [['Results · run 1', 1, false], ['Runs · 2 of 20', 2, true], ['Compare', 2, false]]);
   assert.equal(await page.eval("document.querySelector('#tree [role=treeitem][tabindex=\"0\"]').dataset.node"), 'results:runs', 'the tab stop is the selected Runs node');
   await page.onElement('function(s){this.querySelector(s).focus();return true}', '#tree [data-node="results:runs"]');
   await press('ArrowUp'); assert.deepEqual([(await focused()).name, (await focused()).expanded], ['Results · run 1', 'true']);
@@ -1217,43 +1230,59 @@ try {
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false);
   await page.click('nav [data-page=Results]'); await page.until("/Same as the current inputs/.test(document.getElementById('inspector').textContent)", 'restored run is current');
   await toNode('Optical modes'); assert.equal(await page.eval("document.getElementById('mode-count-number').value"), '8', 'Restore sets Modes to find');
-  // M4-e: five more wide runs (6 kept: the newest unpinned replace the oldest) are over 16 MiB
-  for (const wl of [1570, 1580, 1590, 1600]) { await toNode('Optical modes'); await page.type('#wavelength-number', wl); await runAndWait(); }
-  await page.click('#menu-export-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question');
-  const question = await page.eval("({text:document.getElementById('session-overflow-description').textContent,buttons:[...document.querySelectorAll('#session-overflow button')].map(b=>b.textContent)})");
-  stage('M4-e overflow question', question);
-  assert.match(question.text, /^Session is \d\d MB; the limit is 16 MiB\. Keep the fields of the selected and pinned runs only\? The other runs keep n_eff, the TE fractions and the effective areas, but not their fields\.$/);
-  assert.deepEqual(question.buttons, ['Cancel', 'Keep fields for selected and pinned runs']);
-  listed = await listDownloads(); await page.click('#overflow-cancel'); await sleep(500);
-  assert.match(await text('#file-status'), /^Session not saved: nothing was written\./); assert.deepEqual(await listDownloads(), listed, 'Cancel writes nothing');
-  // P3 (V-P6): File › Save of the project asks the same question, naming the model
-  await page.click('#save-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e project overflow question');
-  assert.equal(await page.eval("document.getElementById('session-overflow-description').textContent"), 'Optical waveguide: ' + question.text);
-  await page.click('#overflow-cancel'); await sleep(300); assert.equal(await text('#file-status'), 'Project not saved: nothing was written.'); assert.deepEqual(await listDownloads(), listed, 'Cancel writes nothing');
-  await page.click('#menu-export-session'); await page.until("document.getElementById('session-overflow').open", 'M4-e overflow question again');
-  // round 13 (O1): the file opened above is the current file, which the name dialog offers
-  await page.click('#overflow-keep'); await page.until("document.getElementById('save-name-dialog')?.open", 'M4-e name dialog');
+  // M4-e (run retention, design "Keeping more runs"): four more wide runs of 8 modes (seven in all,
+  // about 26 MB with every field; the limit of 20 runs drops none). When a result's field arrives the fields kept stay within
+  // 16.8 MB, so Messages says which runs keep their values only and the run list marks them; File ›
+  // Export › Model with runs and File › Save write at once, asking nothing, and the file holds
+  // exactly the fields the tab shows; the file opened again shows a run without fields by its values
+  // (4.1) and Compare lists its modes by number (4.2).
+  const m4eMessages = [];
+  for (const wl of [1570, 1580, 1590, 1600]) { await toNode('Optical modes'); await page.type('#wavelength-number', wl); await runAndWait(); m4eMessages.push(await text('#file-status')); }
+  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length===7", 'M4-e run list');
+  const m4eItems = await page.eval("[...document.querySelectorAll('.run-item')].map(b=>({job:b.dataset.run,text:b.textContent}))");
+  stage('M4-e fields kept', {messages: m4eMessages, items: m4eItems.map(i => i.text)});
+  assert.ok(m4eMessages.some(m => /Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|(?:and|, ) .*keep their values; their fields were not kept) \(16\.8 MB limit\)\./.test(m)), JSON.stringify(m4eMessages));
+  const valuesOnly = m4eItems.filter(i => i.text.endsWith(' · values only'));
+  assert.ok(valuesOnly.length >= 1 && valuesOnly.length < 7, JSON.stringify(m4eItems));
+  // no question: Export › Model with runs names the file and writes it
+  listed = await listDownloads(); await page.click('#menu-export-session'); await page.until("document.getElementById('save-name-dialog')?.open", 'M4-e name dialog');
+  assert.equal(await page.eval("document.getElementById('session-overflow').open"), false, 'Export asks no 16 MiB question');
   assert.equal(await page.eval("document.getElementById('save-name-input').value"), v9File); await page.click('#save-name-download');
-  const reducedFile = await newDownload(listed), reduced = JSON.parse(await readFile(join(downloads, reducedFile), 'utf8'));
+  const reducedFile = await newDownload(listed), reducedText = await readFile(join(downloads, reducedFile), 'utf8'), reduced = JSON.parse(reducedText);
   { const stem = v9File.replace(/\.json$/, ''); // the opened name, or the browser's "name (1).json" (compared as text, no regex built from it)
-    assert.ok(reducedFile === v9File || (reducedFile.startsWith(stem + ' (') && /^ \(\d+\)\.json$/.test(reducedFile.slice(stem.length))), 'the reduced session keeps the opened file name: ' + reducedFile); }
+    assert.ok(reducedFile === v9File || (reducedFile.startsWith(stem + ' (') && /^ \(\d+\)\.json$/.test(reducedFile.slice(stem.length))), 'the session keeps the opened file name: ' + reducedFile); }
   const keptFields = reduced.runs.map(r => [r.job === reduced.selected, r.pinned, 'field' in r]);
-  stage('M4-e reduced session', {file: reducedFile, bytes: (await readFile(join(downloads, reducedFile))).length, keptFields, message: await text('#file-status')});
-  // the limit dropped the oldest runs, so the runs are not numbered 1..6: version 12 keeps their numbers
-  assert.equal(reduced.version, 12); assert.ok(keptFields.every(([selected, pinned, field]) => field === (selected || pinned)), JSON.stringify(keptFields));
-  assert.ok(keptFields.some(([, , field]) => !field), 'some runs were written without fields');
-  assert.match(await text('#file-status'), /Fields not kept for Run \d/);
-  // the reduced file opened: a run without fields shows its modes, no field view, and Compare says why
+  stage('M4-e session', {file: reducedFile, bytes: Buffer.byteLength(reducedText), version: reduced.version, keptFields, message: await text('#file-status')});
+  assert.ok(Buffer.byteLength(reducedText) <= 16 * 1024 * 1024);
+  // the file's fields are the tab's: a run marked "values only" is written without its field
+  const onlyValues = new Set(valuesOnly.map(i => i.job));
+  assert.deepEqual(reduced.runs.map(r => 'field' in r), reduced.runs.map(r => !onlyValues.has(r.job)), JSON.stringify(keptFields));
+  assert.equal(reduced.runs.find(r => r.job === reduced.selected)?.field !== undefined, true, 'the selected run keeps its field');
+  // seven runs: a session of more than six runs is version 13, which keeps each run's number
+  assert.equal(reduced.version, 13); assert.deepEqual(reduced.runs.map(r => r.number), [1, 2, 3, 4, 5, 6, 7]);
+  // File › Save of the project: no question either
+  listed = await listDownloads(); await page.click('#save-session'); await sleep(500);
+  assert.equal(await page.eval("document.getElementById('session-overflow').open"), false, 'File › Save asks no 16 MiB question');
+  if (await page.eval("!!document.getElementById('save-name-dialog')?.open")) await page.click('#save-name-download');
+  const projectFile = await newDownload(listed);
+  stage('M4-e project saved', {file: projectFile, bytes: (await stat(join(downloads, projectFile))).size});
+  // the session file opened: a run without fields shows its modes and its values, the field export
+  // waits for its fields, and Compare lists its modes by number
   await setFile('#session-file', join(downloads, reducedFile));
-  await answerDialogs(`/^Opened /.test(document.getElementById('autosave-status').textContent)`, 'M4-e open reduced');
-  const bare = reduced.runs.findIndex(r => !('field' in r));
-  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length===6", 'M4-e run list');
+  await answerDialogs(`/^Opened /.test(document.getElementById('autosave-status').textContent)`, 'M4-e open');
+  const bare = reduced.runs.findIndex(r => !('field' in r)), bareNumber = reduced.runs[bare].number;
+  await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length===7", 'M4-e run list opened');
   await page.click(`.run-item[data-run="${reduced.runs[bare].job}"]`); await page.until("!!document.getElementById('fields-not-kept')", 'M4-e field-less run');
-  const bareView = await page.eval("({rows:document.querySelectorAll('#modes-table tbody tr').length,field:!!document.getElementById('optical-field'),details:document.getElementById('run-details').textContent})");
+  const bareView = await page.eval("({rows:document.querySelectorAll('#modes-table tbody tr').length,field:!!document.getElementById('optical-field'),details:document.getElementById('run-details').textContent,line:document.getElementById('fields-not-kept').textContent,png:{disabled:document.getElementById('export-field').disabled,title:document.getElementById('export-field').title},item:document.querySelector('.run-item[aria-pressed=true]').textContent})");
   stage('M4-e field-less run', bareView); assert.equal(bareView.rows, 8); assert.equal(bareView.field, false); assert.match(bareView.details, /saved in the session file; its fields were not kept/);
+  assert.equal(bareView.line, `Run ${bareNumber}'s fields were not kept in the session file. Its n_eff, TE fractions and effective areas are kept.`);
+  assert.deepEqual(bareView.png, {disabled: true, title: `Recompute Run ${bareNumber}'s fields first`}); assert.ok(bareView.item.endsWith(' · values only'), bareView.item);
   await page.click('nav [data-page=Compare]'); await page.until("!!document.querySelector('.compare-no-fields')||!!document.getElementById('compare-neff')", 'M4-e Compare');
   await page.choose('#compare-b', reduced.runs[bare].job); await page.until("!!document.querySelector('.compare-no-fields')", 'M4-e Compare without fields');
-  assert.match(await text('.compare-no-fields'), /^Run \d has no saved fields, so its modes cannot be matched by overlap\.$/);
+  assert.equal(await text('.compare-no-fields'), `Run ${bareNumber}'s fields are not kept, so its modes are listed by number and not plotted.`);
+  assert.equal(await page.eval("document.querySelector('#compare-neff caption').textContent"), 'Modes of A and B listed by mode number, not matched by overlap');
+  assert.equal(await page.eval("!!document.getElementById('compare-field-a')"), false, 'no plots');
+  assert.ok(/^Geometry: /.test(await text('#compare-description')));
   await noOverflow('M4-e Compare without fields');
 
   // M5-s (group index; pre-registered): Also compute group index in Study, off by default; a run
@@ -1368,9 +1397,10 @@ try {
   const p1Name = await newDownload(p1Before), p1Session = JSON.parse(await readFile(join(downloads, p1Name), 'utf8'));
   assert.match(p1Name, /^p1-four(?: \(\d\))?\.json$/); assert.equal(await page.eval("!!document.getElementById('save-name-dialog').open"), false);
   stage('P1 session input', {version: p1Session.version, input: p1Session.input.version, modeCount: p1Session.input.model.modeCount});
-  // the tab's runs were numbered past their places by the drops above (M4-e), so the session is version 12;
-  // its input is still the version 8 file with Modes to find 4
-  assert.deepEqual([p1Session.version, p1Session.input.version, p1Session.input.model.modeCount], [12, 8, 4]);
+  // the tab keeps more than six runs (the 20-run limit dropped none above, M4-e), so the session is
+  // version 13, which keeps the run numbers as version 12 does; its input is still the version 8 file
+  // with Modes to find 4
+  assert.deepEqual([p1Session.version, p1Session.input.version, p1Session.input.model.modeCount], [13, 8, 4]);
   // U3: Use this run's inputs with a run of other Modes to find and box (the M5 run with the box off)
   await page.type('#mode-count-number', 5); await page.click('#group-index-check'); assert.deepEqual(await study(), {modes: '5', box: true});
   await page.click('nav [data-page=Results]'); await page.until("document.querySelectorAll('.run-item').length>=2", 'P1 run list');
@@ -2123,19 +2153,21 @@ try {
     // round 23 (E3): with the Turn off group index button beside it
     assert.equal(u3.on.hidden, false); assert.equal(u3.on.text, 'Closed window · group index on (3 solves)Turn off group index');
     assert.equal(u3.off.hidden, false); assert.equal(u3.off.text, 'Closed window');
-    // U2: seven runs of the template (core mesh 30, 32, …, 42 nm): the seventh drops Run 1 and
-    // renumbers nothing; Messages names it
+    // U2: seven runs of the template (core mesh 30, 32, …, 42 nm), the fourteen values-only runs
+    // added before the seventh (Runs 7 to 20): the seventh (Run 21) drops Run 1 and renumbers
+    // nothing; Messages names it
     for (let i = 0; i < 7; i++) {
+      if (i === 6) await addValuesOnlyRuns(r, 'R17 U2');
       if (i) { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', 30 + 2 * i); }
       await rRun();
     }
     const u2 = {items: await runItems(), message: await rText('#file-status'), status: await rText('#status')};
     stage('R17 U2 seven runs', u2);
-    assert.deepEqual(u2.items.map(t => t.split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
+    assert.deepEqual(u2.items.map(t => t.split(' · ')[0]), ['Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2']);
     // round 21 (W2): the drop words, then the swap Messages offers
     assert.ok(u2.message.endsWith(' Run 1 (closed · 500 × 220 nm) was dropped Keep Run 1, drop Run 2 (closed · 500 × 220 nm) instead'), u2.message);
-    assert.ok(u2.status.startsWith('Run 7 · '), u2.status);
-    // Run 5 and Run 6 named (pinned) on Compare; an eighth run drops Run 2, keeps the pair and says Run 8 is newer
+    assert.ok(u2.status.startsWith('Run 21 · '), u2.status);
+    // Run 5 and Run 6 named (pinned) on Compare; an eighth run (Run 22) drops Run 2, keeps the pair and says Run 22 is newer
     await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R17 Results');
     const showRun = async n => { await r.onElement('function(n){const b=[...this.querySelectorAll(".run-item")].find(b=>b.textContent.split(" · ").includes(n));b.click();return true}', 'Run ' + n); await sleep(200); };
     await showRun(5); await nameRun('Design A'); await showRun(6); await nameRun('Design B');
@@ -2149,9 +2181,9 @@ try {
       options: await r.eval("[...document.getElementById('compare-a').options].map(o=>o.textContent.split(' · ').slice(0,2).join(' · '))"),
       headings: await r.eval("[...document.querySelectorAll('#compare-table-runs [data-side]')].map(s=>s.textContent.split(' · ').slice(0,3).join(' · '))")};
     stage('R17 U2 eighth run', u2b);
-    assert.deepEqual(u2b.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
+    assert.deepEqual(u2b.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 22', 'Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);
     assert.ok(u2b.dropped.endsWith(' Run 2 (closed · 500 × 220 nm) was dropped Keep Run 2, drop Run 3 (closed · 500 × 220 nm) instead'), u2b.dropped);
-    assert.equal(u2b.newer, 'Run 8 is newer than this pair · Compare Run 8 with B');
+    assert.equal(u2b.newer, 'Run 22 is newer than this pair · Compare Run 22 with B');
     assert.deepEqual(u2b.headings, ['A · Run 5 · Design A', 'B · Run 6 · Design B']);
     // U9: the pickers are named Run A and Run B; the run number and name fit their visible width
     for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
@@ -2190,19 +2222,19 @@ try {
     await rTree('Optical modes', "!!document.getElementById('wavelength-number')"); await r.type('#wavelength-number', 1540);
     await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R17 Results after edit');
     const u14 = await rText('#status'); stage('R17 U14 status line', {status: u14});
-    assert.ok(u14.startsWith('Run 9 · Core 500 × 220 + Substrate 3000 × 700 nm'), u14);
+    assert.ok(u14.startsWith('Run 23 · Core 500 × 220 + Substrate 3000 × 700 nm'), u14);
     await rTree('Optical modes', "!!document.getElementById('wavelength-number')"); await r.type('#wavelength-number', 1550);
-    // the template core alone (Run 8) against the substrate run (Run 9): the note for B, the best overlap of each unmatched row
+    // the template core alone (Run 22) against the substrate run (Run 23): the note for B, the best overlap of each unmatched row
     await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'R17 Compare U1');
-    await r.choose('#compare-a', await r.eval("[...document.getElementById('compare-a').options].find(o=>o.textContent.startsWith('Run 8 · ')).value"));
-    await r.choose('#compare-b', await r.eval("[...document.getElementById('compare-b').options].find(o=>o.textContent.startsWith('Run 9 · ')).value"));
+    await r.choose('#compare-a', await r.eval("[...document.getElementById('compare-a').options].find(o=>o.textContent.startsWith('Run 22 · ')).value"));
+    await r.choose('#compare-b', await r.eval("[...document.getElementById('compare-b').options].find(o=>o.textContent.startsWith('Run 23 · ')).value"));
     await r.until("!!document.getElementById('compare-neff')", 'R17 Compare table');
     await rSize(1440, 900);
     const u4 = await r.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll');
       return {note:document.getElementById('compare-edge-note')?.textContent??null,unmatched:[...t.querySelectorAll('tr[data-no-match]')].map(tr=>[tr.dataset.noMatch,tr.cells[3].textContent,tr.cells[3].dataset.bestOverlap??null]),
        slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width)};})()`);
     stage('R17 U1 U4 Compare', u4);
-    assert.ok(u4.note && u4.note.startsWith('B · Run 9: Mode 1 is mostly in Substrate ('), u4.note);
+    assert.ok(u4.note && u4.note.startsWith('B · Run 23: Mode 1 is mostly in Substrate ('), u4.note);
     assert.ok(u4.unmatched.length > 0, 'the substrate modes match none of the template core');
     for (const [, text, eta] of u4.unmatched) {
       if (eta === null) { assert.equal(text, '—'); continue; }
@@ -2299,11 +2331,12 @@ try {
     await r.onElement('function(){[...this.querySelectorAll(".run-item")].find(b=>b.textContent.startsWith("Run 1 · ")).click();return true}', 'body'); await sleep(300);
     const x11 = await rText('#status'); stage('R18 X11 status', {status: x11});
     assert.ok(x11.endsWith(' · current inputs from Run 2'), x11);
-    // X3: runs 3 to 6: the box names the run the next one drops, with Pin Run 1; the ribbon does not move
+    // X3: runs 3 to 5, the fourteen values-only runs (Runs 6 to 19) and Run 20: the box names the run
+    // the next one drops, with Pin Run 1; the ribbon does not move
     const ribbonBefore = await ribbon();
-    for (const nm of [34, 36, 38, 40]) { await mesh(nm); await rRun(); }
-    // round 21 (W5): the line is hidden while the inputs equal Run 6's; an edit makes them differ
-    await mesh(42); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R21 X3 run list');
+    for (const nm of [34, 36, 38, 40]) { if (nm === 40) await addValuesOnlyRuns(r, 'R18 X3'); await mesh(nm); await rRun(); }
+    // round 21 (W5): the line is hidden while the inputs equal Run 20's; an edit makes them differ
+    await mesh(42); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===20", 'R21 X3 run list');
     const x3 = {drop: await rText('#run-drop-text'), pin: await rText('#run-drop-pin'), plan: await plan()};
     sameRibbon(ribbonBefore, await ribbon(), 'X3 drop line');
     await rOverflow('X3 drop line');
@@ -2315,7 +2348,7 @@ try {
     // round 22 (V4): Messages names the run the next result drops instead
     assert.equal(x3.afterPin.message, 'Run 1 pinned. If you run: drops Run 2 (closed · 500 × 220 nm) · pin it to keep it');
     assert.ok(x3.afterPin.items.some(t => t.startsWith('Pinned · Run 1 · closed · ')), JSON.stringify(x3.afterPin.items));
-    // X9: the strip over a substrate in a closed window (run 7, which drops Run 2): the note's shortcuts
+    // X9: the strip over a substrate in a closed window (Run 21, which drops Run 2): the note's shortcuts
     await rTree('Geometry', "!!document.querySelector('#shape-w')");
     await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'R18 substrate added');
     await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silicon');
@@ -2339,7 +2372,7 @@ try {
     const x6 = await r.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll');
       return {picker:document.getElementById('compare-b').selectedOptions[0].textContent,heads:[...document.querySelectorAll('.compare-grid article h3, #compare-table-runs [data-side]')].map(e=>e.textContent),slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width)};})()`);
     stage('R18 X6 Compare', x6);
-    assert.ok(x6.picker.startsWith('Run 7 · closed · Core 500 × 220 + Substrate 3000 × 700 nm · '), x6.picker);
+    assert.ok(x6.picker.startsWith('Run 21 · closed · Core 500 × 220 + Substrate 3000 × 700 nm · '), x6.picker);
     assert.ok(x6.heads.length > 0 && x6.heads.every(h => h.includes(' · closed · ')), JSON.stringify(x6.heads));
     assert.ok(x6.slack >= 24, `R18 Compare: ${x6.slack} px to spare at 1440 (O2, 24 px)`);
     await rOverflow('X6 Compare');
@@ -2386,23 +2419,24 @@ try {
     const y7 = await r.eval("['shape-name','shape-material'].map(id=>{const e=document.getElementById(id);return [id,[...e.labels].map(l=>l.textContent),e.closest('label')===null]})");
     stage('R19 Y7 labels', {y7});
     assert.deepEqual(y7, [['shape-name', ['Name'], true], ['shape-material', ['Material'], true]]);
-    // R21 (round 21, pre-registered; replaces round 19's Y4 and round 20's Z7 dialog stages): six runs,
-    // then W5 the drop line beside "No need to run", W2 Run study starting at once with the line during
-    // the run, Pin during the run, the drop when the result arrives and the swap offered in Messages
+    // R21 (round 21, pre-registered; replaces round 19's Y4 and round 20's Z7 dialog stages): five runs,
+    // the fourteen values-only runs (Runs 6 to 19) and Run 20 (20 runs, the limit), then W5 the drop
+    // line beside "No need to run", W2 Run study starting at once with the line during the run, Pin
+    // during the run, the drop when the result arrives and the swap offered in Messages
     await clearRecorded();
-    for (const nm of [30, 32, 34, 36, 38, 40]) { await mesh(nm); await rRun(); }
+    for (const nm of [30, 32, 34, 36, 38, 40]) { if (nm === 40) await addValuesOnlyRuns(r, 'R21'); await mesh(nm); await rRun(); }
     await recorded('R19 six runs kept');
     const dropLine = () => r.eval("({hidden:document.getElementById('run-drop').hidden,text:document.getElementById('run-drop-text').textContent,pin:document.getElementById('run-drop-pin').hidden?null:document.getElementById('run-drop-pin').textContent})");
-    // W5: the inputs of Run 6 (mesh 40): no drop line beside "No need to run"; mesh 42: the line is back
+    // W5: the inputs of Run 20 (mesh 40): no drop line beside "No need to run"; mesh 42: the line is back
     const w5 = {matched: {...await dropLine(), message: await rText('#file-status')}};
     await mesh(42); w5.differ = await dropLine();
     await mesh(40); w5.again = {...await dropLine(), message: await rText('#file-status')};
     await mesh(42); w5.back = await dropLine();
     stage('R21 W5 drop line beside No need to run', w5);
     assert.equal(w5.matched.hidden, true);
-    assert.equal(w5.again.hidden, true); assert.ok(w5.again.message.includes('No need to run: Run 6 already has these results.'), w5.again.message);
+    assert.equal(w5.again.hidden, true); assert.ok(w5.again.message.includes('No need to run: Run 20 already has these results.'), w5.again.message);
     for (const state of [w5.differ, w5.back]) assert.deepEqual(state, {hidden: false, text: 'If you run: drops Run 1 (closed · 500 × 220 nm) · pin it to keep it', pin: 'Pin Run 1'});
-    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 run list');
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===20", 'R19 run list');
     // W2: the job's status replies are held in the page until released, so the line during the run is read deterministically
     await r.eval("(()=>{const f=window.fetch;window.__held=[];window.__hold=true;window.fetch=(u,o)=>{const s=String(u);if(window.__hold&&s.includes('/api/jobs/'))return new Promise(go=>window.__held.push(()=>go(f(u,o))));return f(u,o);};window.__release=()=>{window.__hold=false;const h=window.__held;window.__held=[];h.forEach(x=>x());};})()");
     await r.click('#run-optical');
@@ -2412,11 +2446,11 @@ try {
     await r.click('#run-drop-pin'); await sleep(300);
     w2.pinned = {...await dropLine(), items: await runItems()};
     await clearRecorded(); await r.eval('window.__release()');
-    await r.until(`[...document.querySelectorAll('.run-item')].some(b=>b.textContent.split(' · ').includes('Run 7'))&&${idle}`, 'R21 run 7', 300000);
+    await r.until(`[...document.querySelectorAll('.run-item')].some(b=>b.textContent.split(' · ').includes('Run 21'))&&${idle}`, 'R21 run 21', 300000);
     const keepButton = () => r.eval("(()=>{const b=document.querySelector('#file-status [data-keep-run]');return b?b.textContent:null})()");
     w2.after = {items: await runItems(), message: await rText('#file-status'), keep: await keepButton(), drop: await dropLine()};
     await rOverflow('W2 drop with the swap button');
-    // the swap: Run 2 back at its place, Run 3 dropped instead, no further button; six runs
+    // the swap: Run 2 back at its place, Run 3 dropped instead, no further button; 20 runs
     await r.click('#file-status [data-keep-run]'); await sleep(300);
     w2.swapped = {items: await runItems(), message: await rText('#file-status'), keep: await keepButton(), heading: await rText('#run-list-heading')};
     // a stale button does nothing: the next run (mesh 44) offers a swap; the run after it starts, then the old button is pressed
@@ -2434,20 +2468,22 @@ try {
     // Pin during the run keeps Run 1; the line names the next unpinned run
     assert.equal(w2.pinned.text, 'When this run finishes, Run 2 (closed · 500 × 220 nm) is dropped'); assert.equal(w2.pinned.pin, 'Pin Run 2');
     assert.ok(w2.pinned.items.some(t => t.startsWith('Pinned · Run 1 · ')), JSON.stringify(w2.pinned.items));
-    assert.deepEqual(w2.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 1']);
+    assert.deepEqual(w2.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 1']);
     assert.ok(w2.after.message.includes(' Run 2 (closed · 500 × 220 nm) was dropped '), w2.after.message);
     assert.equal(w2.after.keep, 'Keep Run 2, drop Run 3 (closed · 500 × 220 nm) instead');
-    // W5: the inputs are Run 7's now, so the line before the next run is hidden
+    // W5: the inputs are Run 21's now, so the line before the next run is hidden
     assert.equal(w2.after.drop.hidden, true);
-    assert.deepEqual(w2.swapped.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
+    assert.deepEqual(w2.swapped.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 2', 'Run 1']);
     assert.equal(w2.swapped.message, 'Run 2 (closed · 500 × 220 nm) is back; Run 3 (closed · 500 × 220 nm) was dropped instead.');
-    assert.equal(w2.swapped.keep, null); assert.equal(w2.swapped.heading, 'Runs · 6 of 6 · 1 pinned');
+    assert.equal(w2.swapped.keep, null); assert.equal(w2.swapped.heading, 'Runs · 20 of 20 · 15 pinned');
     assert.equal(w2.next.keep, 'Keep Run 2, drop Run 4 (closed · 500 × 220 nm) instead');
     assert.deepEqual(w2.stale.after, w2.stale.before); assert.equal(w2.stale.connected, false);
-    assert.equal(w2.stale.after.length, 6);
+    assert.equal(w2.stale.after.length, 20);
     // Y1: a second session of one run started after this one; reload: the newest leads, the other says older
     await recorded('R19 seven runs kept');
-    // session version 12: the six runs kept (Run 1 among them, pinned) come back with these numbers
+    // the 20 runs kept (Run 1 among them, pinned) come back with these numbers: a session of more than six
+    // runs is version 13, whose runs keep their numbers as version 12's do (the restore of a version 12
+    // record is checked by studio_session_numbers.cjs, K2, and studio_run_retention_fields.cjs, K2)
     await r.click('nav [data-page=Results]'); const keptNumbers = (await runItems()).map(t => t.replace('Pinned · ', '').split(' · ')[0]);
     await r.call('Page.reload'); await r.until("!!document.getElementById('optical-start-new')", 'R19 Library after reload');
     await r.click('#optical-start-new'); await r.until("!!document.getElementById('shape-w')", 'R19 new model');
@@ -2456,11 +2492,11 @@ try {
     const offers = () => r.eval("({box:[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({id:b.id,record:b.dataset.resumeRecord,text:b.textContent})),card:{record:document.getElementById('resume-optical')?.dataset.resumeRecord??null,text:document.getElementById('resume-optical')?.textContent??null},earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent),boxShown:!!document.querySelector('.resume-card'),lastSession:!document.getElementById('recover-notebook').disabled})");
     const y1 = {before: await offers()};
     await rOverflow('Y1 Library');
-    const older = y1.before.box.findIndex(b => b.text.includes('Optical waveguide · 6 runs · '));
+    const older = y1.before.box.findIndex(b => b.text.includes('Optical waveguide · 20 runs · '));
     await clearRecorded(); await r.click(`.resume-card [data-resume-record="${y1.before.box[older]?.record}"]`);
     await r.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R19 older restored');
     const restoredMessage = await rText('#file-status');
-    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R19 restored runs');
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===20", 'R19 restored runs');
     const restoredItems = await runItems();
     y1.restored = {message: restoredMessage, items: restoredItems.length, numbers: restoredItems.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ...await offers()};
     await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R19 restored kept', 30000); await sleep(1200);
@@ -2469,17 +2505,17 @@ try {
     assert.equal(y1.before.box[0].id, 'resume-newest'); assert.equal(y1.before.box[0].record, y1.before.card.record, 'the box leads with the newest, which its card also offers');
     assert.match(y1.before.box[0].text, /^Restore newest from this browser: Optical waveguide · 1 run · Run 1 · saved \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.ok(older > 0, JSON.stringify(y1.before.box));
-    assert.match(y1.before.box[older].text, /^Restore from this browser: Optical waveguide · 6 runs · .* · older · saved \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.match(y1.before.box[older].text, /^Restore from this browser: Optical waveguide · 20 runs · .* · older · saved \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.match(y1.before.card.text, /^Restore from this browser · Optical waveguide · Run 1 · \d{1,2}:\d\d(?: [AP]M)?$/);
-    // stable run numbers (session version 12): the restore keeps them and says nothing about numbering
-    assert.ok(!y1.restored.message.includes('numbered from 1'), y1.restored.message); assert.equal(y1.restored.items, 6);
+    // stable run numbers (session versions 12 and 13): the restore keeps them and says nothing about numbering
+    assert.ok(!y1.restored.message.includes('numbered from 1'), y1.restored.message); assert.equal(y1.restored.items, 20);
     assert.deepEqual(y1.restored.numbers, keptNumbers);
     // the box hides while the tab holds runs; the restored session is not listed again. The newer one
     // stays offered without a reload: at once as the last session (Workspace tools › Restore last
     // session from this browser), and in the earlier sessions once this tab's own record is written
     for (const state of [y1.restored, y1.kept]) {
       assert.equal(state.boxShown, false);
-      assert.ok(!state.earlier.some(t => t.includes('Optical waveguide · 6 runs · ')), JSON.stringify(state.earlier));
+      assert.ok(!state.earlier.some(t => t.includes('Optical waveguide · 20 runs · ')), JSON.stringify(state.earlier));
     }
     assert.equal(y1.restored.lastSession, true);
     assert.ok(y1.kept.earlier.some(t => t.startsWith('Restore earlier session from this browser · Optical waveguide · 1 run · Run 1 · ')), JSON.stringify(y1.kept.earlier));
@@ -2846,7 +2882,8 @@ try {
     await rTree('Geometry', "!!document.querySelector('#shape-w')");
     await r.onElement('function(){[...this.querySelectorAll(".shape-item")].find(b=>b.textContent.includes("Substrate")).click();return true}', 'body'); await sleep(300);
     await r.click('#delete-shape'); await r.until("document.querySelectorAll('.shape-item').length===1", 'R22 substrate deleted');
-    for (const nm of [30, 32, 34, 36]) { await mesh(nm); await rRun(); }
+    // the fourteen values-only runs (Runs 6 to 19) before the sixth run, which is Run 20
+    for (const nm of [30, 32, 34, 36]) { if (nm === 36) await addValuesOnlyRuns(r, 'R22 P4'); await mesh(nm); await rRun(); }
     // P3: matched pairs (Run 3 against Run 4) give no reason line
     await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-description')", 'R22 Compare matched');
     for (const [id, n] of [['#compare-a', 3], ['#compare-b', 4]]) {
@@ -2857,8 +2894,8 @@ try {
     stage('R22 P3 matched pair', p3.matched);
     assert.ok(p3.matched.line.includes(' Shown: A mode 1 ↔ B mode 1, overlap '), p3.matched.line);
     assert.equal(p3.matched.reasons, 0); assert.equal(p3.matched.links, 0);
-    // P4 (V4): six runs; an edit shows the drop line; Pin names the next drop in Messages
-    await mesh(38); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R22 six runs');
+    // P4 (V4): 20 runs (the limit); an edit shows the drop line; Pin names the next drop in Messages
+    await mesh(38); await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===20", 'R22 20 runs');
     const p4 = {line: await rText('#run-drop-text'), pins: []};
     for (let n = 1; n <= 5; n++) {
       assert.equal(await rText('#run-drop-pin'), `Pin Run ${n}`);
@@ -2866,17 +2903,17 @@ try {
       p4.pins.push({message: await rText('#file-status'), line: await rText('#run-drop-text'), pin: await r.eval("document.getElementById('run-drop-pin').hidden?null:document.getElementById('run-drop-pin').textContent")});
     }
     await rOverflow('P4 pinned');
-    // every other earlier run pinned: the result drops Run 6, says why there is no swap, and offers none
+    // every other earlier run pinned: the result drops Run 20, says why there is no swap, and offers none
     await rRun();
     p4.after = {message: await rText('#file-status'), keep: await r.eval("!!document.querySelector('#file-status [data-keep-run]')"), items: await runItems()};
     stage('R22 P4 pin and no swap', p4);
     assert.match(p4.line, /^If you run: drops Run 1 \(closed · Core 500 × 220 \+ Substrate 3000 × 700 nm\) · pin it to keep it$/);
     assert.match(p4.pins[0].message, /^Run 1 pinned\. If you run: drops Run 2 \(open \(PML 1 µm\) · Core 500 × 220 \+ Substrate 3000 × 700 nm\) · pin it to keep it$/);
-    for (let n = 2; n <= 5; n++) assert.equal(p4.pins[n - 1].message, `Run ${n} pinned. If you run: drops Run ${n + 1} (closed · 500 × 220 nm) · pin it to keep it`);
-    assert.equal(p4.pins[4].line, 'If you run: drops Run 6 (closed · 500 × 220 nm) · pin it to keep it'); assert.equal(p4.pins[4].pin, null);
-    assert.ok(p4.after.message.endsWith(' Run 6 (closed · 500 × 220 nm) was dropped; every other earlier run is pinned, so no other run can be dropped instead'), p4.after.message);
+    for (let n = 2; n <= 5; n++) assert.equal(p4.pins[n - 1].message, `Run ${n} pinned. If you run: drops Run ${n < 5 ? n + 1 : 20} (closed · 500 × 220 nm) · pin it to keep it`);
+    assert.equal(p4.pins[4].line, 'If you run: drops Run 20 (closed · 500 × 220 nm) · pin it to keep it'); assert.equal(p4.pins[4].pin, null);
+    assert.ok(p4.after.message.endsWith(' Run 20 (closed · 500 × 220 nm) was dropped; every other earlier run is pinned, so no other run can be dropped instead'), p4.after.message);
     assert.equal(p4.after.keep, false);
-    assert.deepEqual(p4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 7', 'Run 5', 'Run 4', 'Run 3', 'Run 2', 'Run 1']);
+    assert.deepEqual(p4.after.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 21', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3', 'Run 2', 'Run 1']);
     await rOverflow('P4 no swap');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
@@ -2988,25 +3025,26 @@ try {
     await rRun();
     await modes(); await r.click('#closed-search-highest'); await sleep(300); await mesh(32);
     await rRun();
-    // P2 (E2): the line names the runs Save keeps, what the others keep and the runs whose fields
-    // browser recovery leaves out (the record's runs by number, or by place where a file written
-    // before version 12 has no numbers) (it keeps the selected and pinned runs' fields, then the newest
-    // others that fit); it wraps. The record in this browser holds exactly the fields not named.
-    const LEFT = /without the fields of (Run \d+(?:(?:, | and )Run \d+)*)$/;
+    // P2 (E2, run retention): five runs of the T18 window (about 19 MB with every field). The fields
+    // kept stay within 16.8 MB from the result on: the after-result line says which runs keep their
+    // values only (it wraps), there is no size line, the header reads "kept for recovery in this
+    // browser" with nothing after it, and the record in this browser holds exactly the fields the tab
+    // shows (the runs not marked "values only"), the selected run's and then the newest others'.
     const record = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>{const s=g.result.session,d=JSON.parse(s);resolve({bytes:new TextEncoder().encode(s).length,fields:d.runs.map((x,i)=>[Number.isInteger(x.number)?x.number:i+1,!!x.field])});};};})`);
-    const left = list => list.filter(([, f]) => !f).map(([n]) => 'Run ' + n);
-    const names = text => { const w = text.split(/, | and /); return w; };
-    await r.until(`/without the fields of Run \\d+/.test(document.getElementById('project').textContent)`, 'R23 header names the fields left out', 30000);
-    const p2 = {message: await rText('#file-status'), header: await rText('#project'), record: await record()};
+    const fieldsOf = async () => Object.fromEntries((await runItems()).map(t => [Number(/Run (\d+)/.exec(t)[1]), !t.endsWith(' · values only')]));
+    const p2 = {message: await rText('#file-status')};
+    await r.until(`/ · kept for recovery in this browser$/.test(document.getElementById('project').textContent)&&!/without the fields of/.test(document.getElementById('project').textContent)`, 'R23 header', 30000);
+    await sleep(1500); p2.header = await rText('#project'); p2.record = await record();
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===5", 'R23 five runs'); p2.tab = await fieldsOf();
     const wraps = () => r.eval("(()=>{const m=document.getElementById('file-status'),l=m.closest('.message-line'),line=parseFloat(getComputedStyle(m).lineHeight)||12;return {over:m.scrollWidth-m.clientWidth,lineOver:l.scrollWidth-l.clientWidth,lines:Math.round(m.getBoundingClientRect().height/line),right:m.getBoundingClientRect().right<=innerWidth}})()");
     p2.wide = await wraps(); await rSize(390, 844, true); p2.phone = await wraps(); await rSize(1440, 900);
-    stage('R23 P2 session over 16 MiB', p2);
-    const [, msgLeft] = /^.* Session is now (?:1[7-9]|2\d) MB, over the 16 MiB \(16\.8 MB\) limit\. File › Save will ask whether to keep the fields of the selected and pinned runs only \(Run 5\); the other runs keep n_eff, the TE fractions and the effective areas\. Browser recovery keeps every field but those of (Run \d+(?:(?:, | and )Run \d+)*)\.$/.exec(p2.message) || [];
-    assert.ok(msgLeft, p2.message);
-    const [, headLeft] = LEFT.exec(p2.header) || []; assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser without the fields of /.test(p2.header) && headLeft, p2.header);
-    // the record: within 16 MiB, Run 5 (selected) with its field, the runs named are those without
-    assert.ok(p2.record.bytes <= 16 * 1024 * 1024, JSON.stringify(p2.record));
-    assert.deepEqual(names(msgLeft), left(p2.record.fields)); assert.deepEqual(names(headLeft), left(p2.record.fields));
+    stage('R23 P2 five runs within the field budget', p2);
+    assert.ok(/Run \d+ \([^()]*\) (?:keeps its values; its fields were not kept|.* keep their values; their fields were not kept) \(16\.8 MB limit\)\./.test(p2.message), p2.message);
+    assert.ok(!p2.message.includes('Session is now'), p2.message);
+    assert.ok(/^Untitled project · not saved to a file · kept for recovery in this browser$/.test(p2.header), p2.header);
+    // the record: within the field budget, Run 5 (selected) with its field, the tab's fields
+    assert.ok(p2.record.bytes <= 16760832, JSON.stringify(p2.record));
+    assert.deepEqual(Object.fromEntries(p2.record.fields), p2.tab);
     assert.equal(p2.record.fields.find(([n]) => n === 5)[1], true);
     // newest first: every run with a field is newer than every run without one, the selected run apart
     const kept = p2.record.fields.filter(([n, f]) => f && n !== 5).map(([n]) => n), gone = p2.record.fields.filter(([, f]) => !f).map(([n]) => n);
@@ -3014,24 +3052,26 @@ try {
     for (const w of [p2.wide, p2.phone]) { assert.ok(w.over <= 0 && w.lineOver <= 0 && w.right, JSON.stringify(w)); }
     assert.ok(p2.phone.lines > 1, JSON.stringify(p2.phone));
     await rOverflow('P2 session size');
-    // P4 (E4): Run 6, then an edit: the drop line, Pin twice, a run and its swap; each run named with
-    // the run list's parts (its label up to the material: "Run 2 · closed · 4 modes · n_g · …")
+    // P4 (E4): the fourteen values-only runs (Runs 6 to 19), then Run 20, then an edit: the drop line,
+    // Pin three times, a run and its swap; each run named with the run list's parts (its label up to
+    // the material: "Run 2 · closed · 4 modes · n_g · …")
+    await addValuesOnlyRuns(r, 'R23 P4');
     await mesh(34); await rRun();
-    // P2 (b): six runs of the T18 window (about 24 MB): the record within 16 MiB holds Run 6's field
-    // and the newest others that fit; the header names the rest
-    // the header and the record settle once recovery has written the six-run snapshot
+    // P2 (b): 20 runs, the last six real T18 runs (about 24 MB with every field): the record within
+    // the field budget holds Run 20's field and the newest others that fit, as the tab does
     let p2b = null;
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===20", 'R23 20 runs');
     for (let i = 0; i < 60; i++) {
-      const now = {header: await rText('#project'), record: await record()};
-      if (now.record.fields.length === 6 && now.record.fields.find(([n]) => n === 6)?.[1] && names((LEFT.exec(now.header) || [])[1] || '').join() === left(now.record.fields).join()) { p2b = now; break; }
+      const now = {header: await rText('#project'), record: await record(), tab: await fieldsOf()};
+      if (now.record.fields.length === 20 && now.record.fields.find(([n]) => n === 20)?.[1] && JSON.stringify([...now.record.fields].sort((x, y) => x[0] - y[0])) === JSON.stringify(Object.entries(now.tab).map(([n, f]) => [Number(n), f]).sort((x, y) => x[0] - y[0]))) { p2b = now; break; }
       await sleep(500);
     }
-    stage('R23 P2 six runs', p2b); assert.ok(p2b, 'R23 six-run record and header');
-    const [, sixLeft] = LEFT.exec(p2b.header) || []; assert.ok(sixLeft, p2b.header);
-    assert.ok(p2b.record.bytes <= 16 * 1024 * 1024, JSON.stringify(p2b.record)); assert.deepEqual(names(sixLeft), left(p2b.record.fields));
-    assert.equal(p2b.record.fields.find(([n]) => n === 6)[1], true);
+    stage('R23 P2 20 runs', p2b); assert.ok(p2b, 'R23 20-run record equal to the tab');
+    assert.ok(/ · kept for recovery in this browser$/.test(p2b.header) && !p2b.header.includes('without the fields of'), p2b.header);
+    assert.ok(p2b.record.bytes <= 16760832, JSON.stringify(p2b.record));
+    assert.equal(p2b.record.fields.find(([n]) => n === 20)[1], true);
     await mesh(36);
-    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===6", 'R23 six runs');
+    await r.click('nav [data-page=Results]'); await r.until("document.querySelectorAll('.run-item').length===20", 'R23 20 runs before P4');
     const listed = async () => Object.fromEntries((await runItems()).map(t => t.replace(/^Pinned · /, '').split(' · λ ')[0].replace(/ · Silicon$/, '')).map(t => [t.split(' · ')[0], t]));
     const named = words => words.replace(/^(Run \d+) \((.*)\)$/, '$1 · $2');
     const p4 = {list: await listed(), line: await rText('#run-drop-text'), pins: []};
@@ -3045,8 +3085,9 @@ try {
     const [pin2] = one(p4.pins[0], /^Run 1 pinned\. If you run: drops (Run 2 \(.*\)) · pin it to keep it$/);
     const [pin3] = one(p4.pins[1], /^Run 2 pinned\. If you run: drops (Run 3 \(.*\)) · pin it to keep it$/);
     const [pin4] = one(p4.pins[2], /^Run 3 pinned\. If you run: drops (Run 4 \(.*\)) · pin it to keep it$/);
-    // (the session size line follows the swap button: the session is still over 16 MiB)
-    const [dropped4] = one(p4.after.message, / (Run 4 \([^()]*\)) was dropped Keep Run 4, drop Run 5 \([^()]*\) instead Session is now /);
+    // (run retention: no session size line; the fields words, when a field went, follow the dropped words)
+    const [dropped4] = one(p4.after.message, / (Run 4 \([^()]*\)) was dropped (?:.* )?Keep Run 4, drop Run 5 \([^()]*\) instead(?: |$)/);
+    assert.ok(!p4.after.message.includes('Session is now'), p4.after.message);
     const [keep5] = one(p4.after.keep, /^Keep Run 4, drop (Run 5 \(.*\)) instead$/);
     for (const [n, words] of [['Run 1', line1], ['Run 2', pin2], ['Run 3', pin3], ['Run 4', pin4], ['Run 4', dropped4], ['Run 5', keep5]]) assert.equal(named(words), p4.list[n], `${words} names ${n} as the list does`);
     // the three kinds: a closed n_g run, an open run, a closed-near run
@@ -3067,6 +3108,113 @@ try {
     assert.match(p6.open, /^Current inputs differ from this run: this run core mesh 30 nm · open boundary \(PML 1 µm\) on [a-z, ]+ · search near \d\.\d+ · Modes to find 2, current core mesh 36 nm · closed window · highest n_eff · Modes to find 4; unchanged: Core 500 × 220 \+ Substrate 3000 × 700 nm · Silicon · λ 1550 nm$/);
     assert.equal(p6.ng, 'Current inputs differ from this run: this run core mesh 30 nm · group index on, current core mesh 36 nm · group index off; unchanged: Core 500 × 220 + Substrate 3000 × 700 nm · Silicon · λ 1550 nm · Modes to find 4');
     await rOverflow('P6 inputs line');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
+  // R24 (run retention, design "Keeping more runs", pre-registered K10), in a browser context of its
+  // own: twelve runs (eight of the template, core mesh 30 to 44 nm, then four T18 runs: closed 2 modes,
+  // closed 4 modes, closed near 2.46 and open with n_g). After each result the browser-recovery record
+  // is within 16 MiB and is Save's text, byte for byte (File › Export › Model with runs, asking
+  // nothing), and the runs with fields are those the run list does not mark "values only". Then a run
+  // without fields: its Results block, the field export waiting for its fields, and Compare with it,
+  // the words whole and wrapped at 1440 × 900 and 390 × 844.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable');
+    const rtDownloads = join(out, 'downloads-retention'); await mkdir(rtDownloads, {recursive: true});
+    await browserPage.call('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: rtDownloads, browserContextId});
+    await r.call('Page.addScriptToEvaluateOnNewDocument', {source: 'delete window.showSaveFilePicker;delete Window.prototype.showSaveFilePicker;'});
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rOverflow = async tag => {
+      for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+        await rSize(width, height, mobile);
+        const over = await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth');
+        stage('R24 overflow ' + tag, {width, height, over}); assert.ok(over <= 0, `${tag} at ${width} × ${height} overflows by ${over}px`);
+      }
+      await rSize(1440, 900);
+    };
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const rRun = async () => {
+      await r.until("!document.getElementById('run-optical').disabled", 'R24 Run enabled');
+      const before = await r.eval("JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))");
+      await r.click('#run-optical');
+      await r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(before)}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'R24 run', 600000);
+    };
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>({job:b.dataset.run,text:b.textContent}))");
+    const mesh = async nm => { await rTree('Mesh', "!!document.getElementById('core-mesh-number')"); await r.type('#core-mesh-number', nm); await sleep(400); };
+    const modes = async () => rTree('Optical modes', "!!document.getElementById('mode-count-number')");
+    const record = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>resolve(g.result?.session??null);};})`);
+    const listFiles = async () => Object.fromEntries(await Promise.all((await readdir(rtDownloads)).filter(n => n.endsWith('.json')).map(async n => [n, (await stat(join(rtDownloads, n))).mtimeMs])));
+    const exported = async label => {
+      const before = await listFiles(); await r.click('#menu-export-session');
+      await r.until("document.getElementById('save-name-dialog')?.open||document.getElementById('session-overflow')?.open", label + ' save');
+      assert.equal(await r.eval("document.getElementById('session-overflow').open"), false, label + ': no 16 MiB question');
+      await r.click('#save-name-download');
+      for (let i = 0; i < 600; i++) { const now = await listFiles(), f = Object.keys(now).find(n => before[n] !== now[n]); if (f) { await sleep(700); return readFile(join(rtDownloads, f), 'utf8'); } await sleep(100); }
+      throw new Error(label + ': no download');
+    };
+    // after a result: the record settles on the tab's session (it is written after a short delay)
+    const k10 = [];
+    const afterResult = async label => {
+      await r.click('nav [data-page=Results]'); await r.until("!!document.querySelector('.run-item')", label + ' run list');
+      const items = await runItems(), message = await rText('#file-status'), save = await exported(label);
+      let rec = null; for (let i = 0; i < 80 && rec !== save; i++) { await sleep(500); rec = await record(); }
+      const doc = JSON.parse(save), withField = Object.fromEntries(doc.runs.map(x => [x.job, 'field' in x]));
+      const entry = {label, runs: items.length, bytes: Buffer.byteLength(save), recordEqual: rec === save, version: doc.version, valuesOnly: items.filter(i => i.text.endsWith(' · values only')).length, message};
+      k10.push(entry); stage('R24 K10 ' + label, entry);
+      assert.equal(rec, save, label + ': the recovery record is Save\'s text');
+      assert.ok(Buffer.byteLength(save) <= 16 * 1024 * 1024, label);
+      for (const i of items) assert.equal(withField[i.job], !i.text.endsWith(' · values only'), `${label}: ${i.text}`);
+      return {items, doc, message};
+    };
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'R24 start page');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R24 optical model');
+    for (let i = 0; i < 8; i++) { if (i) await mesh(30 + 2 * i); await rRun(); await afterResult('template run ' + (i + 1)); }
+    // T18: the strip over a silicon substrate spanning the window, core mesh 30 nm
+    await rTree('Geometry', "!!document.querySelector('#shape-w')");
+    await r.click('[data-add-shape=rect]'); await r.until("document.querySelectorAll('.shape-item').length===2", 'R24 substrate added');
+    await r.type('#shape-name', 'Substrate'); await r.choose('#shape-material', 'Silica');
+    for (const [id, value] of [['#shape-x', -1500], ['#shape-y', -1200], ['#shape-w', 3000], ['#shape-h', 700]]) await r.type(id, value);
+    await rTree('Materials', "!!document.querySelector('[data-shape-material=\"1\"]')"); await r.choose('[data-shape-material="1"]', 'Silicon'); await sleep(300);
+    await mesh(30);
+    await rRun(); await afterResult('T18 closed 2 modes');
+    await modes(); await r.type('#mode-count-number', 4); await sleep(300); await rRun(); await afterResult('T18 closed 4 modes');
+    await modes(); await r.click('#run-edge-search'); await sleep(400); await rRun(); await afterResult('T18 closed near 2.46');
+    await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); await r.type('#mode-count-number', 2); await sleep(300);
+    if (!(await r.eval("document.getElementById('group-index-check').checked"))) await r.click('#group-index-check'); await sleep(300);
+    await rRun(); const last = await afterResult('T18 open with n_g');
+    stage('R24 K10 twelve runs', {records: k10.map(e => [e.label, e.bytes, e.version, e.valuesOnly])});
+    assert.equal(last.items.length, 12); assert.equal(last.doc.version, 13);
+    assert.ok(k10.some(e => e.valuesOnly > 0), 'some runs keep their values only');
+    assert.ok(k10.some(e => /keeps its values; its fields were not kept \(16\.8 MB limit\)\.|keep their values; their fields were not kept \(16\.8 MB limit\)\./.test(e.message)), JSON.stringify(k10.map(e => e.message)));
+    // a run without fields in Results: the block, whole and wrapped, and the field export waiting
+    const bare = last.items.find(i => i.text.endsWith(' · values only')), bareNumber = Number(/^(?:Pinned · )?Run (\d+)/.exec(bare.text)[1]);
+    await r.click(`.run-item[data-run="${bare.job}"]`); await r.until("!!document.getElementById('fields-not-kept')", 'R24 run without fields');
+    const visible = id => r.eval(`(()=>{const e=document.getElementById('${id}'),b=e.getBoundingClientRect();return {text:e.textContent,whole:e.scrollWidth<=e.clientWidth+1&&b.left>=0&&b.right<=innerWidth+1,lines:Math.round(b.height/(parseFloat(getComputedStyle(e).lineHeight)||16))}})()`);
+    const block = {};
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) { await rSize(width, height, mobile); block[width] = {...await visible('fields-not-kept'), png: await r.eval("({disabled:document.getElementById('export-field').disabled,title:document.getElementById('export-field').title})"), field: await r.eval("!!document.getElementById('optical-field')"), rows: await r.eval("document.querySelectorAll('#modes-table tbody tr').length")}; }
+    await rSize(1440, 900); stage('R24 K10 Results without fields', block);
+    for (const b of Object.values(block)) {
+      assert.equal(b.text, `Run ${bareNumber}'s fields are not kept: up to 16.8 MB of fields are kept, for the selected and pinned runs first, then the newest. Its n_eff, TE fractions and effective areas are kept.`);
+      assert.ok(b.whole, JSON.stringify(b)); assert.equal(b.field, false); assert.ok(b.rows >= 2); assert.deepEqual(b.png, {disabled: true, title: `Recompute Run ${bareNumber}'s fields first`});
+    }
+    assert.ok(block[390].lines > 1, 'the block wraps at 390 px');
+    await rOverflow('K10 Results without fields');
+    // Compare with it: the inputs that differ, its modes listed by number, its line
+    await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'R24 Compare');
+    await r.choose('#compare-a', last.items[0].job); await sleep(300); await r.choose('#compare-b', bare.job); await r.until("!!document.querySelector('.compare-no-fields')", 'R24 Compare without fields');
+    const compare = {line: await rText('.compare-no-fields'), caption: await r.eval("document.querySelector('#compare-neff caption')?.textContent??null"), description: await rText('#compare-description'), plots: await r.eval("!!document.getElementById('compare-field-a')")};
+    stage('R24 K10 Compare without fields', compare);
+    assert.equal(compare.line, `Run ${bareNumber}'s fields are not kept, so its modes are listed by number and not plotted.`);
+    assert.equal(compare.caption, 'Modes of A and B listed by mode number, not matched by overlap'); assert.match(compare.description, /^Geometry: /); assert.equal(compare.plots, false);
+    await rOverflow('K10 Compare without fields');
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
