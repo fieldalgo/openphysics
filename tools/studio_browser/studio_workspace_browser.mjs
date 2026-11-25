@@ -3376,6 +3376,8 @@ try {
       await r.click('nav [data-page=Results]');
       for (const job of jobs) {
         await r.click(`.run-item[data-run="${job}"]`); await r.until("!!document.getElementById('optical-field')", 'F7 field view ' + tag);
+        // the line profile open before every view: its line is drawn on the field view, the same in both captures
+        await r.eval("(()=>{const d=document.querySelector('details.line-profile');if(!d.open){d.open=true;d.ontoggle();}return 1})()"); await sleep(300);
         const count = await r.eval("document.getElementById('field-mode').options.length");
         for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
           await rSize(width, height, mobile);
