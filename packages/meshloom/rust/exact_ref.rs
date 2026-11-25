@@ -451,6 +451,21 @@ mod tests {
         run(n, n, 16);
     }
 
+    /// The exact stage of orient3d alone (no filter in front), on the same random and
+    /// adversarial cases: it must give the integers' sign for every case, zero included.
+    #[test]
+    fn v16_orient3d_exact_stage_agrees_with_exact_integers() {
+        let mut r = Rng(1617);
+        let mut zeros = 0usize;
+        for k in 0..40_000 {
+            let p = orient_case(&mut r, k >= 10_000);
+            let s = pr::orient3d_exact(&p[0], &p[1], &p[2], &p[3]);
+            assert_eq!(s, orient3d(&p), "orient3d_exact {p:?}");
+            zeros += (s == 0) as usize;
+        }
+        assert!(zeros > 1000, "the adversarial cases hold coplanar ones ({zeros})");
+    }
+
     /// V16 outside CI: 10^6 random and 10^5 adversarial cases per predicate
     /// (`cargo test --release -- --ignored`).
     #[test]
