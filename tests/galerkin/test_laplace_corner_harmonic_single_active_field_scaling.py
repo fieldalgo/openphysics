@@ -3,8 +3,8 @@
 """Physical scaling of the one-active guard field, split from
 test_laplace_corner_harmonic_single_active_field.py.
 
-Each scale needs its own harmonic solve; together with the rest of that module they exceed an
-eighth of the CI suite (tools/tests/test_openphysics_shard.py), so they run as their own file.
+Each scale needs its own harmonic solve; together with the rest of that module they exceed
+the share of one CI test part (tools/tests/test_openphysics_shard.py), so they run as their own file.
 """
 import numpy as np
 import pytest
