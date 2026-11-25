@@ -3367,7 +3367,7 @@ try {
     // field of T19's size (3 modes, 12,253 triangles, 6,263 nodes), and the conversion of the tab's
     // own session read back (the record before the conversion), single-threaded.
     const fePng = async () => { const before = new Set((await readdir(rtDownloads)).filter(n => n.endsWith('.png'))); await r.click('#export-field');
-      for (let i = 0; i < 200; i++) { const f = (await readdir(rtDownloads)).find(n => n.endsWith('.png') && !before.has(n)); if (f) { await sleep(500); return (await readFile(join(rtDownloads, f))).toString('base64'); } await sleep(100); }
+      for (let i = 0; i < 200; i++) { const f = (await readdir(rtDownloads)).find(n => n.endsWith('.png') && !before.has(n)); if (f) { await sleep(500); const png = (await readFile(join(rtDownloads, f))).toString('base64'); await rm(join(rtDownloads, f)); return png; } await sleep(100); }
       throw new Error('F7: no field PNG'); };
     const feView = (mode, component) => r.eval(`(()=>{const m=document.getElementById('field-mode');m.value='${mode}';m.onchange();const c=document.getElementById('field-component');c.value='${component}';c.onchange();return 1})()`);
     const feKeep = (key, expression) => r.eval(`(()=>{const c=${expression};(window.__fe??={})[${JSON.stringify(key)}]=c.getContext('2d').getImageData(0,0,c.width,c.height);return 1})()`);
