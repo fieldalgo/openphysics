@@ -702,7 +702,7 @@ Used by the page, usable by anything else.
 | POST | `/api/validate` | `{doc}` -> `{ok: true, summary, doc, diagnostics}` or `{ok: false, error, diagnostics}`; `doc` is the document as sent, every number with its written digits |
 | POST | `/api/mesh` | `{doc}` -> `node_coordinates` (m) with `field_units`, `display`, triangles, regions, boundary edges, stats, `diagnostics` |
 | POST | `/api/run` | `{doc}` -> `{job}`; runs in a background thread |
-| GET | `/api/jobs/{id}` | status and log lines |
+| GET | `/api/jobs/{id}` | status, log lines and `step`: the latest progress event of `run(doc, on_event=...)` while an optical job runs (`search_started`, see [From Python](#from-python)), `null` before the first event and once the job is done or failed |
 | GET | `/api/jobs/{id}/result` | `effective_index`, `group_index`, `propagation_loss` (the summary's series), `vacuum_wavelength`, fields, `node_coordinates` (m), timings, summary |
 
 Every route that takes a document reads the request's raw bytes with `simcase.reader`:
