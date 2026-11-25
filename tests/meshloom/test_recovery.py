@@ -483,6 +483,42 @@ def test_twisted_prism_with_segment_points_is_rounded_and_certified():
             assert m["nodes"][i].tolist() == pts[s].tolist(), "input points are kept bit for bit"
 
 
+# open surfaces whose points all lie in one plane: recovery has no tetrahedra to work
+# with, so before the fix it failed first (RecoveryError, no witness); C10 synthetic repros
+OPEN_COPLANAR = {
+    "one triangle": ([[0, 0, 0], [1, 0, 0], [0, 1, 0]], [[[0, 1, 2]]]),
+    "a square of two triangles": ([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]], [[[0, 1, 2]], [[0, 2, 3]]]),
+    "a fan of five triangles": ([[0, 0, 0]] + [[math.cos(a), math.sin(a), 0] for a in np.linspace(0, 2, 6)],
+                                [[[0, i, i + 1]] for i in range(1, 6)]),
+    "a quadrilateral facet": ([[0, 0, 0], [2, 0, 0], [2, 1, 0], [0, 1, 0]], [[[0, 1, 2, 3]]]),
+}
+
+
+@pytest.mark.parametrize("name", sorted(OPEN_COPLANAR))
+def test_parity_refuses_an_open_coplanar_surface_as_not_closed(name):
+    """C10: an open surface in one plane is NotClosed with a type-6 witness, as the C14
+    verifier reads it: an elementary segment (no input point inside it) on the boundary of
+    an odd number of facets, counted here from the loops."""
+    from meshloom._core import NotClosed, mesh_plc
+    pts, facets = OPEN_COPLANAR[name]
+    pts = np.array(pts, dtype=float)
+    with pytest.raises(NotClosed) as e:
+        mesh_plc(pts, facets, domain="parity")
+    w = e.value.witness
+    assert w["type"] == 6 and e.value.kind == "NotClosed"
+    u, v = w["segment"]
+    assert u != v
+    incidences = sum(1 for f in facets for lp in f for k in range(len(lp))
+                     if {lp[k], lp[(k + 1) % len(lp)]} == {u, v})
+    assert incidences % 2 == 1 and incidences == len(w["facets"])
+    a, b = pts[u], pts[v]
+    for i, p in enumerate(pts):
+        if i in (u, v):
+            continue
+        t = np.dot(p - a, b - a) / np.dot(b - a, b - a)
+        assert not (0 < t < 1 and np.allclose(a + t * (b - a), p, atol=0)), "elementary: no point inside"
+
+
 def test_parity_refuses_surfaces_that_are_not_closed():
     from meshloom._core import mesh_plc
     # three stacked cells of different materials: interface edges have three facets

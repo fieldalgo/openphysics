@@ -710,7 +710,14 @@ pub struct Boundary {
 }
 
 pub fn recover_boundary(plc: &crate::plc::Plc, max_depth: u32) -> Result<Boundary, String> {
-    let pr = crate::recovery::recover_plc(plc, max_depth)?;
+    let checked = crate::plc::check(plc).map_err(|e| e.msg)?;
+    recover_boundary_checked(plc, checked, max_depth)
+}
+
+/// `recover_boundary` after the caller's own PLC check (its result on this PLC).
+pub fn recover_boundary_checked(plc: &crate::plc::Plc, checked: crate::plc::Checked, max_depth: u32)
+    -> Result<Boundary, String> {
+    let pr = crate::recovery::recover_checked(plc, checked, max_depth)?;
     let mut g = MixedPoints::new(plc.points.clone());
     for s in &pr.rec.s {
         g.push(*s);

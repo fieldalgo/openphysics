@@ -119,6 +119,20 @@ pub fn build(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> Res
     })
 }
 
+/// Witness 6 from the PLC check alone, before boundary recovery: the first elementary
+/// sub-segment (input points, none inside it) on the boundary of an odd number of facets,
+/// with the facets whose loops hold it. Parity mode asks this first, so an open surface
+/// is refused as not closed even when recovery itself would fail on it (three coplanar
+/// points, say); `closed` stays the check after recovery.
+pub fn open_in_check(c: &crate::plc::Checked) -> Result<(), MeshError> {
+    let Some(&[u, v]) = c.open_subsegments.first() else { return Ok(()) };
+    let e = (u.min(v), u.max(v));
+    let facets: Vec<u32> = c.facets.iter().enumerate()
+        .filter(|(_, info)| info.boundary.iter().any(|&(a, b)| (a.min(b), a.max(b)) == e))
+        .map(|(f, _)| f as u32).collect();
+    Err(MeshError::NotClosed { segment: [e.0, e.1], facets })
+}
+
 /// Witness 6 of the C14 validity rule: an elementary segment on the boundary of an odd
 /// number of facets. A facet's boundary edges are the edges used once by its subfacets.
 fn closed(n: usize, b: &Boundary) -> Result<(), MeshError> {

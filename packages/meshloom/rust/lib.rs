@@ -436,7 +436,20 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     let plc = plc::Plc { points, segments, facets };
     // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "RefineFail" | "Internal", message, ids)
     let (m, b, rs) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
-        let mut b = facetrec::recover_boundary(&plc, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
+        // parity mode: an open surface is refused (witness 6) before recovery, which can fail
+        // on it first (an open surface of coplanar points has no tetrahedra)
+        let mut b = if domain == mesh::Domain::Parity && seeds.is_empty() {
+            let c = plc::check(&plc).map_err(|e| ("RecoveryFail", e.msg, vec![]))?;
+            mesh::open_in_check(&c).map_err(|e| match &e {
+                mesh::MeshError::NotClosed { segment, facets } => {
+                    ("NotClosed", e.to_string(), segment.iter().chain(facets).copied().collect())
+                }
+                _ => ("Internal", e.to_string(), vec![]),
+            })?;
+            facetrec::recover_boundary_checked(&plc, c, max_depth)
+        } else {
+            facetrec::recover_boundary(&plc, max_depth)
+        }.map_err(|e| ("RecoveryFail", e, vec![]))?;
         let locked = locked.unwrap_or_default();
         // a locked (curved) facet is sampled on its surface by the caller: recovery must find
         // it among the Delaunay faces, with no point added on it or on its edges
