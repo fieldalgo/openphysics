@@ -1613,14 +1613,15 @@ try {
     before = await listDownloads(); await page.click('nav [data-page=Model]'); await page.click('#menu-save');
     await page.until("document.getElementById('download-again')?.open", 'A2 Save asks'); const a2Asked = await againView();
     await page.click('#download-again-cancel'); await sleep(1500);
-    const a2Cancel = {asked: a2Asked, downloads: (await listDownloads()).length - before.length, message: await status(), open: await page.eval("document.getElementById('download-again').open")};
+    const changedSince = async since => { const now = await listDownloads(); return Object.keys(now).filter(n => since[n] !== now[n]).length; };
+    const a2Cancel = {asked: a2Asked, downloads: await changedSince(before), message: await status(), open: await page.eval("document.getElementById('download-again').open")};
     stage('A2 Save of a downloaded file asks; Cancel', a2Cancel);
     assert.deepEqual(a2Asked, AGAIN); assert.equal(a2Cancel.downloads, 0); assert.equal(a2Cancel.message, 'Save cancelled; nothing was written.'); assert.equal(a2Cancel.open, false);
     // Save, then Download again: one download under the name, with today's words
     before = await listDownloads(); await page.click('#menu-save');
     await page.until("document.getElementById('download-again')?.open", 'A2 Save asks again'); await page.click('#download-again-confirm');
     await noDialog('O1 Save'); const o1Second = await newDownload(before), o1SecondMessage = await status(), o1SecondHeader = await header();
-    assert.equal((await listDownloads()).length - before.length, 1, 'Download again writes one file');
+    assert.equal(await changedSince(before), 1, 'Download again writes one file');
     stage('O1 Save under the Save As name', {first: o1First, edited: o1Edited, second: o1Second, message: o1SecondMessage, header: o1SecondHeader});
     assert.match(o1Second, /^design-a-ng(?: \(\d\))?\.json$/); assert.equal(await savedWidth(o1Second), 650, 'the second file holds Width 650');
     // round 14 (Q2): Width 650 (650 × 400 nm here) has no run, and the save notice says so
