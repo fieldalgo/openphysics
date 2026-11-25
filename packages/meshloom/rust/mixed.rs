@@ -232,6 +232,26 @@ impl<'a> Mixed<'a> {
         }
     }
 
+    /// The points' coordinates when every one is a double triple: an input point or a
+    /// volume S point (stored as its doubles). The exact predicates of
+    /// [`crate::predicates`] then decide directly, without the interval filter.
+    fn double_only<const N: usize>(&self, p: &[Pt; N]) -> Option<[&P3; N]> {
+        let mut out = [&self.input[0]; N];
+        for (o, q) in out.iter_mut().zip(p) {
+            match q {
+                Pt::In(i) => *o = &self.input[*i as usize],
+                Pt::S(k) => {
+                    let sp = &self.s[*k as usize];
+                    if sp.kind() != Kind::Volume {
+                        return None;
+                    }
+                    *o = &sp.p;
+                }
+            }
+        }
+        Some(out)
+    }
+
     fn input_only<const N: usize>(&self, p: &[Pt; N]) -> Option<[&P3; N]> {
         let mut out = [&self.input[0]; N];
         for (o, q) in out.iter_mut().zip(p) {
@@ -246,7 +266,7 @@ impl<'a> Mixed<'a> {
     /// Sign of det[b - a, c - a, d - a], as [`pr::orient3d`].
     pub fn orient3d(&self, p: [Pt; 4], n: &mut MixedCounters) -> i8 {
         n.calls += 1;
-        if let Some(q) = self.input_only(&p) {
+        if let Some(q) = self.double_only(&p) {
             return pr::orient3d(q[0], q[1], q[2], q[3], &mut n.input);
         }
         n.interval += 1;
@@ -262,7 +282,7 @@ impl<'a> Mixed<'a> {
     /// as [`pr::insphere`].
     pub fn insphere(&self, p: [Pt; 5], n: &mut MixedCounters) -> i8 {
         n.calls += 1;
-        if let Some(q) = self.input_only(&p) {
+        if let Some(q) = self.double_only(&p) {
             return pr::insphere(q[0], q[1], q[2], q[3], q[4], &mut n.input);
         }
         n.interval += 1;
@@ -369,6 +389,30 @@ trait Num: Clone {
 
 fn diff<T: Num>(a: &[T; 3], b: &[T; 3]) -> [T; 3] {
     [a[0].sub(&b[0]), a[1].sub(&b[1]), a[2].sub(&b[2])]
+}
+
+/// (a - o) . (b - o) over any number type.
+fn dot_from<T: Num>(o: &[T; 3], a: &[T; 3], b: &[T; 3]) -> T {
+    let (u, w) = (diff(a, o), diff(b, o));
+    u[0].mul(&w[0]).add(&u[1].mul(&w[1])).add(&u[2].mul(&w[2]))
+}
+
+/// The terms of [`Mixed::equatorial_sign`] over any number type: (|n|^2, the signed value).
+fn equatorial<T: Num>(a: &[T; 3], b: &[T; 3], c: &[T; 3], p: &[T; 3]) -> (T, T) {
+    let (u, w, q) = (diff(b, a), diff(c, a), diff(p, a));
+    let cross = |x: &[T; 3], y: &[T; 3]| -> [T; 3] {
+        [x[1].mul(&y[2]).sub(&x[2].mul(&y[1])), x[2].mul(&y[0]).sub(&x[0].mul(&y[2])),
+         x[0].mul(&y[1]).sub(&x[1].mul(&y[0]))]
+    };
+    let dot = |x: &[T; 3], y: &[T; 3]| x[0].mul(&y[0]).add(&x[1].mul(&y[1])).add(&x[2].mul(&y[2]));
+    let n = cross(&u, &w);
+    let nn = dot(&n, &n);
+    let (uu, ww) = (dot(&u, &u), dot(&w, &w));
+    let (wn, nu) = (cross(&w, &n), cross(&n, &u));
+    let off: [T; 3] = std::array::from_fn(|k| uu.mul(&wn[k]).add(&ww.mul(&nu[k])));
+    // 2 |n|^2 (q . q) - 2 (off . q) has the sign of |n|^2 (q . q) - off . q
+    let v = nn.mul(&dot(&q, &q)).sub(&dot(&off, &q));
+    (nn, v)
 }
 
 fn det3<T: Num>(r0: &[T; 3], r1: &[T; 3], r2: &[T; 3]) -> T {
@@ -582,30 +626,27 @@ impl Mixed<'_> {
     /// that of 2 |n|^2 |q|^2 - 2 (|u|^2 (w x n) + |w|^2 (n x u)) . q. A degenerate
     /// triangle (n = 0) gives 0.
     pub fn equatorial_sign(&self, p: Pt, a: Pt, b: Pt, c: Pt) -> i8 {
-        let (ea, eb, ec, ep) = (self.exact(a), self.exact(b), self.exact(c), self.exact(p));
-        let (u, w, q) = (diff(&eb, &ea), diff(&ec, &ea), diff(&ep, &ea));
-        let cross = |x: &[Dy; 3], y: &[Dy; 3]| -> [Dy; 3] {
-            [x[1].mul(&y[2]).sub(&x[2].mul(&y[1])), x[2].mul(&y[0]).sub(&x[0].mul(&y[2])),
-             x[0].mul(&y[1]).sub(&x[1].mul(&y[0]))]
-        };
-        let dot = |x: &[Dy; 3], y: &[Dy; 3]| x[0].mul(&y[0]).add(&x[1].mul(&y[1])).add(&x[2].mul(&y[2]));
-        let n = cross(&u, &w);
-        let nn = dot(&n, &n);
+        // interval filter first; the exact value only when it cannot decide
+        let (nn, v) = equatorial(&self.interval(a), &self.interval(b), &self.interval(c), &self.interval(p));
+        if nn.sign() == Some(1) {
+            if let Some(s) = v.sign() {
+                return s;
+            }
+        }
+        let (nn, v) = equatorial(&self.exact(a), &self.exact(b), &self.exact(c), &self.exact(p));
         if nn.exact_sign() == 0 {
             return 0;
         }
-        let (uu, ww) = (dot(&u, &u), dot(&w, &w));
-        let (wn, nu) = (cross(&w, &n), cross(&n, &u));
-        let off: [Dy; 3] = std::array::from_fn(|k| uu.mul(&wn[k]).add(&ww.mul(&nu[k])));
-        let two = Dy::from_f64(2.0);
-        two.mul(&nn).mul(&dot(&q, &q)).sub(&two.mul(&dot(&off, &q))).exact_sign()
+        v.exact_sign()
     }
 
     /// Sign of (a - o) . (b - o), exactly.
     pub fn dot_sign(&self, o: Pt, a: Pt, b: Pt) -> i8 {
-        let (eo, ea, eb) = (self.exact(o), self.exact(a), self.exact(b));
-        let d = (0..3).map(|k| ea[k].sub(&eo[k]).mul(&eb[k].sub(&eo[k]))).reduce(|x, y| x.add(&y)).unwrap();
-        d.exact_sign()
+        // interval filter first; the exact value only when it cannot decide
+        if let Some(s) = dot_from(&self.interval(o), &self.interval(a), &self.interval(b)).sign() {
+            return s;
+        }
+        dot_from(&self.exact(o), &self.exact(a), &self.exact(b)).exact_sign()
     }
 }
 
