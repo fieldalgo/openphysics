@@ -1117,8 +1117,8 @@ its runs and Undo stay as they were:
   read as File › Open reads a model file (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 13 is refused by name (“This session file is version 14, newer than this Studio
-reads (versions 6–13). Open it in a newer Studio.”; versions 9 to 13 are
+A version above 14 is refused by name (“This session file is version 15, newer than this Studio
+reads (versions 6–14). Open it in a newer Studio.”; versions 9 to 14 are
 [optical sessions](#optical-session-files-version-9), and a version 8 layout under version 9 is
 refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
@@ -1990,6 +1990,8 @@ with 3 modes and the group index 5.6 MB (19.0 MB). The measurement is
 substrate (core mesh 30 nm): a closed run with 2 modes is 2.10 MB, with 4 modes 3.78 MB, closed near
 2.46 with 4 modes 3.75 MB, an open run with 2 modes 3.94 MB with or without n_g (the field is 99 % of
 each; a run without its field is 3 to 21 kB), so the sixth run of T22 brought the session to 22 MB.
+At [single precision](#compact-fields-single-precision) the same fields are 1.02, 1.74, 1.74 and
+1.11 MB.
 Since [run retention](#keeping-runs-values-and-fields) the optical model keeps its fields within one
 budget, so a session never goes over the limit, Save asks nothing and browser recovery writes Save's
 text. The question, the refusal and the recovery rules below still apply in the two cases where the
@@ -2146,13 +2148,71 @@ values, and a tab over 16 MiB showed fields that Save asked about and recovery l
   the last arrival. The inputs are bounded (8 optical shapes, 8 Joule shapes, 6 materials), so the
   second is rare; the next arrival chooses the fields within the budget again.
 - **Measured** (2026-11-25, `tools/studio_run_retention.mjs`): 20 results of the T18 mix (closed 2
-  modes, closed 4 modes, closed near 2.46, open with n_g; Run 2 pinned) keep 4 fields; the session is
-  at most 16.6 MB after every result, and the 20 records without fields are 0.15 MB.
+  modes, closed 4 modes, closed near 2.46, open with n_g; Run 2 pinned) keep 4 fields as text; the
+  session is at most 16.6 MB after every result, and the 20 records without fields are 0.15 MB. With
+  [compact fields](#compact-fields-single-precision) the same 20 results keep 11 fields (Runs 2 and
+  11–20).
 
 The checks are `tests/simcase/studio_run_retention_fields.cjs` (the order, the words, a seeded
 sequence of 2000 steps for the numbers, the tab against the file and recovery, and the two cases
 above), `tests/simcase/studio_run_retention_recompute.cjs`, the tool's `k1` and `k5` commands, and the
 RT stage (run retention) of `tools/studio_browser/studio_workspace_browser.mjs`.
+
+### Compact fields (single precision)
+
+Since the design *Compact field encoding* (round 25 A1) a field can be kept at single precision, so
+that more fields fit the [16.8 MB budget](#keeping-runs-values-and-fields).
+
+- **Only when needed.** While every field of the tab fits as text, nothing changes: the files are
+  written as before. At the first arrival whose fields would not all fit as text (a result, a
+  recomputed field, Add runs from file, or **Keep Run N, drop … instead** bringing a run back), every
+  field in the tab is kept at single precision, and the order of run retention applies with the
+  smaller sizes. Messages says once: *Fields are now kept at single precision (float32), so more of
+  them fit in 16.8 MB. n_eff, TE fractions and effective areas are unchanged. Files saved from now on
+  need this Studio or later (session version 14).* From then on every field that arrives is kept the
+  same way; the tab never converts back. File › Open and Restore keep a file's fields as the file
+  holds them unless they would not all fit as text, so a file opened and saved again unchanged is its
+  own bytes.
+- **What changes.** The field samples are rounded to float32 (about 7 significant digits; at most
+  2^-24 relative, about 6e-8). The node coordinates and triangles are kept exactly, so the window, the
+  crop and the physical window are unchanged. n_eff, the TE fractions, the effective areas, n_g and an
+  open run's candidates are the values the run showed before, stored with it. The field view, the
+  probe, the profile, Compare and the PNG exports read the float32 samples, so a restore or an opened
+  file shows exactly what the tab showed. Measured on the T18 results: TE fractions and areas
+  computed from a compact field differ by at most 7e-9 relative, the normalized field view by 6e-8,
+  and the probe's 6-digit text differs by one unit in its last digit for about 1 % of triangles.
+- **Words.** Results, under the field view of a compact run: *Field at single precision (float32).
+  The values above are the engine's.* Export this run: *… with the run's inputs and fields (fields at
+  single precision) …*, a version 14 file. The note under the run list adds *When fields would not
+  all fit, they are kept at single precision.* once the tab holds a compact field. The profile CSV
+  keeps its header and columns; relative_amplitude [1] holds the float32 sample, normalized.
+- **A field single precision cannot hold** (a sample beyond ±3.4e38, or a nonzero sample that would
+  become 0 or a subnormal below 1.2e-38) stays as text. Engine fields are normalized to at most 1, so
+  only a synthetic or edited file holds one.
+- **Full precision.** Once the tab is compact it holds no float64 field. **Recompute Run N's fields**
+  brings back a field that was let go, checks every value to 1e-12 and stores it at single precision
+  like the others. For float64 samples, use **Use this run's inputs**, then Export solver JSON, and
+  run the document with simcase.
+- **Limitation.** For a run first opened from a version 6 or 7 file, the stored TE fractions and
+  effective areas were computed by Studio from that file's field; after saving, Studio labels them as
+  stored values. A run whose TE fractions or effective areas come out not a number (only a synthetic
+  file holds one, such as the runs of the project fixture `project-v1.json`) leaves the tab without a
+  field budget, as before compact fields: its fields stay as they are.
+- **Sizes** (2026-11-25, T18 strip over a silicon substrate, core mesh 30 nm; text → single
+  precision): closed, 2 modes 2.25 → 1.02 MB; closed, 4 modes 4.10 → 1.74 MB; closed near 2.46, 4
+  modes 4.08 → 1.74 MB; open, 2 modes (with or without n_g) 3.92 → 1.11 MB (6,263 nodes, 12,253
+  triangles). A compact field's size follows from its counts: 32·k·T + 4⌈16N/3⌉ + 4⌈12T/3⌉ characters
+  and its keys (k modes, N nodes, T triangles). The conversion of a tab of six T18 fields (16.6 MB as
+  text) took 112 ms in Node, and of a tab of 11 fields (13.6 MB as text) 68 ms in Chrome. In the
+  browser the field view, the line profile and the field PNG of three closed T18 runs were the same
+  before and after the conversion, but for 4 pixels by one colour level in one view of 31. Deflate was measured and is not used: 1.05× on open fields, up to 2.8×
+  on the closed fields' imaginary parts (half of a closed field's samples are exact zeros).
+
+The checks are `tests/simcase/studio_field_encoding_format.cjs` (the format, F1, F3, F4 and F10),
+`tests/simcase/studio_field_encoding_tab.cjs` (F2: no conversion while the fields fit, the same texts as
+main 499a0d3; F11: a seeded sequence of 2000 steps with the conversion; F6 and F8: what Studio computes
+from a compact field), `tests/simcase/test_studio_field_encoding.py` (F5: the same strings as NumPy),
+and `tools/studio_field_encoding.mjs` (`f9`, `f14`, `f16`, `sizes`).
 
 ### Optical session files (version 13)
 
@@ -2177,6 +2237,50 @@ hold at most six runs.
 The checks are `tests/simcase/studio_run_retention_format.cjs` (K2: every earlier fixture written
 again byte for byte; K3: the fixture `optical-v13-nine-runs.json` of runs 2 and 4 to 11; K4: what main
 3f16709 reads, `refusals-v13-3f16709.json`).
+
+### Optical session files (version 14)
+
+Version 14 is [version 13](#optical-session-files-version-13) whose runs may hold a compact field
+([compact fields](#compact-fields-single-precision)): the same top-level keys, 0 to 20 runs, the run
+records of version 13 and the same digest. A field is either version 13's nested numbers or a compact
+field, with these keys in this order and no other:
+
+```json
+"field": {
+  "encoding": "f32-base64-v1",
+  "counts": {"modes": 2, "nodes": 6263, "triangles": 12253},
+  "node_coordinates": "<base64: nodes × 2 float64, little-endian, metres>",
+  "triangles": "<base64: triangles × 3 uint32, little-endian>",
+  "real": "<base64: modes × triangles × 3 float32, little-endian>",
+  "imag": "<base64: the same for the imaginary parts>"
+}
+```
+
+- **Layout.** Each array is today's nesting flattened: mode, then triangle, then x, y, z; node, then
+  x, y; triangle, then its three indices. Base64 is RFC 4648's standard alphabet, padded, without line
+  breaks. NumPy's `astype('<f4')`, `'<f8'` and `'<u4'` with the standard library's base64 write the
+  same strings.
+- **Stored values.** A run with a compact field also stores its TE fractions and effective areas.
+- **When it is written.** Only when a run is kept with a compact field; otherwise version 13, 12, 11,
+  10, 9 or 7, byte for byte. A version 14 file without a compact field is read. A compact field is
+  written again from the strings it was read from, so a version 14 file read and written again is its
+  own bytes.
+- **Refusals,** each naming the run: *Run 5's field is encoded as "…", which this Studio does not
+  read.*; *Run 5's compact field must hold encoding, counts, node_coordinates, triangles, real, imag
+  in this order, and nothing else.*; *Run 5's compact field counts must be whole numbers: modes 1 to 8,
+  nodes 3 to 250000, triangles 1 to 500000.*; *Run 5's compact field holds 1 modes; the run has 2.*;
+  *Run 5's compact field real is not canonical base64.*; *Run 5's compact field triangles holds 36
+  bytes; its counts give 24.*; *Run 5's compact field imag holds a value that is not a finite
+  number.*; *Run 5's compact field triangle 2 names node 5, outside 0–4.*; *Run 5's compact field
+  triangle 1 repeats a node.*; *Run 5 has a compact field and no saved TE fractions and effective
+  areas.*; and in a file of version 13 or earlier *Run 3: a compact field is read from a version 14
+  session file only.* The decoded field then passes every check of a field of nested numbers.
+- **Earlier Studios.** A Studio that reads up to version 13 (main 499a0d3) refuses a version 14 file
+  by name: *This session file is version 14, newer than this Studio reads (versions 6–13). Open it in
+  a newer Studio.*, after *Optical waveguide: * for a project file's entry, and does not take over a
+  browser-recovery record that holds one. The project file stays version 1 (its optical entry reads
+  version 14); the recovery record stays version 1; the optical documents, adapters, server replies,
+  results and the multiphysics session (version 8) are unchanged.
 
 ### Matching modes in Compare
 
