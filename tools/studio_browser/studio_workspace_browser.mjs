@@ -3444,6 +3444,48 @@ try {
       for (const i of items) assert.equal(withField[i.job], !i.text.endsWith(' · values only'), `${label}: ${i.text}`);
       return {items, doc, message};
     };
+    // F7 and F12 (design "Compact field encoding", slice E3): the field view (each component, mode 1 and
+    // the last mode), the line profile and the Export field PNG of the three closed T18 runs, before the
+    // conversion (their fields as text) and after it (at single precision), at the same view and
+    // device pixel ratio, at 1440 × 900 (and the magnitude of mode 1 at 390 × 844). Per channel |Δ| ≤ 1
+    // level and at most 0.1 % of the pixels differ. F12: the browser's encode and decode time of a
+    // field of T19's size (3 modes, 12,253 triangles, 6,263 nodes), and the conversion of the tab's
+    // own session read back (the record before the conversion), single-threaded.
+    const fePng = async () => { const before = new Set((await readdir(rtDownloads)).filter(n => n.endsWith('.png'))); await r.click('#export-field');
+      for (let i = 0; i < 200; i++) { const f = (await readdir(rtDownloads)).find(n => n.endsWith('.png') && !before.has(n)); if (f) { await sleep(500); const png = (await readFile(join(rtDownloads, f))).toString('base64'); await rm(join(rtDownloads, f)); return png; } await sleep(100); }
+      throw new Error('F7: no field PNG'); };
+    const feView = (mode, component) => r.eval(`(()=>{const m=document.getElementById('field-mode');m.value='${mode}';m.onchange();const c=document.getElementById('field-component');c.value='${component}';c.onchange();return 1})()`);
+    const feKeep = (key, expression) => r.eval(`(()=>{const c=${expression};(window.__fe??={})[${JSON.stringify(key)}]=c.getContext('2d').getImageData(0,0,c.width,c.height);return 1})()`);
+    const feCapture = async (tag, jobs) => {
+      const shots = [];
+      await r.click('nav [data-page=Results]');
+      for (const job of jobs) {
+        await r.click(`.run-item[data-run="${job}"]`); await r.until("!!document.getElementById('optical-field')", 'F7 field view ' + tag);
+        // the line profile open before every view: its line is drawn on the field view, the same in both captures
+        await r.eval("(()=>{const d=document.querySelector('details.line-profile');if(!d.open){d.open=true;d.ontoggle();}return 1})()"); await sleep(300);
+        const count = await r.eval("document.getElementById('field-mode').options.length");
+        for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+          await rSize(width, height, mobile);
+          for (const mode of width === 1440 ? [0, count - 1] : [0]) for (const component of (width === 1440 ? ['magnitude', 'Ex', 'Ey', 'Ez'] : ['magnitude'])) {
+            await feView(mode, component); await sleep(250);
+            const key = [job, width, mode + 1, component].join('|'); await feKeep(tag + '|' + key, "document.getElementById('optical-field')"); shots.push(key);
+          }
+        }
+        await rSize(1440, 900);
+        // the line profile (its default line) of mode 1's magnitude
+        await feView(0, 'magnitude'); await r.eval("(()=>{const d=document.querySelector('details.line-profile');if(!d.open){d.open=true;d.ontoggle();}return 1})()"); await sleep(400);
+        const key = [job, 'profile'].join('|'); await feKeep(tag + '|' + key, "document.querySelector('details.line-profile canvas')"); shots.push(key);
+      }
+      // the Export field PNG of the last run, mode 1, magnitude
+      await feView(0, 'magnitude'); await sleep(300);
+      const png = await fePng();
+      await r.eval(`new Promise(res=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas');c.width=i.width;c.height=i.height;const g=c.getContext('2d');g.drawImage(i,0,0);(window.__fe??={})[${JSON.stringify(tag + '|png')}]=g.getImageData(0,0,c.width,c.height);res(1)};i.src='data:image/png;base64,${png}';})`);
+      shots.push('png');
+      return shots;
+    };
+    const feCompare = keys => r.eval(`(()=>{const out={};for(const k of ${JSON.stringify(keys)}){const a=window.__fe['before|'+k],b=window.__fe['after|'+k];
+      if(!a||!b||a.width!==b.width||a.height!==b.height){out[k]={missing:true};continue;}let max=0,differ=0;for(let i=0;i<a.data.length;i+=4){let d=0;for(let c=0;c<4;c++)d=Math.max(d,Math.abs(a.data[i+c]-b.data[i+c]));if(d){differ++;max=Math.max(max,d);}}
+      out[k]={width:a.width,height:a.height,maxDelta:max,share:differ/(a.width*a.height)};}return out})()`);
     await r.call('Page.navigate', {url: base + '/workspace'});
     await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'RT start page');
     await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'RT optical model');
@@ -3458,10 +3500,29 @@ try {
     await rRun(); await afterResult('T18 closed 2 modes');
     await modes(); await r.type('#mode-count-number', 4); await sleep(300); await rRun(); await afterResult('T18 closed 4 modes');
     await modes(); await r.click('#run-edge-search'); await sleep(400);
-    await rRun(); await afterResult('T18 closed near 2.46');
+    await rRun(); const nearResult = await afterResult('T18 closed near 2.46');
+    // F7, before: the three closed T18 runs, their fields as text; F12: the tab's session read back
+    const feJobs = nearResult.items.slice(0, 3).map(i => i.job), feKeys = await feCapture('before', feJobs);
+    const f12 = await r.eval(`(async()=>{const E=await import('/workspace-assets/workspace-field-encoding.mjs'),N=await import('/workspace-assets/workspace-notebook.mjs'),X=await import('/workspace-assets/workspace-retention.mjs');
+      const T=12253,M=6263,k=3,f={node_coordinates:Array.from({length:M},(_,i)=>[(i%97)*3e-8-1.5e-6,Math.floor(i/97)*3e-8-1.2e-6]),triangles:Array.from({length:T},(_,i)=>[i%M,(i+1)%M,(i+2)%M]),
+       real:Array.from({length:k},(_,m)=>Array.from({length:T},(_,i)=>[Math.sin(i+m),Math.cos(i*m),1e-3*(i+1)/T])),imag:Array.from({length:k},(_,m)=>Array.from({length:T},(_,i)=>[0,Math.sin(i*0.5+m+0.1)*1e-2,0]))};
+      const time=fn=>{const t=[];for(let i=0;i<5;i++){const s=performance.now();fn();t.push(performance.now()-s);}t.sort((a,b)=>a-b);return t[2];};
+      let rec;const encode=time(()=>{rec=E.encodeField(f);}),decode=time(()=>E.decodeField(rec,k));
+      const text=await new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>resolve(g.result.session);};});
+      const s=N.parseSession(text);s.runs.forEach(r=>{const n=r.number;delete r.number;r.number=n;});
+      const fields=s.runs.filter(r=>r.field).length,textBytes=s.runs.reduce((t,r)=>t+N.runFieldBytes(r),0),start=performance.now();
+      const out=X.compactFields(s.input,s.runs,s.selected,s.comparison,s.view,{budget:1});
+      return {encodeMs:encode,decodeMs:decode,tab:{runs:s.runs.length,fields,textBytes,converted:out.converted.length,ms:performance.now()-start}};})()`);
+    stage('F12 browser cost', f12);
+    assert.ok(f12.tab.converted === f12.tab.fields && f12.tab.ms <= 500, JSON.stringify(f12));
     await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400); await r.type('#mode-count-number', 2); await sleep(300);
     if (!(await r.eval("document.getElementById('group-index-check').checked"))) await r.click('#group-index-check'); await sleep(300);
     await rRun(); const last = await afterResult('T18 open with n_g');
+    // F7, after: the same runs and views, their fields now at single precision
+    await feCapture('after', feJobs);
+    const f7 = await feCompare(feKeys);
+    stage('F7 plot pixels before and after the conversion', f7);
+    for (const [key, v] of Object.entries(f7)) { assert.ok(!v.missing, key); assert.ok(v.maxDelta <= 1 && v.share <= 0.001, `${key}: ${JSON.stringify(v)}`); }
     stage('RT K10 twelve runs', {records: k10.map(e => [e.label, e.bytes, e.version, e.valuesOnly])});
     // compact fields (design "Compact field encoding"): the conversion sentence exactly once, at the
     // result whose fields would not all fit as text (the first written as version 14); from there on
