@@ -103,18 +103,28 @@ from .edge import EdgeSpace
 from .core import eigen, forms, kernels
 from .core import live as live_inputs
 from .core import solve as core_solve
-from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (galerkin.waveguide re-exports them)
+from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning, PartialSearchWarning  # noqa: F401 (galerkin.waveguide re-exports them)
 from .core.backend import Backend, backend_of, lift, live_namespace, scatter_add, to_numpy
 from .core.checks import contains_live, refuse_live
 from .core.sparse import CooMatrix
 from .core.spaces import TRI_LOCAL_EDGES
 
-__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning"]
+__all__ = ["STATIC_ROOT_TOL", "assemble_mode_system", "solve_modes", "DegenerateModeWarning",
+           "PartialSearchWarning"]
 
 #: Relative size |beta^2| / |sigma| at or below which a root belongs to the static
 #: beta^2 = 0 family (module docstring). Measured static roots away from a TM
 #: cutoff of the PEC box: <= 1.2e-14.
 STATIC_ROOT_TOL = 1e-10
+
+#: ARPACK restarts of the vector search (its ``maxiter``). The 63 searches of the PML and
+#: open-boundary tests (2026-11-25, Linux) converged in at most 14; a search that asks for
+#: more roots than lie between the shift and the static family can take thousands, or never
+#: converge, depending on the last bits of the pencil (docs/packages/galerkin/waveguide_formulation.md).
+SEARCH_RESTARTS = 200
+
+#: Relative residual |A x - lambda B x| / |lambda B x| each root of a partial search must meet.
+PARTIAL_RESIDUAL_TOL = 1e-10
 
 
 def assemble_mode_system(mesh: Mesh, eps_r, k0: float, mu_r=1.0,
@@ -666,6 +676,32 @@ def _moving_system(mesh, step, space, eps_r, k0, mu_r, pec_nodes, pec_edges, *, 
     return xp, A, B, free
 
 
+def _partial_search(stopped, A, B, sigma, requested):
+    """The converged pairs of a shift-invert search that stopped at SEARCH_RESTARTS, or ``stopped``.
+
+    ``nu = 1 / (lambda - sigma)`` with ``A x = lambda B x``; the static family is ``lambda = 0``,
+    ``|nu| = 1 / |sigma|``. The pairs are taken only when the search has reached that family and
+    every other root it converged is nearer the shift: at least one static root converged, every
+    non-static ``|nu| > 1 / |sigma|`` and each non-static pair has
+    ``|A x - lambda B x| / |lambda B x| <= PARTIAL_RESIDUAL_TOL``. Otherwise ``stopped`` is raised.
+    """
+    nu, vecs = np.asarray(stopped.eigenvalues), np.asarray(stopped.eigenvectors)
+    if len(nu) == 0:
+        raise stopped
+    lam = sigma + 1.0 / nu
+    static = np.abs(lam) <= STATIC_ROOT_TOL * abs(sigma)
+    if not static.any() or np.any(np.abs(nu[~static]) <= 1.0 / abs(sigma)):
+        raise stopped
+    for j in np.flatnonzero(~static):
+        Bx = B @ vecs[:, j]
+        if np.linalg.norm(A @ vecs[:, j] - lam[j] * Bx) > PARTIAL_RESIDUAL_TOL * np.linalg.norm(lam[j] * Bx):
+            raise stopped
+    warnings.warn(f"the mode search stopped after {SEARCH_RESTARTS} restarts with {len(nu)} of {requested} "
+                  f"roots converged; the missing values were static roots (beta^2 = 0), which are not "
+                  f"returned", PartialSearchWarning, stacklevel=3)
+    return nu, vecs
+
+
 def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
                        num_modes: int = 6, mu_r=1.0, pec_nodes=None, *, pec_edges=None,
                        coordinate_factors=None):
@@ -691,8 +727,11 @@ def _solve_modes_numpy(mesh: Mesh, eps_r, k0: float, n_target: float | complex,
     sigma = -(k0 * n_target) ** 2
     lu = spla.splu((A - sigma * B).tocsc())
     op = spla.LinearOperator((n, n), matvec=lambda x: lu.solve(B @ x), dtype=lu.L.dtype)
-    nu, vecs = spla.eigs(op, k=num_modes, which="LM", v0=np.ones(n),
-                         ncv=min(n, max(4 * num_modes, 40)), maxiter=20000)
+    try:
+        nu, vecs = spla.eigs(op, k=num_modes, which="LM", v0=np.ones(n),
+                             ncv=min(n, max(4 * num_modes, 40)), maxiter=SEARCH_RESTARTS)
+    except spla.ArpackNoConvergence as stopped:
+        nu, vecs = _partial_search(stopped, A, B, sigma, num_modes)
 
     beta2 = -(sigma + 1.0 / nu)
     # Roots of the static beta^2 = 0 family are not modes (module docstring).

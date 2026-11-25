@@ -1,0 +1,9 @@
+# Fixed
+
+## English
+
+- `galerkin`: **a vector mode search that reaches the static β² = 0 family no longer runs for hours.** A search for more roots than lie between the shift and that exactly degenerate family asks ARPACK for vectors of it, and whether they converge depends on the last bits of the pencil. The bent slab of `tests/simcase/test_pml_gain_bound.py` with 64 roots converged in 67 s under one NumPy CPU dispatch (AVX-512) and had not converged after 30 min under another (AVX2), on the same mesh too. `solve_modes` now stops after `SEARCH_RESTARTS` = 200 ARPACK restarts (it allowed 20000); the 63 searches of the PML and open-boundary tests converge in at most 14, and their results are bit for bit unchanged. At the cap it keeps the converged pairs only when at least one static root converged, every other converged root is nearer the shift (`|nu| > 1/|sigma|`) and each has a relative residual of at most 1e-10, and then warns with the new `galerkin.waveguide.PartialSearchWarning`. Otherwise ARPACK's `ArpackNoConvergence` is raised, as before. No record changes. [Waveguide formulation](docs/packages/galerkin/waveguide_formulation.md#3-full-vector-mixed-nédélecnodal-formulation).
+
+## 한국어
+
+- `galerkin`: **정적 β² = 0 무리에 닿는 벡터 모드 탐색이 더는 몇 시간씩 돌지 않습니다.** shift와 정확히 겹친 그 무리 사이에 있는 근보다 많은 근을 찾는 탐색은 ARPACK에 그 무리의 벡터를 요구하고, 수렴 여부는 pencil의 마지막 비트에 달려 있습니다. `tests/simcase/test_pml_gain_bound.py`의 굽은 slab을 64개 근으로 찾으면 NumPy CPU dispatch 하나(AVX-512)에서는 67초에 수렴했고 다른 dispatch(AVX2)에서는 같은 메시에서도 30분 뒤까지 수렴하지 않았습니다. 이제 `solve_modes`는 ARPACK 재시작 `SEARCH_RESTARTS` = 200번 뒤에 멈춥니다(이전 20000). PML·열린 경계 테스트의 탐색 63개는 최대 14번에 수렴하고 결과는 비트 단위로 같습니다. 한도에서는 정적 근이 하나 이상 수렴했고, 수렴한 다른 근이 모두 shift에 더 가깝고(`|nu| > 1/|sigma|`) 상대 잔차가 1e-10 이하일 때만 수렴한 쌍을 쓰고, 새 `galerkin.waveguide.PartialSearchWarning`으로 경고합니다. 그 밖에는 예전처럼 ARPACK의 `ArpackNoConvergence`를 냅니다. 기록은 바뀌지 않습니다. [도파관 정식화](packages/galerkin/waveguide_formulation.md#3-full-vector-혼합-nédélec절점-정식화).

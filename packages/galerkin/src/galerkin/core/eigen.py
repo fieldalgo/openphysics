@@ -36,6 +36,11 @@ class DegenerateModeWarning(RuntimeWarning):
     """A returned eigenvalue is multiple (to DEGENERATE_GAP): its derivatives are NaN."""
 
 
+class PartialSearchWarning(RuntimeWarning):
+    """A vector mode search stopped at its restart cap; the values it did not converge were
+    static beta^2 = 0 roots, which are never returned (galerkin._waveguide_kernels)."""
+
+
 def scipy_matrix(matrix):
     """The numbers of a CooMatrix as a SciPy CSC matrix."""
     return sp.coo_matrix((to_numpy(matrix.values), (matrix.rows, matrix.cols)),

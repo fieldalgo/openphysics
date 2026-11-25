@@ -49,14 +49,14 @@ from ._public import refuse_text
 from ._waveguide_kernels import STATIC_ROOT_TOL, solve_modes as _solve_modes
 from .core.backend import is_live, to_numpy
 from .core.checks import contains_live
-from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning  # noqa: F401 (DEGENERATE_GAP is read here, as before)
+from .core.eigen import DEGENERATE_GAP, DegenerateModeWarning, PartialSearchWarning  # noqa: F401 (DEGENERATE_GAP is read here, as before)
 from .edge import EdgeSpace
 from .mode_coordinates import mode_coordinates as _mode_coordinates
 from .mode_overlap import (confinement_factor as _confinement_factor, coupling_efficiency as _coupling_efficiency,
                            effective_area as _effective_area, vector_cross_power as _vector_cross_power,
                            vector_field_overlap as _vector_field_overlap, vector_power as _vector_power)
 
-__all__ = ["STATIC_ROOT_TOL", "DegenerateModeWarning", "ModalPML", "Bend", "WaveguideModes",
+__all__ = ["STATIC_ROOT_TOL", "DegenerateModeWarning", "PartialSearchWarning", "ModalPML", "Bend", "WaveguideModes",
            "solve_waveguide_modes", "DegenerateModeBranches", "degenerate_branch_derivatives", "mode_power", "cross_power", "field_overlap", "mode_coupling_efficiency",
            "mode_confinement_factor", "mode_effective_area"]
 
