@@ -2121,7 +2121,10 @@ values, and a tab over 16 MiB showed fields that Save asked about and recovery l
   fields* with **Pin Run 3** (two or more: *… and Run 5 (…) keep their values, not their fields*);
   with no such run it says *If you run: older runs' fields may not be kept (16.8 MB limit) · pin a
   run to keep its fields first* (round 25, A1; no Pin button, it names no run) when the room left in
-  the 16.8 MB is less than the smallest field kept now, and otherwise nothing. While the run computes: *When this run finishes, Run 3 (…) keeps
+  the 16.8 MB is less than the smallest field kept now, and otherwise nothing. Both lines count the
+  sizes the result's arrival will apply: in a tab whose fields are still text, a result whose fields
+  would not all fit as text makes every field compact first ([compact fields](#compact-fields-single-precision)),
+  so the line names only the runs that would go even at single precision (round 26, C1). While the run computes: *When this run finishes, Run 3 (…) keeps
   its values, not its fields*. At 20 runs the line keeps the drop words above. After the result,
   Messages says *Run 3 (…) keeps its values; its fields were not kept (16.8 MB limit).* with
   **Recompute Run 3's fields** and, when another unpinned, unselected run has a field at least as
