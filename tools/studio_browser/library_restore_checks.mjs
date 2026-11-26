@@ -45,10 +45,10 @@ export function assertLibraryRestore(state, {visible, cards = {}}, tag) {
   }
   // round 31 (K1): the box note keeps only its first sentence
   if (state.box?.note != null) assert.equal(state.box.note, 'Restore brings back completed runs kept in this browser, without recomputing.', tag);
-  if (state.other) assert.ok(state.other.detail.startsWith('Older · kept in this browser '), state.other.detail);
+  if (state.other) { assert.ok(state.other.detail.startsWith('Older · kept in this browser '), state.other.detail); assert.ok(!(state.other.text + state.other.detail).includes('Open file'), state.other.detail); }
   if (state.copies) {
     assert.equal(state.copies.summary, `Earlier copies in this browser (${state.copies.entries.length})`, tag);
-    for (const e of state.copies.entries) { assert.ok(e.text.startsWith('Restore '), e.text); assert.ok(/^(?:Older copy|Copy without runs) · kept in this browser /.test(e.detail), e.detail); }
+    for (const e of state.copies.entries) { assert.ok(e.text.startsWith('Restore '), e.text); assert.ok(/^(?:Older copy|Copy without runs) · kept in this browser /.test(e.detail), e.detail); assert.ok(!(e.text + e.detail).includes('Open file'), e.detail); }
   }
 }
 
