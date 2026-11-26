@@ -153,7 +153,7 @@ test('V17: the digest covers every key of a version 9 run; unknown keys and mode
  // (version 10, the open boundary, is read since slice P2, and version 11, the closed-window search,
  // since slice C2, and version 12, the run numbers, and version 13, more than six runs, since then: version 14 is the newer one; the refusal Studio 4b58fb7 gave a version 10 file is
  // newerVersionText(10, 9), and the one Studio 13f07f4 gives a version 11 file newerVersionText(11, 10))
- assert.throws(()=>N.parseSession(edit(text,d=>{d.version=17;})),{message:'This session file is version 17, newer than this Studio reads (versions 6–16). Open it in a newer Studio.'});
+ assert.throws(()=>N.parseSession(edit(text,d=>{d.version=18;})),{message:'This session file is version 18, newer than this Studio reads (versions 6–17). Open it in a newer Studio.'});
  assert.equal(N.newerVersionText(11,10),'This session file is version 11, newer than this Studio reads (versions 6–10). Open it in a newer Studio.');
  assert.equal(N.newerVersionText(10,9),'This session file is version 10, newer than this Studio reads (versions 6–9). Open it in a newer Studio.');
  assert.equal(N.newerVersionText(9,8),'This session file is version 9, newer than this Studio reads (versions 6–8). Open it in a newer Studio.');

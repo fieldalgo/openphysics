@@ -9,6 +9,7 @@
 //   node tools/studio_heated_retention.mjs engine <dir> <tag> [--python python] [--only a,b]
 //   node tools/studio_heated_retention.mjs hk1 <dir> <out>
 //   node tools/studio_heated_retention.mjs hk5 <dir> <out>          (one-b against one-a)
+//   node tools/studio_heated_retention.mjs hq <dir> <out>           (HQ1 to HQ4: compact maps, session version 17)
 //
 // writes <dir>/<case>.document.json ({document, events}) and <dir>/<case>.<tag>.result.json, and
 // appends one line per case to <dir>/<tag>.times.json. The solve is single threaded (OMP, OpenBLAS
@@ -165,10 +166,68 @@ export async function hk5(dir, out = null) {
   return report;
 }
 
+// HQ1 to HQ4 (design "Session versions 16 and 17", section 3.4, pre-registered limits): each case's
+// maps made compact (workspace-map-encoding.mjs) and read back from a version 17 file. HQ1: every
+// decoded sample is bitwise base + fround(x − base), the coordinates, triangles and regions bitwise
+// equal; HQ2: |ΔT| of each node ≤ 2^-24·(range.max − range.min) + 2^-52·|T|; HQ3: the coupled
+// (triangle) temperature against the server's within the same bound; HQ4: |Δ| of n, k and
+// index_change ≤ 2^-24·max over the region |x − base| + 2^-52·|x|. The worst of each is recorded.
+export async function hqAccuracy(dir, out = null, cases = ['tpl-p2', 'tpl4-p2', 'v012', 'v008', 'slab']) {
+  const M = await page('workspace-multiphysics-session.mjs'), N = await page('workspace-notebook.mjs'), E = await page('workspace-map-encoding.mjs');
+  const report = {check: 'HQ1-HQ4', cases: {}, failures: []};
+  for (const name of cases) {
+    const run = await runOf(dir, name, {number: 1, job: 'mp-00000000b001', completedAt: '2026-11-26T01:00:00.000Z'});
+    const server = structuredClone(run.result);
+    if (!M.compactRunMaps(run)) {report.failures.push(name + ': maps not compact'); continue;}
+    const text = M.writeMultiphysicsSession({document: run.doc, runs: [run], baselines: {}, selected: run.job, view}).text;
+    const read = N.parseSession(text).runs[0].result, fail = what => report.failures.push(`${name}: ${what}`);
+    if (JSON.parse(text).version !== 17) fail('not version 17');
+    const m = server.mesh, d = read.mesh;
+    if (JSON.stringify(m.node_coordinates) !== JSON.stringify(d.node_coordinates) || !m.node_coordinates.flat().every((x, i) => Object.is(x, d.node_coordinates.flat()[i]))) fail('HQ1 node coordinates differ');
+    if (JSON.stringify(m.triangles) !== JSON.stringify(d.triangles) || JSON.stringify(m.regions) !== JSON.stringify(d.regions)) fail('HQ1 triangles or regions differ');
+    const entry = {nodes: m.node_coordinates.length, triangles: m.triangles.length};
+    const R = m.regions, names = m.region_names.length;
+    for (const [pname, p] of Object.entries(server.physics)) {
+      if (p.type === 'thermal.steady2d') {
+        const T = p.temperature.values, D = read.physics[pname].temperature.values, base = p.range.min, span = p.range.max - p.range.min;
+        let worst = 0, ratio = 0;
+        T.forEach((x, i) => {
+          if (!Object.is(D[i], base + Math.fround(x - base))) fail(`HQ1 ${pname} node ${i} is not base + fround(x − base)`);
+          const e = Math.abs(D[i] - x), bound = 2 ** -24 * span + 2 ** -52 * Math.abs(x); worst = Math.max(worst, e); ratio = Math.max(ratio, e / bound);
+          if (e > bound) fail(`HQ2 ${pname} node ${i}: |ΔT| ${e} > ${bound}`);
+        });
+        entry[pname] = {span, nodeT_abs: worst, nodeT_bound_ratio: ratio, rangeMinExact: Math.min(...D) === base, rangeMaxRule: Math.max(...D) === base + Math.fround(span)};
+      } else if (p.coupled) {
+        const c = p.coupled, k = read.physics[pname].coupled, src = server.physics.heat1 ?? Object.values(server.physics).find(q => q.type === 'thermal.steady2d');
+        const span = src.range.max - src.range.min;
+        let worst = 0;
+        c.temperature.values.forEach((x, i) => {const e = Math.abs(k.temperature.values[i] - x), bound = 2 ** -24 * span + 2 ** -52 * Math.abs(x); worst = Math.max(worst, e); if (e > bound) fail(`HQ3 ${pname} triangle ${i}: |ΔT| ${e} > ${bound}`);});
+        entry[pname] = {coupledT_abs: worst};
+        for (const [label, a, b] of [['n', c.refractive_index.n, k.refractive_index.n], ['k', c.refractive_index.k, k.refractive_index.k], ['index_change', c.index_change, k.index_change]]) {
+          if (a == null) {if (b != null) fail(`${label} appeared`); continue;}
+          const base = E.regionBases(a, R, names), spread = new Array(names).fill(0);
+          a.forEach((x, i) => {spread[R[i]] = Math.max(spread[R[i]], Math.abs(x - base[R[i]]));});
+          let w = 0;
+          a.forEach((x, i) => {
+            if (!Object.is(b[i], base[R[i]] + Math.fround(x - base[R[i]]))) fail(`HQ1 ${label} triangle ${i} is not base + fround(x − base)`);
+            const e = Math.abs(b[i] - x), bound = 2 ** -24 * spread[R[i]] + 2 ** -52 * Math.abs(x); w = Math.max(w, e); if (e > bound) fail(`HQ4 ${label} triangle ${i}: ${e} > ${bound}`);
+          });
+          entry[pname][label + '_abs'] = w;
+        }
+      }
+    }
+    report.cases[name] = entry; console.log(name, JSON.stringify(entry));
+  }
+  if (out) {await mkdir(out, {recursive: true}); await writeFile(join(out, 'hq-accuracy.json'), JSON.stringify(report, null, 1) + '\n');}
+  console.log(JSON.stringify({failures: report.failures}));
+  return report;
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [command, dir, arg, ...rest] = process.argv.slice(2);
   if (command === 'engine') await engine(resolve(dir), arg, rest);
   else if (command === 'hk1') {if ((await hk1(resolve(dir), resolve(arg))).failures.length) process.exitCode = 1;}
   else if (command === 'hk5') {if ((await hk5(resolve(dir), resolve(arg))).failures.length) process.exitCode = 1;}
-  else throw new Error('usage: engine <dir> <tag> | hk1 <dir> <out> | hk5 <dir> <out>');
+  else if (command === 'hq') {if ((await hqAccuracy(resolve(dir), resolve(arg))).failures.length) process.exitCode = 1;}
+  else throw new Error('usage: engine <dir> <tag> | hk1 <dir> <out> | hk5 <dir> <out> | hq <dir> <out>');
 }

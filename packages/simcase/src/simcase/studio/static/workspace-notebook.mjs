@@ -602,9 +602,11 @@ export const sessionRunLimit=version=>version===RUNS_SESSION_VERSION||version===
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
 // version 9 is an optical session with application: 'optical'; versions 10 to 14 and 16 are optical
-// and version 15 is a multiphysics model of more than six runs (run retention of the heated model).
-/** The highest session version this Studio reads: 16, TIMED_SESSION_VERSION (run time on open runs). */
-export const HIGHEST_SESSION_VERSION=16;
+// and version 15 is a multiphysics model of more than six runs (run retention of the heated model);
+// version 17 is a multiphysics model with compact maps (workspace-map-encoding.mjs).
+/** The highest session version this Studio reads: 17, COMPACT_MULTIPHYSICS_VERSION (compact heated
+ * maps), written here as a number since the two modules import each other. */
+export const HIGHEST_SESSION_VERSION=17;
 export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
  let doc;try{doc=JSON.parse(text);}catch{

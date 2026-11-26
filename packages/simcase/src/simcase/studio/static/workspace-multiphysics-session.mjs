@@ -8,6 +8,11 @@
 // written only when the session has more than six runs; a session of six or fewer is version 8, byte
 // for byte. The maps of the runs are kept within the field budget (workspace-budget.mjs) when a map
 // arrives: a new result, a recompute, or an opened or restored session.
+// Version 17 (compact heated maps, design "Session versions 16 and 17" section 3): version 15 whose
+// runs may hold compact maps (maps "compact", workspace-map-encoding.mjs: float64 coordinates, uint32
+// triangles, uint8 regions and float32 offsets from float64 bases, the coupled temperature left out),
+// 0 to 20 runs. Written only when a run of the session holds compact maps; otherwise version 15 or 8,
+// byte for byte. The previous Studio reads versions 6 to 16 and refuses a version 17 file by name.
 //
 // Every number is written in its shortest round-trip form, as JSON.stringify writes it, except
 // negative zero, which is written -0.0 so that it reads back as negative zero; NaN and the
@@ -17,17 +22,21 @@
 import {ENVELOPE,uncoupledDocument,canonicalJson,physicsLabel,materialUses,couplingTitle} from './workspace-multiphysics.mjs';
 import {FIELD_BUDGET_BYTES,budgetOrder,budgetChoose,sameValue,valuePair} from './workspace-budget.mjs';
 import {validateRunLabel} from './workspace-notebook.mjs';
+import {MAP_ENCODING,compactMapsRecord,compactResult,decodeMaps,isCompactResult} from './workspace-map-encoding.mjs';
 
 export const SESSION_FORMAT='openphysics-studio-session';
 export const MULTIPHYSICS_VERSION=8;
 export const RUNS_MULTIPHYSICS_VERSION=15;
+export const COMPACT_MULTIPHYSICS_VERSION=17;
 export const MULTIPHYSICS_RUN_LIMIT=20;
 /** The most runs a version 8 file holds. */
 export const PREVIOUS_MULTIPHYSICS_RUN_LIMIT=6;
-/** The version a session of these runs is written as: 15 above six runs, else 8. */
-export const multiphysicsVersion=runs=>runs.length>PREVIOUS_MULTIPHYSICS_RUN_LIMIT?RUNS_MULTIPHYSICS_VERSION:MULTIPHYSICS_VERSION;
+/** The version a session of these runs is written as: 17 when a run holds compact maps, else 15 above
+ * six runs, else 8. */
+export const multiphysicsVersion=runs=>runs.some(r=>r.maps==='compact')?COMPACT_MULTIPHYSICS_VERSION:runs.length>PREVIOUS_MULTIPHYSICS_RUN_LIMIT?RUNS_MULTIPHYSICS_VERSION:MULTIPHYSICS_VERSION;
 /** The session versions of a multiphysics model. */
-export const MULTIPHYSICS_VERSIONS=Object.freeze([MULTIPHYSICS_VERSION,RUNS_MULTIPHYSICS_VERSION]);
+export const MULTIPHYSICS_VERSIONS=Object.freeze([MULTIPHYSICS_VERSION,RUNS_MULTIPHYSICS_VERSION,COMPACT_MULTIPHYSICS_VERSION]);
+export {MAP_ENCODING,isCompactResult};
 export const MAX_SESSION_BYTES=16*1024*1024;
 export const MAX_DOCUMENT_BYTES=1024*1024;
 export const RESULT_FORMAT='multiphysics-run-v1';
@@ -119,10 +128,12 @@ export function valuesOnly(result){
 export function meshCounts(result){return {nodes:result.mesh.node_coordinates.length,triangles:result.mesh.triangles.length};}
 /** A run as the file stores it. keepMaps false stores its values only (§2), with the node and
  * triangle counts the Coupling check names. */
+// A run with compact maps (version 17) writes its compact record: the strings it was read from or
+// encoded to.
 export function sessionRun(run,keepMaps=true){
- const kept=keepMaps&&run.maps!=='not kept';
+ const kept=keepMaps&&run.maps!=='not kept',compact=kept&&run.maps==='compact';
  const record={job:run.job,number:run.number,label:run.label||'',pinned:run.pinned===true,completedAt:run.completedAt,serverVersion:run.serverVersion??null,
-  document:run.doc,events:run.events||[],maps:kept?'kept':'not kept',...(kept?{}:{counts:run.counts||meshCounts(run.result)}),result:kept?run.result:run.maps==='not kept'?run.result:valuesOnly(run.result)};
+  document:run.doc,events:run.events||[],maps:compact?'compact':kept?'kept':'not kept',...(kept?{}:{counts:run.counts||meshCounts(run.result)}),result:compact?compactMapsRecord(run.result):kept?run.result:run.maps==='not kept'?run.result:valuesOnly(run.result)};
  return {...record,digest:recordDigest(record)};
 }
 function sessionBaseline(b){const record={job:b.job,completedAt:b.completedAt,document:b.document,result:b.result};return {...record,digest:recordDigest(record)};}
@@ -197,6 +208,17 @@ export function recoveryText(state,limit=MAX_SESSION_BYTES){
 /** The bytes a run's maps add to a session file: its record with its maps less its record without
  * them (both texts cached while the run is unchanged); 0 for a run without maps. */
 export function mapBytes(run){return run.maps==='not kept'?0:runPiece(run,true).bytes-runPiece(run,false).bytes;}
+/** A run's maps made compact (version 17), in place: its result becomes the decoded result of its
+ * compact record (workspace-map-encoding.mjs), so the run holds the values a file holds; maps
+ * "compact". A run without maps, already compact, or whose maps cannot be kept compact (more than 256
+ * regions, a value beyond single precision, no node temperatures for its coupled maps) is unchanged.
+ * Returns whether the run holds compact maps. */
+export function compactRunMaps(run){
+ if(run.maps==='compact')return true;
+ if(run.maps!=='kept')return false;
+ const result=compactResult(run.result,run.doc);if(!result)return false;
+ run.result=result;run.maps='compact';return true;
+}
 /** The session file's bytes with no run's maps (the base of the budget). */
 export const sessionBytesWithoutMaps=state=>fileParts(state,new Set()).bytes;
 /** The session text with the maps of the runs in keep only (for checks; null: every run's). */
@@ -327,7 +349,7 @@ const fail=text=>{throw new Error(text);};
 const finite=x=>typeof x==='number'&&Number.isFinite(x);
 const runName=(r,i)=>`Run ${Number.isInteger(r?.number)&&r.number>0?r.number:i+1}`;
 function documentSize(doc,what){if(!isObject(doc))fail(`${what} has no model.`);if(byteLength(sessionJson(doc))>MAX_DOCUMENT_BYTES)fail(`${what} is over 1 MiB, the size Studio reads a model file up to.`);}
-function checkArrays(r,result,run){
+function checkArrays(r,result,run,compact=false){
  const where=`${r}'s stored maps are not well formed`,mesh=result.mesh;
  if(!isObject(mesh))fail(`${where}: the mesh is missing.`);
  const P=mesh.node_coordinates,T=mesh.triangles,R=mesh.regions,names=mesh.region_names;
@@ -346,7 +368,9 @@ function checkArrays(r,result,run){
    if(p.temperature?.unit!=='K'||p.temperature?.location!=='node')fail(`${where}: ${physicsLabel(name)} temperature must be node values in K.`);
    values(p.temperature.values,N,`${physicsLabel(name)} node temperature`);
    let lo=Infinity,hi=-Infinity;for(const v of p.temperature.values){if(v<lo)lo=v;if(v>hi)hi=v;}
-   if(p.range?.min!==lo||p.range?.max!==hi)fail(`${r}'s heat range does not equal the minimum and maximum of its stored temperatures.`);
+   // compact maps (version 17): the minimum decodes to range.min, the maximum to range.min plus the
+   // float32 of the span
+   if(p.range?.min!==lo||(compact?hi!==p.range.min+Math.fround(p.range.max-p.range.min):p.range?.max!==hi))fail(`${r}'s heat range does not equal the minimum and maximum of its stored temperatures.`);
   }else if(p.type==='em.modes2d'&&p.coupled){
    const c=p.coupled;
    if(c.temperature?.unit!=='K'||c.temperature?.location!=='element')fail(`${where}: the coupled temperature must be triangle values in K.`);
@@ -365,14 +389,14 @@ function indexSeries(s){
  if('values' in s)return !('re' in s)&&!('im' in s)&&indexRows(s.values);
  return indexRows(s.re)&&indexRows(s.im)&&s.re.length===s.im.length&&s.re.every((row,i)=>row.length===s.im[i].length)&&s.time_convention==='exp(-i omega t)';
 }
-function checkValues(r,result,run){
+function checkValues(r,result,run,compact=false){
  for(const [name,p] of Object.entries(result.physics)){
   if(p.type==='thermal.steady2d'&&!(finite(p.range?.min)&&finite(p.range?.max)&&p.range.min<=p.range.max&&p.range.unit==='K'))fail(`${r}'s heat range is not well formed.`);
   if(p.type==='em.modes2d'&&!indexSeries(p.effective_index))fail(`${r}'s ${physicsLabel(name)} effective index is not well formed.`);
  }
  if(run.maps==='not kept'){const c=run.counts;if(!isObject(c)||!Number.isInteger(c.nodes)||c.nodes<1||!Number.isInteger(c.triangles)||c.triangles<1)fail(`${r} keeps no maps and no node and triangle counts.`);
   if('mesh' in result)fail(`${r} says its maps are not kept but holds a mesh.`);}
- else{if('counts' in run)fail(`${r} keeps its maps and also counts.`);checkArrays(r,result,run);}
+ else{if('counts' in run)fail(`${r} keeps its maps and also counts.`);checkArrays(r,result,run,compact);}
 }
 // a quantity "1e-6 K" in K, for the loop tolerance
 const KELVIN={K:1,mK:1e-3,uK:1e-6,'µK':1e-6};
@@ -405,8 +429,8 @@ export function readMultiphysicsSession(doc,{recovered=false}={}){
  if(doc.application!=='multiphysics')fail(`This session file holds a “${typeof doc.application==='string'?doc.application:'unnamed'}” model, which this Studio does not read.`);
  documentSize(doc.document,'The session');
  if(typeof doc.document.openphysics!=='string')fail('The session model has no "openphysics" version.');
- // version 8 holds up to six runs, version 15 up to 20
- const limit=doc.version===RUNS_MULTIPHYSICS_VERSION?MULTIPHYSICS_RUN_LIMIT:PREVIOUS_MULTIPHYSICS_RUN_LIMIT;
+ // version 8 holds up to six runs, versions 15 and 17 up to 20
+ const limit=doc.version===RUNS_MULTIPHYSICS_VERSION||doc.version===COMPACT_MULTIPHYSICS_VERSION?MULTIPHYSICS_RUN_LIMIT:PREVIOUS_MULTIPHYSICS_RUN_LIMIT;
  if(!Array.isArray(doc.runs)||doc.runs.length>limit)fail('Unsupported session format or run count.');
  const jobs=new Set(),numbers=new Set(),runs=[],documents=[{what:'The session model',doc:doc.document,current:true}];
  doc.runs.forEach((raw,i)=>{
@@ -422,18 +446,21 @@ export function readMultiphysicsSession(doc,{recovered=false}={}){
   if(raw.serverVersion!==null&&(typeof raw.serverVersion!=='string'||!/^\d[0-9A-Za-z.+-]{0,63}$/.test(raw.serverVersion)))fail(`${r} has an invalid server version.`);
   documentSize(raw.document,r);
   if(!Array.isArray(raw.events)||!raw.events.every(e=>isObject(e)&&typeof e.event==='string'))fail(`${r}'s progress events are not well formed.`);
-  if(!['kept','not kept'].includes(raw.maps))fail(`${r} does not say whether its maps are kept.`);
+  if(!['kept','not kept','compact'].includes(raw.maps))fail(`${r} does not say whether its maps are kept.`);
+  if(raw.maps==='compact'&&doc.version!==COMPACT_MULTIPHYSICS_VERSION)fail(`${r}'s stored maps are not well formed: compact maps are read from a version 17 session file only.`);
   if(!isObject(raw.result))fail(`${r} has no result.`);
   const multi=raw.document.openphysics===ENVELOPE,types=Object.values(isObject(raw.document.physics)?raw.document.physics:{}).map(p=>p?.type);
   // a document of another envelope is refused by the server's reader, named in the run (§3.3)
   const known=multi||raw.document.openphysics==='0.3',accepted=multi?[RESULT_FORMAT]:types.length===1?SINGLE_RESULT_FORMATS[types[0]]||[]:[];
   if(known&&!accepted.includes(raw.result.result))fail(`${r} was saved as result “${typeof raw.result.result==='string'?raw.result.result:'unnamed'}”, which this Studio does not read.`);
   // a record of an unexpected shape is refused by name, not with the engine's TypeError
-  try{checkStructure(r,raw.result,raw.document);checkValues(r,raw.result,raw);}catch(e){if(e instanceof TypeError)fail(`${r} is not well formed.`);throw e;}
+  // compact maps are decoded first (their strings checked), then checked as maps of nested numbers
+  let result=raw.result;
+  try{if(raw.maps==='compact')result=decodeMaps(raw.result,raw.document,r);checkStructure(r,result,raw.document);checkValues(r,result,raw,raw.maps==='compact');}catch(e){if(e instanceof TypeError)fail(`${r} is not well formed.`);throw e;}
   if(typeof raw.digest!=='string'||raw.digest!==recordDigest(raw))fail(`${r} changed after it was saved (its check value does not match).`);
   documents.push({what:r,doc:raw.document,run:raw.job,order:raw.result.solve_order});
   runs.push({job:raw.job,number:raw.number,label,pinned:raw.pinned,completedAt:new Date(raw.completedAt).toISOString(),serverVersion:raw.serverVersion,doc:raw.document,events:raw.events,
-   order:raw.result.solve_order,result:raw.result,maps:raw.maps,...(raw.maps==='not kept'?{counts:{nodes:raw.counts.nodes,triangles:raw.counts.triangles}}:{}),origin:recovered?'recovered':'imported'});
+   order:raw.result.solve_order,result,maps:raw.maps,...(raw.maps==='not kept'?{counts:{nodes:raw.counts.nodes,triangles:raw.counts.triangles}}:{}),origin:recovered?'recovered':'imported'});
  });
  const baselines={};
  if(!isObject(doc.baselines))fail('The without-heater results are not well formed.');

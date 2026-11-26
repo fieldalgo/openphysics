@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- Studio: **multiphysics session version 17 holds compact heated maps** (encoding `f32-offset-base64-v1`): a run's mesh as float64 coordinates, uint32 triangles and uint8 regions, its node temperatures as float32 offsets from the heat range's minimum and its index maps (n, k, index_change) as float32 offsets from a float64 base per region, in base64, about 2.7 times smaller than as text; the coupled temperature is left out and read as the mean of each triangle's node temperatures. Every value of the run (n_eff, the range, the coupling check, the iteration history) stays the server's, and the maps read back within 2⁻²⁴ of the heat range or of the region's spread (under 1 µK and 1e-11 on the four measured models). Version 17 is written only when a run holds compact maps; versions 8 and 15 are written byte for byte as before. Damaged compact maps are refused with *Run N's stored maps are not well formed: …*. An earlier Studio refuses a version 17 file with "This session file is version 17, newer than this Studio reads (versions 6–15)." [Session files of multiphysics models (version 17)](docs/packages/simcase/workspace.md#session-files-of-multiphysics-models-version-17).
+
+## 한국어
+
+- Studio: **다중물리 세션 버전 17이 압축한 가열 맵을 담습니다**(인코딩 `f32-offset-base64-v1`): 실행의 메시는 float64 좌표, uint32 삼각형, uint8 영역으로, 노드 온도는 열 범위 최솟값에서의 float32 오프셋으로, 굴절률 맵(n, k, index_change)은 영역마다 float64 기준값에서의 float32 오프셋으로 base64에 담아 텍스트보다 약 2.7배 작습니다. 결합 온도는 빼고 삼각형마다 노드 온도의 평균으로 읽습니다. 실행의 모든 값(n_eff, 범위, 결합 검사, 반복 기록)은 서버의 값 그대로이고, 맵은 열 범위나 영역 안 퍼짐의 2⁻²⁴ 이내로 되읽힙니다(잰 모델 넷에서 1 µK와 1e-11 미만). 버전 17은 실행이 압축 맵을 가질 때만 쓰고, 버전 8과 15는 이전처럼 바이트 그대로 씁니다. 손상된 압축 맵은 *Run N's stored maps are not well formed: …*로 거부합니다. 이전 Studio는 버전 17 파일을 "This session file is version 17, newer than this Studio reads (versions 6–15)."로 거부합니다. [다중물리 모델의 세션 파일(버전 17)](packages/simcase/workspace.md#다중물리-모델의-세션-파일버전-17).

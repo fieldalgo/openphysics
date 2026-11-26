@@ -77,7 +77,7 @@ test('HK3: version 15 holds 7 to 20 runs, is read and written byte for byte, and
  assert.equal(M.writeMultiphysicsSession(stateOfSession(session)).text,text);assert.equal(M.recoveryText(stateOfSession(session)).text,text);
  const project=PF.writeProject({name:'p',savedAt:'2026-11-25T10:00:00.000Z',studio:'0.0.0',active:'m1',entries:[PF.projectEntry({id:'m1',kind:'multiphysics',title:'Heated silicon waveguide',card:'heated-waveguide',text})]}).text;
  assert.equal(PF.readProject(project).models[0].session.runs.length,13);
- assert.deepEqual([...PF.KIND_VERSIONS.multiphysics],[8,15]);
+ assert.deepEqual([...PF.KIND_VERSIONS.multiphysics],[8,15,17]);
  // 7 and 20 runs: version 15, written and read again byte for byte; six runs: version 8
  for(const count of [6,7,20]){
   const runs=Array.from({length:count},(_,i)=>runOf(i+1,3+i%4)),t=M.writeMultiphysicsSession(stateOf(runs)).text;
@@ -100,8 +100,8 @@ test('HK3: version 15 holds 7 to 20 runs, is read and written byte for byte, and
  refused(edit(text,d=>{d.runs[0].result.mesh.triangles[0][0]=99999;d.runs[0].digest=M.recordDigest(d.runs[0]);}),"Run 2's stored maps are not well formed: triangle 0 names node 99999, outside 0–1725.");
  refused(edit(text,d=>{d.application='optical';}),'This session file holds a “optical” model, which this Studio does not read.');
  // above 15 by name
- refused(edit(text,d=>{d.version=17;}),'This session file is version 17, newer than this Studio reads (versions 6–16). Open it in a newer Studio.');
- assert.equal(N.HIGHEST_SESSION_VERSION,N.TIMED_SESSION_VERSION);
+ refused(edit(text,d=>{d.version=18;}),'This session file is version 18, newer than this Studio reads (versions 6–17). Open it in a newer Studio.');
+ assert.equal(N.HIGHEST_SESSION_VERSION,M.COMPACT_MULTIPHYSICS_VERSION);
 });
 
 test('HK4: main ddb09a1 refuses a version 15 file by name, alone, in a project and in a recovery record, and does not adopt the record',async()=>{
