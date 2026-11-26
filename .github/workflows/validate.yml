@@ -171,8 +171,10 @@ jobs:
     # CPU. Plus about 3 min of setup; the limit only stops hung jobs. Sixteen parts since the
     # boundary- and corner-panel tests landed (2026-11-25): with them the suite is about 378 min
     # (run 45536602993), and twelve balanced parts still ran 21-42 min of tests because the
-    # runners' speed varies.
-    timeout-minutes: 45
+    # runners' speed varies. On an EPYC 7763 runner the corner-harmonic solves run about 2.3
+    # times slower (run 45553196144: a part balanced to 23.5 min took 40.7 min of tests and
+    # 43 min in all), so the limit is 60 min; it still only stops hung jobs.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -247,8 +249,9 @@ jobs:
     # In one job the step took 39-71 min on 2026-11-20, following the runner CPU (EPYC
     # 9V45 39, Xeon 8573C 51, EPYC 7763 63 and over 74, Xeon 8370C 71); the eight parts of
     # the 63-min run would be 7.1-10.9 min, the longest being one test
-    # (test_cavity_mesh_slab_refinement.py). The limit only stops hung jobs.
-    timeout-minutes: 45
+    # (test_cavity_mesh_slab_refinement.py). 60 min, like the source parts, for the slow
+    # runners with the corner-panel tests; the limit only stops hung jobs.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
