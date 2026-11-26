@@ -12,6 +12,7 @@ mod delaunay;
 mod exact_ref;
 mod facet;
 mod facetrec;
+mod locked;
 mod mesh;
 mod mixed;
 mod plc;
@@ -439,7 +440,7 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     let (plc, checked) = py.detach(move || { let c = plc::check(&plc); (plc, c) });
     let checked = checked.map_err(invalid_plc)?;
     // errors: ("RecoveryFail" | "NotClosed" | "RoundingFail" | "RegionSeed" | "RefineFail" | "Internal", message, ids)
-    let (m, b, rs) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
+    let (m, b, rs, ls) = py.detach(move || -> Result<_, (&'static str, String, Vec<u32>)> {
         // parity mode: an open surface is refused (witness 6) before recovery, which can fail
         // on it first (an open surface of coplanar points has no tetrahedra)
         if domain == mesh::Domain::Parity && seeds.is_empty() {
@@ -452,19 +453,12 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
         }
         let mut b = facetrec::recover_boundary_checked(&plc, checked, max_depth).map_err(|e| ("RecoveryFail", e, vec![]))?;
         let locked = locked.unwrap_or_default();
-        // a locked (curved) facet is sampled on its surface by the caller: recovery must find
-        // it among the Delaunay faces, with no point added on it or on its edges
-        let n_in = plc.points.len() as u32;
-        for &fi in &locked {
-            let Some(subs) = b.plc.subfacets.get(fi as usize) else {
-                return Err(("Internal", format!("locked facet {fi} does not exist"), vec![]));
-            };
-            if let Some(v) = subs.iter().flatten().find(|&&v| v >= n_in) {
-                return Err(("RecoveryFail", format!(
-                    "locked facet {fi} needs a point that is not an input point ({v}); a curved surface \
-                     must be sampled so that its triangles are Delaunay faces"), vec![fi]));
-            }
+        // a locked facet keeps its triangles: no point on it or on its edges. Recovery may
+        // put S points there; they move into the domain (design option (B), locked.rs)
+        if let Some(&fi) = locked.iter().find(|&&fi| fi as usize >= b.plc.subfacets.len()) {
+            return Err(("Internal", format!("locked facet {fi} does not exist"), vec![]));
         }
+        let ls = locked::relocate(&plc.points, &mut b, &locked).map_err(|e| ("RecoveryFail", e, vec![]))?;
         let mut rs = refine::RefineStats::default();
         if h > 0.0 || ratio > 0.0 {
             let opt = refine::RefineOptions { h, alpha, ratio, max_points };  // 0: refine() derives the cap from the size field
@@ -482,7 +476,7 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
             mesh::MeshError::Seed(_) => ("RegionSeed", e.to_string(), vec![]),
             mesh::MeshError::Internal(_) => ("Internal", e.to_string(), vec![]),
         })?;
-        Ok((m, b.stats, rs))
+        Ok((m, b.stats, rs, ls))
     }).map_err(|(kind, msg, ids)| PyValueError::new_err((kind, msg, ids)))?;
     let i64_bytes = |xs: Vec<u32>| -> PyResult<Bound<'py, PyBytes>> {
         PyBytes::new_with(py, 8 * xs.len(), |buf| {
@@ -506,6 +500,10 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
     ];
     let d = PyDict::new(py);
     d.set_item("region_count", m.region_count)?;
+    d.set_item("locked_points_moved", ls.removed)?;
+    d.set_item("locked_interior_points", ls.interior)?;
+    d.set_item("locked_cells", ls.cells)?;
+    d.set_item("locked_collapsed", ls.collapsed)?;
     d.set_item("segment_points", rs.segment_points)?;
     d.set_item("facet_points", rs.facet_points)?;
     d.set_item("volume_points", rs.volume_points)?;

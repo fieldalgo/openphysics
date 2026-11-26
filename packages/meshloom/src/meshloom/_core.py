@@ -223,9 +223,10 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     insertions that fell back to the smallest cavity (``minimal_cavities``).
 
     ``locked_facets`` lists facets (by index) on which no point may be added, nor on their
-    edges: curved surfaces sampled on the surface by a builder. Recovery must find them
-    among the Delaunay faces (``RecoveryError`` otherwise), and refinement never splits
-    them or inserts a point that encroaches them.
+    edges: curved surfaces sampled on the surface by a builder, or any surface to keep as
+    given. Where recovery puts a point on one of them or on its edges, that point is moved
+    into the domain (``RecoveryError`` where it cannot be), so their triangles stay as
+    given; refinement never splits them or inserts a point that encroaches them.
 
     Errors: ``InvalidPLC`` (the input check, with its witness), ``NotClosed`` (parity mode,
     witness type 6), ``RecoveryError``, ``RefineError``, ``RoundingError``, ``RegionError``
