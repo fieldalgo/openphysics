@@ -141,13 +141,11 @@ test('X9: under a closed run\'s edge note, Use Open boundary and Search near 2.4
 
 test('X7: a restore offer whose project file holds the other model too lists it with its runs',async()=>{
  const A=await import(STATIC+'workspace-applications.mjs');
- const file='design-ab.json',also=[{model:'Heated silicon waveguide',names:['Run 1'],runs:1,inTab:false}];
- assert.equal(A.cardResumeChoice({runs:2,names:['Run 1 · Design A','Run 2 · Design B'],file,fileCurrent:true,fileSavedAt:'S',savedAt:'T',also},'Optical waveguide',()=>'9:24 PM').label,
-  'Restore from this browser · Optical waveguide · Run 1 · Design A, Run 2 · Design B · same as file design-ab.json, saved 9:24 PM · also in this project: Heated silicon waveguide · Run 1 (restored separately)');
+ const file='design-ab.json';
+ // after rounds 26–30 the card offer is gone; X7's fact survives as the pair label or "already in
+ // this tab" in the detail line (studio_library_restore.cjs 5.2)
  assert.equal(A.sessionLine({model:'Heated silicon waveguide',runs:1,names:['Run 1'],file,also:[{model:'Optical waveguide',names:[],runs:2,inTab:true}]}),
   'Heated silicon waveguide · 1 run · Run 1 · file design-ab.json · also in this project: Optical waveguide · 2 runs (already in this tab)');
- // without another model the words are as before
- assert.equal(A.cardResumeChoice({runs:1,names:['Run 1'],savedAt:'T'},'Optical waveguide',()=>'2:25 PM').label,'Restore from this browser · Optical waveguide · Run 1 · 2:25 PM');
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("const also=name?projectAlso(recovered,name):[];"));
  assert.ok(app.includes("(e.file||e.recovered.savedFile?.name||e.recovered.openedFile)===name"));

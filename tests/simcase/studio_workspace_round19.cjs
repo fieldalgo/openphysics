@@ -86,12 +86,6 @@ test('Y1: the newest stored session with runs is the first restore offer; every 
  assert.deepEqual(c.earlier,[{kind:'latest',label:'Restore Optical waveguide · 5 runs',detail:'Older copy · kept in this browser 5:38 AM · last linked to both-models.json'}]);
  // a session without runs saved after the newest is not called older
  assert.deepEqual(A.resumeChoices({runs:0,savedAt:at('50')},[{runs:2,savedAt:at('46'),index:0}],t=>t).earlier.map(e=>[e.label,e.detail]),[['Restore 0 runs','Copy without runs · kept in this browser '+at('50')+' · not saved to a file']]);
- // a card's offer: the newest keeps its words; another says older with its save time
- const item={runs:1,names:['Run 1'],savedAt:'T',file:'x.json',fileCurrent:false};
- assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM').label,'Restore from this browser · Heated silicon waveguide · Run 1 · 5:30 AM · file x.json, changed since');
- assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM',{older:true}).label,'Restore from this browser · Heated silicon waveguide · Run 1 · older · saved 5:30 AM · file x.json, changed since');
- assert.equal(A.cardResumeChoice({...item,fileCurrent:true,fileSavedAt:'S'},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · same as file x.json, saved 9:24 PM');
- assert.equal(A.cardResumeChoice({...item,fileCurrent:true},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · browser copy 9:24 PM · same as file x.json');
  const lib=read('workspace-applications.mjs');
  assert.ok(lib.includes("if(choice.newest){button.className='primary';button.id='resume-newest';}"));
  const app=read('workspace-app.mjs');
@@ -99,7 +93,6 @@ test('Y1: the newest stored session with runs is the first restore offer; every 
  // after rounds 26–30 (amendment A1) Not now closes the box instead of hiding it: a collapsed flag
  assert.ok(app.includes(" if(runs.length)return null;\n const list=recoveryList(),latest=list.find(e=>e.kind==='latest');"));
  assert.ok(app.includes("collapsed:resumeCollapsed"));
- assert.ok(app.includes("{older:!!newest&&newest.index!==found.index}"));
  // the record just restored is left out until this tab's own record is written; the rest stay listed
  assert.ok(app.includes("distinctRecords(notebookRecoveryRecord,earlierRecords).filter(e=>e.index!==restoredIndex)"));
  assert.ok(app.includes("const restored=restoredIndex!==null;restoredIndex=null;if(notebookStore.movedEarlier()||first||restored)renderEarlierSessions();"));

@@ -33,17 +33,17 @@ export function sessionLine(item){
 // Round 18 (X7): a record names one model, but its project file may hold the other one too. When
 // browser recovery holds a record of the other model under the same file, the offer lists it with
 // its runs and says this button does not restore it: " · also in this project: Heated silicon
-// waveguide · Run 1 (restored separately)", or "(already in this tab)". item.also: [{model, names,
-// runs, inTab}].
-export const alsoWords=item=>(item.also||[]).map(o=>` · also in this project: ${o.model} · ${o.names?.length?o.names.join(', '):`${o.runs} ${o.runs===1?'run':'runs'}`} (${o.inTab?'already in this tab':'restored separately'})`).join('');
+// waveguide · Run 1", or "· Run 1 (already in this tab)". After rounds 26–30 the not-in-tab case
+// no longer adds a parenthesis: the box restores both as one piece of work (Z2), and the
+// Workspace tools list names the other model only. item.also: [{model, names, runs, inTab}].
+export const alsoWords=item=>(item.also||[]).map(o=>` · also in this project: ${o.model} · ${o.names?.length?o.names.join(', '):`${o.runs} ${o.runs===1?'run':'runs'}`}${o.inTab?' (already in this tab)':''}`).join('');
 // The session file a recovery entry names: " · same as file x" when the record still matched it,
 // " · file x, changed since" when it did not, " · file x" when the record does not say.
 export const fileWords=item=>!item.file?'':item.fileCurrent===true?' · same as file '+item.file:item.fileCurrent===false?' · file '+item.file+', changed since':' · file '+item.file;
 // One phrase for browser recovery on the Library page; "Open session file…" is for files.
 export const RESTORE_TEXT='Restore from this browser';
 // What each Library choice does (round 15). A card opens its model with the runs this tab holds kept;
-// its offer restores a browser session's runs; the card's Start new opens the model without those runs
-// (the inputs are the model's, not emptied); the top box's choice only closes the box.
+// the top box restores a browser session's runs; its Not now closes the box.
 // Round 16: the button reads "Open model" and the card's description line says the runs stay.
 export const CARD_OPEN_TEXT='Open model';
 // Round 18 (X10): on the card of a model already in the project (shown or not), "Open model" read as
@@ -52,45 +52,19 @@ export const CARD_OPEN_TEXT='Open model';
 // waveguide (2 runs)", "Return to Heated silicon waveguide (1 run)", "Return to Optical waveguide".
 export const returnToModelText=(runs,title='model')=>Number.isInteger(runs)&&runs>0?`Return to ${title} (${runs} ${runs===1?'run':'runs'})`:`Return to ${title}`;
 export const CARD_STAY_TEXT='Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.';
-export const CARD_START_NEW_TEXT='Start new (no runs)';
 export const RESUME_NOT_NOW_TEXT='Not now (choose a model below)';
 // The time an offer names: the time of day for a session saved today, else the date and time.
 export function offerTime(savedAt,now=new Date()){
  const t=new Date(savedAt),time=t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
  return t.toDateString()===now.toDateString()?time:t.toLocaleDateString()+' '+time;
 }
-// The time a card offer names. The record is written a moment after a save, so a record that is
-// the same as its session file names the file's save time ("same as file x, saved 9:24 PM"), the
-// time people remember; else the browser copy's time, said as such when a file is named beside it.
-// Round 19 (Y1): an offer that is not the newest stored session with runs says so, with its save
-// time: " · older · saved 5:38 AM", " · older · same as file x, saved T", " · older · browser copy T ·
-// same as file x".
-// Round 20 (Z4): one time for one record, in the card and in the top box alike. After a project
-// save the stored record of the model not shown is relinked to the file (relinkRecords): it then
-// names the file and its save time while its own savedAt stays older, so the card said the file's
-// time and the box the record's. Both now say offerSavedAt: the file's save time for a record that
-// still matches a file it was saved to, else the record's own time.
+// The time a record's file was saved, for a record that still matches a file it was saved to,
+// else the record's own time (round 20, Z4). The Library no longer shows it (the detail line names
+// both times, after rounds 26–30); kept for the other callers.
 export const offerSavedAt=item=>item.file&&item.fileCurrent===true&&item.fileSavedAt?item.fileSavedAt:item.savedAt;
-function offerTimeWords(item,when,older=false){
- const old=older?' · older':'';
- if(item.file&&item.fileCurrent===true&&item.fileSavedAt)return `${old} · same as file ${item.file}, saved ${when(item.fileSavedAt)}`;
- if(item.file&&item.fileCurrent===true)return `${old} · browser copy ${when(item.savedAt)} · same as file ${item.file}`;
- return `${old} · ${older?'saved ':''}${when(item.savedAt)}${fileWords(item)}`;
-}
-// A model card's offer when the tab holds none of that model's runs and browser recovery holds a
-// session of it: "Restore from this browser · Optical waveguide · design A, design B · 2:25 PM",
-// then the file it names, shown before Start new. item: a recovery entry {runs, names, savedAt,
-// file, fileCurrent, fileSavedAt}; model: the model the entry names.
-// older (round 19, Y1): the entry is not the newest stored session with runs.
-export function cardResumeChoice(item,model,when=offerTime,{older=false}={}){
- const names=item.names?.length?item.names.join(', '):`${item.runs} ${item.runs===1?'run':'runs'}`;
- return {label:`${RESTORE_TEXT} · ${model} · ${names}${offerTimeWords(item,when,older)}${alsoWords(item)}`};
-}
-export const opticalResumeChoice=(item,when=offerTime)=>cardResumeChoice(item,'Optical waveguide',when);
-// Which stored session each model card offers: the newest of its model (entries newest first, each
+// Which stored session each model card counts: the newest of its model (entries newest first, each
 // {kind, index, application}), on the cards whose model this tab does not hold runs of (busy: the
-// set of card ids to leave out). {optical: entry, 'heated-waveguide': entry}. Round 19 (Y1): the top
-// box lists every session, newest first, so a card's record is also listed there.
+// set of card ids to leave out). {optical: entry, 'heated-waveguide': entry}.
 export function cardRecords(entries,busy=new Set()){
  const out={};
  for(const entry of entries){const card=entry.application==='multiphysics'?'heated-waveguide':'optical';
@@ -100,12 +74,14 @@ export function cardRecords(entries,busy=new Set()){
 // Library recovery after a restart (after rounds 26–30): one box with one button per piece of work
 // (a project file, or a model's records without one), a detail line under it saying how the browser
 // copy compares with that file, and the older copies folded under "Earlier copies in this browser
-// (N)". The labels carry no time and no file words: a browser time reads "Kept in this browser T",
-// a file time "saved F" (a real file save).
+// (N)". Model cards have no restore buttons; a card whose model has a kept record not in the tab
+// says so in a plain line (cardKeptText). The labels carry no time and no file words: a browser time
+// reads "Kept in this browser T", a file time "saved F" (a real file save).
 export const RESTORE_NEWEST_TEXT='Restore newest from this browser';
 export const RESUME_HEADING='Continue where you left off';
 export const RESUME_NOTE='Restore brings back completed runs kept in this browser, without recomputing. Open file… at the top opens a project file instead.';
 export const earlierCopiesText=n=>`Earlier copies in this browser (${n})`;
+export const cardKeptText=runs=>`Kept in this browser · ${runCount(runs)} · Restore at the top of the page`;
 // Round 20 (Z2): when the newest record's project file also holds the other model and browser
 // recovery has that model's record (item.pair: {model, runs, savedAt, fileCurrent}; offered by the
 // caller only while the tab holds runs of neither model), its button restores both (pair: true).
@@ -220,16 +196,6 @@ function libraryFiles(onOpenFile,extra=null){
  const portable=document.createElement('p');portable.className='library-portable';portable.textContent=PORTABLE_NOTE;
  bar.append(open,portable);if(extra)bar.append(extra);return bar;
 }
-// A model card with its resume offer under it: Resume first, then Start new. key: the id the
-// buttons carry (resume-optical, optical-start-new; resume-heated-waveguide, ...).
-function cardSlot(button,offer,key){
- const slot=document.createElement('div');slot.className='card-slot';
- const actions=document.createElement('div');actions.className='card-resume';
- const go=document.createElement('button');go.type='button';go.id='resume-'+key;go.className='primary';go.textContent=offer.label;if(offer.record!=null)go.dataset.resumeRecord=String(offer.record);go.onclick=()=>offer.onResume(go);
- const fresh=document.createElement('button');fresh.type='button';fresh.id=key+'-start-new';fresh.textContent=CARD_START_NEW_TEXT;fresh.onclick=()=>offer.onStartNew();
- actions.append(go,fresh);slot.append(button,actions);
- return slot;
-}
 // The project's name on the Library (P3), at the right of the Open file… row, so the cards and
 // their restore offers stay in the first screen; the project line heads the page in its view title
 // row. Rename takes 1 to 80 characters with no control characters; an empty name is refused by
@@ -254,17 +220,18 @@ function projectNameForm(project,draft=null){
  form.onsubmit=event=>{event.preventDefault();if(!project.onRename(input.value))input.value=project.name||'';else input.dataset.kept=input.value;};
  form.append(label,input,button,note);return form;
 }
-// offers: each model card's resume offer by card id ({optical, 'heated-waveguide'}), each
-// {label, record, onResume(button), onStartNew()}; a card without one has none. onOpenFile:
-// the Library's one "Open session file…", at the top of the page.
+// The third argument (once each card's restore offer) is not read: cards have no restore buttons.
+// kept: the cards whose model has a kept record not in the tab, with that record's run count; the
+// card says "Kept in this browser · N runs · Restore at the top of the page" (not a control).
+// onOpenFile: the Library's one "Open file…", at the top of the page.
 // inProject: the cards whose model is in the project but not shown, with its run count; the card
 // reads "In this project · N runs", and choosing it shows that model (P3).
 export const inProjectText=runs=>`In this project · ${runs} ${runs===1?'run':'runs'}`;
 // returnTo: the cards whose model is in the project, shown or not, with its run count (round 18).
-export function renderApplications(host,resume=null,offers={},{onOpenFile=null,project=null,inProject={},returnTo={}}={}){
+export function renderApplications(host,resume=null,_unused=null,{onOpenFile=null,project=null,inProject={},returnTo={},kept={}}={}){
  // the earlier copies keep their open state across a re-render (a browser recovery update, for example)
  const earlierOpen=!!host.querySelector?.('#earlier-copies')?.open;
- const draft=projectNameDraft(host.ownerDocument);host.replaceChildren();offers={...(offers||{})};
+ const draft=projectNameDraft(host.ownerDocument);host.replaceChildren();
  if(onOpenFile)host.append(libraryFiles(onOpenFile,project?projectNameForm(project,draft):null));
  const card=resume?resumeCard(resume,earlierOpen):null;if(card)host.append(card);
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
@@ -281,7 +248,9 @@ export function renderApplications(host,resume=null,offers={},{onOpenFile=null,p
   button.append(title,status,description,scope,action);
   // a model of the project not shown (P3): "In this project · N runs"
   if(inProject[app.id]!==undefined){const here=document.createElement('span');here.className='card-project';here.textContent=inProjectText(inProject[app.id]);button.append(here);}
-  cards.append(offers[app.id]?cardSlot(button,offers[app.id],app.id):button);
+  // a kept record of this model not in the tab: where to restore it, not a second restore control
+  if(kept[app.id]!==undefined){const line=document.createElement('span');line.className='card-kept';line.textContent=cardKeptText(kept[app.id]);button.append(line);}
+  cards.append(button);
  }
  const contract=document.createElement('section');contract.className='application-contract';
  const contractTitle=document.createElement('h3');contractTitle.textContent='What this workspace supports';
