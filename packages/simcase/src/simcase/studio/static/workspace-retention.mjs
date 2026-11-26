@@ -18,7 +18,7 @@
 // TE fractions, the effective areas, n_g and the open-boundary candidates (its values).
 import {FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText,RUNS_KEPT_TEXT,FIELDS_MOVE_TEXT,RUN_LIMIT,PREVIOUS_RUN_LIMIT,sessionText,sessionBytesWithoutFields,runFieldBytes,withoutField,appendRun,fitsVersion7,runModeCount,runSearchTarget,compactRunField} from './workspace-notebook.mjs';
 import {isCompactField,compactBytesOf} from './workspace-field-encoding.mjs';
-import {dropName,dropParts,runTitle,aboutText} from './workspace-workflow.mjs';
+import {dropName,dropParts,runTitle,aboutText,runTime} from './workspace-workflow.mjs';
 import {withStudy,projectStudy,projectBoundary} from './workspace-project.mjs';
 import {opticalDocument,withGroupIndex} from './workspace-optical.mjs';
 import {runChoice} from './workspace-open-run.mjs';
@@ -168,9 +168,10 @@ export const fieldsNotKeptResultsText=(run,fromFile=false)=>{const t=runTitle(ru
  return fromFile?`${t}'s fields were not kept in the session file. Its n_eff, TE fractions and effective areas are kept.`
   :`${t}'s fields are not kept; its n_eff, TE fractions and effective areas are kept. ${FIELDS_MOVE_TEXT}`;};
 /** The button that recomputes a run's fields (R3) and its estimate: " · about 2 min" from the run's
- * wall time in this tab; none for a run opened or restored (it has no time). */
+ * time (runTime: its wall time in this tab, or an open run's time kept by a version 16 file); none for
+ * a run without one (opened or restored from an earlier file, or a closed run opened or restored). */
 export const recomputeLabel=run=>`Recompute ${runTitle(run.number,run.label||'')}'s fields`;
-export const recomputeEstimate=run=>Number.isFinite(run.duration)?` · about ${aboutText(run.duration)}`:'';
+export const recomputeEstimate=run=>runTime(run)!==null?` · about ${aboutText(runTime(run))}`:'';
 /** The title of a field export of a run without its fields. */
 export const recomputeFirstText=run=>`${recomputeLabel(run)} first`;
 /** Compare, a run without its fields (section 4.2). */

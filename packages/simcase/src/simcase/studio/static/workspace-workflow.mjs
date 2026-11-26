@@ -88,9 +88,17 @@ export function runPlanText({open=false,searches=1,groupIndex=false,pmlCheck=fal
 // when it computed the group index too, else 3 times its time (the group index adds the solves at
 // λ0 − 1 nm and λ0 + 1 nm). null with no such run (round 20, Z5: no estimate without a measured run).
 // On 2026-11-24 the T18 open run took 68 s without and 199 s with group index (2.9 ×).
+// Session version 16: an open run opened or restored keeps its time (runTime), so it counts too.
 export function groupIndexEstimate(runs,{open},{isOpen,hasGroup}){
- const last=runs.findLast(r=>Number.isFinite(r.duration)&&isOpen(r)===!!open);
- return last?(hasGroup(last)?last.duration:3*last.duration):null;
+ const last=runs.findLast(r=>runTime(r)!==null&&isOpen(r)===!!open);
+ return last?(hasGroup(last)?runTime(last):3*runTime(last)):null;
+}
+/** A run's time in ms (session version 16): its wall time when it has one (measured in this tab, or
+ * kept by a version 16 file), else the server's compute time mesh + solve, else null (a run of an
+ * earlier file, or a closed run opened or restored). */
+export function runTime(r){
+ if(Number.isFinite(r?.duration))return r.duration;
+ const t=r?.timings;return t&&Number.isFinite(t.mesh)&&Number.isFinite(t.solve)?Math.round(1000*(t.mesh+t.solve)):null;
 }
 // "about 40 s" under a minute and a half (to 10 s, at least 10 s), else "about 3 min" (to the minute)
 export function aboutText(ms){
@@ -102,10 +110,10 @@ export function durationText(ms){
  return h?`${h}:${String(m).padStart(2,'0')}:${r}`:`${m}:${r}`;
 }
 // The newest run of the tab that is comparable with the next one (round 18, X2): the same boundary
-// kind (open: a run with a PML) and group-index state, with a wall time measured in this tab
-// (opened and recovered runs have none). isOpen and hasGroup say that of a run.
+// kind (open: a run with a PML) and group-index state, with a time (runTime: measured in this tab, or
+// an open run's kept by a version 16 file). isOpen and hasGroup say that of a run.
 export function lastComparableRun(runs,{open,groupIndex},{isOpen,hasGroup}){
- return runs.findLast(r=>Number.isFinite(r.duration)&&isOpen(r)===!!open&&hasGroup(r)===!!groupIndex)||null;
+ return runs.findLast(r=>runTime(r)!==null&&isOpen(r)===!!open&&hasGroup(r)===!!groupIndex)||null;
 }
 // Round 28 (G3): the newest run that already has the results of the slab shortcut's inputs (a closed
 // window, Nearest to n_eff t, Modes to find 4, the other inputs the current ones: input and the group

@@ -102,17 +102,17 @@ test('P3 (B4): runs newer than a named pair: Compare offers the two newest; a pa
  assert.ok(line.includes('else{swap.textContent=`Compare Run ${n} with B`;swap.onclick=()=>{compareIds=[compareIds[1],newer.job];comparePicked=true;'));
 });
 
-test('P4 (B5): runs read from a file or browser recovery carry no wall time; the estimate skips them and uses an older measured run, or none',async()=>{
+test('P4 (B5): runs read from a file of version 15 or earlier carry no wall time; the estimate skips them and uses an older measured run, or none',async()=>{
  const N=await import(STATIC+'workspace-notebook.mjs'),W=await import(STATIC+'workspace-workflow.mjs');
  const fixture=name=>fs.readFileSync(path.join(__dirname,'studio_session_fixtures',name),'utf8');
  // a session file (an open run of version 10) read: no duration on its runs
  const opened=N.parseSession(fixture('optical-v10-open-full-083e151.json'));
  assert.ok(opened.runs.length>0&&opened.runs.every(r=>!('duration' in r)));
- // a run measured in this tab, written and read back as File › Save and browser recovery do: its
- // wall time is not in the session (no format change; the session stores completedAt only)
+ // an open run measured in this tab, written and read back as File › Save and browser recovery do: a
+ // version 16 file keeps its wall time (design "Session versions 16 and 17", slice S1)
  const timed={...opened.runs[0],duration:68000},out=N.writeOpticalSession(opened.input,[timed],timed.job,[timed.job,timed.job],opened.view);
- assert.equal(out.ok,true);assert.ok(!out.text.includes('"duration"'));
- assert.equal('duration' in N.parseSession(out.text).runs[0],false);
+ assert.equal(out.ok,true);assert.equal(JSON.parse(out.text).version,16);assert.ok(out.text.includes('"duration":68000'));
+ assert.equal(N.parseSession(out.text).runs[0].duration,68000);
  // the estimate before an open n_g run: the comparable run from a file is skipped
  const kinds={isOpen:r=>r.open===true,hasGroup:r=>r.ng===true};
  const fromFile={job:'f',open:true,ng:false},older={job:'o',open:true,ng:false,duration:60000},closed={job:'c',open:false,ng:false,duration:5000};

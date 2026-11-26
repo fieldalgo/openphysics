@@ -2076,8 +2076,10 @@ try {
     const workspaceSession = text => JSON.parse(text).models.find(m => m.kind === 'workspace').session;
     const saved = (await obSave('OB first save')).name;
     const v10 = workspaceSession(await readFile(join(obDownloads, saved), 'utf8'));
-    stage('OB version 10 saved', {file: saved, version: v10.version, settings: v10.runs[0].settings.pml, check: v10.runs[0].pml_check, candidates: v10.runs[0].open_boundary.candidates.length});
-    assert.deepEqual([v10.version, v10.runs[0].settings.adapter, v10.runs[0].settings.boundary], [10, 'optical-shapes-v9', 'PML']);
+    // session version 16 (design "Session versions 16 and 17", A1): an open run computed in this tab keeps its time
+    stage('OB version 16 saved', {file: saved, version: v10.version, settings: v10.runs[0].settings.pml, check: v10.runs[0].pml_check, candidates: v10.runs[0].open_boundary.candidates.length, duration: v10.runs[0].duration, timings: v10.runs[0].timings});
+    assert.deepEqual([v10.version, v10.runs[0].settings.adapter, v10.runs[0].settings.boundary], [16, 'optical-shapes-v9', 'PML']);
+    assert.ok(Number.isSafeInteger(v10.runs[0].duration) && Number.isFinite(v10.runs[0].timings?.solve), JSON.stringify([v10.runs[0].duration, v10.runs[0].timings]));
     assert.deepEqual(v10.runs[0].settings.pml, {thickness: '1000 nm', open_edges: ['left', 'right', 'bottom', 'top'], target: '2.460'});
     // slice T2: the run's settings are P2's; its record is the engine's /3 of both searches
     assert.equal(v10.runs[0].pml_check.pml_strength, 6); assert.equal(v10.runs[0].pml_check.paired.length, 2);
@@ -3535,8 +3537,8 @@ try {
     assert.ok(p2.record.bytes <= 16760832, JSON.stringify(p2.record));
     assert.deepEqual(Object.fromEntries(p2.record.fields), p2.tab);
     assert.equal(p2.record.fields.find(([n]) => n === 5)[1], true);
-    // every field is kept, at single precision (version 14)
-    assert.equal(p2.record.version, 14); assert.ok(p2.record.fields.every(([, f]) => f), JSON.stringify(p2.record.fields));
+    // every field is kept, at single precision (version 14; 16 since Run 3, an open run of this tab, keeps its time)
+    assert.equal(p2.record.version, 16); assert.ok(p2.record.fields.every(([, f]) => f), JSON.stringify(p2.record.fields));
     // round 27 (D1): the message no longer holds the conversion sentence, so it may fit one line on a
     // phone (it did with the runner's fonts); it stays whole and inside the line at both sizes. A long
     // Messages line wrapping whole at 390 px is checked at R22 P5 (the shortcut's message).
@@ -3607,7 +3609,10 @@ try {
   // pair picked by hand stays after a run and keeps "Compare Run 5 with B". P4 the estimate before an
   // open run with group index: none when the only open runs came from a session file (they have no
   // wall time); after an open run in this tab "about N"; a newer open run added from a file, which has
-  // none, is skipped; after a browser restore none again.
+  // none, is skipped; after a browser restore the same "about N" (session version 16 keeps the
+  // measured open run's time). T18-G1 (design "Session versions 16 and 17", S1): File › Open of the
+  // version 16 file whose Run 5 is open, no group index, with its time d5: group index on reads
+  // "… · about ${aboutText(3·d5)}", off "… · last such run m:ss", and the same after a browser restore.
   {
     const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
     const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
@@ -3696,13 +3701,15 @@ try {
     // run; it has no wall time and the estimate skips it
     await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('import-runs')", 'R24 Results');
     p4.before = (await r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)")).length;
+    const recordBefore = await rText('#notebook-recovery-detail');
     await setFile('#run-import-file', fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-v10-open-full-083e151.json', import.meta.url)));
     await r.until("!!document.getElementById('run-import-confirm')?.open", 'R24 import dialog'); await r.click('#confirm-run-import');
     await r.until(`document.querySelectorAll('.run-item').length===${p4.before + 1}`, 'R24 run added from file');
     p4.items = await r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
     p4.added = await plan();
-    // browser recovery: the restored runs have no wall time either
-    await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R24 recovery record', 60000); await sleep(800);
+    // browser recovery: the restored runs keep the measured open run's time (session version 16); the
+    // record restored is one written after the run was added (the detail names a newer save)
+    await r.until(`/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)&&document.getElementById('notebook-recovery-detail').textContent!==${JSON.stringify(recordBefore)}`, 'R24 recovery record', 60000); await sleep(800);
     await r.call('Page.navigate', {url: base + '/workspace'});
     await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.getElementById('resume-newest')", 'R24 restore offer', 30000);
     await r.click('#resume-newest');
@@ -3716,8 +3723,30 @@ try {
     assert.match(p4.fromFile, NONE); assert.match(p4.fromFileOff, /^Open boundary · 2 modes · [12] searche?s?$/);
     assert.match(p4.measured, ABOUT); assert.equal(p4.added, p4.measured);
     assert.equal(p4.items.length, p4.before + 1, JSON.stringify(p4.items));
-    assert.match(p4.restored, NONE);
+    assert.equal(p4.restored, p4.measured);
     await rOverflow('P4 estimate');
+    // T18-G1: the version 16 file, opened, then restored; the expected words from its stored d5
+    {
+      const fixturePath = fileURLToPath(new URL('../../tests/simcase/studio_session_fixtures/optical-v16-times.json', import.meta.url));
+      const W = await import(new URL('../../packages/simcase/src/simcase/studio/static/workspace-workflow.mjs', import.meta.url).href);
+      const d5 = JSON.parse(await readFile(fixturePath, 'utf8')).runs.find(run => run.number === 5).duration;
+      const on = `Open boundary · 2 modes · 2 searches · group index on (3 solves) · about ${W.aboutText(3 * d5)}`, off = `Open boundary · 2 modes · 2 searches · last such run ${W.durationText(d5)}`;
+      await r.eval("document.getElementById('file-status').textContent=''");
+      const g1Before = await rText('#notebook-recovery-detail');
+      await setFile('#session-file', fixturePath);
+      await answer("/^Opened /.test(document.getElementById('file-status').textContent)", 'T18-G1 file opened');
+      if (await r.eval("!!document.getElementById('restore-run-input')")) { await r.click('#restore-run-input'); await sleep(300); }
+      const g1 = {d5}; await groupIndex(false); g1.openedOff = await plan(); await groupIndex(true); g1.opened = await plan();
+      await r.until(`/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)&&document.getElementById('notebook-recovery-detail').textContent!==${JSON.stringify(g1Before)}`, 'T18-G1 recovery record', 60000); await sleep(800);
+      await r.call('Page.navigate', {url: base + '/workspace'});
+      await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.getElementById('resume-newest')", 'T18-G1 restore offer', 30000);
+      await r.click('#resume-newest');
+      await answer("/^(?:Recovered|Restored) /.test(document.getElementById('file-status').textContent)", 'T18-G1 restored');
+      await groupIndex(false); g1.restoredOff = await plan(); await groupIndex(true); g1.restored = await plan();
+      stage('T18-G1 estimate from a version 16 file', {...g1, expected: on});
+      assert.deepEqual({opened: g1.opened, openedOff: g1.openedOff, restored: g1.restored, restoredOff: g1.restoredOff}, {opened: on, openedOff: off, restored: on, restoredOff: off});
+      await rOverflow('T18-G1 estimate');
+    }
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 
@@ -3870,10 +3899,13 @@ try {
     // version 14; every field kept (no run "values only"); the record is Save's text after each result
     // (above). The let-go words, the Results block of a run without fields and Recompute are in M4-e.
     // round 27 (D1): no result's Messages says it
-    const said = k10.map((e, i) => e.message.includes('More field plots now fit') || e.message.includes('single precision') ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14);
+    // session version 16 (A1): from the open run of this tab (the last) the record is version 16, which
+    // holds compact fields too; the first record written compact is version 14, or 16 when the
+    // conversion is the open run's own result
+    const said = k10.map((e, i) => e.message.includes('More field plots now fit') || e.message.includes('single precision') ? i : -1).filter(i => i >= 0), first14 = k10.findIndex(e => e.version === 14 || e.version === 16), first16 = k10.findIndex(e => e.version === 16);
     assert.deepEqual(said, [], JSON.stringify(k10.map(e => [e.label, e.version, e.message])));
-    assert.ok(first14 > 0 && k10.slice(first14).every(e => e.version === 14) && k10.slice(0, first14).every(e => e.version !== 14), JSON.stringify(k10.map(e => e.version)));
-    assert.equal(last.items.length, 12); assert.equal(last.doc.version, 14);
+    assert.ok(first14 > 0 && first16 >= first14 && first16 === k10.length - 1 && k10.slice(first14, first16).every(e => e.version === 14) && k10.slice(first16).every(e => e.version === 16) && k10.slice(0, first14).every(e => e.version !== 14 && e.version !== 16), JSON.stringify(k10.map(e => e.version)));
+    assert.equal(last.items.length, 12); assert.equal(last.doc.version, 16);
     assert.ok(k10.every(e => e.valuesOnly === 0), 'no run keeps its values only');
     assert.ok(last.doc.runs.every(x => x.field?.encoding === 'f32-base64-v1'), 'every field is compact');
     // a compact run in Results: the single-precision line under its field view, whole at both sizes
