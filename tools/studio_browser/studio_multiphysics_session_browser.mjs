@@ -1136,7 +1136,8 @@ print(n)`;
   await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until(`document.querySelectorAll('[data-mp-run]').length===${lastRunNumber}`, 'the runs opened');
   const bigList = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
-  assert.equal(bigList.filter(t => / · values only$/.test(t)).length, 2, JSON.stringify(bigList));
+  // the saved file's values-only runs (derived above, coordinator ruling 2026-11-26), exactly
+  assert.deepEqual(bigList.map(t => / · values only$/.test(t)), [...bigSession.runs].reverse().map(r => valuesOnly.includes(r.number)), JSON.stringify(bigList));
   await page.click('[data-mp-run]:last-of-type');
   await page.until("!!document.querySelector('[data-mp-values-only]')", 'values-only run shown');
   await page.clickTreeItem('Heat 1');
