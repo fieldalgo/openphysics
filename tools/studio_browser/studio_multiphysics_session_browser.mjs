@@ -878,9 +878,10 @@ print(n)`;
   // Re-registered again by design (HQ decision 2026-11-26-openphysics-studio-hk10-compact; design
   // "Session versions 16 and 17" §3.1: the tab converts to compact maps when text would not fit): six
   // runs no longer let a map go, so the stage runs until the first map is let go and one result more;
-  // the result that converts, the two that let Run 1's and Run 2's maps go and the run the recompute
-  // lets go are derived from the file's own records, each written here by an encoder of this script
-  // (f32-offset-base64-v1), and the arrays are compared as HQ1: decoded = base + fround(x − base).
+  // the result that converts, the runs the first let-go result and the next one let go, and the runs the
+  // recompute lets go are derived (the let-go sets by the arrival's order rule, coordinator ruling
+  // 2026-11-26: the sizes differ by platform, so no run is named here) from the file's own records,
+  // each written here by an encoder of this script (f32-offset-base64-v1), and the arrays are compared as HQ1: decoded = base + fround(x − base).
   // HQ (design "Session versions 16 and 17", S3; compact maps, multiphysics session version 17), in this
   // sequence (it converts at an early result): no Messages sentence at the conversion; the maps of a
   // compact run carry "Maps at single precision (float32). The values above are the engine's.", the
@@ -942,7 +943,12 @@ print(n)`;
   const hq = {results: []};
   let converted = null;
   const s5Messages = [];
-  let firstLetGo = null, fifthMessage = null, letGoMessage = null;
+  let firstLetGo = null, fifthMessage = null, letGoMessage = null, fifthButtons = null, letGoButtons = null;
+  // the runs whose maps a result let go, as Messages names them (one or more, singular or plural words),
+  // and the page's "Recompute Run N's maps" buttons; compared below with the sets derived from the file
+  const LET_GO = /((?:Run \d+ \(run at [^)]+\)(?:, | and )?)+) (keeps its values; its maps were not kept|keep their values; their maps were not kept) \(16\.8 MB limit\)\./;
+  const letGoOf = text => {const m = LET_GO.exec(text); if (!m) return null; const runs = [...m[1].matchAll(/Run (\d+) \(/g)].map(x => +x[1]); return {runs, plural: m[2].startsWith('keep their')};};
+  const recomputeButtons = () => page.eval("[...document.querySelectorAll('#file-status [data-recompute-run]')].map(b=>[+b.dataset.recomputeRun,b.textContent])");
   for (let n = 1; n <= 20; n++) {
     await runAndWait(n); await keepReplies();
     const m = await notice(), note = await page.eval("document.querySelector('[data-mp-map-precision]')?.textContent??null"); s5Messages.push(m);
@@ -955,7 +961,7 @@ print(n)`;
       const reply = JSON.parse(replies.get(hq.run1)), points = Object.fromEntries(CANVASES.map(([key, , , region]) => [key, centroidPixels(reply, region, hq.before[key])]));
       await showRun(1); hq.after = await capture('after', 'differ', points);
     }
-    if (firstLetGo === null && /Run 1 \(run at [^)]+\) keeps its values; its maps were not kept/.test(m)) { firstLetGo = n; fifthMessage = m; continue; }
+    if (firstLetGo === null && letGoOf(m)) { firstLetGo = n; fifthMessage = m; fifthButtons = await recomputeButtons(); continue; }
     if (firstLetGo !== null) break;
   }
   // HQ: the conversion said nothing in Messages (above); the note under the maps from the converting result on
@@ -969,13 +975,13 @@ print(n)`;
   assert.ok(firstLetGo !== null, JSON.stringify(s5Messages));
   const lastRunNumber = firstLetGo + 1;
   // HK10 a (after the result): the first let-go result let Run 1's maps go, with Recompute Run 1's maps
-  assert.match(fifthMessage, new RegExp(`^Run ${firstLetGo} complete\\. .*Run 1 \\(run at [^)]+\\) keeps its values; its maps were not kept \\(16\\.8 MB limit\\)\\. .*Recompute Run 1's maps`));
+  assert.match(fifthMessage, new RegExp(`^Run ${firstLetGo} complete\\. `));
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off 0.08', 180000);
-  // HK10 a (after the result): the next result let Run 2's maps go; Messages names Run 2 with
-  // Recompute Run 2's maps
-  await page.until("/Run 2 \\(run at [^)]+\\) keeps its values; its maps were not kept \\(16\\.8 MB limit\\)\\./.test(document.getElementById('file-status').textContent)&&!!document.querySelector('#file-status [data-recompute-run=\"2\"]')", 'Run 2 keeps its values', 60000);
-  letGoMessage = await notice(); const recomputeButton = await page.text('#file-status [data-recompute-run="2"]');
-  assert.equal(recomputeButton, "Recompute Run 2's maps");
+  // HK10 a (after the result): the next result lets more maps go; which runs, derived from the file's
+  // records below (coordinator ruling 2026-11-26: the sizes differ by platform, so the runs are derived,
+  // not named here); Messages names them with one "Recompute Run N's maps" each
+  await page.until(`(()=>{const t=document.getElementById('file-status').textContent;return t.startsWith('Run ${lastRunNumber} complete. ')&&/maps were not kept \\(16\\.8 MB limit\\)\\./.test(t)&&!!document.querySelector('#file-status [data-recompute-run]')})()`, 'the next result lets maps go', 60000);
+  letGoMessage = await notice(); letGoButtons = await recomputeButtons();
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HK10 a ' + tag); await page.screenshot('hk10a-' + tag); }
   await size(1440, 900);
   // the tab is the file: recovery holds it whole, and Export › Model with runs writes without a question
@@ -997,11 +1003,8 @@ print(n)`;
   const bigNotice = await notice(), bigSession = JSON.parse(big.text);
   assert.ok(Buffer.byteLength(big.text) <= 16 * 1024 * 1024 - 16 * 1024);
   assert.equal(bigSession.version, 17);
-  assert.deepEqual(bigSession.runs.map(r => r.maps), bigSession.runs.map((r, i) => i < 2 ? 'not kept' : 'compact'));
   assert.equal(bigSession.runs.length, lastRunNumber);
-  assert.match(bigNotice, new RegExp(`^Session file variant-008\\.json sent to your browser's Downloads: the model, ${lastRunNumber} runs and the without-heater result\\. 2 runs \\(Run 1, Run 2\\) keep values only, without maps\\.$`));
   await fetchReplies(big.text);
-  const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2]}), python: comparePython(big.path)};
   // the counts, derived independently of the product's chooser: each run's map bytes are its record
   // with the server's reply (as text, version 15's layout, or compact, encoded here) less its record
   // without maps, the base is the file less the maps it holds, and the maps are added in the order of
@@ -1041,6 +1044,39 @@ print(n)`;
   assert.equal(firstLetGo, derived.firstLetGo, 'the first map is let go at the result the arithmetic says');
   assert.equal(converted, derived.conversion, 'the maps become compact at the result the arithmetic says');
   assert.deepEqual(bigSession.runs.filter(r => r.maps === 'compact').map(r => r.number), [...fitRuns].sort((a, b) => a - b), 'the screen keeps the maps the arithmetic fits');
+  // the runs each result lets go, by the same rule as the arrival (coordinator ruling 2026-11-26): from
+  // the conversion on, the runs that still hold maps and the new one, in the order of 3.2 (the new,
+  // selected run, then newest first), each kept while the total stays within the budget
+  const byOrder = (held, order) => order.filter(i => held.has(i));
+  const greedy = (k, held, order) => {let total = baseAt(k, 17); const fit = new Set();
+    for (const i of byOrder(held, order)) if (total + compactBytes[i] <= BUDGET) {total += compactBytes[i]; fit.add(i);}
+    return fit;};
+  let held = new Set(); const released = {};
+  for (let k = 1; k <= lastRunNumber; k++) {
+    held.add(k - 1); if (k < derived.conversion) continue;
+    const fit = greedy(k, held, newestFirst(k)); released[k] = [...held].filter(i => !fit.has(i)).map(i => i + 1).sort((a, b) => a - b); held = fit;
+  }
+  const valuesOnly = bigSession.runs.map(r => r.number).filter(n => !held.has(n - 1));
+  const seen = (message, buttons) => ({message, named: letGoOf(message), buttons});
+  stage('HK10 a derived let-go', {compactBytes, base: baseMeasured, budget: BUDGET, released, valuesOnly, conversion: derived.conversion, firstLetGo,
+    page: {first: seen(fifthMessage, fifthButtons), next: seen(letGoMessage, letGoButtons), saved: bigNotice}});
+  const sameRuns = (message, buttons, runs, tag) => {
+    assert.ok(runs.length > 0, `${tag}: the derived set is empty`);
+    const named = letGoOf(message); assert.ok(named, `${tag}: ${message}`);
+    assert.deepEqual([...named.runs].sort((a, b) => a - b), runs, `${tag}: the runs Messages names`);
+    assert.equal(named.plural, runs.length > 1, `${tag}: singular or plural words`);
+    assert.deepEqual(buttons.map(b => b[0]).sort((a, b) => a - b), runs, `${tag}: one Recompute button per run`);
+    for (const [n, text] of buttons) assert.equal(text, `Recompute Run ${n}'s maps`, tag);
+  };
+  for (let k = derived.conversion; k < firstLetGo; k++) assert.deepEqual(released[k], [], `result ${k} lets no map go`);
+  sameRuns(fifthMessage, fifthButtons, released[firstLetGo], 'the first let-go result');
+  sameRuns(letGoMessage, letGoButtons, released[lastRunNumber], 'the next result');
+  assert.deepEqual(valuesOnly, [...released[firstLetGo], ...released[lastRunNumber]].sort((a, b) => a - b));
+  assert.ok(valuesOnly.includes(1), 'Run 1 keeps values only (HK10 b recomputes it)');
+  assert.deepEqual([...held].map(i => i + 1).sort((a, b) => a - b), [...fitRuns].sort((a, b) => a - b), 'the order kept the maps the arithmetic fits');
+  assert.deepEqual(bigSession.runs.map(r => r.maps), bigSession.runs.map(r => valuesOnly.includes(r.number) ? 'not kept' : 'compact'));
+  assert.equal(bigNotice, `Session file variant-008.json sent to your browser's Downloads: the model, ${lastRunNumber} runs and the without-heater result. ${valuesOnly.length} runs (${valuesOnly.map(n => 'Run ' + n).join(', ')}) keep values only, without maps.`);
+  const s5Arrays = {...compareArrays(big.text, {valuesOnly}), python: comparePython(big.path)};
   // HK10 b: Recompute Run 1's maps, its words read while the job's replies are held in the page
   await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
   await page.until(`document.querySelectorAll('[data-mp-run]').length===${lastRunNumber}`, 'run list for the recompute');
@@ -1064,15 +1100,23 @@ print(n)`;
   await page.until(`document.querySelectorAll('[data-mp-run]').length===${lastRunNumber}`, 'run list after the recompute');
   const afterRecompute = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   // the order after a recompute (after the result): the selected run (Run 1), then the newest
-  const afterFit = fitAt(lastRunNumber, compactBytes, 17, [0, ...newestFirst(lastRunNumber).filter(i => i !== 0)]), afterGo = bigSession.runs.map(r => r.number).filter(n => n !== 2 && !afterFit.includes(n));
+  const afterFit = fitAt(lastRunNumber, compactBytes, 17, [0, ...newestFirst(lastRunNumber).filter(i => i !== 0)]), afterGo = bigSession.runs.map(r => r.number).filter(n => !(valuesOnly.includes(n) && n !== 1) && !afterFit.includes(n));
+  // by the arrival's rule: the runs holding maps and Run 1, Run 1 first, then newest first
+  const recomputeHeld = new Set([...held, 0]), recomputeFit = greedy(lastRunNumber, recomputeHeld, [0, ...newestFirst(lastRunNumber).filter(i => i !== 0)]);
+  const recomputeGo = [...recomputeHeld].filter(i => !recomputeFit.has(i)).map(i => i + 1).sort((a, b) => a - b);
+  stage('HK10 b derived', {recomputeGo, afterGo, page: seen(recomputed, [])});
   stage('HK10 a b', {fifthMessage, letGoMessage, recoveryWhole, bigNotice, valuesOnlyBanner, during, recomputed, recomputeSeconds, afterRecompute, afterFit, s5Seconds: (Date.now() - s5Started) / 1000, runs: lastRunNumber});
   assert.match(letGoMessage, new RegExp(`^Run ${lastRunNumber} complete\\. `));
   assert.match(valuesOnlyBanner, /^Run 1's maps are not kept; its n_eff, coupling check and iteration history are kept\. Maps are kept up to 16\.8 MB\. When a result or a recompute arrives, Studio keeps the selected run's maps first, then pinned runs', then the newest\. Selecting a run does not bring its maps back; Recompute does\./);
   assert.match(during.heading, /^Recomputing Run 1's maps · about \d+ (?:s|min)$/); assert.equal(during.status, during.heading); assert.equal(during.message, during.heading);
-  // Run 1 is back (compact); the oldest run with maps goes (Run 3, as the arithmetic says); Run 2 keeps its values only
-  assert.deepEqual(afterGo, [3], JSON.stringify(afterFit));
-  assert.match(recomputed, /^Run 1's maps recomputed from its stored model; its values match\. Run 3 \(run at [^)]+\) keeps its values; its maps were not kept \(16\.8 MB limit\)\./);
-  assert.deepEqual(afterRecompute.map(t => / · values only$/.test(t)), [...bigSession.runs].reverse().map(r => r.number === 2 || r.number === 3), JSON.stringify(afterRecompute));
+  // Run 1 is back (compact); the runs the arithmetic says go (Run 3 on Linux); the other values-only runs stay so
+  assert.ok(recomputeGo.length > 0 && !recomputeGo.includes(1), JSON.stringify(recomputeGo));
+  assert.deepEqual(afterGo, recomputeGo, JSON.stringify(afterFit));
+  assert.match(recomputed, /^Run 1's maps recomputed from its stored model; its values match\. /);
+  const named = letGoOf(recomputed); assert.ok(named, recomputed);
+  assert.deepEqual([...named.runs].sort((a, b) => a - b), recomputeGo, 'the runs the recompute lets go'); assert.equal(named.plural, recomputeGo.length > 1);
+  const valuesOnlyAfter = new Set([...valuesOnly.filter(n => n !== 1), ...recomputeGo]);
+  assert.deepEqual(afterRecompute.map(t => / · values only$/.test(t)), [...bigSession.runs].reverse().map(r => valuesOnlyAfter.has(r.number)), JSON.stringify(afterRecompute));
   // opened, the saved file's values-only runs say so in the list and on their map pages
   await openSession(big.path);
   hq.opened = await capture('opened', 'digest');
