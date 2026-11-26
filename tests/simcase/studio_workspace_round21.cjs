@@ -114,21 +114,25 @@ test('W4: the pair offer does not list the other model again; an older entry nam
  const older={runs:1,model:'Optical waveguide',names:['Run 1'],savedAt:'2026-11-24T11:20:00Z',file,fileCurrent:false,index:1,
   also:[{model:'Heated silicon waveguide',names:['Run 1','Run 2'],runs:2,inTab:false}]};
  const choices=A.resumeChoices(optical,[heated,older],t);
- assert.deepEqual(choices.map(c=>c.label),[
-  'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 2026-11-24T11:40:00Z',
-  'Restore from this browser: Optical waveguide · 1 run · Run 1 · file both-models.json, changed since · older · saved 2026-11-24T11:20:00Z']);
+ // after rounds 26–30: the pair's second record is listed neither as the other piece of work nor as
+ // an earlier copy; the older optical record is an earlier copy
+ assert.equal(choices.newest.label,'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)');
+ assert.equal(choices.other,null);
+ assert.deepEqual(choices.earlier.map(c=>[c.label,c.detail]),[['Restore Optical waveguide · 1 run · Run 1','Older copy · kept in this browser 2026-11-24T11:20:00Z · last linked to both-models.json']]);
  // a heated record of another time or file is a different record: it stays, without "also in this project"
  const other={...heated,savedAt:'2026-11-24T11:10:00Z'};
- assert.equal(A.resumeChoices(optical,[other],t)[1].label,'Restore from this browser: Heated silicon waveguide · 2 runs · Run 1, Run 2 · file both-models.json, changed since · older · saved 2026-11-24T11:10:00Z');
+ assert.equal(A.resumeChoices(optical,[other],t).earlier[0].label,'Restore Heated silicon waveguide · 2 runs · Run 1, Run 2');
  // without the pair (the tab holds runs of one model) the other entry stays, and an older one drops "also"
  const {pair,...single}=optical;
- assert.equal(A.resumeChoices(single,[heated],t)[1].label,'Restore from this browser: Heated silicon waveguide · 2 runs · Run 1, Run 2 · file both-models.json, changed since · older · saved 2026-11-24T11:33:00Z');
- // the newest entry keeps it
- assert.ok(A.resumeChoices(single,[heated],t)[0].label.includes(' · also in this project: Heated silicon waveguide · Run 1, Run 2 (restored separately)'));
+ const unpaired=A.resumeChoices(single,[heated],t);
+ assert.equal(unpaired.other.label,'Restore from this browser: Heated silicon waveguide · 2 runs · Run 1, Run 2');
+ assert.equal(unpaired.other.detail,'Older · kept in this browser 2026-11-24T11:33:00Z · newer than both-models.json as opened');
+ // "(restored separately)" is shown nowhere
+ for(const c of [choices,unpaired])for(const x of [c.newest,c.other,...c.earlier].filter(Boolean))assert.ok(!(x.label+x.detail).includes('restored separately'),x.label);
  // cards are unchanged: an older card still names the project's other model
  assert.ok(A.cardResumeChoice(heated,'Heated silicon waveguide',t,{older:true}).label.includes(' · also in this project: Optical waveguide · '));
  // the caller carries the other record's save time with the pair
- assert.ok(read('workspace-app.mjs').includes("pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt}"));
+ assert.ok(read('workspace-app.mjs').includes("pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt,fileCurrent:o.record.fileCurrent}"));
 });
 
 test('W5: the drop line is hidden beside "No need to run" and returns when the inputs differ from every run',()=>{

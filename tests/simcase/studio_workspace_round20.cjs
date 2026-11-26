@@ -55,13 +55,16 @@ test('Z4: the box and the card name one time for one record',async()=>{
  const newest={runs:1,model:'Heated silicon waveguide',names:['Run 1'],savedAt:'8:32'};
  const t=x=>x;
  assert.equal(A.offerSavedAt(relinked),'8:31');
- const box=A.resumeChoices(newest,[{...relinked,index:0}],t)[1].label,card=A.cardResumeChoice(relinked,'Optical waveguide',t,{older:true}).label;
- assert.equal(box,'Restore from this browser: Optical waveguide · 2 runs · Run 1, Run 2 · same as file both-models.json · older · saved 8:31');
+ // after rounds 26–30 the box's entry names both times, each for what it is
+ const box=A.resumeChoices(newest,[{...relinked,index:0}],t).other,card=A.cardResumeChoice(relinked,'Optical waveguide',t,{older:true}).label;
+ assert.equal(box.label,'Restore from this browser: Optical waveguide · 2 runs · Run 1, Run 2');
+ assert.equal(box.detail,'Older · kept in this browser 8:30 · same as both-models.json, saved 8:31 · Open file… gives the same runs');
  assert.equal(card,'Restore from this browser · Optical waveguide · Run 1, Run 2 · older · same as file both-models.json, saved 8:31');
  // a record changed since its file, or with no file save time, names its own time in both
  for(const item of [{...relinked,fileCurrent:false},{...relinked,fileSavedAt:undefined},{...relinked,file:null}])assert.equal(A.offerSavedAt(item),'8:30');
  // the order still follows the records' own times
- assert.deepEqual(A.resumeChoices({...relinked,savedAt:'2026-11-24T08:30:00Z',fileSavedAt:'2026-11-24T08:31:00Z'},[{...newest,savedAt:'2026-11-24T08:30:30Z',index:0}],t).map(c=>c.kind),['earlier','latest']);
+ const order=A.resumeChoices({...relinked,savedAt:'2026-11-24T08:30:00Z',fileSavedAt:'2026-11-24T08:31:00Z'},[{...newest,savedAt:'2026-11-24T08:30:30Z',index:0}],t);
+ assert.deepEqual([order.newest.kind,order.other.kind],['earlier','latest']);
 });
 
 test('Z5: without a comparable timed run the Run study box has no timing part',async()=>{
@@ -96,16 +99,17 @@ test('Z2: the newest offer of a project with both models restores both',async()=
  const optical={runs:6,model:'Optical waveguide',names:['Run 1'],savedAt:'2026-11-24T08:44:00Z',file:'both-models.json',fileCurrent:false,pair:{model:'Heated silicon waveguide',runs:2,savedAt:'2026-11-24T08:30:00Z'}};
  const heated={runs:2,model:'Heated silicon waveguide',names:['Run 1','Run 2'],savedAt:'2026-11-24T08:30:00Z',file:'both-models.json',fileCurrent:false,index:0};
  const choices=A.resumeChoices(optical,[heated],t);
- assert.deepEqual(choices[0],{kind:'latest',newest:true,pair:true,label:'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · saved 2026-11-24T08:44:00Z'});
- // round 21 (W4): the other model's own entry is not listed again (its card still offers it)
- assert.equal(choices.length,1);
+ // after rounds 26–30 the file words and the time are in the detail line (string 5: an opened file)
+ assert.deepEqual(choices.newest,{kind:'latest',newest:true,pair:true,label:'Restore newest from this browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)',detail:'Kept in this browser 2026-11-24T08:44:00Z · newer than both-models.json as opened'});
+ // round 21 (W4): the other model's own entry is not listed again
+ assert.equal(choices.other,null);assert.deepEqual(choices.earlier,[]);
  // a pair on an entry that is not the newest is not offered; one run reads "1 run"
- assert.equal(A.resumeChoices({...heated,kind:'latest',pair:{model:'Optical waveguide',runs:1}},[{...optical,pair:null,index:0}],t)[1].pair,undefined);
+ assert.equal(A.resumeChoices({...heated,kind:'latest',pair:{model:'Optical waveguide',runs:1}},[{...optical,pair:null,index:0}],t).other.pair,undefined);
  assert.equal(A.pairLine({model:'Heated silicon waveguide',runs:1},{model:'Optical waveguide',runs:1}),'Heated silicon waveguide (1 run) and Optical waveguide (1 run)');
  // the caller: a pair only while the tab holds runs of neither model, and not "(already in this tab)"
  const app=read('workspace-app.mjs');
  assert.ok(app.includes("const pairable=!runs.length&&!multiView.projectRuns();"));
- assert.ok(app.includes("return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt}}:entry;"));
+ assert.ok(app.includes("return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt,fileCurrent:o.record.fileCurrent}}:entry;"));
  // the second record is found again by its model, time and file; a failure names that model
  assert.ok(app.includes("e.recovered.session.application===record.application&&e.recovered.savedAt===record.savedAt&&entryFile(e)===record.file"));
  assert.ok(app.includes("notice(`${other.model} was not restored: its browser record is no longer stored.`)"));
