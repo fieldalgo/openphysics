@@ -251,7 +251,8 @@ by the table of PR #349's run 45409971229 (2026-11-24, every collected file list
 a part of eight was about 21.5 minutes of tests plus about 3 minutes of setup. With the
 boundary- and corner-panel tests (2026-11-25) the table sums to about 378 minutes; twelve
 balanced parts still ran 21 to 42 minutes of tests because runner speed varies, so CI runs
-sixteen parts of about 24 minutes by the table; the 45-minute limit only stops hung runs. A file missing from the table is counted as the
+sixteen parts of about 24 minutes by the table. On an EPYC 7763 runner the corner-harmonic
+solves run about 2.3 times slower, so the test jobs' limit is 60 minutes; it only stops hung runs. A file missing from the table is counted as the
 median, a few seconds, however long it runs: rebuild the table from a complete run's
 `source-tests-*.xml` when files are added (part 5 of main's run 45415835896 reached the
 limit after the 3-minute `test_studio_closed_target.py` was added, unlisted, on a slow
@@ -339,7 +340,7 @@ together run every test file once, and each writes `shard.json` with its files
 and estimated time. In one job the run took 39 to 71 minutes on 2026-11-20,
 depending on the runner CPU; the eight parts of a 63-minute run would be 7.1 to
 10.9 minutes each, the longest being the M3 slab refinement study alone, and
-the 45-minute limit only stops hung runs. Without `--shard`,
+the 60-minute limit (as for the source parts) only stops hung runs. Without `--shard`,
 as locally, the script runs every test file.
 
 **Licenses** (`tools/check_licenses.py`). Before the tests, the pinned validation
