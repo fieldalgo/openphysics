@@ -903,12 +903,12 @@ print(n)`;
     for (const job of await page.eval('[...window.__jobs]')) if (!replies.has(job))
       replies.set(job, await page.on('function(j){return fetch("/api/multiphysics/jobs/"+j+"/result").then(r=>{if(!r.ok)throw Error("no reply "+j);return r.text()})}', job));
   };
-  const keep = (key, sel) => page.eval(`(()=>{const c=document.querySelector(${JSON.stringify(sel)});if(!c)return null;(window.__hq??={})[${JSON.stringify(key)}]=c.getContext('2d').getImageData(0,0,c.width,c.height);return [c.width,c.height]})()`);
+  const keep = (key, sel) => page.on('function(key,sel){const c=this.querySelector(sel);if(!c)return null;(window.__hq??={})[key]=c.getContext("2d").getImageData(0,0,c.width,c.height);return [c.width,c.height]}', key, sel);
   // the colour change at the given pixels ([x, y], the centroids of the drawn triangles), against the
   // pixels kept before: {maxDelta, changed, points}
-  const differAt = (key, sel, points) => page.eval(`(()=>{const a=window.__hq?.[${JSON.stringify(key)}],c=document.querySelector(${JSON.stringify(sel)});if(!a||!c)return {missing:true};const b=c.getContext('2d').getImageData(0,0,c.width,c.height);if(a.width!==b.width||a.height!==b.height)return {size:[a.width,a.height,b.width,b.height]};let max=0,n=0;for(const [x,y] of ${JSON.stringify(points)}){const i=4*(y*a.width+x),d=Math.max(Math.abs(a.data[i]-b.data[i]),Math.abs(a.data[i+1]-b.data[i+1]),Math.abs(a.data[i+2]-b.data[i+2]));if(d){n++;if(d>max)max=d;}}return {maxDelta:max,changed:n,points:${points.length}}})()`);
+  const differAt = (key, sel, points) => page.on('function(key,sel,points){const a=window.__hq?.[key],c=this.querySelector(sel);if(!a||!c)return {missing:true};const b=c.getContext("2d").getImageData(0,0,c.width,c.height);if(a.width!==b.width||a.height!==b.height)return {size:[a.width,a.height,b.width,b.height]};let max=0,n=0;for(const [x,y] of points){const i=4*(y*a.width+x),d=Math.max(Math.abs(a.data[i]-b.data[i]),Math.abs(a.data[i+1]-b.data[i+1]),Math.abs(a.data[i+2]-b.data[i+2]));if(d){n++;if(d>max)max=d;}}return {maxDelta:max,changed:n,points:points.length}}', key, sel, points);
   // a canvas's pixels as SHA-256 (with its size), kept here: a reload clears the page's own copies
-  const digest = sel => page.eval(`(async()=>{const c=document.querySelector(${JSON.stringify(sel)});if(!c)return null;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;const h=await crypto.subtle.digest('SHA-256',d);return c.width+'x'+c.height+':'+[...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')})()`);
+  const digest = sel => page.on('async function(sel){const c=this.querySelector(sel);if(!c)return null;const d=c.getContext("2d").getImageData(0,0,c.width,c.height).data;const h=await crypto.subtle.digest("SHA-256",d);return c.width+"x"+c.height+":"+[...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("")}', sel);
   // the maps of the Results page: [key, tree item, canvas, region drawn (core, or every triangle), share limit]
   const CANVASES = [['heat', 'Heat 1', 'canvas[data-mp-map=temperature]', null, 0.001], ['T', 'Modes 1', 'canvas[data-mp-map=T]', 'core', 0.05], ['n', 'Modes 1', 'canvas[data-mp-map=n]', 'core', 0.001]];
   const showRun = async n => {
@@ -920,7 +920,9 @@ print(n)`;
   const capture = async (tag, how = 'keep', points = null) => {
     const out = {};
     for (const [key, item, sel] of CANVASES) {
-      await page.clickTreeItem(item); await page.until(`!!document.querySelector(${JSON.stringify(sel)})`, `HQ ${tag} ${key}`); await sleep(400);
+      await page.clickTreeItem(item);
+      for (const end = Date.now() + 60000; !(await page.on('function(s){return !!this.querySelector(s)}', sel)); await sleep(150)) assert.ok(Date.now() < end, `HQ ${tag} ${key}`);
+      await sleep(400);
       out[key] = how === 'digest' ? await digest(sel) : how === 'differ' ? await differAt(key, sel, points[key]) : await keep(key, sel);
       out[key + ' note'] = await page.eval("document.querySelector('[data-mp-map-precision]')?.textContent??null");
     }
