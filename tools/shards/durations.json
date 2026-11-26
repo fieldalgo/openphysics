@@ -1,5 +1,5 @@
 {
- "source": "Validate packages run 45536602993 (branch claude/compassionate-rubin-bypei0-landing d73c387f, 2026-11-25), linux-py312 source-tests-1..12.xml",
+ "source": "Validate packages run 45536602993 (branch claude/compassionate-rubin-bypei0-landing d73c387f, 2026-11-25), linux-py312 source-tests-1..12.xml; files added on main after that run take main's times (Validate packages run 45409971229 (PR #349 head 7a3fb38, 2026-11-24), linux-py31)",
  "seconds": {
   "tests/galerkin/test_api_units_scan_galerkin.py": 3.0,
   "tests/galerkin/test_arpack_rng.py": 0.6,
@@ -320,6 +320,8 @@
   "tests/simcase/test_studio_closed_target.py": 244.4,
   "tests/simcase/test_studio_geometry_lab.py": 2.0,
   "tests/simcase/test_studio_joule_regions.py": 11.8,
+  "tests/simcase/test_studio_mode_channel_gate.py": 120.0,
+  "tests/simcase/test_studio_mode_channel_mesh.py": 330.0,
   "tests/simcase/test_studio_mode_count.py": 6.6,
   "tests/simcase/test_studio_mode_identity.py": 30.2,
   "tests/simcase/test_studio_mode_matching.py": 6.0,
