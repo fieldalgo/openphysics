@@ -234,10 +234,45 @@ export function chooseMaps(state,{first=[],budget=FIELD_BUDGET_BYTES,bytes=mapBy
  const {kept,letGo,total}=budgetChoose(budgetOrder(withMaps,selected,first),{base,bytes,selected,budget});
  return {kept,letGo,total,base,fits:false};
 }
-/** chooseMaps, with the maps of letGo let go (in place): what the tab does when a map arrives. */
+/** chooseMaps, with the maps of letGo let go (in place): the order at an arrival, the maps as they are. */
 export function keepMapsAtArrival(state,options={}){
  const out=chooseMaps(state,options);for(const r of out.letGo)letGoMaps(r);return out;
 }
+// Compact maps in the tab (session version 17, design "Session versions 16 and 17" section 3.1), as
+// optical compact fields do (workspace-retention.mjs, compactFields): while every map of the tab fits
+// as text in the budget nothing changes, so the session stays version 8 or 15 byte for byte. At the
+// first arrival (a result, a recompute, Open, Restore, a swap) where the maps would not all fit as
+// text, every map of the tab is made compact in place; from then on every map that arrives is (an
+// opened or restored file is converted only when its maps would not all fit). A run whose maps cannot
+// be kept compact stays text at its text size. The tab then holds what a file holds.
+/** The runs whose maps were made compact now (in place), and whether this was the tab's first
+ * conversion. loaded: the arrival is an opened or restored session. */
+export function compactMaps(state,{budget=FIELD_BUDGET_BYTES,first=[],loaded=false}={}){
+ const text=state.runs.filter(r=>r.maps==='kept');
+ if(!text.length)return {converted:[],started:false};
+ const already=state.runs.some(r=>r.maps==='compact');
+ if((!already||loaded)&&chooseMaps(state,{first,budget}).fits)return {converted:[],started:false};
+ const converted=text.filter(compactRunMaps);
+ return {converted,started:!already&&converted.length>0};
+}
+/** What the tab does when maps arrive: compactMaps, then the order (keepMapsAtArrival): {...out,
+ * converted, started}. */
+export function chooseMapsAtArrival(state,options={}){
+ const {converted,started}=compactMaps(state,options);
+ return {...keepMapsAtArrival(state,options),converted,started};
+}
+/** The bytes a run's maps would add kept compact, or null when they cannot be (they would stay
+ * text); a compact run's own bytes. Kept per result object. */
+export function compactMapBytesOf(run){
+ if(run.maps==='compact')return mapBytes(run);
+ if(run.maps!=='kept')return null;
+ if(COMPACT_BYTES.has(run.result))return COMPACT_BYTES.get(run.result);
+ const result=compactResult(run.result,run.doc),bytes=result?mapBytes({...run,result,maps:'compact'}):null;
+ COMPACT_BYTES.set(run.result,bytes);return bytes;
+}
+const COMPACT_BYTES=new WeakMap();
+/** Whether the tab holds compact maps (the notes under the run list and the maps). */
+export const holdsCompactMaps=runs=>runs.some(r=>r.maps==='compact');
 /** The bytes of the session with the maps of the selected and pinned runs only (the words when a
  * pinned run's maps go). */
 export const selectedAndPinnedMapBytes=(state,base)=>state.runs.filter(r=>r.maps!=='not kept'&&(r.pinned||r.job===state.selected)).reduce((t,r)=>t+mapBytes(r),base);
@@ -255,10 +290,10 @@ export function letGoMaps(run){
 export const mapsLetGoHere=run=>run.maps==='not kept'&&run[LET_GO]===true;
 /** Whether a run's let-go maps are still held for Keep Run N's maps. */
 export const heldMaps=run=>run.maps==='not kept'&&!!run[HELD];
-/** The run's let-go maps back, as they were (Keep Run N's maps). */
+/** The run's let-go maps back, as they were (Keep Run N's maps): compact maps stay compact. */
 export function takeBackMaps(run){
  const held=run[HELD];if(!held||run.maps!=='not kept')return false;
- run.result=held.result;run.maps='kept';delete run.counts;delete run[HELD];delete run[LET_GO];return true;
+ run.result=held.result;run.maps=isCompactResult(held.result)?'compact':'kept';delete run.counts;delete run[HELD];delete run[LET_GO];return true;
 }
 /** The held maps are dropped (at the next arrival the swap is stale, and memory is freed). */
 export function forgetHeldMaps(runs){for(const r of runs)if(r[HELD])delete r[HELD];}

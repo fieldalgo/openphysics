@@ -12,7 +12,10 @@
 // (1e-15 absolute below 1e-3), with the same mesh, and its maps are attached. HQ1 to HQ4 (design
 // "Session versions 16 and 17", section 3.4): each case's maps made compact (session version 17) and
 // read back are bitwise base + fround(x − base), with node and coupled temperatures, n, k and
-// index_change within the pre-registered bounds.
+// index_change within the pre-registered bounds. HQ5: the Results page of each case with compact maps
+// against the server's maps (the range, the colour-bar labels and accessible names identical, colours
+// within 1 level, changed on at most 0.1 % of triangles, 5 % of the core T map). HQ6: 20 results through
+// the tab's rule with compact maps keep 20, 20, 15 and 17 maps (template, 0.12 µm, 0.08 µm, slab).
 const test=require('node:test');const assert=require('node:assert/strict');const path=require('node:path');
 const RESULTS=process.env.STUDIO_HEATED_RETENTION_RESULTS;
 if(RESULTS){
@@ -28,6 +31,17 @@ if(RESULTS){
   assert.deepEqual(report.failures,[]);
   assert.deepEqual(Object.keys(report.cases),['tpl-p2','tpl4-p2','v012','v008','slab']);
   for(const [name,c] of Object.entries(report.cases)){assert.ok(c.heat1.rangeMinExact&&c.heat1.rangeMaxRule,name);console.log(name,JSON.stringify(c));}
+ });
+ test('HQ5: the Results page with compact maps: the same range, labels and names; colours within 1 level, on at most 0.1 % (core T 5 %) of triangles',async()=>{
+  const T=await import(path.join(__dirname,'../../tools/studio_heated_retention.mjs'));
+  const report=await T.hq5(RESULTS);
+  assert.deepEqual(report.failures,[]);
+ });
+ test('HQ6: 20 results through the tab with compact maps keep 20, 20, 15 and 17 maps (template, 0.12 µm, 0.08 µm, slab)',async()=>{
+  const T=await import(path.join(__dirname,'../../tools/studio_heated_retention.mjs'));
+  const report=await T.hq6(RESULTS);
+  assert.deepEqual(report.failures,[]);
+  assert.deepEqual(Object.fromEntries(Object.entries(report.sequences).map(([k,s])=>[k,s.mapsKeptAt20])),{template:20,v012:20,v008:15,slab:17});
  });
  test('HK5: a recomputed heated run matches its stored values and gets its maps back',async()=>{
   const T=await import(path.join(__dirname,'../../tools/studio_heated_retention.mjs'));

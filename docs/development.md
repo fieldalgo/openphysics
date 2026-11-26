@@ -694,7 +694,16 @@ pre-registered HK10, its expected values re-registered after the result: about 3
 run, so four fit; the fifth result lets Run 1's maps go and the sixth Run 2's, each said with
 **Recompute Run N's maps**; the count is also derived from the measured map bytes; the file is
 written without a question; and Recompute Run 1's maps brings them back and lets Run 3's go; before
-H1, the 16 MiB question and the refusal), 20 runs and the 21st run's drop (six
+H1, the 16 MiB question and the refusal; since compact maps, design *Session versions 16 and 17*,
+re-registered by design, HQ decision 2026-11-26-openphysics-studio-hk10-compact: the maps become
+compact at the result whose maps would not all fit as text, about 1.3 MB a run, so the stage runs
+until the first map is let go and one result more, the results that convert and let Run 1's and
+Run 2's maps go and the run the recompute lets go derived from the file's own records, written by
+the script's own encoder of `f32-offset-base64-v1`, and every compact array compared as HQ1, in Node
+and in Python; in the same sequence, HQ: no Messages sentence at the conversion, both notes, Run 1's
+heat, core temperature and index maps before and after it read at each triangle's centroid pixel,
+within one colour level on at most 0.1 % of triangles, 5 % for the core temperature, and the
+selected run's canvases bit-identical after Save, Open, Save again and Restore), 20 runs and the 21st run's drop (six
 and the seventh before H1), the refusals of damaged and newer files, browser recovery after a reload, three
 earlier sessions, the conflict of two tabs, and a restart: two optical runs, the heated session
 file opened over them, a reload and the same file opened again. After it, the title keeps

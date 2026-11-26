@@ -12,14 +12,14 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {ENVELOPE,SIDES,PHYSMAT_THERMO_OPTIC,kindCatalog,physicsLabel,physicsNames,couplingNames,couplingTitle,splitSpec,portLabel,quantityWords,unitText,locationWords,
  normalizeEnvelope,isMultiphysics,addPhysics,removePhysics,sourceChoicesFor,targetChoices,transferNote,addCoupling,removeCoupling,suggestedCouplings,suggestionText,
  acceptLoop,removeLoop,loopText,loopIndexOf,materialUses,materialLabel,modesTemperatureCoupled,anyTemperatureCoupled,physmatFor,fillThermoOptic,usePhysmat,fillText,geometryOf,lengthsNote,
- mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,wireEnds,progressRows,failureText,formatValue,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument,
+ mapDiagnostics,problemCounts,runBlockText,connectionLayout,renderMultiphysicsGraph,wireEnds,progressRows,failureText,formatValue,mapColour,mapValues,mapLegend,mapAriaLabel,couplingCheckRows,effectiveIndexRows,resultPages,uncoupledDocument,
  runFreshness,freshnessAgain,editNotice,staleRows,originRows,sequenceHeading,readyStatus,RANKING_CAVEAT,modeCountText,baselineReturnText,baselineKey,baselinePhysics,baselineOptionState,shiftText,baselineText,unsourcedInputs,canonicalJson} from './workspace-multiphysics.mjs';
 import {curvePath,loopPath} from './workspace-graph.mjs';
 import {persistenceTitle,persistenceHint,sessionFileName} from './workspace-persistence.mjs';
 import {appendMultiphysicsRun,nextRunNumber,multiphysicsRunName,meshCounts,writeMultiphysicsSession,recoveryText,overflowQuestion,savedNotice,modelSlug,
- MULTIPHYSICS_RUN_LIMIT,MAPS_NOT_KEPT,VIEW_PAGES,readMultiphysicsView,chooseMaps,letGoMaps,mapsLetGoHere,heldMaps,takeBackMaps,forgetHeldMaps,mapSwapCandidate,selectedAndPinnedMapBytes,
+ MULTIPHYSICS_RUN_LIMIT,MAPS_NOT_KEPT,VIEW_PAGES,readMultiphysicsView,chooseMaps,compactMaps,letGoMaps,mapsLetGoHere,heldMaps,takeBackMaps,forgetHeldMaps,mapSwapCandidate,selectedAndPinnedMapBytes,
  recomputeMapsMismatch,attachMaps} from './workspace-multiphysics-session.mjs';
-import {MP_RUNS_KEPT_TEXT,mpRunsNodeLabel,ALL_PINNED_TEXT,UNPINNED_TEXT,mapsKeepValuesText,mapsKeepValuesWhileRunningText,MAPS_MAY_GO_TEXT,mapsNotKeptAfterText,keepMapsInsteadLabel,mapsBackText,pinnedMapsText,
+import {MP_RUNS_KEPT_TEXT,MP_COMPACT_RESULTS_TEXT,mpRunsKeptNote,mpRunsNodeLabel,ALL_PINNED_TEXT,UNPINNED_TEXT,mapsKeepValuesText,mapsKeepValuesWhileRunningText,MAPS_MAY_GO_TEXT,mapsNotKeptAfterText,keepMapsInsteadLabel,mapsBackText,pinnedMapsText,
  mapsNotKeptResultsText,recomputeMapsLabel,recomputeMapsEstimate,recomputingMapsText,recomputeStoppedText,recomputedMapsText,notRecomputedMapsText,cannotRecomputeMapsText,mapsValuesAgainText,
  predictedMapsLetGo,unestimatedMapRisk} from './workspace-multiphysics-retention.mjs';
 import {matchesAgainText} from './workspace-multiphysics.mjs';
@@ -93,7 +93,7 @@ export function createMultiphysicsView(ctx){
   loaded={kind:source==='file'?'opened':'recovered',name:source==='file'?label:null,stamp:stamp(),file:sourceFile,fileCurrent:source==='file'||openedMatch};if(sessionFile&&matched)sessionFile.stamp=loaded.stamp;
   openedStamp=source==='file'||openedMatch?loaded.stamp:null;
   // run retention: an opened or restored session is an arrival of maps (section 3.2)
-  dropSwap=null;noSwapNote='';const mapWords=applyMapBudget();
+  dropSwap=null;noSwapNote='';const mapWords=applyMapBudget([],{loaded:true});
   ctx.onHistory();ctx.render();
   notice((source==='file'?`Opened ${label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${label}), not recomputed. `+(savedFile?`Last session file ${savedFile.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.'))+(mapWords?' '+mapWords:''),'',swapAction());
  }
@@ -308,10 +308,12 @@ export function createMultiphysicsView(ctx){
  // When maps arrive (a result, a recompute, an opened or restored session, a dropped run kept
  // instead), the maps kept are chosen within the budget in the order of workspace-budget.mjs; nothing
  // else lets maps go. Returns the Messages words ('' when every map stays). first: the jobs whose maps
- // arrived and are not the selected run's.
- function applyMapBudget(first=[]){
+ // arrived and are not the selected run's. Compact maps (session version 17): when the maps would not
+ // all fit as text, they are made compact first (compactMaps), with no Messages sentence (the
+ // notes under the maps and the run list say it); loaded: an opened or restored session.
+ function applyMapBudget(first=[],{loaded=false}={}){
   forgetHeldMaps(runs);mapSwap=null;mapsLetGo=[];mapNote='';
-  const state=sessionState();let out;try{out=chooseMaps(state,{first});}catch{return '';}
+  const state=sessionState();let out;try{compactMaps(state,{first,loaded});out=chooseMaps(state,{first});}catch{return '';}
   if(!out.letGo.length)return '';
   const pinned=out.letGo.filter(r=>r.pinned),plain=out.letGo.filter(r=>!r.pinned),pinnedBytes=pinned.length?selectedAndPinnedMapBytes(state,out.base):0;
   for(const r of out.letGo)letGoMaps(r);mapsLetGo=out.letGo;
@@ -581,18 +583,16 @@ export function createMultiphysicsView(ctx){
   resize=new ResizeObserver(draw);resize.observe(stage);draw();
  }
  // ---- results ----
- const RAMP=[[48,18,59],[64,98,215],[34,180,180],[150,215,80],[250,200,40],[180,30,20]];
- function colour(t){t=Math.min(1,Math.max(0,t))*(RAMP.length-1);const i=Math.min(RAMP.length-2,Math.floor(t)),f=t-i,a=RAMP[i],b=RAMP[i+1];return `rgb(${a.map((v,k)=>Math.round(v+(b[k]-v)*f)).join(',')})`;}
+ const colour=t=>`rgb(${mapColour(t).join(',')})`;
  function drawMap(canvas,result,values,{nodal=false,region=null,label}){
-  const mesh=result.mesh,P=mesh.node_coordinates,T=mesh.triangles,keep=region===null?null:mesh.region_names.indexOf(region);
-  const tris=T.map((t,i)=>i).filter(i=>keep===null||keep<0||mesh.regions[i]===keep),tv=i=>nodal?(values[T[i][0]]+values[T[i][1]]+values[T[i][2]])/3:values[i];
-  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity,lo=Infinity,hi=-Infinity;for(const i of tris){for(const n of T[i]){x0=Math.min(x0,P[n][0]);x1=Math.max(x1,P[n][0]);y0=Math.min(y0,P[n][1]);y1=Math.max(y1,P[n][1]);}const v=tv(i);lo=Math.min(lo,v);hi=Math.max(hi,v);}
+  const mesh=result.mesh,P=mesh.node_coordinates,T=mesh.triangles,{tris,tv,lo,hi}=mapValues(result,values,{nodal,region});
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;for(const i of tris)for(const n of T[i]){x0=Math.min(x0,P[n][0]);x1=Math.max(x1,P[n][0]);y0=Math.min(y0,P[n][1]);y1=Math.max(y1,P[n][1]);}
   const r=canvas.getBoundingClientRect(),W=Math.max(200,Math.round(r.width)),H=Math.max(120,Math.round(r.height)),dpr=globalThis.devicePixelRatio||1;canvas.width=W*dpr;canvas.height=H*dpr;
   const c=canvas.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,W,H);const pad=16,bar=46,s=Math.min((W-2*pad-bar)/(x1-x0||1),(H-2*pad)/(y1-y0||1)),X=x=>pad+(x-x0)*s,Y=y=>H-pad-(y-y0)*s;
   for(const i of tris){const [a,b,d]=T[i];c.beginPath();c.moveTo(X(P[a][0]),Y(P[a][1]));c.lineTo(X(P[b][0]),Y(P[b][1]));c.lineTo(X(P[d][0]),Y(P[d][1]));c.closePath();const col=colour(hi>lo?(tv(i)-lo)/(hi-lo):.5);c.fillStyle=col;c.strokeStyle=col;c.lineWidth=.6;c.fill();c.stroke();}
   const bx=W-bar+6;for(let k=0;k<64;k++){c.fillStyle=colour(k/63);c.fillRect(bx,H-pad-(k+1)*(H-2*pad)/64,10,(H-2*pad)/64+1);}
-  c.fillStyle='#34445b';c.font='10px system-ui,sans-serif';const fmt=v=>Math.abs(hi-lo)<1e-3*Math.max(Math.abs(hi),1e-30)?v.toPrecision(7):v.toPrecision(Math.max(3,Math.ceil(Math.log10(Math.max(Math.abs(hi),Math.abs(lo))/Math.max(hi-lo,1e-300)))+2));c.fillText(fmt(hi),bx-12,pad-4>8?pad-4:10);c.fillText(fmt(lo),bx-12,H-4);
-  canvas.setAttribute('aria-label',`${label}: ${formatValue(lo)} to ${formatValue(hi)}`);return {lo,hi};
+  c.fillStyle='#34445b';c.font='10px system-ui,sans-serif';const [top,bottom]=mapLegend(lo,hi);c.fillText(top,bx-12,pad-4>8?pad-4:10);c.fillText(bottom,bx-12,H-4);
+  canvas.setAttribute('aria-label',mapAriaLabel(label,lo,hi));return {lo,hi};
  }
  const wavelengthText=w=>{const v=Number(w?.values?.[0]??w?.value);return w?.unit==='m'&&Number.isFinite(v)?`${Number((v*1e9).toPrecision(9))} nm`:`${w?.values?.[0]??w?.value??''} ${w?.unit||''}`;};
  function results(host){
@@ -611,7 +611,7 @@ export function createMultiphysicsView(ctx){
   }
   const p=r.physics[id];
   if(p.type==='thermal.steady2d'){
-   host.insertAdjacentHTML('beforeend',`<h2>${esc(physicsLabel(id))} · temperature</h2>${kept?'<div class="mp-plot"><canvas data-mp-map="temperature" role="img"></canvas></div>':`<p class="mp-no-maps" data-mp-no-maps>${esc(noMapsText(lastRun))}</p>`}${pair('Minimum T',p.range.min.toFixed(3)+' K')}${pair('Maximum T',p.range.max.toFixed(3)+' K')}${pair('Nodes',counts.nodes.toLocaleString('en-US'))}${pair('Triangles',counts.triangles.toLocaleString('en-US'))}${kept?'<p class="muted">Each triangle is coloured by the mean of its node temperatures.</p>':''}`);
+   host.insertAdjacentHTML('beforeend',`<h2>${esc(physicsLabel(id))} · temperature</h2>${kept?'<div class="mp-plot"><canvas data-mp-map="temperature" role="img"></canvas></div>':`<p class="mp-no-maps" data-mp-no-maps>${esc(noMapsText(lastRun))}</p>`}${pair('Minimum T',p.range.min.toFixed(3)+' K')}${pair('Maximum T',p.range.max.toFixed(3)+' K')}${pair('Nodes',counts.nodes.toLocaleString('en-US'))}${pair('Triangles',counts.triangles.toLocaleString('en-US'))}${kept?'<p class="muted">Each triangle is coloured by the mean of its node temperatures.</p>':''}${lastRun.maps==='compact'?compactNote:''}`);
    if(kept)maps.push(['temperature',()=>drawMap(host.querySelector('[data-mp-map=temperature]'),r,p.temperature.values,{nodal:true,label:'Temperature in K'})]);
   }else{
    const rows=effectiveIndexRows(p),alone=uncoupled[id],coupled=p.coupled;
@@ -632,7 +632,7 @@ export function createMultiphysicsView(ctx){
    // the answer first, then the coupled input it was solved from
    if(coupled&&!kept)host.insertAdjacentHTML('beforeend',`<p class="mp-no-maps" data-mp-no-maps>${esc(noMapsText(lastRun))}</p>`);
    else if(coupled){const region=r.mesh.region_names.includes('core')?'core':null,dn=coupled.index_change;
-    host.insertAdjacentHTML('beforeend',`<div class="mp-maps"><figure><figcaption>Temperature per triangle [K]${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="T" role="img"></canvas></div></figure><figure><figcaption><label>Show <select id="mp-index-view"><option value="n" ${indexView==='n'?'selected':''}>refractive index n</option>${dn?`<option value="dn" ${indexView==='dn'?'selected':''}>change n − n₀</option>`:''}</select></label>${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="n" role="img"></canvas></div></figure></div><p class="muted">The coupled input as the optical solve used it: the mean of each triangle's 3 node temperatures, and n = n₀ + (dn/dT)(T − T_ref). The change is (dn/dT)(T − T_ref) of each triangle's material.</p>`);
+    host.insertAdjacentHTML('beforeend',`<div class="mp-maps"><figure><figcaption>Temperature per triangle [K]${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="T" role="img"></canvas></div></figure><figure><figcaption><label>Show <select id="mp-index-view"><option value="n" ${indexView==='n'?'selected':''}>refractive index n</option>${dn?`<option value="dn" ${indexView==='dn'?'selected':''}>change n − n₀</option>`:''}</select></label>${region?' · core':''}</figcaption><div class="mp-plot"><canvas data-mp-map="n" role="img"></canvas></div></figure></div><p class="muted">The coupled input as the optical solve used it: the mean of each triangle's 3 node temperatures, and n = n₀ + (dn/dT)(T − T_ref). The change is (dn/dT)(T − T_ref) of each triangle's material.</p>${lastRun.maps==='compact'?compactNote:''}`);
     maps.push(['T',()=>drawMap(host.querySelector('[data-mp-map=T]'),r,coupled.temperature.values,{region,label:'Temperature in K'})]);
     maps.push(['n',()=>drawMap(host.querySelector('[data-mp-map=n]'),r,indexView==='dn'&&dn?dn:coupled.refractive_index.n,{region,label:indexView==='dn'&&dn?'Index change n − n₀':'Refractive index'})]);}
    else host.insertAdjacentHTML('beforeend','<p>This physics had no coupled input in this run.</p>');
@@ -645,6 +645,8 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
  const runTitle=run=>`Run ${run.number}${run.label?' · '+run.label:''}`;
  // a run without its maps: let go in this tab (S9), or read so from a file or record
  const noMapsText=run=>mapsLetGoHere(run)?mapsNotKeptResultsText(run):MAPS_NOT_KEPT;
+ // under the maps of a run whose maps are compact (session version 17)
+ const compactNote=`<p class="input-hint" data-mp-map-precision>${esc(MP_COMPACT_RESULTS_TEXT)}</p>`;
  // round 14 (Q5): the plain words, with what the checksum does not show as the title text
  const CHECKSUM_HELP='The checksum detects a damaged or hand-edited file; it does not show who made the file: whoever edits a file can recompute it.';
  const originNote=run=>run.origin==='local'?'':run.origin==='recovered'?' Recovered from this browser, not recomputed.':' Loaded from file, not recomputed. <span data-mp-checksum title="'+CHECKSUM_HELP+'">Results match the file\'s checksum.</span>';
@@ -655,7 +657,7 @@ const runTime=run=>new Date(run.completedAt).toLocaleTimeString([],{hour:'2-digi
   host.insertAdjacentHTML('beforeend',`<h2 id="mp-run-list-heading">${mpRunsNodeLabel(runs.length)} · ${pinned} pinned</h2><div class="mp-run-list">${[...runs].reverse().map(r=>`<button type="button" class="run-item" data-mp-run="${esc(r.job)}" aria-pressed="${r===lastRun}">${esc(runItem(r))}</button>`).join('')}</div>
    <form class="run-name" id="mp-run-name"><label>Run name<input id="mp-run-name-input" type="text" maxlength="80" value="${esc(lastRun.label)}" placeholder="For example: heater 10 mW" aria-describedby="mp-run-name-hint"></label><button id="mp-rename-run" type="submit">Apply name</button><p id="mp-run-name-hint" class="input-hint">Press Enter to apply. Naming a run pins it, so new runs do not replace it; Enter on a named, unpinned run pins it again.</p></form>
    ${lastRun.pinned?'<button type="button" id="mp-unpin-run">Unpin this run</button>':''}
-   <p data-mp-runs-kept>${esc(MP_RUNS_KEPT_TEXT)}</p>`);
+   <p data-mp-runs-kept>${esc(mpRunsKeptNote(runs))}</p>`);
   host.querySelectorAll('[data-mp-run]').forEach(b=>b.onclick=()=>{const r=runs.find(x=>x.job===b.dataset.mpRun);if(!r)return;lastRun=r;ctx.onHistory();ctx.render();notice(`${runTitle(r)} shown under Results; the model is unchanged.`);});
   const input=host.querySelector('#mp-run-name-input'),form=host.querySelector('#mp-run-name'),target=lastRun;
   const apply=()=>nameRun(target,input.value);

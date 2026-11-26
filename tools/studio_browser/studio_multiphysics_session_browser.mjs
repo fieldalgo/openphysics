@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-// Real-browser check of multiphysics session files (version 8): Save session and Open session in
+// Real-browser check of multiphysics session files (version 8, 15 and 17): Save session and Open session in
 // every model, a multiphysics model saved with its runs and opened again, the run list with names
 // and pins, browser recovery, the 16 MiB limit and the refusals of a damaged or newer file. The
 // checks S1, S2 and S5-S8 and S10 of docs/packages/simcase/workspace.md ("Session files"): every
@@ -280,6 +280,54 @@ try {
     ['physics', 'modes1', 'coupled', 'temperature', 'values'], ['physics', 'modes1', 'coupled', 'refractive_index', 'n'], ['physics', 'modes1', 'coupled', 'refractive_index', 'k'],
     ['physics', 'modes1', 'coupled', 'index_change'], ['physics', 'modes1', 'effective_index', 'values']];
   const bytesOf = value => value === null ? 'null' : Buffer.from(new Float64Array([value].flat(Infinity)).buffer).toString('hex');
+  // compact maps (multiphysics session version 17, f32-offset-base64-v1), written by this script from the
+  // server's reply as the workspace page documents them, independent of the page's encoder: the mesh as
+  // float64 coordinates, uint32 triangles and uint8 regions; node temperatures as float32 offsets from
+  // range.min; n, k and index_change as float32 offsets from a float64 base per region (its first
+  // triangle's value, 0 for none); the coupled temperature left out
+  const b64 = (Type, values) => Buffer.from(Type.from(values).buffer).toString('base64');
+  const regionBases = (values, regions, count) => Array.from({length: count}, (_, k) => {const i = regions.indexOf(k); return i < 0 ? 0 : values[i];});
+  function compactOf(reply) {
+    const m = reply.mesh, R = m.regions, count = m.region_names.length;
+    const mesh = {encoding: 'f32-offset-base64-v1', counts: {nodes: m.node_coordinates.length, triangles: m.triangles.length}};
+    for (const [k, v] of Object.entries(m)) mesh[k] = k === 'node_coordinates' ? b64(Float64Array, v.flat()) : k === 'triangles' ? b64(Uint32Array, v.flat()) : k === 'regions' ? b64(Uint8Array, v) : v;
+    const offsets = (values, base) => b64(Float32Array, values.map((x, i) => x - base(i)));
+    const physics = {};
+    for (const [name, p] of Object.entries(reply.physics)) {
+      if (p.type === 'thermal.steady2d' && Array.isArray(p.temperature?.values)) physics[name] = {...p, temperature: {...p.temperature, values: offsets(p.temperature.values, () => p.range.min)}};
+      else if (p.type === 'em.modes2d' && p.coupled) {
+        const coupled = {};
+        for (const [k, v] of Object.entries(p.coupled)) {
+          if (k === 'temperature') {const {values, ...rest} = v; coupled[k] = rest;}
+          else if (k === 'refractive_index') {const o = {}; for (const [q, a] of Object.entries(v)) {if ((q === 'n' || q === 'k') && Array.isArray(a)) {const base = regionBases(a, R, count); o[q] = offsets(a, i => base[R[i]]); o[q + '_base'] = base;} else o[q] = a;} coupled[k] = o;}
+          else if (k === 'index_change' && Array.isArray(v)) {const base = regionBases(v, R, count); coupled[k] = offsets(v, i => base[R[i]]); coupled.index_change_base = base;}
+          else coupled[k] = v;
+        }
+        physics[name] = {...p, coupled};
+      } else physics[name] = p;
+    }
+    return Object.fromEntries(Object.entries(reply).map(([k, v]) => [k, k === 'mesh' ? mesh : k === 'physics' ? physics : v]));
+  }
+  // a compact run's arrays as HQ1: coordinates, triangles and regions bitwise the server's, every map
+  // value bitwise base + fround(x − base), decoded here from the file's strings
+  function compareCompact(run, reply) {
+    const r = run.result, m = reply.mesh, R = m.regions, buf = s => Buffer.from(s, 'base64'), hex = a => Buffer.from(new Float64Array(a).buffer).toString('hex');
+    const f32 = s => {const b = buf(s); return Array.from({length: b.length / 4}, (_, i) => b.readFloatLE(4 * i));};
+    assert.equal(buf(r.mesh.node_coordinates).toString('hex'), Buffer.from(new Float64Array(m.node_coordinates.flat()).buffer).toString('hex'), `run ${run.number} coordinates`);
+    assert.deepEqual([...new Uint32Array(Uint8Array.from(buf(r.mesh.triangles)).buffer)], m.triangles.flat(), `run ${run.number} triangles`);
+    assert.deepEqual([...buf(r.mesh.regions)], R, `run ${run.number} regions`);
+    let arrays = 3, values = m.node_coordinates.length * 2 + m.triangles.length * 4;
+    const check = (what, text, sent, base) => {const got = f32(text).map((y, i) => base(i) + y), want = sent.map((x, i) => base(i) + Math.fround(x - base(i)));
+      assert.equal(hex(got), hex(want), `run ${run.number} ${what}`); arrays++; values += sent.length;};
+    const T = reply.physics.heat1.temperature.values, min = reply.physics.heat1.range.min; check('node temperature', r.physics.heat1.temperature.values, T, () => min);
+    const c = reply.physics.modes1.coupled, k = r.physics.modes1.coupled, count = m.region_names.length;
+    for (const [what, sent, text, base] of [['n', c.refractive_index.n, k.refractive_index.n, k.refractive_index.n_base], ['k', c.refractive_index.k, k.refractive_index.k, k.refractive_index.k_base], ['index_change', c.index_change, k.index_change, k.index_change_base]]) {
+      if (sent == null) {assert.equal(text, null, `run ${run.number} ${what}`); continue;}
+      assert.deepEqual(base, regionBases(sent, R, count), `run ${run.number} ${what} bases`); check(what, text, sent, i => base[R[i]]);
+    }
+    assert.equal(bytesOf(r.physics.modes1.effective_index.values), bytesOf(reply.physics.modes1.effective_index.values), `run ${run.number} n_eff`); arrays++; values++;
+    return {arrays, values};
+  }
   function compareArrays(sessionText, {valuesOnly = []} = {}) {
     const session = JSON.parse(sessionText);
     let arrays = 0, values = 0;
@@ -287,6 +335,7 @@ try {
       const reply = JSON.parse(replies.get(run.job));
       const residuals = r => (r.loops || []).map(l => l.residuals.map(x => x.value));
       assert.equal(bytesOf(residuals(run.result)), bytesOf(residuals(reply)), `run ${run.number} loop residuals`);
+      if (run.maps === 'compact') {const c = compareCompact(run, reply); arrays += c.arrays; values += c.values; continue;}
       for (const path of ARRAYS) {
         // a run whose maps were not kept holds n_eff and the loop residuals of its arrays
         if (run.maps === 'not kept' && path.join('.') !== 'physics.modes1.effective_index.values') continue;
@@ -309,8 +358,26 @@ s=json.load(open(sys.argv[1],encoding='utf-8'));d=sys.argv[2];n=0
 def flat(x): return [v for i in x for v in flat(i)] if isinstance(x,list) else [x]
 def hexes(x): return None if x is None else [float(v).hex() for v in flat(x)]
 paths=[p.split('.') for p in sys.argv[3].split(',')]
+import base64,struct
+def f32(x): return struct.unpack('<f',struct.pack('<f',x))[0]
+def floats(t,c): b=base64.b64decode(t,validate=True); return list(struct.unpack('<%d%s'%(len(b)//struct.calcsize(c),c),b))
+def bases(v,R,count): return [v[R.index(k)] if k in R else 0.0 for k in range(count)]
 for run in s['runs']:
   reply=json.load(open(os.path.join(d,run['job']+'.json'),encoding='utf-8'))
+  if run['maps']=='compact':
+    r,m=run['result'],reply['mesh'];R=m['regions']
+    assert [float(v).hex() for v in floats(r['mesh']['node_coordinates'],'d')]==hexes(m['node_coordinates']),(run['number'],'coordinates');n+=1
+    assert floats(r['mesh']['triangles'],'I')==flat(m['triangles']),(run['number'],'triangles');n+=1
+    assert floats(r['mesh']['regions'],'B')==R,(run['number'],'regions');n+=1
+    lo=reply['physics']['heat1']['range']['min'];T=reply['physics']['heat1']['temperature']['values']
+    assert [(lo+y).hex() for y in floats(r['physics']['heat1']['temperature']['values'],'f')]==[(lo+f32(x-lo)).hex() for x in T],(run['number'],'node temperature');n+=1
+    c,k=reply['physics']['modes1']['coupled'],r['physics']['modes1']['coupled']
+    for sent,text,base in [(c['refractive_index']['n'],k['refractive_index']['n'],k['refractive_index'].get('n_base')),(c['refractive_index']['k'],k['refractive_index']['k'],k['refractive_index'].get('k_base')),(c['index_change'],k['index_change'],k.get('index_change_base'))]:
+      if sent is None: assert text is None;continue
+      assert base==bases(sent,R,len(m['region_names'])),(run['number'],'bases')
+      assert [(base[R[i]]+y).hex() for i,y in enumerate(floats(text,'f'))]==[(base[R[i]]+f32(x-base[R[i]])).hex() for i,x in enumerate(sent)],(run['number'],'triangle map');n+=1
+    assert hexes(r['physics']['modes1']['effective_index']['values'])==hexes(reply['physics']['modes1']['effective_index']['values']);n+=1
+    continue
   for p in paths:
     def get(o):
       for k in p: o=o.get(k) if isinstance(o,dict) else None
@@ -803,51 +870,140 @@ print(n)`;
   stage('R1 resumed', {neff: await opticalNeff()});
 
   // S5 (run retention of the heated model, H1, pre-registered HK10 a and b; replaces the 16 MiB question,
-  // the pinned loop and the refusal, which a tab within the budget no longer reaches): six runs of the
-  // 0.08 µm mesh (core near 0.01 µm), about 3.7 MB of maps each; the budget (16.8 MB) keeps four.
+  // the pinned loop and the refusal, which a tab within the budget no longer reaches): runs of the
+  // 0.08 µm mesh (core near 0.01 µm), about 3.4 MB of maps each as text and 1.3 MB compact.
   // The expected values were re-registered AFTER THE RESULT (HQ decision 2026-11-25-openphysics-studio-
   // h1-hk10-after-result): as registered they came from the near-0.015 µm mesh (five maps fit), which
-  // failed; the count is now derived from the measured map bytes below, not from the product's chooser.
+  // failed; the count is derived from the measured map bytes below, not from the product's chooser.
+  // Re-registered again by design (HQ decision 2026-11-26-openphysics-studio-hk10-compact; design
+  // "Session versions 16 and 17" §3.1: the tab converts to compact maps when text would not fit): six
+  // runs no longer let a map go, so the stage runs until the first map is let go and one result more;
+  // the result that converts, the two that let Run 1's and Run 2's maps go and the run the recompute
+  // lets go are derived from the file's own records, each written here by an encoder of this script
+  // (f32-offset-base64-v1), and the arrays are compared as HQ1: decoded = base + fround(x − base).
+  // HQ (design "Session versions 16 and 17", S3; compact maps, multiphysics session version 17), in this
+  // sequence (it converts at an early result): no Messages sentence at the conversion; the maps of a
+  // compact run carry "Maps at single precision (float32). The values above are the engine's.", the
+  // run list adds "When maps would not all fit, they are kept at single precision."; Run 1's heat,
+  // core temperature and index maps before and after the conversion, read at each drawn triangle's
+  // centroid pixel, differ by at most one colour level on at most 0.1 % of triangles (5 % for the core
+  // temperature, HQ5 c, d; changed after the result, coordinator ruling 2026-11-26: the whole canvas
+  // differed by two levels on 0.17 % of the core temperature map's pixels, at triangle edges); and the
+  // selected run's canvases are bit-identical after Save and Open and after Restore.
   await page.call('Page.reload');
   await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'reload for S5');
   await openTemplate();
   await openInputs('variant-008.json', variant('0.08 um', '0.01 um'));
   const s5Started = Date.now();
-  let fifthMessage = null;
-  for (let n = 1; n <= 6; n++) {
-    await runAndWait(n);
-    if (n === 5) { await page.until("/Run 1 \\(run at [^)]+\\) keeps its values; its maps were not kept/.test(document.getElementById('file-status').textContent)", 'Run 1 keeps its values', 60000); fifthMessage = await notice(); }
+  // the server keeps the replies of its last 8 finished jobs (multiphysics_api MAX_FINISHED), fewer than
+  // this stage's runs: the page's result requests are noted (the job ids only) and each reply is fetched
+  // here, separately from the page's copy, right after its run
+  await page.eval("(()=>{const f=window.fetch;window.__jobs=new Set();window.fetch=(u,o)=>{const m=/\\/api\\/multiphysics\\/jobs\\/(mp-[0-9a-f]{12})\\/result/.exec(String(u));if(m)window.__jobs.add(m[1]);return f(u,o);};return true})()");
+  const keepReplies = async () => {
+    for (const job of await page.eval('[...window.__jobs]')) if (!replies.has(job))
+      replies.set(job, await page.on('function(j){return fetch("/api/multiphysics/jobs/"+j+"/result").then(r=>{if(!r.ok)throw Error("no reply "+j);return r.text()})}', job));
+  };
+  const keep = (key, sel) => page.eval(`(()=>{const c=document.querySelector(${JSON.stringify(sel)});if(!c)return null;(window.__hq??={})[${JSON.stringify(key)}]=c.getContext('2d').getImageData(0,0,c.width,c.height);return [c.width,c.height]})()`);
+  // the colour change at the given pixels ([x, y], the centroids of the drawn triangles), against the
+  // pixels kept before: {maxDelta, changed, points}
+  const differAt = (key, sel, points) => page.eval(`(()=>{const a=window.__hq?.[${JSON.stringify(key)}],c=document.querySelector(${JSON.stringify(sel)});if(!a||!c)return {missing:true};const b=c.getContext('2d').getImageData(0,0,c.width,c.height);if(a.width!==b.width||a.height!==b.height)return {size:[a.width,a.height,b.width,b.height]};let max=0,n=0;for(const [x,y] of ${JSON.stringify(points)}){const i=4*(y*a.width+x),d=Math.max(Math.abs(a.data[i]-b.data[i]),Math.abs(a.data[i+1]-b.data[i+1]),Math.abs(a.data[i+2]-b.data[i+2]));if(d){n++;if(d>max)max=d;}}return {maxDelta:max,changed:n,points:${points.length}}})()`);
+  // a canvas's pixels as SHA-256 (with its size), kept here: a reload clears the page's own copies
+  const digest = sel => page.eval(`(async()=>{const c=document.querySelector(${JSON.stringify(sel)});if(!c)return null;const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;const h=await crypto.subtle.digest('SHA-256',d);return c.width+'x'+c.height+':'+[...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('')})()`);
+  // the maps of the Results page: [key, tree item, canvas, region drawn (core, or every triangle), share limit]
+  const CANVASES = [['heat', 'Heat 1', 'canvas[data-mp-map=temperature]', null, 0.001], ['T', 'Modes 1', 'canvas[data-mp-map=T]', 'core', 0.05], ['n', 'Modes 1', 'canvas[data-mp-map=n]', 'core', 0.001]];
+  const showRun = async n => {
+    await page.clickTreeItemLike(/^Runs · \d+ of 20$/); await page.until("document.querySelectorAll('[data-mp-run]').length>0", 'HQ run list');
+    await page.on('function(n){const b=[...this.querySelectorAll("[data-mp-run]")].find(b=>new RegExp("^(?:Pinned · )?Run "+n+" ").test(b.textContent));b.click();return true}', n);
+    await page.until(`/^Run ${n} /.test(document.querySelector('.dock-title>span').textContent)`, `HQ Run ${n} shown`);
+    return page.on('function(n){return [...this.querySelectorAll("[data-mp-run]")].find(b=>new RegExp("^(?:Pinned · )?Run "+n+" ").test(b.textContent)).dataset.mpRun}', n);
+  };
+  const capture = async (tag, how = 'keep', points = null) => {
+    const out = {};
+    for (const [key, item, sel] of CANVASES) {
+      await page.clickTreeItem(item); await page.until(`!!document.querySelector(${JSON.stringify(sel)})`, `HQ ${tag} ${key}`); await sleep(400);
+      out[key] = how === 'digest' ? await digest(sel) : how === 'differ' ? await differAt(key, sel, points[key]) : await keep(key, sel);
+      out[key + ' note'] = await page.eval("document.querySelector('[data-mp-map-precision]')?.textContent??null");
+    }
+    return out;
+  };
+  // each drawn triangle's centroid pixel on a canvas of width W and height H, as drawMap places the map
+  // (workspace-multiphysics-view.mjs: a 16 px pad, a 46 px colour bar, the drawn triangles' extent)
+  const centroidPixels = (reply, region, [W, H]) => {
+    const m = reply.mesh, P = m.node_coordinates, keepRegion = region === null ? null : m.region_names.indexOf(region);
+    const tris = m.triangles.map((t, i) => i).filter(i => keepRegion === null || keepRegion < 0 || m.regions[i] === keepRegion);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const i of tris) for (const k of m.triangles[i]) {x0 = Math.min(x0, P[k][0]); x1 = Math.max(x1, P[k][0]); y0 = Math.min(y0, P[k][1]); y1 = Math.max(y1, P[k][1]);}
+    const pad = 16, bar = 46, sc = Math.min((W - 2 * pad - bar) / (x1 - x0 || 1), (H - 2 * pad) / (y1 - y0 || 1));
+    return tris.map(i => {const t = m.triangles[i], cx = (P[t[0]][0] + P[t[1]][0] + P[t[2]][0]) / 3, cy = (P[t[0]][1] + P[t[1]][1] + P[t[2]][1]) / 3;
+      return [Math.floor(pad + (cx - x0) * sc), Math.floor(H - pad - (cy - y0) * sc)];});
+  };
+  const hq = {results: []};
+  let converted = null;
+  const s5Messages = [];
+  let firstLetGo = null, fifthMessage = null, letGoMessage = null;
+  for (let n = 1; n <= 20; n++) {
+    await runAndWait(n); await keepReplies();
+    const m = await notice(), note = await page.eval("document.querySelector('[data-mp-map-precision]')?.textContent??null"); s5Messages.push(m);
+    hq.results.push({run: n, note});
+    assert.doesNotMatch(m, /single precision/, `S5 result ${n}: no Messages sentence at the conversion`);
+    if (n === 1) { hq.run1 = await showRun(1); hq.before = await capture('before'); }
+    if (converted === null && note !== null) {
+      converted = n;
+      // Run 1's maps, now compact: read at the centroid pixel of each drawn triangle
+      const reply = JSON.parse(replies.get(hq.run1)), points = Object.fromEntries(CANVASES.map(([key, , , region]) => [key, centroidPixels(reply, region, hq.before[key])]));
+      await showRun(1); hq.after = await capture('after', 'differ', points);
+    }
+    if (firstLetGo === null && /Run 1 \(run at [^)]+\) keeps its values; its maps were not kept/.test(m)) { firstLetGo = n; fifthMessage = m; continue; }
+    if (firstLetGo !== null) break;
   }
-  // HK10 a (after the result): the fifth result let Run 1's maps go, with Recompute Run 1's maps
-  assert.match(fifthMessage, /^Run 5 complete\. .*Run 1 \(run at [^)]+\) keeps its values; its maps were not kept \(16\.8 MB limit\)\. .*Recompute Run 1's maps/);
+  // HQ: the conversion said nothing in Messages (above); the note under the maps from the converting result on
+  assert.ok(converted > 1, JSON.stringify(hq.results));
+  assert.ok(hq.results.every(r => r.note === (r.run < converted ? null : "Maps at single precision (float32). The values above are the engine's.")), JSON.stringify(hq.results));
+  assert.ok(CANVASES.every(([key]) => hq.before[key + ' note'] === null), JSON.stringify(hq.before));
+  for (const [key, , , , share] of CANVASES) {const v = hq.after[key];
+    assert.ok(!v.missing && !v.size && v.maxDelta <= 1 && v.changed <= share * v.points, `HQ ${key}: ${JSON.stringify(v)}`);
+    assert.equal(hq.after[key + ' note'], "Maps at single precision (float32). The values above are the engine's.", `HQ ${key} note`);}
+
+  assert.ok(firstLetGo !== null, JSON.stringify(s5Messages));
+  const lastRunNumber = firstLetGo + 1;
+  // HK10 a (after the result): the first let-go result let Run 1's maps go, with Recompute Run 1's maps
+  assert.match(fifthMessage, new RegExp(`^Run ${firstLetGo} complete\\. .*Run 1 \\(run at [^)]+\\) keeps its values; its maps were not kept \\(16\\.8 MB limit\\)\\. .*Recompute Run 1's maps`));
   await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'heater-off 0.08', 180000);
-  // HK10 a (after the result): the sixth result let Run 2's maps go; Messages names Run 2 with
+  // HK10 a (after the result): the next result let Run 2's maps go; Messages names Run 2 with
   // Recompute Run 2's maps
   await page.until("/Run 2 \\(run at [^)]+\\) keeps its values; its maps were not kept \\(16\\.8 MB limit\\)\\./.test(document.getElementById('file-status').textContent)&&!!document.querySelector('#file-status [data-recompute-run=\"2\"]')", 'Run 2 keeps its values', 60000);
-  const letGoMessage = await notice(), recomputeButton = await page.text('#file-status [data-recompute-run="2"]');
+  letGoMessage = await notice(); const recomputeButton = await page.text('#file-status [data-recompute-run="2"]');
   assert.equal(recomputeButton, "Recompute Run 2's maps");
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HK10 a ' + tag); await page.screenshot('hk10a-' + tag); }
   await size(1440, 900);
   // the tab is the file: recovery holds it whole, and Export › Model with runs writes without a question
   await page.until("/kept for recovery in this browser$/.test(document.getElementById('autosave-status').textContent)", 'recovery of the tab', 60000);
   const recoveryWhole = await page.text('#autosave-status');
+  // HQ: the note under the run list; the selected run's canvases (the newest run, compact) before Save,
+  // to compare after Open and Restore
+  await page.clickTreeItemLike(/^Runs · \d+ of 20$/); await page.until("!!document.querySelector('[data-mp-runs-kept]')", 'HQ run list note');
+  hq.runList = await page.text('[data-mp-runs-kept]');
+  assert.match(hq.runList, / File › Save keeps every run in one file\. When maps would not all fit, they are kept at single precision\.$/);
+  hq.tab = await capture('tab', 'digest');
   const before5 = await listed(); await clearNotice(); await page.click('#menu-export-session');
   // round 13 (O1): the model file opened above (variant-008.json) is the current file, which the name dialog offers
-  await page.until("document.getElementById('save-name-dialog')?.open", 'six 0.08 runs: name dialog');
+  await page.until("document.getElementById('save-name-dialog')?.open", 'the 0.08 runs: name dialog');
   assert.equal(await page.eval("document.getElementById('session-overflow').open"), false);
   assert.equal(await page.eval("document.getElementById('save-name-input').value"), 'variant-008.json'); await page.click('#save-name-download');
-  const big = await nextDownload(before5, 'six 0.08 runs'); assert.match(big.name, /^variant-008(?: \(\d\))?\.json$/);
+  const big = await nextDownload(before5, 'the 0.08 runs'); assert.match(big.name, /^variant-008(?: \(\d\))?\.json$/);
   await page.until("/values only, without maps\\.$/.test(document.getElementById('file-status').textContent)", 'values-only notice');
   const bigNotice = await notice(), bigSession = JSON.parse(big.text);
   assert.ok(Buffer.byteLength(big.text) <= 16 * 1024 * 1024 - 16 * 1024);
-  assert.deepEqual(bigSession.runs.map(r => r.maps), ['not kept', 'not kept', 'kept', 'kept', 'kept', 'kept']);
-  assert.match(bigNotice, /^Session file variant-008\.json sent to your browser's Downloads: the model, 6 runs and the without-heater result\. 2 runs \(Run 1, Run 2\) keep values only, without maps\.$/);
+  assert.equal(bigSession.version, 17);
+  assert.deepEqual(bigSession.runs.map(r => r.maps), bigSession.runs.map((r, i) => i < 2 ? 'not kept' : 'compact'));
+  assert.equal(bigSession.runs.length, lastRunNumber);
+  assert.match(bigNotice, new RegExp(`^Session file variant-008\\.json sent to your browser's Downloads: the model, ${lastRunNumber} runs and the without-heater result\\. 2 runs \\(Run 1, Run 2\\) keep values only, without maps\\.$`));
   await fetchReplies(big.text);
   const s5Arrays = {...compareArrays(big.text, {valuesOnly: [1, 2]}), python: comparePython(big.path)};
-  // the count, derived independently of the product's chooser: each run's map bytes are its record
-  // with the server's reply less its record without maps (the layout of version 8, written here), the
-  // base is the file less the maps it holds, and the maps are added in the order of 3.2 (the selected
-  // Run 6, then newest first; none pinned) while the total stays within 16,760,832 bytes
+  // the counts, derived independently of the product's chooser: each run's map bytes are its record
+  // with the server's reply (as text, version 15's layout, or compact, encoded here) less its record
+  // without maps, the base is the file less the maps it holds, and the maps are added in the order of
+  // 3.2 (the selected run, then newest first; none pinned) while the total stays within 16,760,832 bytes
   const utf8 = t => Buffer.byteLength(t, 'utf8'), BUDGET = 16 * 1024 * 1024 - 16 * 1024;
   const stripMaps = result => {const {mesh, ...rest} = result, physics = {};
     for (const [n, p] of Object.entries(result.physics)) {
@@ -855,21 +1011,37 @@ print(n)`;
       else if (p.type === 'em.modes2d' && p.coupled) physics[n] = {...p, coupled: {temperature: {unit: p.coupled.temperature.unit, location: p.coupled.temperature.location}, refractive_index: {location: p.coupled.refractive_index.location}}};
       else physics[n] = p;}
     return {...rest, physics};};
-  const recordText = (r, kept) => {const reply = JSON.parse(replies.get(r.job)), {digest, counts, result, maps, ...head} = r;
-    const record = {...head, maps: kept ? 'kept' : 'not kept', ...(kept ? {} : {counts: {nodes: reply.mesh.node_coordinates.length, triangles: reply.mesh.triangles.length}}), result: kept ? reply : stripMaps(reply)};
+  const recordText = (r, how) => {const reply = JSON.parse(replies.get(r.job)), {digest, counts, result, maps, ...head} = r;
+    const kept = how !== 'not kept', record = {...head, maps: how, ...(kept ? {} : {counts: {nodes: reply.mesh.node_coordinates.length, triangles: reply.mesh.triangles.length}}),
+      result: how === 'kept' ? reply : how === 'compact' ? compactOf(reply, r.document) : stripMaps(reply)};
     return sessionJson({...record, digest: recordDigest(record)});};
-  const mapBytesMeasured = bigSession.runs.map(r => utf8(recordText(r, true)) - utf8(recordText(r, false)));
   // the records as the file holds them are those written here (the measurement is of the file's layout)
-  bigSession.runs.forEach(r => assert.equal(sessionJson(r), recordText(r, r.maps === 'kept'), `run ${r.number}: record layout`));
-  const baseMeasured = utf8(big.text) - bigSession.runs.reduce((t, r, i) => t + (r.maps === 'kept' ? mapBytesMeasured[i] : 0), 0);
-  let total = baseMeasured; const fitRuns = [];
-  for (const i of [5, 4, 3, 2, 1, 0]) if (total + mapBytesMeasured[i] <= BUDGET) {total += mapBytesMeasured[i]; fitRuns.push(i + 1);}
-  stage('HK10 a measured map bytes', {mapBytes: mapBytesMeasured, base: baseMeasured, budget: BUDGET, fit: fitRuns});
-  assert.equal(fitRuns.length, 4, 'four maps fit the budget');
-  assert.deepEqual(bigSession.runs.filter(r => r.maps === 'kept').map(r => r.number), [...fitRuns].sort((a, b) => a - b), 'the screen keeps the maps the arithmetic fits');
+  bigSession.runs.forEach(r => assert.equal(sessionJson(r), recordText(r, r.maps), `run ${r.number}: record layout`));
+  const mapsOf = how => bigSession.runs.map(r => utf8(recordText(r, how)) - utf8(recordText(r, 'not kept')));
+  const textBytes = mapsOf('kept'), compactBytes = mapsOf('compact');
+  const keptBytes = bigSession.runs.reduce((t, r, i) => t + (r.maps === 'compact' ? compactBytes[i] : 0), 0), baseMeasured = utf8(big.text) - keptBytes;
+  // the base after result k: the file's base less the values-only records of the later runs (and their
+  // commas), with the version text of that result's file (8 up to six runs as text, 15 above, 17 compact)
+  const recordBytes = bigSession.runs.map(r => utf8(recordText(r, 'not kept')));
+  const baseAt = (k, version) => baseMeasured - recordBytes.slice(k).reduce((t, b) => t + b + 1, 0) - 2 + String(version).length;
+  const fitAt = (k, bytes, version, order) => {let total = baseAt(k, version); const fit = [];
+    for (const i of order) if (total + bytes[i] <= BUDGET) {total += bytes[i]; fit.push(i + 1);}
+    return fit;};
+  const newestFirst = k => Array.from({length: k}, (_, j) => k - 1 - j);
+  const derived = {conversion: null, firstLetGo: null};
+  for (let k = 1; k <= lastRunNumber; k++) {
+    if (derived.conversion === null && fitAt(k, textBytes, k > 6 ? 15 : 8, newestFirst(k)).length < k) derived.conversion = k;
+    if (derived.conversion !== null && derived.firstLetGo === null && fitAt(k, compactBytes, 17, newestFirst(k)).length < k) derived.firstLetGo = k;
+  }
+  const fitRuns = fitAt(lastRunNumber, compactBytes, 17, newestFirst(lastRunNumber));
+  stage('HK10 a measured map bytes', {textBytes, compactBytes, base: baseMeasured, budget: BUDGET, fit: fitRuns, derived, observed: {firstLetGo}});
+  assert.ok(derived.conversion > 1 && derived.conversion < derived.firstLetGo, JSON.stringify(derived));
+  assert.equal(firstLetGo, derived.firstLetGo, 'the first map is let go at the result the arithmetic says');
+  assert.equal(converted, derived.conversion, 'the maps become compact at the result the arithmetic says');
+  assert.deepEqual(bigSession.runs.filter(r => r.maps === 'compact').map(r => r.number), [...fitRuns].sort((a, b) => a - b), 'the screen keeps the maps the arithmetic fits');
   // HK10 b: Recompute Run 1's maps, its words read while the job's replies are held in the page
   await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
-  await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'run list for the recompute');
+  await page.until(`document.querySelectorAll('[data-mp-run]').length===${lastRunNumber}`, 'run list for the recompute');
   await page.click('[data-mp-run]:last-of-type');
   await page.until("!!document.querySelector('[data-mp-values-only] [data-mp-recompute]')", 'Run 1 without its maps');
   const valuesOnlyBanner = await page.text('[data-mp-values-only]');
@@ -887,20 +1059,36 @@ print(n)`;
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HK10 b after ' + tag); await page.screenshot('hk10b-' + tag); }
   await size(1440, 900);
   await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
-  await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'run list after the recompute');
+  await page.until(`document.querySelectorAll('[data-mp-run]').length===${lastRunNumber}`, 'run list after the recompute');
   const afterRecompute = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
-  stage('HK10 a b', {fifthMessage, letGoMessage, recoveryWhole, bigNotice, valuesOnlyBanner, during, recomputed, recomputeSeconds, afterRecompute, s5Seconds: (Date.now() - s5Started) / 1000});
-  assert.match(letGoMessage, /^Run 6 complete\. /);
-  assert.match(valuesOnlyBanner, /^Run 1's maps are not kept; its n_eff, coupling check and iteration history are kept\. Maps are kept up to 16\.8 MB\. When a result or a recompute arrives, Studio keeps the selected run's maps first, then pinned runs', then the newest\. Selecting a run does not bring its maps back; Recompute does\. Recompute Run 1's maps · about \d+ (?:s|min)$/);
+  // the order after a recompute (after the result): the selected run (Run 1), then the newest
+  const afterFit = fitAt(lastRunNumber, compactBytes, 17, [0, ...newestFirst(lastRunNumber).filter(i => i !== 0)]), afterGo = bigSession.runs.map(r => r.number).filter(n => n !== 2 && !afterFit.includes(n));
+  stage('HK10 a b', {fifthMessage, letGoMessage, recoveryWhole, bigNotice, valuesOnlyBanner, during, recomputed, recomputeSeconds, afterRecompute, afterFit, s5Seconds: (Date.now() - s5Started) / 1000, runs: lastRunNumber});
+  assert.match(letGoMessage, new RegExp(`^Run ${lastRunNumber} complete\\. `));
+  assert.match(valuesOnlyBanner, /^Run 1's maps are not kept; its n_eff, coupling check and iteration history are kept\. Maps are kept up to 16\.8 MB\. When a result or a recompute arrives, Studio keeps the selected run's maps first, then pinned runs', then the newest\. Selecting a run does not bring its maps back; Recompute does\./);
   assert.match(during.heading, /^Recomputing Run 1's maps · about \d+ (?:s|min)$/); assert.equal(during.status, during.heading); assert.equal(during.message, during.heading);
-  // the order after a recompute (after the result): the selected run (Run 1), then the newest 6, 5, 4:
-  // Run 3's maps go; Run 2 keeps its values only
+  // Run 1 is back (compact); the oldest run with maps goes (Run 3, as the arithmetic says); Run 2 keeps its values only
+  assert.deepEqual(afterGo, [3], JSON.stringify(afterFit));
   assert.match(recomputed, /^Run 1's maps recomputed from its stored model; its values match\. Run 3 \(run at [^)]+\) keeps its values; its maps were not kept \(16\.8 MB limit\)\./);
-  assert.deepEqual(afterRecompute.map(t => / · values only$/.test(t)), [false, false, false, true, true, false], JSON.stringify(afterRecompute));
+  assert.deepEqual(afterRecompute.map(t => / · values only$/.test(t)), [...bigSession.runs].reverse().map(r => r.number === 2 || r.number === 3), JSON.stringify(afterRecompute));
   // opened, the saved file's values-only runs say so in the list and on their map pages
   await openSession(big.path);
+  hq.opened = await capture('opened', 'digest');
+  // HQ: the opened file saved again holds the same run records (its view and selection follow the
+  // page); an opened, unchanged file leaves no new recovery record, so Restore restores that save's
+  // record, which draws the same canvases
+  const bigAgain = await saveSession('HQ compact again', {named: true});
+  assert.deepEqual(JSON.parse(bigAgain.text).runs.map(r => sessionJson(r)), bigSession.runs.map(r => sessionJson(r)), 'the run records saved again are the file\'s');
+  await page.until(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();return r?.savedFile?.name===${JSON.stringify(bigAgain.name)}&&r.savedFile.current===true})`, 'HQ record of the saved file', 60000);
+  await page.call('Page.reload');
+  await page.until("!!document.querySelector('[data-template=heated-waveguide]')&&!document.getElementById('recover-notebook').disabled", 'HQ reload');
+  await clearNotice(); await page.click('#recover-notebook');
+  await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'HQ recovered');
+  hq.restored = await capture('restored', 'digest');
+  for (const tag of ['opened', 'restored']) for (const [key] of CANVASES) {assert.ok(hq.tab[key], `HQ tab ${key}`); assert.equal(hq[tag][key], hq.tab[key], `HQ ${tag} ${key}: the same pixels as the tab`);
+    assert.equal(hq[tag][key + ' note'], "Maps at single precision (float32). The values above are the engine's.", `HQ ${tag} ${key} note`);}
   await page.clickTreeItemLike(/^Runs · \d+ of 20$/);
-  await page.until("document.querySelectorAll('[data-mp-run]').length===6", 'six runs opened');
+  await page.until(`document.querySelectorAll('[data-mp-run]').length===${lastRunNumber}`, 'the runs opened');
   const bigList = await page.eval("[...document.querySelectorAll('[data-mp-run]')].map(b=>b.textContent)");
   assert.equal(bigList.filter(t => / · values only$/.test(t)).length, 2, JSON.stringify(bigList));
   await page.click('[data-mp-run]:last-of-type');
@@ -916,6 +1104,9 @@ print(n)`;
   const counts = bigSession.runs[0].counts, us = n => n.toLocaleString('en-US');
   assert.match(await page.text('.mp-check tbody'), new RegExp(`${us(counts.nodes)} node temperatures, 300\\.0–[0-9.]+ K .*${us(counts.triangles)} triangle means \\(mean of 3 nodes\\) Passed · max \\|received − sent\\| = 0 K`));
   await page.screenshot('s5-values-only');
+  for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) { await size(width, height, mobile); await sleep(300); assert.equal(await overflow(), 0, 'HQ ' + tag); await page.screenshot('hq-' + tag); }
+  await size(1440, 900);
+  stage('HQ compact maps in the tab', {converted, ...hq});
   stage('S5', {bigNotice, bytes: Buffer.byteLength(big.text), recoveryWhole, list: bigList, ...s5Arrays});
 
   // R19 (round 19, pre-registered): a real mouse click on the heater-off label ticks and unticks

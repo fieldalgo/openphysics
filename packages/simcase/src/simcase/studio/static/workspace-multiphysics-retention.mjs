@@ -5,7 +5,7 @@
 // (run at 14:02)". The budget and the order are the optical ones (workspace-budget.mjs); the maps a
 // run adds are counted from its cached record texts (workspace-multiphysics-session.mjs).
 import {FIELD_BUDGET_BYTES,mbText} from './workspace-budget.mjs';
-import {MULTIPHYSICS_RUN_LIMIT,chooseMaps,mapBytes,appendMultiphysicsRun} from './workspace-multiphysics-session.mjs';
+import {MULTIPHYSICS_RUN_LIMIT,chooseMaps,mapBytes,appendMultiphysicsRun,compactMapBytesOf,holdsCompactMaps} from './workspace-multiphysics-session.mjs';
 import {canonicalJson} from './workspace-multiphysics.mjs';
 import {aboutText} from './workspace-workflow.mjs';
 
@@ -17,6 +17,14 @@ export const MAPS_MOVE_TEXT=`Maps are kept up to ${MAP_BUDGET_TEXT}. When a resu
 /** The note under the run list (it replaces "Up to six runs are kept. …"). */
 export const MP_RUNS_KEPT_TEXT=`Up to ${MULTIPHYSICS_RUN_LIMIT} runs are kept with their values. ${MAPS_MOVE_TEXT} Pinned runs stay; when a ${MULTIPHYSICS_RUN_LIMIT+1}st run arrives, the oldest unpinned run is replaced. File › Save keeps every run in one file.`;
 export const mpRunsNodeLabel=count=>`Runs · ${count} of ${MULTIPHYSICS_RUN_LIMIT}`;
+// Compact maps (session version 17), in the words of the optical compact fields (round 27, D1: no
+// Messages sentence when maps become compact).
+/** The sentence after the note under the run list, while the tab holds compact maps. */
+export const MP_COMPACT_NOTE='When maps would not all fit, they are kept at single precision.';
+/** Results, under the maps of a run whose maps are compact. */
+export const MP_COMPACT_RESULTS_TEXT='Maps at single precision (float32). The values above are the engine\'s.';
+/** The note under the run list: MP_RUNS_KEPT_TEXT, then MP_COMPACT_NOTE while the tab holds compact maps. */
+export const mpRunsKeptNote=runs=>holdsCompactMaps(runs)?`${MP_RUNS_KEPT_TEXT} ${MP_COMPACT_NOTE}`:MP_RUNS_KEPT_TEXT;
 export const ALL_PINNED_TEXT=`All ${MULTIPHYSICS_RUN_LIMIT} runs are pinned. Unpin a run under Results › Runs before running again.`;
 export const UNPINNED_TEXT=`Run unpinned: once ${MULTIPHYSICS_RUN_LIMIT} runs are kept, a new run replaces the oldest unpinned one. Press Enter in Run name to pin it again.`;
 const keeps=(list,name)=>`${listWords(list.map(name))} ${list.length>1?'keep their values, not their maps':'keeps its values, not its maps'}`;
@@ -60,13 +68,15 @@ export const mapSizeKey=doc=>canonicalJson([doc?.geometry??null,doc?.mesh??null,
  Object.entries(doc?.physics??{}).map(([n,p])=>[n,p?.type??null]),doc?.couplings??null]);
 /** The runs whose maps the next result would let go, from the map bytes of the newest run with maps
  * of the same key ([] with none). state: the session state; next: the next run's document. The
- * 20-run drop is applied first (a run it drops is named by the drop words). */
+ * 20-run drop is applied first (a run it drops is named by the drop words). Compact maps (version 17):
+ * when the arrival would make the tab's maps compact (compactMaps), their compact bytes count. */
 export function predictedMapsLetGo(state,next){
  const key=mapSizeKey(next),like=state.runs.findLast(r=>r.maps!=='not kept'&&mapSizeKey(r.doc)===key);if(!like)return [];
  const top=Math.max(0,...state.runs.map(r=>r.number||0)),phantom={...like,job:'mp-ffffffffffff',pinned:false,label:'',number:top+1};
  let after;try{after=appendMultiphysicsRun(state.runs,phantom);}catch{return [];}
- const bytes=mapBytes(like),size=r=>r===phantom?bytes:mapBytes(r);
- const {letGo}=chooseMaps({...state,runs:after,selected:phantom.job},{bytes:size});
+ const bytes=mapBytes(like),size=r=>r===phantom?bytes:mapBytes(r),trial={...state,runs:after,selected:phantom.job};
+ const compact=!holdsCompactMaps(after)&&!chooseMaps(trial,{bytes:size}).fits,arrival=compact?r=>compactMapBytesOf(r===phantom?like:r)??size(r):size;
+ const {letGo}=chooseMaps(trial,{bytes:arrival});
  return letGo.filter(r=>r.job!==phantom.job);
 }
 /** Whether "older runs' maps may not be kept" is shown: no run with maps of the next key, some map
