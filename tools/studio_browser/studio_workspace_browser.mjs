@@ -636,6 +636,17 @@ try {
   await page.until("/Studio was restarted/.test(document.getElementById('job-message').textContent)&&/^Connected/.test(document.getElementById('connection-status').textContent)", 'reconnect after restart', 20000);
   stage('reconnected after restart', {message: await page.eval("document.getElementById('job-message').textContent")});
 
+  // after rounds 26–30 (side finding i): the Model page with optical runs has no horizontal overflow at
+  // 1280 × 800 (the ribbon's Compute group reached 1392 px)
+  await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false});
+  {const ribbon1280 = {};
+   for (const tab of ['Results', 'Model']) {
+     await page.click(`nav [data-page=${tab}]`); await sleep(400);
+     ribbon1280[tab] = await page.eval("({over:document.documentElement.scrollWidth-document.documentElement.clientWidth,right:Math.round(document.querySelector('.ribbon-group.solve-commands').getBoundingClientRect().right),runs:document.querySelectorAll('.run-item').length})");
+   }
+   stage('S4 ribbon at 1280 with runs', ribbon1280);
+   assert.ok(ribbon1280.Results.runs >= 2, JSON.stringify(ribbon1280));
+   for (const tab of ['Results', 'Model']) { assert.equal(ribbon1280[tab].over, 0, `the ${tab} page with runs overflows by ${ribbon1280[tab].over}px at 1280 × 800`); assert.ok(ribbon1280[tab].right <= 1280, JSON.stringify(ribbon1280)); }}
   // round 10 (K6): browser recovery keeps the page shown; Compare again before the reload, so the
   // restore below opens Compare because it was the page shown, not because there are two runs
   await page.click('nav [data-page=Compare]'); await page.until("!!document.getElementById('compare-neff')", 'Compare before reload');
