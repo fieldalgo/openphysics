@@ -553,7 +553,10 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    Studio restart, the start page shows **Continue where you left off**: one way back for each
    piece of work (a project file, or a model's records without one). Its note reads *Restore brings
    back completed runs kept in this browser, without recomputing.* (until round 30 it went on
-   to name Open file… as a second way back). The first and most prominent button (filled) is the newest stored session
+   to name Open file… as a second way back). The box appears once Studio has read every record kept
+   in this browser, so its first offer is final; until then the Library shows Open file… and the cards
+   without it (before, the newest button could restore one model of a project for a moment before it
+   offered both). The first and most prominent button (filled) is the newest stored session
    with runs, whatever its model (round 19), *Restore newest from this browser: Optical waveguide ·
    6 runs · Run 1, …*, or both models of a project (below). The line under it says how this browser
    copy compares with the file its record names: *Kept in this browser 11:40 AM · not saved to a
