@@ -58,7 +58,7 @@ test('Z4: the box and the card name one time for one record',async()=>{
  // after rounds 26–30 a card names no time (Z4 is moot); the box's entry names both times, each for what it is
  const box=A.resumeChoices(newest,[{...relinked,index:0}],t).other;
  assert.equal(box.label,'Restore from this browser: Optical waveguide · 2 runs · Run 1, Run 2');
- assert.equal(box.detail,'Older · kept in this browser 8:30 · same as both-models.json, saved 8:31 · Open file… gives the same runs');
+ assert.equal(box.detail,'Older · kept in this browser 8:30 · same as both-models.json, saved 8:31');
  // a record changed since its file, or with no file save time, names its own time in both
  for(const item of [{...relinked,fileCurrent:false},{...relinked,fileSavedAt:undefined},{...relinked,file:null}])assert.equal(A.offerSavedAt(item),'8:30');
  // the order still follows the records' own times

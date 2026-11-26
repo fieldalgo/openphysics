@@ -22,12 +22,24 @@ test('K1: the box note and the newest detail name no second way back',async()=>{
   const d=A.resumeDetail({...base,file,fileCurrent,fileSavedAt,pair:p},when);assert.ok(!d.includes('Open file'),d);
   const c=A.resumeChoices({...base,file,fileCurrent,fileSavedAt,pair:p},[],when);assert.ok(!c.newest.detail.includes('Open file'),c.newest.detail);
  }
- // the box keeps its structure: the earlier-copies and #resume-other details are unchanged
+ // the #resume-other detail drops the words too (coordinator ruling); its "Older · kept" stays
  const lib=read('workspace-applications.mjs');
- assert.ok(!lib.includes('Open file… at the top opens a project file instead.'));
+ assert.ok(!lib.includes('Open file… at the top opens a project file instead.'));assert.ok(!lib.includes('gives the same runs'));
  const older={runs:2,model:'Optical waveguide',names:['Run 1','Run 2'],savedAt:'8:30',file:'both-models.json',fileCurrent:true,fileSavedAt:'8:31'};
  const box=A.resumeChoices({runs:1,model:'Heated silicon waveguide',names:['Run 1'],savedAt:'8:32'},[{...older,index:0}],when);
- assert.equal(box.other.detail,'Older · kept in this browser 8:30 · same as both-models.json, saved 8:31 · Open file… gives the same runs');
+ assert.equal(box.other.detail,'Older · kept in this browser 8:30 · same as both-models.json, saved 8:31');
+ {const {fileSavedAt,...opened}=older;assert.equal(A.resumeChoices({runs:1,model:'Heated silicon waveguide',names:['Run 1'],savedAt:'8:32'},[{...opened,index:0}],when).other.detail,'Older · kept in this browser 8:30 · same as both-models.json as opened');}
+ // no label or detail of the box (newest, other, earlier copies) and not its note names Open file
+ assert.ok(!A.RESUME_NOTE.includes('Open file'));
+ const rec=(over)=>({runs:1,model:'Optical waveguide',names:['Run 1'],...over});
+ const heated=(over)=>({runs:1,model:'Heated silicon waveguide',names:['Run 1'],...over});
+ for(const file of [null,'x.json'])for(const fileCurrent of [true,false,null])for(const fileSavedAt of ['F',undefined]){
+  const f={file,fileCurrent,fileSavedAt};
+  const c=A.resumeChoices(heated({savedAt:'2026-11-26T09:00:00Z',...f}),[{...rec({savedAt:'2026-11-26T08:00:00Z',...f}),index:0},{...heated({savedAt:'2026-11-26T07:00:00Z',...f}),index:1},{...rec({savedAt:'2026-11-26T06:00:00Z',...f}),index:2}],when);
+  const all=[c.newest,c.other,...c.earlier].filter(Boolean);
+  assert.ok(c.other&&c.earlier.length>0,JSON.stringify(c));
+  for(const x of all)for(const t of [x.label,x.detail])assert.ok(!String(t).includes('Open file'),t);
+ }
 });
 
 test('K2: the question\'s title, words and buttons, with the estimate of the plan line',async()=>{
