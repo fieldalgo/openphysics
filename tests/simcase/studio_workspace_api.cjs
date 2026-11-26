@@ -56,22 +56,23 @@ test('HTTP failure status reaches job recovery without replacing server detail',
 });
 test('the landing page offers the latest and earlier browser sessions to resume',()=>{
  const when=t=>t;
- assert.deepEqual(resumeChoices(null,[],when),[]);
- assert.deepEqual(resumeChoices({runs:2,savedAt:'T1'},[{runs:1,savedAt:'T0'}],when),[
-  {kind:'latest',newest:true,label:'Restore newest from this browser: 2 runs · kept T1'},
-  {kind:'earlier',index:0,label:'Restore from this browser: 1 run · older · kept T0'}]);
- assert.deepEqual(resumeChoices(null,[{runs:3,savedAt:'T0'}],when).map(c=>c.kind),['earlier']);
+ assert.deepEqual(resumeChoices(null,[],when),{newest:null,other:null,earlier:[]});
+ // after rounds 26–30: the label names the work, the detail line the browser copy and its file
+ assert.deepEqual(resumeChoices({runs:2,savedAt:'T1'},[{runs:1,savedAt:'T0'}],when),{
+  newest:{kind:'latest',newest:true,label:'Restore newest from this browser: 2 runs',detail:'Kept in this browser T1 · not saved to a file'},other:null,
+  earlier:[{kind:'earlier',index:0,label:'Restore 1 run',detail:'Older copy · kept in this browser T0 · not saved to a file'}]});
+ assert.deepEqual(resumeChoices(null,[{runs:3,savedAt:'T0'}],when).newest.kind,'earlier');
 });
 test('an earlier session choice keeps its storage index when an unreadable record is skipped',()=>{
  const choices=resumeChoices(null,[{runs:1,savedAt:'T0',index:0},{runs:2,savedAt:'T2',index:2}],t=>t);
- assert.deepEqual(choices.map(c=>c.index),[0,2]);
+ assert.deepEqual([choices.newest,...choices.earlier].map(c=>c.index),[0,2]);
 });
 test('every recovery entry names its model and its runs',()=>{
  assert.deepEqual(sessionRunNames({runs:[{label:'design A'},{label:''}]}),['Run 1 · design A','Run 2']);
  assert.deepEqual(sessionRunNames({runs:[{number:3,label:''},{number:4,label:'heater 10 mW'}]}),['Run 3','Run 4 · heater 10 mW']);
- assert.deepEqual(resumeChoices({runs:2,savedAt:'T1',model:'Optical waveguide',names:['design A','Run 2']},[{runs:1,savedAt:'T0',model:'Heated silicon waveguide',names:['Run 1'],index:0}],t=>t),[
-  {kind:'latest',newest:true,label:'Restore newest from this browser: Optical waveguide · 2 runs · design A, Run 2 · kept T1'},
-  {kind:'earlier',index:0,label:'Restore from this browser: Heated silicon waveguide · 1 run · Run 1 · older · kept T0'}]);
+ assert.deepEqual(resumeChoices({runs:2,savedAt:'T1',model:'Optical waveguide',names:['design A','Run 2']},[{runs:1,savedAt:'T0',model:'Heated silicon waveguide',names:['Run 1'],index:0}],t=>t),{
+  newest:{kind:'latest',newest:true,label:'Restore newest from this browser: Optical waveguide · 2 runs · design A, Run 2',detail:'Kept in this browser T1 · not saved to a file'},
+  other:{kind:'earlier',index:0,label:'Restore from this browser: Heated silicon waveguide · 1 run · Run 1',detail:'Older · kept in this browser T0 · not saved to a file'},earlier:[]});
 });
 test('the Library page says what File › Save keeps of each model, and how to leave the coupled one',()=>{
  const [optical,heat,joule,coupled]=CHOOSER_NOTES;

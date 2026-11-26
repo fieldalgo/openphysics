@@ -46,12 +46,15 @@ test('L2: the browser copy\'s time is "kept"; a file\'s save time stays "saved"'
  const at=s=>'2026-11-24T05:'+s+':00Z',w=t=>({[at('46')]:'5:46 AM',[at('38')]:'5:38 AM',[at('30')]:'5:30 AM',S:'9:24 PM'})[t]??t;
  const latest={runs:5,savedAt:at('38'),model:'Optical waveguide',names:[],file:'optical-and-heated.json',fileCurrent:false};
  const earlier=[{runs:6,savedAt:at('46'),model:'Optical waveguide',names:[],index:0,file:'optical-and-heated.json',fileCurrent:false},{runs:1,savedAt:at('30'),model:'Heated silicon waveguide',names:['Run 1'],index:1}];
- assert.deepEqual(A.resumeChoices(latest,earlier,w).map(c=>c.label),[
-  'Restore newest from this browser: Optical waveguide · 6 runs · file optical-and-heated.json, changed since · kept 5:46 AM',
-  'Restore from this browser: Optical waveguide · 5 runs · file optical-and-heated.json, changed since · older · kept 5:38 AM',
-  'Restore from this browser: Heated silicon waveguide · 1 run · Run 1 · older · kept 5:30 AM']);
+ // after rounds 26–30 the times are in the detail lines: the browser copy's time reads "Kept in this
+ // browser T" (or "kept in this browser T" after Older), a file's save time "saved T"
+ const c=A.resumeChoices(latest,earlier,w);
+ assert.deepEqual([c.newest,c.other,...c.earlier].map(x=>[x.label,x.detail]),[
+  ['Restore newest from this browser: Optical waveguide · 6 runs','Kept in this browser 5:46 AM · newer than optical-and-heated.json as opened'],
+  ['Restore from this browser: Heated silicon waveguide · 1 run · Run 1','Older · kept in this browser 5:30 AM · not saved to a file'],
+  ['Restore Optical waveguide · 5 runs','Older copy · kept in this browser 5:38 AM · last linked to optical-and-heated.json']]);
  // a record that is the same as its file names the file's save time: that is a file save
- assert.equal(A.resumeChoices({runs:2,savedAt:at('46'),file:'x.json',fileCurrent:true,fileSavedAt:'S'},[],w)[0].label,'Restore newest from this browser: 2 runs · same as file x.json · saved 9:24 PM');
+ assert.equal(A.resumeChoices({runs:2,savedAt:at('46'),file:'x.json',fileCurrent:true,fileSavedAt:'S'},[],w).newest.detail,'Kept in this browser 5:46 AM · same as x.json, saved 9:24 PM · Open file… gives the same runs');
  // the card offers: an older one says kept; the file's own time keeps saved
  const item={runs:1,names:['Run 1'],savedAt:'T',file:'x.json',fileCurrent:false};
  assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:38 AM',{older:true}).label,'Restore from this browser · Heated silicon waveguide · Run 1 · older · kept 5:38 AM · file x.json, changed since');

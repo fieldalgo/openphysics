@@ -77,10 +77,6 @@ function offerTimeWords(item,when,older=false){
  if(item.file&&item.fileCurrent===true)return `${old} · browser copy ${when(item.savedAt)} · same as file ${item.file}`;
  return `${old} · ${older?'kept ':''}${when(item.savedAt)}${fileWords(item)}`;
 }
-// Round 29 (L2): the word before an offer's time. offerSavedAt is a file's save time for a record
-// that is the same as its file ("saved": a file was saved then); else the browser copy's time,
-// "kept" (P04 and P02 read "saved 8:48 PM" as a file save that never happened).
-const offerTimeWord=item=>item.file&&item.fileCurrent===true&&item.fileSavedAt?'saved':'kept';
 // A model card's offer when the tab holds none of that model's runs and browser recovery holds a
 // session of it: "Restore from this browser · Optical waveguide · design A, design B · 2:25 PM",
 // then the file it names, shown before Start new. item: a recovery entry {runs, names, savedAt,
@@ -101,59 +97,109 @@ export function cardRecords(entries,busy=new Set()){
   if(!busy.has(card)&&!out[card])out[card]=entry;}
  return out;
 }
-// What the landing page offers to resume: the latest browser session and the
-// earlier ones (C1), each as {runs, savedAt, model, names}: model names the session's model and
-// names its runs (sessionLine). Empty when there is nothing.
-// Round 19 (Y1): newest first, and the newest stored session with runs leads, whatever its kind:
-// "Restore newest from this browser: Optical waveguide · 6 runs · … · saved 5:46 AM" (newest: true);
-// each other one "Restore from this browser: … · older · saved 5:38 AM" ("older" left out for a
-// session without runs saved after it).
+// Library recovery after a restart (after rounds 26–30): one box with one button per piece of work
+// (a project file, or a model's records without one), a detail line under it saying how the browser
+// copy compares with that file, and the older copies folded under "Earlier copies in this browser
+// (N)". The labels carry no time and no file words: a browser time reads "Kept in this browser T",
+// a file time "saved F" (a real file save).
 export const RESTORE_NEWEST_TEXT='Restore newest from this browser';
+export const RESUME_HEADING='Continue where you left off';
+export const RESUME_NOTE='Restore brings back completed runs kept in this browser, without recomputing. Open file… at the top opens a project file instead.';
+export const earlierCopiesText=n=>`Earlier copies in this browser (${n})`;
 // Round 20 (Z2): when the newest record's project file also holds the other model and browser
-// recovery has that model's record (item.pair: {model, runs}; offered by the caller only while the
-// tab holds runs of neither model), its button restores both: "Restore newest from this browser:
-// Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file x.json, changed since ·
-// saved 8:44 AM" (pair: true on the choice).
+// recovery has that model's record (item.pair: {model, runs, savedAt, fileCurrent}; offered by the
+// caller only while the tab holds runs of neither model), its button restores both (pair: true).
 const runCount=n=>`${n} ${n===1?'run':'runs'}`;
 export const pairLine=(item,pair)=>`${item.model||'Optical waveguide'} (${runCount(item.runs)}) and ${pair.model} (${runCount(pair.runs)})`;
-export function resumeChoices(latest,earlier=[],when=offerTime){
- // index: the record's place in storage, which recovery reads (given by the caller, else the position)
+// A record as a button names it: the model, the run count and the run names, without file words
+// or "also" words ("Optical waveguide · 1 run · Run 1").
+const plainLine=item=>sessionLine({...item,file:null,also:undefined});
+// How the browser copy compares with the file the record names, after "Kept in this browser T":
+// the six cases of the detail line under the newest button.
+function fileRelation(file,current,savedAt,when){
+ if(!file)return 'not saved to a file';
+ if(current===true)return savedAt?`same as ${file}, saved ${when(savedAt)} · Open file… gives the same runs`:`same as ${file} as opened · Open file… gives the same runs`;
+ if(current===false)return savedAt?`newer than ${file}, saved here ${when(savedAt)}`:`newer than ${file} as opened`;
+ return `last linked to ${file}`;
+}
+const newer=(a,b)=>b&&(Date.parse(b)||0)>(Date.parse(a)||0)?b:a;
+// The detail line of the newest offer (strings 1–6). For a pair, "same" needs both records the same
+// as the file, else "newer than"; T is the newer of the two records' times. When the other model's
+// runs are already in the tab: " · <model> · <run names> already in this tab".
+export function resumeDetail(item,when=offerTime){
+ const pair=item.pair;let current=item.fileCurrent??null,savedAt=item.savedAt;
+ if(pair){savedAt=newer(item.savedAt,pair.savedAt);
+  const both=[item.fileCurrent??null,pair.fileCurrent??null];
+  current=both.every(c=>c===true)?true:both.every(c=>c===null)?null:false;}
+ const inTab=(item.also||[]).filter(o=>o.inTab).map(o=>` · ${o.model} · ${o.names?.length?o.names.join(', '):runCount(o.runs)} already in this tab`).join('');
+ return `Kept in this browser ${when(savedAt)} · ${fileRelation(item.file,current,item.fileSavedAt,when)}${pair?'':inTab}`;
+}
+// An older copy never says "same as" or "newer than": its match with the file may be stale after a
+// later save. It says what it matched when it was kept, or only the file it was last linked to.
+// A record without runs saved after the newest one is not called older: "Copy without runs".
+function olderCopyDetail(item,when,later=false){
+ const file=item.file;
+ const tail=!file?'not saved to a file':item.fileCurrent===true?(item.fileSavedAt?`matched ${file} as saved ${when(item.fileSavedAt)}`:`matched ${file} as opened`):`last linked to ${file}`;
+ return `${later?'Copy without runs':'Older copy'} · kept in this browser ${when(item.savedAt)} · ${tail}`;
+}
+// What the box offers: {newest, other, earlier}. newest: the newest stored session with runs, whatever
+// its kind (round 19, Y1), or the pair (Z2); other: at most one more piece of work, the other model's
+// newest record when it is not paired and its runs are not in the tab (inTab: the model names whose
+// runs the tab holds); earlier: every remaining record, newest first. Round 21 (W4): the pair's
+// second record is listed in neither. Each choice: {kind, index (earlier records: the record's place
+// in storage, which recovery reads), label, detail}.
+export function resumeChoices(latest,earlier=[],when=offerTime,{inTab=[]}={}){
  const all=[...(latest?[{item:latest,kind:'latest'}]:[]),...earlier.map((item,position)=>({item,kind:'earlier',index:item.index??position}))];
  const time=e=>Date.parse(e.item.savedAt)||0;all.sort((a,b)=>time(b)-time(a));
- const lead=all.findIndex(e=>e.item.runs>0),newest=lead>=0?all.splice(lead,1)[0]:null;
- // Round 21 (W4): when the newest offer restores the pair, the box does not list the other model's
- // own record again (its card still offers it): the entry of that model, file and save time
- const paired=newest?.item.pair,pairedOut=e=>!!paired&&e.item.model===paired.model&&e.item.file===newest.item.file&&e.item.savedAt===paired.savedAt;
- return [...(newest?[{...newest,newest:true}]:[]),...all.filter(e=>!pairedOut(e))].map(e=>{
-  const older=!!newest&&!e.newest&&!(time(e)>time(newest));
-  const pair=e.newest&&e.item.pair?e.item.pair:null;
-  // round 21 (W4): an older entry leaves "also in this project" out: it named the other model's
-  // newest record, whose runs may be newer than this entry
-  return {kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{}),...(e.newest?{newest:true}:{}),...(pair?{pair:true}:{}),
-   label:pair?`${RESTORE_NEWEST_TEXT}: ${pairLine(e.item,pair)}${fileWords(e.item)} · ${offerTimeWord(e.item)} ${when(offerSavedAt(e.item))}`
-   :`${e.newest?RESTORE_NEWEST_TEXT:RESTORE_TEXT}: ${sessionLine(older?{...e.item,also:undefined}:e.item)} · ${older?'older · ':''}${offerTimeWord(e.item)} ${when(offerSavedAt(e.item))}`};
- });
+ const lead=all.findIndex(e=>e.item.runs>0),first=lead>=0?all.splice(lead,1)[0]:null;
+ const paired=first?.item.pair,pairedOut=e=>!!paired&&e.item.model===paired.model&&e.item.file===first.item.file&&e.item.savedAt===paired.savedAt;
+ const rest=all.filter(e=>!pairedOut(e));
+ const own=e=>({kind:e.kind,...(e.kind==='earlier'?{index:e.index}:{})});
+ const newest=first?{...own(first),newest:true,...(paired?{pair:true}:{}),
+  label:`${RESTORE_NEWEST_TEXT}: ${paired?pairLine(first.item,paired):plainLine(first.item)}`,detail:resumeDetail(first.item,when)}:null;
+ const model=e=>e.item.model||'Optical waveguide';
+ const at=first&&!paired?rest.findIndex(e=>e.item.runs>0&&model(e)!==model(first)&&!inTab.includes(model(e))):-1;
+ const second=at>=0?rest.splice(at,1)[0]:null;
+ const other=second?{...own(second),label:`${RESTORE_TEXT}: ${plainLine(second.item)}`,
+  detail:'Older · '+resumeDetail({...second.item,pair:undefined,also:undefined},when).replace(/^Kept/,'kept')}:null;
+ return {newest,other,earlier:rest.map(e=>({...own(e),label:'Restore '+plainLine(e.item),detail:olderCopyDetail(e.item,when,!!first&&time(e)>time(first))}))};
 }
-// resume: optional {latest, earlier, onLatest(button), onEarlier(index, button),
-// onOpenFile(), onStartNew()}; shown above the templates when there is something. Round 19 (Y1): every
-// stored session the tab does not hold, newest first; a card repeats its model's newest.
-function resumeCard(resume){
- const choices=resumeChoices(resume.latest,resume.earlier);if(!choices.length)return null;
- const card=document.createElement('section');card.className='resume-card';card.setAttribute('aria-labelledby','resume-heading');
- const heading=document.createElement('h3');heading.id='resume-heading';heading.textContent='Continue where you left off';
- const note=document.createElement('p');note.textContent='Completed runs from this browser can be brought back without recomputing. Starting new keeps them as earlier sessions.';
+// resume: optional {latest, earlier, inTab, collapsed, onLatest(button), onEarlier(index, button),
+// onPair(index, button), onStartNew(), onToggle(open)}; shown above the templates when there is
+// something. The box is a disclosure whose summary is its heading, open whenever it is shown; Not now
+// closes it (onStartNew), and opening it shows the same buttons again.
+function restoreButton(choice,resume){
+ const button=document.createElement('button');button.type='button';button.textContent=choice.label;
+ if(choice.kind==='latest'){button.dataset.resumeRecord='-1';button.onclick=()=>resume.onLatest(button);}
+ else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
+ // round 20 (Z2): the newest offer of a project with both models restores both
+ if(choice.pair&&resume.onPair){button.dataset.resumePair='true';button.onclick=()=>resume.onPair(choice.kind==='latest'?-1:choice.index,button);}
+ return button;
+}
+function detailLine(id,text){const p=document.createElement('p');p.className='resume-detail';if(id)p.id=id;p.textContent=text;return p;}
+function resumeCard(resume,earlierOpen=false){
+ const {newest,other,earlier}=resumeChoices(resume.latest,resume.earlier,undefined,{inTab:resume.inTab||[]});
+ if(!newest&&!other&&!earlier.length)return null;
+ const card=document.createElement('details');card.className='resume-card';card.id='resume-box';card.open=!resume.collapsed;
+ const summary=document.createElement('summary'),heading=document.createElement('h3');heading.id='resume-heading';heading.textContent=RESUME_HEADING;summary.append(heading);
+ card.addEventListener?.('toggle',()=>resume.onToggle?.(card.open));
+ const note=document.createElement('p');note.className='resume-note';note.textContent=RESUME_NOTE;
  const actions=document.createElement('div');actions.className='resume-actions';
- for(const choice of choices){
-  const button=document.createElement('button');button.type='button';button.textContent=choice.label;
-  if(choice.newest){button.className='primary';button.id='resume-newest';}
-  if(choice.kind==='latest'){button.dataset.resumeRecord='-1';button.onclick=()=>resume.onLatest(button);}
-  else{button.dataset.resumeEarlier=String(choice.index);button.dataset.resumeRecord=String(choice.index);button.onclick=()=>resume.onEarlier(choice.index,button);}
-  // round 20 (Z2): the newest offer of a project with both models restores both
-  if(choice.pair&&resume.onPair){button.dataset.resumePair='true';button.onclick=()=>resume.onPair(choice.kind==='latest'?-1:choice.index,button);}
-  actions.append(button);
+ for(const [choice,id] of [[newest,'resume-newest'],[other,'resume-other']]){
+  if(!choice)continue;
+  const button=restoreButton(choice,resume);
+  if(choice.newest){button.className='primary';button.id='resume-newest';}else button.id='resume-other';
+  button.setAttribute('aria-describedby',id+'-detail');
+  const piece=document.createElement('div');piece.className='resume-piece';piece.append(button,detailLine(id+'-detail',choice.detail));actions.append(piece);
+ }
+ if(earlier.length){
+  const copies=document.createElement('details');copies.id='earlier-copies';copies.open=earlierOpen;
+  const head=document.createElement('summary');head.textContent=earlierCopiesText(earlier.length);copies.append(head);
+  for(const choice of earlier){const piece=document.createElement('div');piece.className='resume-piece';piece.append(restoreButton(choice,resume),detailLine(null,choice.detail));copies.append(piece);}
+  actions.append(copies);
  }
  const fresh=document.createElement('button');fresh.type='button';fresh.id='resume-start-new';fresh.textContent=RESUME_NOT_NOW_TEXT;fresh.onclick=()=>resume.onStartNew();
- actions.append(fresh);card.append(heading,note,actions);return card;
+ actions.append(fresh);card.append(summary,note,actions);return card;
 }
 // The Library page notes: what each model supports and what File › Save keeps of it. A session
 // file holds the inputs of every single-physics model and the optical runs, or a multiphysics
@@ -216,9 +262,11 @@ function projectNameForm(project,draft=null){
 export const inProjectText=runs=>`In this project · ${runs} ${runs===1?'run':'runs'}`;
 // returnTo: the cards whose model is in the project, shown or not, with its run count (round 18).
 export function renderApplications(host,resume=null,offers={},{onOpenFile=null,project=null,inProject={},returnTo={}}={}){
+ // the earlier copies keep their open state across a re-render (a browser recovery update, for example)
+ const earlierOpen=!!host.querySelector?.('#earlier-copies')?.open;
  const draft=projectNameDraft(host.ownerDocument);host.replaceChildren();offers={...(offers||{})};
  if(onOpenFile)host.append(libraryFiles(onOpenFile,project?projectNameForm(project,draft):null));
- const card=resume?resumeCard(resume):null;if(card)host.append(card);
+ const card=resume?resumeCard(resume,earlierOpen):null;if(card)host.append(card);
  const heading=document.createElement('h2');heading.textContent='Choose a starting model';
  const intro=document.createElement('p');intro.textContent='One workspace for model setup, studies and results. Check what can run before you start.';
  const cards=document.createElement('div');cards.className='cards';

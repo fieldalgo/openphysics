@@ -1111,6 +1111,8 @@ const recoveredEntry=(recovered,file)=>{const own=recovered.savedFile?.name||rec
 // round 18 (X7): the other model of the same project file, when browser recovery holds a record of
 // it under that file name (the newest), with its runs; inTab when this tab already holds that model's runs
 const entryFile=e=>e.file||e.recovered.savedFile?.name||e.recovered.openedFile;
+// whether a stored record still matched the named file (null when it does not say), as recoveredEntry reads it
+const recordFileCurrent=(recovered,name)=>{const own=recovered.savedFile?.name||recovered.openedFile||null;return name&&name===own?(recovered.savedFile?recovered.savedFile.current:recovered.openedCurrent)??null:null;};
 function projectAlso(recovered,name){
  const kind=recovered.session.application==='multiphysics'?'multiphysics':'optical';
  const other=recoveryList().find(e=>(e.recovered.session.application==='multiphysics'?'multiphysics':'optical')!==kind&&(e.file||e.recovered.savedFile?.name||e.recovered.openedFile)===name);
@@ -1119,7 +1121,7 @@ function projectAlso(recovered,name){
  const tab=!inTab?null:kind==='optical'?multiView.runs().map(r=>runTitle(r.number,r.label||'')):runs.map(r=>runTitle(r.number,r.label||''));
  // round 20 (Z2): which record it is, to restore it after this one (found again then: indices move)
  return [{model:recoveredModel(o)||'Optical waveguide',names:tab||sessionRunNames(o.session),runs:tab?tab.length:o.session.runs.length,inTab,
-  record:{application:o.session.application,savedAt:o.savedAt,file:name,runs:o.session.runs.length}}];
+  record:{application:o.session.application,savedAt:o.savedAt,file:name,runs:o.session.runs.length,fileCurrent:recordFileCurrent(o,name)}}];
 }
 // Earlier sessions: what browser recovery held when an earlier page started new work.
 // earlierRecords: the stored records as read, for the list's de-duplication (distinctRecords).
@@ -1155,19 +1157,21 @@ function cardResumeOffers(){
   out[card]={...cardResumeChoice(entry,entry.model,undefined,{older:!!newest&&newest.index!==found.index}),record:found.index,onResume:button=>found.kind==='latest'?recoverLatest(button):recoverEarlier(found.index,button),onStartNew:()=>chooseTemplate(card)};}
  return out;
 }
-// The landing page offers to resume until the page has runs or the user starts new.
-let resumeDismissed=false;
-// Round 19 (Y1): every stored session, newest first, the newest with runs leading (resumeChoices);
-// a card repeats its model's newest. Still hidden while the tab holds optical runs.
+// The landing page offers to resume until the page has runs. Not now closes the box (a disclosure)
+// instead of hiding it: its heading stays, and opening it shows the same buttons again.
+let resumeCollapsed=false;
+// Round 19 (Y1): every stored session, newest first, the newest with runs leading (resumeChoices):
+// one button per piece of work, older copies folded. Still hidden while the tab holds optical runs.
 function resumeOffer(){
- if(resumeDismissed||runs.length)return null;
+ if(runs.length)return null;
  const list=recoveryList(),latest=list.find(e=>e.kind==='latest');
  // round 20 (Z2): the pair only while the tab holds runs of neither model
  const pairable=!runs.length&&!multiView.projectRuns();
- const withPair=entry=>{const o=pairable?entry.also?.[0]:null;return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt}}:entry;};
+ const withPair=entry=>{const o=pairable?entry.also?.[0]:null;return o&&!o.inTab&&o.record?{...entry,pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt,fileCurrent:o.record.fileCurrent}}:entry;};
  return {latest:latest?withPair(recoveredEntry(latest.recovered,latest.file)):null,earlier:list.filter(e=>e.kind==='earlier').map(e=>withPair({...recoveredEntry(e.recovered,e.file),index:e.index})),
+  inTab:multiView.projectRuns()?['Heated silicon waveguide']:[],collapsed:resumeCollapsed,onToggle:open=>{resumeCollapsed=!open;},
   onLatest:button=>recoverLatest(button),onEarlier:(index,button)=>recoverEarlier(index,button),onPair:(index,button)=>restorePair(index,button),
-  onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeDismissed=true;render();document.querySelector('[data-template]')?.focus();}};
+  onOpenFile:()=>$('open-session').click(),onStartNew:()=>{resumeCollapsed=true;const box=document.getElementById('resume-box');if(box)box.open=false;document.querySelector('[data-template]')?.focus({preventScroll:true});}};
 }
 // Round 20 (Z2): the newest offer of a project with both models restores both: the newest record
 // as its own button would, then, once that restore has completed (a load question answered with
