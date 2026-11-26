@@ -31,6 +31,7 @@ import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,comp
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
 import {chooseFieldsAtArrival,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
+import {placeChannelNotes} from './workspace-mode-channel.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
@@ -1770,9 +1771,12 @@ function modesTable(run){
  // slice C2: a closed-window search names its core mode the same way (Mode 2 is the core mode: …)
  // round 25 (A4): an open-boundary run names them too, measured over the window without the PML
  const regions=openRegionNotes(run),edge=new Map([...edgeNotes(run),...regions.filter(n=>n.kind==='edge')].map(n=>[n.mode,n.text])),core=new Map([...coreNotes(run),...regions.filter(n=>n.kind==='core')].map(n=>[n.mode,n.text])),pending=[];let spanEnd=-1;
- const described=m=>[...(edge.has(m-1)?['edge-note-'+m]:[]),...(core.has(m-1)?['core-note-'+m]:[])].join(' ');
+ // open-mode notes (slice S3): an open run's guided / leaky text follows the mode's region note in
+ // the same note, or is a note of its own; a closed run's notes are unchanged (an empty map)
+ const channel=placeChannelNotes(run,edge,core);
+ const described=m=>[...(edge.has(m-1)?['edge-note-'+m]:[]),...(core.has(m-1)?['core-note-'+m]:[]),...(channel.has(m-1)?['channel-note-'+m]:[])].join(' ');
  for(const r of rows){const tr=document.createElement('tr');tr.append(cell('th',r.label,{scope:'row',...(described(r.mode)?{'aria-describedby':described(r.mode)}:{})}),cell('td',r.neff,{'data-neff':String(r.mode)}));
-  if(r.polarization?.rowspan>1)spanEnd=r.mode-1+r.polarization.rowspan-1;if(edge.has(r.mode-1)||core.has(r.mode-1))pending.push(r.mode);
+  if(r.polarization?.rowspan>1)spanEnd=r.mode-1+r.polarization.rowspan-1;if(edge.has(r.mode-1)||core.has(r.mode-1)||channel.has(r.mode-1))pending.push(r.mode);
   if(r.polarization)tr.append(cell('td',r.polarization.text,{title:r.polarization.title,'data-polarization':String(r.mode),...(r.polarization.rowspan>1?{rowspan:String(r.polarization.rowspan)}:{})}));
   {const lossCell=cell('td',r.loss,{'data-loss':String(r.mode),title:r.lossTitle,...(r.depends?{'data-pml-dependent':'',class:'pml-dependent'}:{})});if(r.depends){lossCell.textContent='';const em=document.createElement('em');em.textContent=r.loss;lossCell.append(em);}tr.append(lossCell);}
   tr.append(cell('td',r.area.text,{title:r.area.title,'data-area':String(r.mode),...(r.area.value===null?{}:{'data-area-value':String(r.area.value)})}));
@@ -1781,7 +1785,8 @@ function modesTable(run){
   body.append(tr);
   if(pending.length&&r.mode-1>=spanEnd){for(const m of pending.splice(0)){
    if(edge.has(m-1)){const note=document.createElement('tr');note.className='edge-note-row';const td=cell('td',edge.get(m-1),{colspan:String(head.children.length),id:'edge-note-'+m,'data-edge-note':String(m),class:'edge-note'});note.append(td);body.append(note);}
-   if(core.has(m-1)){const note=document.createElement('tr');note.className='edge-note-row core-note-row';const td=cell('td',core.get(m-1),{colspan:String(head.children.length),id:'core-note-'+m,'data-core-note':String(m),class:'edge-note'});note.append(td);body.append(note);}}}}
+   if(core.has(m-1)){const note=document.createElement('tr');note.className='edge-note-row core-note-row';const td=cell('td',core.get(m-1),{colspan:String(head.children.length),id:'core-note-'+m,'data-core-note':String(m),class:'edge-note'});note.append(td);body.append(note);}
+   if(channel.has(m-1)){const note=document.createElement('tr');note.className='edge-note-row channel-note-row';const td=cell('td',channel.get(m-1).text,{colspan:String(head.children.length),id:'channel-note-'+m,'data-channel-note':String(m),'data-channel-kind':channel.get(m-1).kind,class:'edge-note'});note.append(td);body.append(note);}}}}
  table.append(body);box.append(table);
  // round 18 (X9): in a row under the last edge note (the note's own text unchanged), the inputs that find such a mode: Use Open boundary and,
  // since slice C2 (Q2, Q5, Q8), Search near 2.46 · 4 modes (the design's default target, the closed window kept), in place of

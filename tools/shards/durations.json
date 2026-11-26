@@ -256,6 +256,8 @@
   "tests/simcase/test_studio_closed_target.py": 173.6,
   "tests/simcase/test_studio_geometry_lab.py": 1.8,
   "tests/simcase/test_studio_joule_regions.py": 11.6,
+  "tests/simcase/test_studio_mode_channel_gate.py": 120.0,
+  "tests/simcase/test_studio_mode_channel_mesh.py": 330.0,
   "tests/simcase/test_studio_mode_count.py": 5.6,
   "tests/simcase/test_studio_mode_identity.py": 27.7,
   "tests/simcase/test_studio_mode_matching.py": 10.0,
