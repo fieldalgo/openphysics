@@ -22,6 +22,7 @@ import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {endScript, launchBrowser} from './browser_launch.mjs';
+import {assertFirstScreen, assertLibraryRestore, assertNewestDescription, assertNotNow, libraryRestore} from './library_restore_checks.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
   index % 2 ? pairs : [...pairs, [value.replace(/^--/, ''), all[index + 1]]], []));
@@ -291,6 +292,8 @@ try {
   await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'connected start page');
   const startPage = await page.eval("({heading:document.querySelector('#canvas h2').textContent,resumeCard:!!document.querySelector('.resume-card'),status:document.getElementById('status').textContent,steps:document.querySelectorAll('#sequence b').length,tab:document.querySelector('nav [data-page=Applications]').textContent,view:document.getElementById('view-title').textContent+' · '+document.getElementById('view-detail').textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('start page', startPage);
+  // after rounds 26–30, S0 (no records): no restore button, no box, no card line, one Open file…
+  {const s0 = await libraryRestore(page); stage('S0 Library restore', s0); assertLibraryRestore(s0, {visible: 0}, 'S0'); assert.equal(s0.box, null);}
   // before an application is chosen: a neutral status and no study steps
   assert.equal(startPage.status, 'Choose a model to start'); assert.equal(startPage.steps, 0);
   // one word for one thing on the start page: model
@@ -639,31 +642,40 @@ try {
   await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'browser recovery updated', 20000); await sleep(1500);
   // Reload: the start page offers the last session; recovering it restores the comparison.
   await page.call('Page.reload');
-  // round 9 (J3): the one stored session is the optical one, so the Optical waveguide card resumes
-  // it and no box above lists it again; the session file route and its note are at the top of the page (P2)
-  await page.until("!!document.querySelector('#resume-optical')&&!!document.querySelector('#resume-newest')", 'resume offer');
+  // round 9 (J3): the one stored session is the optical one; after rounds 26–30 the box offers it once
+  // (#resume-newest) and the Optical waveguide card only says so; the session file route and its note
+  // are at the top of the page (P2)
+  await page.until("!!document.querySelector('#resume-newest')&&!!document.querySelector('.card-kept')", 'resume offer');
   // round 19 (Y1): the first offer, in the box above the cards, is the newest session (the card's record too)
   const card = await page.eval("(()=>{const r=document.getElementById('resume-newest').getBoundingClientRect();return {top:Math.round(r.top),bottom:Math.round(r.bottom),inView:r.top>=0&&r.bottom<=innerHeight}})()");
   stage('resume card', card); assert.ok(card.inView, 'the newest restore offer inside the first viewport');
+  // the first screen, tightened: the button and its detail line at 1280 × 800 and 390 × 844
+  stage('first screen J3', await assertFirstScreen(page, (width, height, mobile) => page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}), 'J3', [1280, 800, false]));
   // the routes back say which copy is durable
-  const routes = await page.eval("({latest:document.getElementById('resume-optical').textContent,listed:[...document.querySelectorAll('[data-resume-record]:not(#resume-optical)')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('library-open-file').textContent,beside:!!document.getElementById('library-open-file').closest('.card-slot,.resume-card'),top:document.getElementById('canvas').firstElementChild?.contains(document.getElementById('library-open-file')),count:[...document.querySelectorAll('button')].filter(b=>/^Open file…$/.test(b.textContent)).length,note:document.querySelector('.library-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
+  const routes = await page.eval("({latest:document.getElementById('resume-newest-detail').textContent,listed:[...document.querySelectorAll('[data-resume-record]')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('library-open-file').textContent,beside:!!document.getElementById('library-open-file').closest('.card-slot,.resume-card'),top:document.getElementById('canvas').firstElementChild?.contains(document.getElementById('library-open-file')),count:[...document.querySelectorAll('button')].filter(b=>/^Open file…$/.test(b.textContent)).length,note:document.querySelector('.library-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
-  // the offer names the session file the record was last sent to
+  const restoreJ3 = await libraryRestore(page); stage('J3 Library restore', restoreJ3);
+  assertLibraryRestore(restoreJ3, {visible: 1, cards: {optical: 2}}, 'J3');
+  // the detail line names the session file the record was last sent to
   // round 10 (K3, K7): one phrase for browser recovery, and the file the record still matched
-  // round 11 (L9): the record is the same as the file, so the offer names the file's save time, not the record's
-  assert.ok(routes.latest.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · same as file ' + sessionFile + ', saved '), routes.latest);
-  assert.match(routes.latest, /, saved \d{1,2}:\d\d(?: [AP]M)?$/);
+  // round 11 (L9), after rounds 26–30: the record is the same as the file: string 2, with the file's save time
+  assert.ok(routes.latest.startsWith('Kept in this browser ') && routes.latest.includes(' · same as ' + sessionFile + ', saved ') && routes.latest.endsWith(' · Open file… gives the same runs'), routes.latest);
+  assert.match(routes.latest, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · same as \S+, saved \d{1,2}:\d\d(?: [AP]M)? · Open file… gives the same runs$/);
   assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Library page says Restore from this browser'); assert.equal(routes.open, 'Open file…');
-  // round 19 (Y1): the box above leads with the newest stored session, the record the card resumes
+  // round 19 (Y1): the box above leads with the newest stored session, the record the card counts
   assert.equal(routes.listed.length, 1, JSON.stringify(routes.listed)); assert.equal(routes.box, true);
-  assert.ok(routes.listed[0].startsWith('Restore newest from this browser: Optical waveguide · 2 runs · Run 1 · design A, Run 2 · '), routes.listed[0]);
+  assert.equal(routes.listed[0], 'Restore newest from this browser: Optical waveguide · 2 runs · Run 1 · design A, Run 2');
+  assert.equal(restoreJ3.copies, null, 'no earlier copies'); assert.equal(restoreJ3.other, null);
   assert.equal(routes.beside, false, 'Open file is not under a card'); assert.equal(routes.top, true, 'Open file is at the top of the Library'); assert.equal(routes.count, 1);
+  stage('J3 accessible description', {description: await assertNewestDescription(page, 'J3')});
+  // amendment A1: Not now closes the box; its heading stays and opening it shows the same buttons
+  stage('J3 Not now', await assertNotNow(page, 'J3'));
   await libraryOpenFile('with a resume offer');
   assert.equal(routes.note, 'A project file is the copy that moves between computers; browser recovery stays in this browser.');
   assert.equal(routes.footer, 'Last session kept in this browser · 2 runs');
   await page.screenshot('resume-card');
   // a fresh page holds nothing an open would lose, so recovery asks nothing
-  await page.click('#resume-optical'); await page.until("!!document.getElementById('compare-neff')", 'recovered comparison');
+  await page.click('#resume-newest'); await page.until("!!document.getElementById('compare-neff')", 'recovered comparison');
   await treeMarks('Compare after a restore');
   assert.equal(await page.eval("!!document.querySelector('dialog[open]')"), false, 'no confirmation over an untouched workspace');
   const after = await delta(), recoveredHeader = await page.eval("document.getElementById('autosave-status').textContent");
@@ -768,8 +780,8 @@ try {
   // round 10 (K6): restoring opens the page shown when the record was written (Results, Run 1), not Compare or the newest run
   // the stored record names the page shown and the run selected (read back from browser storage)
   await page.until("import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const r=await m.indexedNotebookStore().load();const d=JSON.parse(r.session);return r.page==='Results'&&d.selected===d.runs[0].job;})", 'recovery of the Results page', 20000);
-  await page.call('Page.reload'); await page.until("!!document.querySelector('#resume-optical')", 'resume offer after Results');
-  await page.click('#resume-optical'); await page.until("!!document.getElementById('optical-field')", 'restored on Results');
+  await page.call('Page.reload'); await page.until("!!document.querySelector('#resume-newest')", 'resume offer after Results');
+  await page.click('#resume-newest'); await page.until("!!document.getElementById('optical-field')", 'restored on Results');
   const restored = await page.eval("({page:[...document.querySelectorAll('nav [data-page]')].filter(b=>b.getAttribute('aria-selected')==='true').map(b=>b.dataset.page),heading:document.querySelector('.dock-title>span').textContent,pressed:[...document.querySelectorAll('.run-item[aria-pressed=true]')].map(b=>b.textContent),header:document.getElementById('autosave-status').textContent})");
   stage('K6 restored on Results', restored);
   assert.deepEqual(restored.page, ['Results']); assert.match(restored.heading, /^Run 1 · design A 600 × 300 nm · current inputs 700 × 300 nm$/); assert.equal(restored.pressed.length, 1); assert.match(restored.pressed[0], /^Pinned · Run 1 · design A/);
@@ -800,9 +812,11 @@ try {
   stage('switch message parts', switchedParts);
   assert.equal(switchedParts.line, 'Heated silicon waveguide ready. Edit settings and couplings, then press Run. Optical waveguide runs stay in this tab · Library › Optical waveguide returns to them');
   assert.equal(switchedParts.summary, 'More');
-  assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Library › Optical waveguide › Restore from this browser \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
+  assert.match(switchedParts.more, /^This tab holds 2 runs until it is closed or reloaded\. After that, Library › Continue where you left off › Restore \(browser recovery, which keeps the four newest sessions\)(?: or Open session with \S+\.json)? brings them back\.$/);
   await noOverflow('heated model after optical runs');
   await page.click('nav [data-page=Applications]'); await page.until("!!document.querySelector('[data-template=optical]')", 'models page again');
+  // S4 (the tab holds runs): the box is hidden and no card line is shown
+  {const s4 = await libraryRestore(page); stage('S4 Library restore', s4); assertLibraryRestore(s4, {visible: 0}, 'S4'); assert.equal(s4.box, null);}
   // round 16 (S9): the optical model returns to the page it was left on, Results with Run 2
   await page.click('[data-template=optical]'); await page.until("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page==='Results'&&!!document.getElementById('modes-table')", 'optical model again, on its Results');
   assert.ok((await page.eval("document.querySelector('.run-item[aria-pressed=true]')?.textContent??''")).includes('Run 2 · '), 'the run last viewed');
@@ -1139,24 +1153,28 @@ try {
     await answerDialogs(`/^Opened /.test(document.getElementById('autosave-status').textContent)&&${recoveryUpdated}`, label);
   };
   await freshPage('J2 page 1'); await openFile('J2 open 1');
-  await freshPage('J2 page 2'); await page.until("!!document.getElementById('resume-optical')", 'J2 resume offer');
-  await page.eval("document.getElementById('notebook-recovery-detail').textContent=''"); await page.click('#resume-optical');
+  await freshPage('J2 page 2'); await page.until("!!document.getElementById('resume-newest')", 'J2 resume offer');
+  await page.eval("document.getElementById('notebook-recovery-detail').textContent=''"); await page.click('#resume-newest');
   await answerDialogs(`/^Recovered from this browser/.test(document.getElementById('autosave-status').textContent)&&${recoveryUpdated}`, 'J2 resumed');
   await freshPage('J2 page 3'); await openFile('J2 open 2');
-  await freshPage('J2 page 4'); await page.until("!!document.getElementById('resume-optical')", 'J2 Library page');
+  await freshPage('J2 page 4'); await page.until("!!document.getElementById('resume-newest')", 'J2 Library page');
   await sleep(500);
   const offers = await page.eval(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const s=m.indexedNotebookStore();const latest=await s.load(),earlier=await s.loadEarlier();
-    const record=i=>Number(i)<0?latest:earlier[Number(i)],card=document.getElementById('resume-optical');
+    const record=i=>Number(i)<0?latest:earlier[Number(i)],card=document.getElementById('resume-newest');
     const top=[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({record:b.dataset.resumeRecord,text:b.textContent}));
-    return {card:{record:card.dataset.resumeRecord,text:card.textContent},top,keys:[card.dataset.resumeRecord,...top.map(t=>t.record)].map(i=>{const d=JSON.parse(record(i).session);return JSON.stringify({model:d.input??d.document,runs:(d.runs||[]).map(r=>[r.job,r.label||'',r.pinned===true])});}),stored:earlier.length};})`);
+    return {card:{record:card.dataset.resumeRecord,text:card.textContent,detail:document.getElementById('resume-newest-detail').textContent,line:document.querySelector('[data-template=optical] .card-kept')?.textContent??null},top,keys:top.map(t=>t.record).map(i=>{const d=JSON.parse(record(i).session);return JSON.stringify({model:d.input??d.document,runs:(d.runs||[]).map(r=>[r.job,r.label||'',r.pinned===true])});}),stored:earlier.length};})`);
   stage('J2 one entry per session', offers);
-  // the record matched the file it was opened from, which has no save time here: the time is the browser copy's
-  assert.ok(offers.card.text.startsWith('Restore from this browser · Optical waveguide · Run 1 · design A, Run 2 · browser copy ') && offers.card.text.endsWith(' · same as file ' + sessionFile), offers.card.text);
-  // round 19 (Y1): the box leads with the newest stored session, which the card also resumes
-  assert.equal(offers.top[0]?.record, offers.card.record, 'the box leads with the record the card resumes');
+  // after rounds 26–30: the record matched the file it was opened from, which has no save time here:
+  // the detail line says so (string 3), with the browser copy's time
+  assert.equal(offers.card.text, 'Restore newest from this browser: Optical waveguide · 2 runs · Run 1 · design A, Run 2');
+  assert.ok(offers.card.detail.startsWith('Kept in this browser ') && offers.card.detail.endsWith(' · same as ' + sessionFile + ' as opened · Open file… gives the same runs'), offers.card.detail);
+  assert.equal(offers.card.line, 'Kept in this browser · 2 runs · Restore at the top of the page');
+  // round 19 (Y1): the box leads with the newest stored session, which the card line counts
+  assert.equal(offers.top[0]?.record, offers.card.record, 'the box leads with the newest record');
   // compared by the stored inputs and runs themselves, not by the sessionKey under test: the box's entries
-  assert.equal(new Set(offers.keys.slice(1)).size, offers.keys.length - 1, 'every entry of the box is another session');
+  assert.equal(new Set(offers.keys).size, offers.keys.length, 'every entry of the box is another session');
   assert.deepEqual(offers.top.map((t, i) => [i, t.text.includes('Optical waveguide · 2 runs · Run 1 · design A, Run 2')]).filter(([, has]) => has).map(([i]) => i), [0], JSON.stringify(offers.top));
+  assertLibraryRestore(await libraryRestore(page), {visible: 1, cards: {optical: 2}}, 'J2');
   await noOverflow('J2 Library page');
 
   // M4 (number of modes; pre-registered, blind except the template's count of guided modes, which
@@ -2804,14 +2822,18 @@ try {
     // runs is version 13, whose runs keep their numbers as version 12's do (the restore of a version 12
     // record is checked by studio_session_numbers.cjs, K2, and studio_run_retention_fields.cjs, K2)
     await r.click('nav [data-page=Results]'); const keptNumbers = (await runItems()).map(t => t.replace('Pinned · ', '').split(' · ')[0]);
-    await r.call('Page.reload'); await r.until("!!document.getElementById('optical-start-new')", 'R19 Library after reload');
-    await r.click('#optical-start-new'); await r.until("!!document.getElementById('shape-w')", 'R19 new model');
+    // after rounds 26–30 the card has no Start new: choosing the card opens the model without the kept runs
+    await r.call('Page.reload'); await r.until("!!document.querySelector('[data-template=optical] .card-kept')", 'R19 Library after reload');
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'R19 new model');
     await clearRecorded(); await rRun(); await recorded('R19 one run kept');
-    await r.call('Page.reload'); await r.until("!!document.getElementById('resume-newest')&&!!document.getElementById('resume-optical')", 'R19 Library offers'); await sleep(800);
-    const offers = () => r.eval("({box:[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({id:b.id,record:b.dataset.resumeRecord,text:b.textContent})),card:{record:document.getElementById('resume-optical')?.dataset.resumeRecord??null,text:document.getElementById('resume-optical')?.textContent??null},earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent),boxShown:!!document.querySelector('.resume-card'),lastSession:!document.getElementById('recover-notebook').disabled})");
+    await r.call('Page.reload'); await r.until("!!document.getElementById('resume-newest')&&!!document.querySelector('[data-template=optical] .card-kept')", 'R19 Library offers'); await sleep(800);
+    const offers = () => r.eval("({box:[...document.querySelectorAll('.resume-card [data-resume-record]')].map(b=>({id:b.id,record:b.dataset.resumeRecord,text:b.textContent,detail:(b.nextElementSibling?.textContent)??null})),card:{line:document.querySelector('[data-template=optical] .card-kept')?.textContent??null},earlier:[...document.querySelectorAll('#earlier-sessions button')].map(b=>b.textContent),boxShown:!!document.querySelector('.resume-card'),lastSession:!document.getElementById('recover-notebook').disabled})");
     const y1 = {before: await offers()};
     await rOverflow('Y1 Library');
+    y1.library = await libraryRestore(r);
     const older = y1.before.box.findIndex(b => b.text.includes('Optical waveguide · 20 runs · '));
+    // the older copy is behind the closed Earlier copies disclosure
+    await r.eval("document.getElementById('earlier-copies').open=true"); await sleep(200);
     await clearRecorded(); await r.click(`.resume-card [data-resume-record="${y1.before.box[older]?.record}"]`);
     await r.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R19 older restored');
     const restoredMessage = await rText('#file-status');
@@ -2821,11 +2843,17 @@ try {
     await r.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R19 restored kept', 30000); await sleep(1200);
     y1.kept = await offers();
     stage('R19 Y1 restore offers', y1);
-    assert.equal(y1.before.box[0].id, 'resume-newest'); assert.equal(y1.before.box[0].record, y1.before.card.record, 'the box leads with the newest, which its card also offers');
-    assert.match(y1.before.box[0].text, /^Restore newest from this browser: Optical waveguide · 1 run · Run 1 · kept \d{1,2}:\d\d(?: [AP]M)?$/);
+    // after rounds 26–30: the newest leads (string 1), the older copy of the same model is an earlier
+    // copy, and the newest equals the record the card line counts (1 run)
+    assert.equal(y1.before.box[0].id, 'resume-newest');
+    assert.equal(y1.before.box[0].text, 'Restore newest from this browser: Optical waveguide · 1 run · Run 1');
+    assert.match(y1.before.box[0].detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · not saved to a file$/);
+    assert.equal(y1.before.card.line, 'Kept in this browser · 1 run · Restore at the top of the page', 'the card line counts the newest record');
+    assertLibraryRestore(y1.library, {visible: 1, cards: {optical: 1}}, 'R19 Y1');
+    assert.equal(y1.library.copies?.open, false, 'the earlier copies are closed');
     assert.ok(older > 0, JSON.stringify(y1.before.box));
-    assert.match(y1.before.box[older].text, /^Restore from this browser: Optical waveguide · 20 runs · .* · older · kept \d{1,2}:\d\d(?: [AP]M)?$/);
-    assert.match(y1.before.card.text, /^Restore from this browser · Optical waveguide · Run 1 · \d{1,2}:\d\d(?: [AP]M)?$/);
+    assert.ok(y1.before.box[older].text.startsWith('Restore Optical waveguide · 20 runs · '), y1.before.box[older].text);
+    assert.match(y1.before.box[older].detail, /^Older copy · kept in this browser \d{1,2}:\d\d(?: [AP]M)? · not saved to a file$/);
     // stable run numbers (session versions 12 and 13): the restore keeps them and says nothing about numbering
     assert.ok(!y1.restored.message.includes('numbered from 1'), y1.restored.message); assert.equal(y1.restored.items, 20);
     assert.deepEqual(y1.restored.numbers, keptNumbers);
@@ -2893,8 +2921,8 @@ try {
     await clearRecorded(); await rRun();
     await rTree('Optical modes', "!!document.getElementById('mode-count-number')"); await r.type('#mode-count-number', 3); await sleep(400);
     await rRun(); await recorded('R20 two runs kept');
-    await r.call('Page.reload'); await r.until("!!document.getElementById('resume-optical')", 'R20 Library offers'); await sleep(800);
-    await r.click('#resume-optical'); await r.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R20 restored');
+    await r.call('Page.reload'); await r.until("!!document.getElementById('resume-newest')", 'R20 Library offers'); await sleep(800);
+    await r.click('#resume-newest'); await r.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R20 restored');
     await rTree('Optical modes', "!!document.getElementById('mode-count-number')");
     await r.type('#mode-count-number', 2); await sleep(600);
     const z1 = {two: await rText('#file-status')};

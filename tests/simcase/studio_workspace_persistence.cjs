@@ -153,9 +153,9 @@ test('switching models says where the optical runs stay: one short line, the res
  // the tab holds them until it is closed or reloaded; after that, only what still holds them is named
  assert.deepEqual(P.opticalRunsStayText({runs:1}),{text:one,more:'This tab holds 1 run until it is closed or reloaded. After that, no file or browser recovery holds it.'});
  assert.deepEqual(P.opticalRunsStayText({runs:2,file:'optical-waveguide-session-2026-11-22-0922.json',recovery:true}),
-  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Library › Optical waveguide › Restore from this browser (browser recovery, which keeps the four newest sessions) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.'});
+  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Library › Continue where you left off › Restore (browser recovery, which keeps the four newest sessions) or Open session with optical-waveguide-session-2026-11-22-0922.json brings them back.'});
  assert.deepEqual(P.opticalRunsStayText({runs:2,recovery:true}),
-  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Library › Optical waveguide › Restore from this browser (browser recovery, which keeps the four newest sessions) brings them back.'});
+  {text:two,more:'This tab holds 2 runs until it is closed or reloaded. After that, Library › Continue where you left off › Restore (browser recovery, which keeps the four newest sessions) brings them back.'});
  assert.deepEqual(P.opticalRunsStayText({runs:1,file:'a.json'}),
   {text:one,more:'This tab holds 1 run until it is closed or reloaded. After that, Open session with a.json brings it back.'});
 });

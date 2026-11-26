@@ -129,8 +129,6 @@ test('W4: the pair offer does not list the other model again; an older entry nam
  assert.equal(unpaired.other.detail,'Older · kept in this browser 2026-11-24T11:33:00Z · newer than both-models.json as opened');
  // "(restored separately)" is shown nowhere
  for(const c of [choices,unpaired])for(const x of [c.newest,c.other,...c.earlier].filter(Boolean))assert.ok(!(x.label+x.detail).includes('restored separately'),x.label);
- // cards are unchanged: an older card still names the project's other model
- assert.ok(A.cardResumeChoice(heated,'Heated silicon waveguide',t,{older:true}).label.includes(' · also in this project: Optical waveguide · '));
  // the caller carries the other record's save time with the pair
  assert.ok(read('workspace-app.mjs').includes("pair:{model:o.model,runs:o.runs,savedAt:o.record.savedAt,fileCurrent:o.record.fileCurrent}"));
 });

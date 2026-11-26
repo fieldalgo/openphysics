@@ -38,7 +38,7 @@ import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,per
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
-import {renderApplications,templatePhysics,sessionRunNames,sessionLine,cardResumeChoice,cardRecords,APPLICATIONS,pairLine} from './workspace-applications.mjs';
+import {renderApplications,templatePhysics,sessionRunNames,sessionLine,cardRecords,APPLICATIONS,pairLine} from './workspace-applications.mjs';
 import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocument,sideText,thermalSummary} from './workspace-heat.mjs';
 import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
@@ -194,7 +194,7 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(t
  // the model's current file name (File › Save downloads under it again), which the header names
  currentFileName:()=>currentFileNow()?.name||null,currentFileHow:()=>currentFileNow()?.how||null,
  // the browser copy, in the indicator's words: kept:N when recovery left out the maps of N runs
- recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),cardResumeOffers(),libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
+ recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),null,libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
 // Reset): refused while its run is going; false when refused.
 function leaveMultiphysics(){
@@ -330,7 +330,7 @@ function libraryOptions(){
  if(multiView.inProject()&&!multiView.active())inProject['heated-waveguide']=multiView.projectRuns();
  // round 18 (X10): every model of the project, shown or not, with its runs: its card reads "Return to model"
  const returnTo={};if(workspaceInProject()&&workspaceCard())returnTo[workspaceCard()]=workspaceCard()==='optical'?runs.length:0;if(multiView.inProject())returnTo['heated-waveguide']=multiView.projectRuns();
- return {onOpenFile:()=>$('open-session').click(),inProject,returnTo,project:{line:projectLine(),name:project.name,onRename:renameProject}};
+ return {onOpenFile:()=>$('open-session').click(),inProject,returnTo,kept:cardKept(),project:{line:projectLine(),name:project.name,onRename:renameProject}};
 }
 // A browser restore of a record saved to a project file (S4, round 16): the project names that file
 // and its name again, so the header and Save name it. The project reads as saved when the record
@@ -500,7 +500,7 @@ else inspector+=pair('Status','Not executed')+'<p>Settings and validation will b
 if(isHeat())inspector=heatInspector();else if(isJoule())inspector=jouleView.inspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();if(isJoule())jouleView.bindInspector();
 if(ui.page==='Connections'&&isOptical()){$('canvas').innerHTML='<h2>Optical-only model</h2><p>This model has one optical interface and no coupled physics. Choose the heated-waveguide template to configure a multiphysics preview; coupled computation remains unavailable.</p><button id=choose-multiphysics>Choose another application</button>';$('choose-multiphysics').onclick=()=>{ui.page='Applications';render();};}
 else if(ui.page==='Connections')$('canvas').innerHTML=renderConnectionOverview();
-else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer(),cardResumeOffers(),libraryOptions());
+else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer(),null,libraryOptions());
 else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>Temperature · displacement · optical fields</p><div class="empty">No computed results<br>Run adapters are not connected.</div><p>Planned: common coordinates, time playback, probes and explicit deformation magnification.</p>';
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=applicationChosen()?active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>':'<span class="sequence-empty">Study steps appear once you choose an application.</span>';
@@ -1140,23 +1140,17 @@ function recoveryList(){
   return parsed.has(index)?[{kind:'earlier',index,recovered:parsed.get(index),file}]:[];
  });
 }
-// Each model card's record: the newest session of its model with runs in browser recovery, offered
-// before Start new while this tab holds none of that model's runs (workspace-applications.mjs
-// cardRecords): the Optical waveguide card for optical sessions, the Heated silicon waveguide card
-// for multiphysics ones.
+// Each model card's record: the newest session of its model with runs in browser recovery, while
+// this tab holds none of that model's runs (workspace-applications.mjs cardRecords): the Optical
+// waveguide card for optical sessions, the Heated silicon waveguide card for multiphysics ones.
 function cardRecordMap(){
  const busy=new Set([...(runs.length?['optical']:[]),...(multiView.projectRuns()?['heated-waveguide']:[])]);
  const list=recoveryList().filter(e=>e.recovered.session.runs.length).map(e=>({...e,application:e.recovered.session.application}));
  return cardRecords(list,busy);
 }
-// the newest stored session with runs (round 19, Y1): a card offering another one says "older"
-const newestRecord=()=>recoveryList().find(e=>e.recovered.session.runs.length)||null;
-function cardResumeOffers(){
- const out={},newest=newestRecord();
- for(const [card,found] of Object.entries(cardRecordMap())){const entry=recoveredEntry(found.recovered,found.file);
-  out[card]={...cardResumeChoice(entry,entry.model,undefined,{older:!!newest&&newest.index!==found.index}),record:found.index,onResume:button=>found.kind==='latest'?recoverLatest(button):recoverEarlier(found.index,button),onStartNew:()=>chooseTemplate(card)};}
- return out;
-}
+// After rounds 26–30 a card has no restore button: a card whose model has a kept record not in the
+// tab says "Kept in this browser · N runs · Restore at the top of the page" ({card: runs}).
+function cardKept(){return Object.fromEntries(Object.entries(cardRecordMap()).map(([card,found])=>[card,found.recovered.session.runs.length]));}
 // The landing page offers to resume until the page has runs. Not now closes the box (a disclosure)
 // instead of hiding it: its heading stays, and opening it shows the same buttons again.
 let resumeCollapsed=false;

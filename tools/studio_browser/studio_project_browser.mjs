@@ -29,6 +29,7 @@ import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {endScript, launchBrowser} from './browser_launch.mjs';
+import {assertFirstScreen, assertLibraryRestore, assertNewestDescription, libraryRestore} from './library_restore_checks.mjs';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((pairs, value, index, all) =>
   index % 2 ? pairs : [...pairs, [value.replace(/^--/, ''), all[index + 1]]], []));
@@ -511,19 +512,24 @@ try {
     await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", 'R16 recovery updated', 20000); await sleep(1500);
     // S5: after a reload the heated card names the newest project file, although the heated model was not shown when it was saved
     await page.call('Page.reload');
-    try { await page.until("!!document.getElementById('resume-optical')&&!!document.getElementById('resume-heated-waveguide')", 'R16 card offers', 30000); }
-    catch (error) { stage('R16 card offers missing', {buttons: await page.eval("[...document.querySelectorAll('button')].map(b=>(b.id||'')+': '+b.textContent.slice(0,120))"), page: await page.eval("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page??null")}); throw error; }
-    const offers = await page.eval("['resume-optical','resume-heated-waveguide'].map(id=>document.getElementById(id).textContent)");
-    stage('R16 S5 cards', {offers});
-    assert.ok(offers[1].includes(' · same as file design-ab.json'), offers[1]); assert.ok(offers[0].includes(' · same as file design-ab.json'), offers[0]);
-    // round 18 (X7): each offer also names the project's other model with its runs; its button restores its own model
-    stage('R18 X7 offers', {offers});
-    assert.ok(offers[0].startsWith('Restore from this browser · Optical waveguide · ') && offers[0].includes(' · also in this project: Heated silicon waveguide · Run ') && offers[0].endsWith(' (restored separately)'), offers[0]);
-    assert.ok(offers[1].startsWith('Restore from this browser · Heated silicon waveguide · ') && offers[1].includes(' · also in this project: Optical waveguide · Run ') && offers[1].endsWith(' (restored separately)'), offers[1]);
-    // S4: restore the optical session; the header names the project file and Save suggests it
-    await page.press('button', offers[0]);
+    // after rounds 26–30: the project file holds both models, so the box offers them as one piece of
+    // work (pair: one button) with its detail line; each card only says it has a kept record
+    try { await page.until("!!document.getElementById('resume-newest')&&document.querySelectorAll('.card-kept').length===2", 'R16 restore offer', 30000); }
+    catch (error) { stage('R16 restore offer missing', {buttons: await page.eval("[...document.querySelectorAll('button')].map(b=>(b.id||'')+': '+b.textContent.slice(0,120))"), page: await page.eval("document.querySelector('nav [data-page][aria-selected=true]')?.dataset.page??null")}); throw error; }
+    const r16 = await libraryRestore(page);
+    stage('R16 S5 restore offer', r16);
+    // S5 and round 18 (X7): the offer names the newest project file and both models of the project
+    assert.equal(r16.newest.pair, 'true', JSON.stringify(r16.newest));
+    assert.match(r16.newest.text, /^Restore newest from this browser: (?:Optical waveguide \(\d+ runs?\) and Heated silicon waveguide|Heated silicon waveguide \(\d+ runs?\) and Optical waveguide) \(\d+ runs?\)$/);
+    assert.match(r16.newest.detail, /^Kept in this browser .+ · same as design-ab\.json, saved .+ · Open file… gives the same runs$/);
+    assertLibraryRestore(r16, {visible: 1, cards: Object.fromEntries(Object.entries(r16.cardLines).map(([k, v]) => [k, Number(v.match(/· (\d+) runs? ·/)[1])]))}, 'R16');
+    assert.deepEqual(Object.keys(r16.cardLines).sort(), ['heated-waveguide', 'optical']);
+    // S4: restore the project's models; the header names the project file and Save suggests it
+    await page.click('#resume-newest');
+    for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
     if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()");
-    await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R16 restored', 30000);
+    // the pair restore names both models (Z2)
+    await page.until("/^Restored (?:Optical waveguide|Heated silicon waveguide) \\(\\d+ runs?\\) and (?:Optical waveguide|Heated silicon waveguide) \\(\\d+ runs?\\) from this browser, not recomputed\\./.test(document.getElementById('file-status').textContent)", 'R16 restored', 60000);
     const restoredTitle = await title();
     await page.press('button', 'File'); await page.press('menuitem', 'Save As…'); await page.until("document.getElementById('save-name-dialog').open", 'R16 Save As after restore');
     const prefill = await page.eval("document.getElementById('save-name-input').value"); await page.press('button', 'Cancel');
@@ -613,6 +619,47 @@ try {
     await stopBrowser(page);
   }
 
+  // After rounds 26–30 (pre-registered, draft §5): two pieces of work. In a new profile an optical run
+  // and a heated run, neither saved to a file, then a reload: the box has two buttons, the newest
+  // (the heated record) and the other model's (optical) with "Older · kept in this browser …"; each
+  // card says it keeps its record; the second button restores the optical model alone.
+  {
+    page = await startBrowser(); await size(1440, 900, false);
+    await page.call('Page.navigate', {url: base + '/workspace'});
+    await page.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'two pieces start page');
+    const recorded = async label => { await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(800); };
+    const clearRecorded = () => page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
+    await page.press('button', 'Optical waveguide', 'start'); await page.until("!!document.getElementById('shape-w')", 'two pieces optical');
+    await clearRecorded(); await runOptical('two pieces optical run'); await recorded('two pieces optical record');
+    await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=heated-waveguide]')", 'two pieces Library');
+    await page.press('button', 'Heated silicon waveguide', 'start');
+    await page.until("!document.getElementById('run-multiphysics').disabled", 'two pieces heated Run', 60000);
+    await clearRecorded(); await page.press('button', 'Run study');
+    await page.until("/^[+−]0\\.\\d{8}$/.test(document.querySelector('[data-neff-shift=\"1\"]')?.textContent||'')", 'two pieces heated run', 240000);
+    await page.until("!document.getElementById('run-multiphysics').disabled", 'two pieces heated run done', 60000);
+    await recorded('two pieces heated record');
+    await page.call('Page.reload');
+    await page.until("!!document.getElementById('resume-newest')&&!!document.getElementById('resume-other')", 'two pieces offers', 30000); await sleep(500);
+    const two = await libraryRestore(page); stage('two pieces of work', two);
+    assertLibraryRestore(two, {visible: 2, cards: {optical: 1, 'heated-waveguide': 1}}, 'two pieces');
+    assert.equal(two.newest.text, 'Restore newest from this browser: Heated silicon waveguide · 1 run · Run 1');
+    assert.match(two.newest.detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · not saved to a file$/);
+    assert.equal(two.other.text, 'Restore from this browser: Optical waveguide · 1 run · Run 1');
+    assert.match(two.other.detail, /^Older · kept in this browser \d{1,2}:\d\d(?: [AP]M)? · not saved to a file$/);
+    assert.equal(two.other.describedBy, 'resume-other-detail');
+    stage('two pieces first screen', await assertFirstScreen(page, size, 'two pieces', [1440, 900, false]));
+    await page.eval("document.getElementById('file-status').textContent=''"); await page.click('#resume-other');
+    if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()");
+    await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'two pieces optical restored', 30000);
+    await page.until("document.querySelectorAll('.run-item').length===1", 'two pieces optical run back');
+    await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'two pieces Library after');
+    const afterTwo = await libraryRestore(page); stage('two pieces after the restore', afterTwo);
+    // the tab holds optical runs: the box is hidden; the heated card still says it keeps its record
+    assertLibraryRestore(afterTwo, {visible: 0, cards: {'heated-waveguide': 1}}, 'two pieces after'); assert.equal(afterTwo.box, null);
+    await noOverflow('two pieces Library after');
+    await stopBrowser(page);
+  }
+
   // R19 Y3 (round 19, pre-registered): a browser restore keeps the project's name and file, or names
   // its source. Opened: the record holds the file it was opened from, not the project's name.
   {
@@ -622,11 +669,15 @@ try {
     const recorded = async label => { await page.until("/^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent)", label, 30000); await sleep(800); };
     const clearRecorded = () => page.eval("document.getElementById('notebook-recovery-detail').textContent=''");
     const restoreOptical = async label => {
-      await page.call('Page.reload'); await page.until("!!document.getElementById('resume-optical')", label + ': card offer', 30000);
-      await page.eval("document.getElementById('file-status').textContent=''"); await page.click('#resume-optical');
+      // after rounds 26–30 the optical record is the box's newest offer (only the optical model wrote a record)
+      await page.call('Page.reload'); await page.until("!!document.getElementById('resume-newest')", label + ': restore offer', 30000);
+      const library = await libraryRestore(page); stage(label + ' Library restore', library);
+      assert.ok(library.newest.text.startsWith('Restore newest from this browser: Optical waveguide · '), library.newest.text); assert.equal(library.newest.pair, null);
+      assertLibraryRestore(library, {visible: 1, cards: {optical: Number(library.newest.text.match(/· (\d+) runs? ·/)[1])}}, label);
+      await page.eval("document.getElementById('file-status').textContent=''"); await page.click('#resume-newest');
       await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", label + ': restored', 30000);
       await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", label + ': Library');
-      return {title: await title(), footer: await footer(), message: await status()};
+      return {title: await title(), footer: await footer(), message: await status(), detail: library.newest.detail};
     };
     await openFile(saved); await page.until("/^Opened project Heater study/.test(document.getElementById('file-status').textContent)", 'R19 open', 60000);
     await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical]')", 'R19 Library');
@@ -648,6 +699,9 @@ try {
     // since session version 12 the record keeps the project's name (Heater study, from the file
     // opened), so the header names it; a record without a name still reads "recovered from a copy of"
     // round 23 (E5): the record no longer matched the file it was opened from (it read "not saved to a file")
+    // after rounds 26–30 the detail line: changed since a file opened here (string 5), then since a file saved here (string 4)
+    assert.match(opened.detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · newer than heater-study\.json as opened$/);
+    assert.match(savedCase.detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · newer than r19-saved\.json, saved here \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.match(opened.title, /^Heater study · recovered from this browser · changed since heater-study\.json, not saved · /);
     assert.equal(opened.footer, 'Recovered from this browser (opened from heater-study.json; changed since)');
     // the restored name Heater study is the user's (set with Rename), so Save As r19-saved.json keeps it
@@ -685,22 +739,25 @@ try {
     assert.equal(await newDownload(before), 'r20-both.json');
     await recorded('R20 records after the save'); await sleep(1500);
     await page.call('Page.reload');
-    await page.until("!!document.getElementById('resume-newest')&&!!document.getElementById('resume-optical')&&!!document.getElementById('resume-heated-waveguide')", 'R20 offers', 30000);
-    const offers = await page.eval("({newest:document.getElementById('resume-newest').textContent,pair:document.getElementById('resume-newest').dataset.resumePair??null,box:[...document.querySelectorAll('.resume-actions button')].map(b=>b.textContent),optical:document.getElementById('resume-optical').textContent,heated:document.getElementById('resume-heated-waveguide').textContent})");
-    stage('R20 Z2 Z4 offers', offers);
-    assert.match(offers.newest, /^Restore newest from this browser: Optical waveguide \(2 runs\) and Heated silicon waveguide \(1 run\) · same as file r20-both\.json · saved \d{1,2}:\d\d(?: [AP]M)?$/);
+    await page.until("!!document.getElementById('resume-newest')&&document.querySelectorAll('.card-kept').length===2", 'R20 offers', 30000);
+    const offers = await page.eval("({newest:document.getElementById('resume-newest').textContent,detail:document.getElementById('resume-newest-detail').textContent,pair:document.getElementById('resume-newest').dataset.resumePair??null,box:[...document.querySelectorAll('.resume-actions button')].map(b=>b.textContent)})");
+    const library = await libraryRestore(page);
+    stage('R20 Z2 Z4 offers', {offers, library});
+    // after rounds 26–30 (state S2, both records the same as the file): the label names the pair, the
+    // detail line the browser copy, the file and its save time (string 2)
+    assert.equal(offers.newest, 'Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run)');
+    assert.match(offers.detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · same as r20-both\.json, saved \d{1,2}:\d\d(?: [AP]M)? · Open file… gives the same runs$/);
     assert.equal(offers.pair, 'true');
     // round 21 (W4, pre-registered): while the newest offer restores the pair, the box does not list the
-    // heated record again; its card still offers it
-    assert.equal(offers.box.find(t => t.startsWith('Restore from this browser: Heated silicon waveguide · ')), undefined, JSON.stringify(offers.box));
-    assert.ok(offers.heated.startsWith('Restore from this browser · Heated silicon waveguide · '), offers.heated);
-    // Z4: the heated record (relinked by the save) names on its card the time the newest offer names
-    const savedTime = text => text.split(', saved ').at(-1).split(' · ')[0];
-    const cardTime = savedTime(offers.heated);
-    stage('R20 Z4 times', {cardTime});
-    assert.match(cardTime, /^\d{1,2}:\d\d(?: [AP]M)?$/);
-    // the file's save time, a minute after the heated record was written
-    const newestTime = offers.newest.split(' · saved ').at(-1); assert.equal(cardTime, newestTime);
+    // heated record again, neither as a second button nor as an earlier copy
+    assert.equal(offers.box.find(t => t.includes('Heated silicon waveguide · ') && t !== offers.newest), undefined, JSON.stringify(offers.box));
+    assertLibraryRestore(library, {visible: 1, cards: {optical: 2, 'heated-waveguide': 1}}, 'R20 S2');
+    assert.equal(library.other, null);
+    // Z4 is moot (a card names no time): the detail line names the file's save time, a minute after the
+    // heated record was written, as "saved", and the browser copy's time as "Kept in this browser"
+    stage('R20 Z4 times', {detail: offers.detail});
+    stage('R20 accessible description', {description: await assertNewestDescription(page, 'R20')});
+    stage('R20 first screen', await assertFirstScreen(page, size, 'R20 pair', [1440, 900, false]));
     await noOverflow('R20 offers');
     await page.eval("document.getElementById('file-status').textContent=''");
     // the server's model check answers after 2 s, as on a slower machine: longer than the first
@@ -713,7 +770,7 @@ try {
     const restored = {message: await status(), title: await title(), page: await shownPage(), optical: await page.eval("document.querySelectorAll('.run-item').length")};
     await page.call('Fetch.disable'); page.onEvent = null;
     await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'R20 Library after');
-    const after = await page.eval("({actions:Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action').textContent])),offers:[...document.querySelectorAll('.resume-actions button,.card-resume button')].map(b=>b.textContent),names:[...document.querySelectorAll('.cards [data-template]')].map(b=>b.querySelector('.card-action').textContent)})");
+    const after = await page.eval("({actions:Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action').textContent])),offers:[...document.querySelectorAll('.resume-actions button,.card-resume button,.card-kept')].map(b=>b.textContent),names:[...document.querySelectorAll('.cards [data-template]')].map(b=>b.querySelector('.card-action').textContent)})");
     stage('R20 Z2 restored', {restored, after});
     assert.equal(restored.message, 'Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed.');
     assert.match(restored.title, /^Heater study · r20-both\.json · saved \d{1,2}:\d\d(?: [AP]M)?$/);
@@ -738,9 +795,11 @@ try {
     stage('R20 pair restore keeps recovery', {settled, edited});
     for (const state of [settled, edited]) { assert.ok(!(state.title + state.footer).includes('another tab'), JSON.stringify(state)); }
     assert.match(edited.detail, /^Browser recovery updated /);
-    await page.call('Page.reload'); await page.until("!!document.getElementById('resume-optical')", 'R20 offers after the edit', 30000);
-    await page.click('#resume-optical'); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()");
-    await page.until("/^Recovered from this browser/.test(document.getElementById('file-status').textContent)", 'R20 edited record restored', 30000);
+    // after rounds 26–30 the edited optical record is the newest offer (the pair): it restores the edit
+    await page.call('Page.reload'); await page.until("!!document.getElementById('resume-newest')", 'R20 offers after the edit', 30000);
+    await page.click('#resume-newest');
+    for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
+    await page.until("/^Restored Optical waveguide \\(2 runs\\) and Heated silicon waveguide \\(1 run\\) from this browser/.test(document.getElementById('file-status').textContent)", 'R20 edited record restored', 60000);
     await page.press('tab', 'Model'); await page.press('treeitem', 'Optical modes'); await page.until("!!document.getElementById('mode-count-number')", 'R20 Optical modes again');
     const kept = await page.eval("document.getElementById('mode-count-number').value"); stage('R20 edit kept', {kept});
     assert.equal(kept, '3');
@@ -854,6 +913,15 @@ try {
     await stopBrowser(page); page = await startBrowser(profile); await size(1440, 900, false); await startPage('K5 start page');
     await page.until("!!document.getElementById('resume-newest')", 'K5 offers', 30000);
     k5.offer = {text: await page.text('#resume-newest'), pair: await page.eval("document.getElementById('resume-newest').dataset.resumePair??null")};
+    // after rounds 26–30 (state S3: the browser copy changed since the file): one button, the detail line
+    // says the browser copy is newer than the file, the older copies are folded (closed) or absent
+    k5.library = await libraryRestore(page); stage('K5 Library restore', k5.library);
+    assert.equal(k5.offer.text, 'Restore newest from this browser: Optical waveguide (20 runs) and Heated silicon waveguide (1 run)');
+    // both-models.json was opened from disk in this profile (it has no save time here): string 5
+    assert.match(k5.library.newest.detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · newer than both-models\.json as opened$/);
+    assertLibraryRestore(k5.library, {visible: 1, cards: {optical: 20, 'heated-waveguide': 1}}, 'K5 S3');
+    assert.ok(k5.library.copies === null || k5.library.copies.open === false, JSON.stringify(k5.library.copies));
+    stage('K5 first screen', await assertFirstScreen(page, size, 'K5', [1440, 900, false]));
     await page.eval("document.getElementById('file-status').textContent=''");
     await page.click('#resume-newest');
     for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
