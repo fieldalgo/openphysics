@@ -499,7 +499,8 @@ edit* in the accessibility tree; the multiphysics check names the tree's warning
 *Open model* (round 16; *Open (runs stay in this tab)* before), its description ending in *Runs
 stay in this tab when you switch models; this browser can bring completed runs back after you close
 it.* (round 28, G4; *Runs stay in this tab until you close it.* before) with each card whole at
-1440 × 900 and 390 × 844, and the card offer's *Start new (no runs)*.
+1440 × 900 and 390 × 844, and (since the Library recovery change after rounds 26–30) a card's
+*Kept in this browser · N runs · Restore at the top of the page* line where it had *Start new (no runs)*.
 Since round 16 it checks the Save As note *This browser cannot write to the file, so later saves
 download again under this name and may add “ (1)”.* (round 15 checked *Chrome and Edge save to the
 same file.*, now in the user guide only), a project name taken from a file name following Save As
@@ -549,8 +550,10 @@ with **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes) instead**, which brings
 Run 3 (*Run 2 (…) is back; Run 3 (…) was dropped instead.*, no further button, *Runs · 20 of 20 · 15
 pinned* since run retention); a swap button kept from an earlier result and pressed after the next run changing nothing;
 and, after a second session of one run, the Library's box leading with *Restore
-newest from this browser: Optical waveguide · 1 run · Run 1 · saved …* (the record the card offers)
-and the six-run session reading *… · older · saved …*; restoring that older one hides the box, the
+newest from this browser: Optical waveguide · 1 run · Run 1* with *Kept in this browser … · not saved
+to a file* under it (the record the card line counts), and the older session folded under the closed
+*Earlier copies in this browser (N)* with *Older copy · kept in this browser … · not saved to a file*
+(*… · older · saved …* before); restoring that older one hides the box, the
 newer session stays offered as the last session at once and in Workspace tools' earlier sessions
 once this tab's record is written, and the restored one is not listed again. The Library check of
 the first viewport now reads the box's newest offer, which sits above the cards; since round 21 the
@@ -692,13 +695,13 @@ H1, the 16 MiB question and the refusal), 20 runs and the 21st run's drop (six
 and the seventh before H1), the refusals of damaged and newer files, browser recovery after a reload, three
 earlier sessions, the conflict of two tabs, and a restart: two optical runs, the heated session
 file opened over them, a reload and the same file opened again. After it, the title keeps
-*Opened …* through tab clicks, the recovery lists show each session once, and the Optical
-waveguide card offers the optical runs, which come back with the same n_eff. It also checks a
+*Opened …* through tab clicks, the recovery lists show each session once, and the box offers the
+optical runs (the Optical waveguide card says it keeps them), which come back with the same n_eff. It also checks a
 named run in the dock and the footer (*Run 1 · Heater 2e14 · …*) and the heated session's save
-message naming the optical runs that are not in its file. Since round 11 the Heated silicon
-waveguide card restores its own newest record after a reload (since round 19 the box above leads
-with that record, the newest),
-naming the session file's save time, the restored title reads *same as file …*, and the
+message naming the optical runs that are not in its file. Since round 11 the heated model's
+newest record is restored after a reload (until round 30 by its card; now by the box's newest
+offer, whose line reads *Kept in this browser … · same as …json, saved … · Open file… gives the same
+runs*), the restored title reads *same as file …*, and the
 Workspace tools say *Restore earlier session from this browser*. Since round 13 it checks Save after a Save As
 name downloading under it again with no name dialog, after **Download again** since round 25 (*Downloaded heated-design.json again*, the footer
 *heated-design.json · downloaded …* with the “ (1)” title text), and Save after an opened model or
@@ -739,8 +742,9 @@ Since round 18 (pre-registered) the same profile checks the Save As line *The fi
 waveguide (no runs).* and, when Save asks, *… and Heated silicon waveguide (no runs).*; the heated
 model's status bar *Heated silicon waveguide · in project u8-optical.json · not saved since it joined
 · …* after it joined and *… · downloaded …* once saved with both, beside the header's words; and
-both cards reading *Return to Optical waveguide* and *Return to Heated silicon waveguide* (round 20 words). In the round-16 reload stage both cards' offers also name the other model,
-*· also in this project: … (restored separately)*.
+both cards reading *Return to Optical waveguide* and *Return to Heated silicon waveguide* (round 20 words). In the round-16 reload stage the box offers both models of design-ab.json as one button, with
+*same as design-ab.json, saved …* under it (until round 30 both cards' offers named the other model,
+*· also in this project: … (restored separately)*).
 Since round 19 (pre-registered) a further profile opens `heater-study.json`, runs the optical model
 again and restores it after a reload: the header reads *Heater study · recovered from this browser
 · not saved to a file · …* (since session version 12 the record keeps the project's name; round 19
@@ -765,8 +769,9 @@ Runs 21 to 4, 2 and 1; the pins run from Run 2 and 4 to 20, and Run 22 drops Run
 Since round 20 (pre-registered) the project script opens `heater-study.json` in a new profile,
 shows both models, saves `r20-both.json` a minute after the heated record was written, and reloads:
 the box leads with *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon
-waveguide (1 run) · same as file r20-both.json · saved …*, and the heated record names the same time
-on its card (the file's save time; in round 20 also in the box); one click restores both, with *Restored Optical
+waveguide (1 run)*, with *Kept in this browser … · same as r20-both.json, saved … · Open file… gives
+the same runs* under it (until round 30 the label held the file and the time, and the heated card named
+the same time); one click restores both, with *Restored Optical
 waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. …*, the
 header *Heater study · r20-both.json · saved …* and the optical model's Results, and the Library
 then offers no restore and reads *Return to Optical waveguide (2 runs)* and *Return to Heated silicon
@@ -774,8 +779,8 @@ waveguide (1 run)*; no horizontal overflow at 1440 × 900 or 390 × 844. The ser
 answers that restore after 2 s (DevTools Fetch interception, as on a slower machine), and an edit
 after it (Modes to find 3) is written, *Browser recovery updated …*, with no *changed in another
 tab* in the header or footer, and comes back after a reload. Since round 21 (pre-registered)
-the box lists no heated entry beside that offer while the heated card still offers its record (with
-the file's save time), and after the restore and that edit the run of Modes to find 4 reads *· closed ·
+the box lists no heated entry beside that offer (since rounds 26–30 neither as a second button nor
+as an earlier copy), and after the restore and that edit the run of Modes to find 4 reads *· closed ·
 4 modes ·* in the run list and in the Compare pickers, whose tags fit the picker at 1440 and 390 px.
 Since [session version 12](packages/simcase/workspace.md#optical-session-files-version-12)
 (stable run numbers, pre-registered K4 and K5) a further profile opens `heater-study.json`, renames
@@ -810,6 +815,27 @@ run's status bar reads *… · has the results of the current model* and its car
 silicon waveguide (2 runs)*.
 Since P3 the workspace and session scripts save sessions through **File › Export › Model with runs
 (session file)…**, as **File › Save** writes the project file.
+Since the Library recovery change after rounds 26–30, the workspace, session and project scripts
+read the Library through `tools/studio_browser/library_restore_checks.mjs`. A restore button counts
+only when `checkVisibility()` is true, because the content of a closed `<details>` still has a box
+in Chromium; the Workspace tools footer is left out. In every state the scripts check that there is
+no card restore button (`#resume-optical`, `#resume-heated-waveguide` and their *Start new*), one
+**Open file…**, no *(restored separately)*, and card lines exactly for the models with a kept
+record that is not in the tab. The states are:
+
+- no records: 0 buttons;
+- one record: 1 button with its detail line;
+- both models with records the same as the project file: 1 button, *same as …, saved … · Open
+  file… gives the same runs*;
+- the browser copy changed since the file: 1 button, *newer than …*, with the earlier copies
+  closed;
+- the tab holds runs: 0 buttons.
+
+At 1280 × 800 and 390 × 844 the bottoms of `#resume-newest` and `#resume-newest-detail` must be at
+or above both the visible bottom of the Library pane (`#canvas`) and the viewport's bottom. The
+accessible description of `#resume-newest` (from `Accessibility.getPartialAXTree`) must equal its
+detail line. **Not now** must close the box to its heading, which stays in the first screen, with
+no restore button visible; opening the heading must show the same buttons again.
 
 **Resource observations.** After a green Linux run, the steady and transient
 Studio servers, and Studio with heat region documents, are measured once with
