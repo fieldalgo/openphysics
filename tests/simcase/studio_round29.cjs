@@ -55,11 +55,9 @@ test('L2: the browser copy\'s time is "kept"; a file\'s save time stays "saved"'
   ['Restore Optical waveguide · 5 runs','Older copy · kept in this browser 5:38 AM · last linked to optical-and-heated.json']]);
  // a record that is the same as its file names the file's save time: that is a file save
  assert.equal(A.resumeChoices({runs:2,savedAt:at('46'),file:'x.json',fileCurrent:true,fileSavedAt:'S'},[],w).newest.detail,'Kept in this browser 5:46 AM · same as x.json, saved 9:24 PM · Open file… gives the same runs');
- // the card offers: an older one says kept; the file's own time keeps saved
- const item={runs:1,names:['Run 1'],savedAt:'T',file:'x.json',fileCurrent:false};
- assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:38 AM',{older:true}).label,'Restore from this browser · Heated silicon waveguide · Run 1 · older · kept 5:38 AM · file x.json, changed since');
- assert.equal(A.cardResumeChoice(item,'Heated silicon waveguide',()=>'5:30 AM').label,'Restore from this browser · Heated silicon waveguide · Run 1 · 5:30 AM · file x.json, changed since');
- assert.equal(A.cardResumeChoice({...item,fileCurrent:true,fileSavedAt:'S'},'Optical waveguide',()=>'9:24 PM',{older:true}).label,'Restore from this browser · Optical waveguide · Run 1 · older · same as file x.json, saved 9:24 PM');
+ // after rounds 26–30 the cards have no offers (and no time): a card line says the record is kept
+ assert.equal(A.cardResumeChoice,undefined);
+ assert.equal(A.cardKeptText(1),'Kept in this browser · 1 run · Restore at the top of the page');
 });
 
 test('L3: the n-th Download again of a name says "(n)"; the first says "(1)" as before',async()=>{

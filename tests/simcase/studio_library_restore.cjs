@@ -3,7 +3,7 @@
 // Library recovery after a restart (after rounds 26–30): one box with one button per piece of
 // work, a detail line saying how the browser copy compares with its file, older copies folded
 // under "Earlier copies in this browser (N)", and model cards with a plain line instead of their
-// own restore buttons (the cards in the next slice). Plain text comparison only: no RegExp is built from a dynamic string.
+// own restore buttons. Plain text comparison only: no RegExp is built from a dynamic string.
 const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');
 const STATIC='../../packages/simcase/src/simcase/studio/static/';
@@ -130,6 +130,28 @@ test('5.4: no label or detail says "restored separately", "saved" before a brows
    [{runs:2,model:'Optical waveguide',names:[],savedAt:'2026-11-26T11:00:00Z',file,fileCurrent,...(fileSavedAt?{fileSavedAt}:{}),index:0}],when);
   assert.equal(c.earlier[0].detail,'Older copy · kept in this browser 2026-11-26T11:00:00Z · last linked to heater-study.json');
  }
+ // the Workspace tools list (sessionLine) names the other model without "(restored separately)"
+ assert.equal(A.sessionLine({model:'Optical waveguide',runs:1,names:['Run 1'],file,also:[{model:'Heated silicon waveguide',names:['Run 1'],runs:1,inTab:false}]}),
+  'Optical waveguide · 1 run · Run 1 · file heater-study.json · also in this project: Heated silicon waveguide · Run 1');
+ assert.ok(A.alsoWords({also:[{model:'Heated silicon waveguide',names:['Run 1'],runs:1,inTab:true}]}).endsWith(' (already in this tab)'));
+ // the words are gone from the module and the app
+ for(const name of ['workspace-applications.mjs','workspace-app.mjs'])assert.ok(!read(name).includes('restored separately'),name);
+});
+
+test('5.5: a model card with a kept record says where to restore it, without a button',async()=>{
+ const A=await import(STATIC+'workspace-applications.mjs');
+ assert.equal(A.cardKeptText(4),'Kept in this browser · 4 runs · Restore at the top of the page');
+ assert.equal(A.cardKeptText(1),'Kept in this browser · 1 run · Restore at the top of the page');
+ // the card buttons are gone with their functions
+ assert.equal(A.cardResumeChoice,undefined);assert.equal(A.opticalResumeChoice,undefined);
+ const lib=read('workspace-applications.mjs'),css=read('workspace.css');
+ for(const word of ['card-resume',"'resume-'+key","'-start-new'",'CARD_START_NEW_TEXT'])assert.ok(!lib.includes(word),word);
+ assert.ok(!css.includes('.card-resume'));
+ // the newest button has a style of its own, and the box keeps its heading and Not now
+ assert.ok(css.includes('.resume-actions .primary'));
+ assert.equal(A.RESUME_NOT_NOW_TEXT,'Not now (choose a model below)');
+ assert.equal(A.RESUME_NOTE,'Restore brings back completed runs kept in this browser, without recomputing. Open file… at the top opens a project file instead.');
+ assert.equal(A.earlierCopiesText(2),'Earlier copies in this browser (2)');
 });
 
 // A small DOM, enough for renderApplications: elements with children, attributes and text.
@@ -153,7 +175,7 @@ function fakeDocument(){
  doc.root=new El('div');doc.root.ownerDocument=doc;return doc;
 }
 
-test('the Library page: one box (a disclosure), the detail line, earlier copies closed',async()=>{
+test('the Library page: one box (a disclosure), the detail line, earlier copies closed, card lines',async()=>{
  const A=await import(STATIC+'workspace-applications.mjs');
  const doc=fakeDocument(),host=doc.root;
  const latest={runs:4,model:'Optical waveguide',names:['Run 1','Run 2','Run 3','Run 4'],savedAt:'2026-11-26T11:40:00Z',file,fileCurrent:false,fileSavedAt:'2026-11-26T11:12:00Z'};
@@ -181,6 +203,12 @@ test('the Library page: one box (a disclosure), the detail line, earlier copies 
   // Not now closes the box (A1), it does not remove it
   const notNow=host.querySelector('#resume-start-new');assert.equal(notNow.textContent,'Not now (choose a model below)');
   notNow.onclick();assert.deepEqual(calls,['not now']);
+  // the card line: non-interactive, inside the card; no card restore buttons
+  const card=host.querySelectorAll('[data-template]').find(b=>b.dataset.template==='optical');
+  assert.equal(card.querySelector('.card-kept').textContent,'Kept in this browser · 4 runs · Restore at the top of the page');
+  assert.equal(card.querySelector('.card-kept').tagName,'SPAN');
+  for(const id of ['resume-optical','resume-heated-waveguide','optical-start-new','heated-waveguide-start-new'])assert.equal(host.querySelector('#'+id),null,id);
+  assert.equal(host.querySelectorAll('.card-kept').length,1);
   // collapsed: the box renders closed, with the same buttons inside
   A.renderApplications(host,{...resume,collapsed:true},{},{kept:{optical:4}});
   assert.equal(host.querySelector('#resume-box').open,false);assert.ok(host.querySelector('#resume-newest'));
@@ -196,14 +224,16 @@ test('the Library page: one box (a disclosure), the detail line, earlier copies 
   assert.equal(other.getAttribute('aria-describedby'),'resume-other-detail');
   assert.ok(host.querySelector('#resume-other-detail').textContent.startsWith('Older · kept in this browser '));
   other.onclick();assert.equal(calls.at(-1),'earlier 1');
+  assert.equal(host.querySelectorAll('.card-kept').length,2);
   // no earlier copies: no disclosure
   A.renderApplications(host,{...resume,earlier:[]},{},{});
   assert.equal(host.querySelector('#earlier-copies'),null);
  }finally{globalThis.document=prev;}
 });
 
-test('the app passes the tab models and the pair record\'s file match; Not now collapses',()=>{
+test('the app passes the card lines, the tab models and the pair record\'s file match; Not now collapses',()=>{
  const app=read('workspace-app.mjs');
+ assert.ok(!app.includes('cardResumeChoice')&&!app.includes('cardResumeOffers'));
  assert.ok(app.includes('fileCurrent:o.record.fileCurrent'));
  assert.ok(app.includes('resumeCollapsed=true'));
  assert.ok(!app.includes('resumeDismissed'));

@@ -207,11 +207,8 @@ main.choosing .workspace>.note{display:none}
 #earlier-copies>summary{cursor:pointer;color:var(--accent);font-size:12px}
 #earlier-copies[open]>summary{margin-bottom:6px}
 #earlier-copies .resume-piece{margin:0 0 8px 14px}
-/* The Optical waveguide card with its resume offer under it (Resume, then Start new). */
-.card-slot{display:flex;flex-direction:column;gap:8px;min-width:0}
-.card-slot>button[data-template]{flex:1}
-.card-resume{display:flex;flex-wrap:wrap;gap:6px}
-.card-resume button{font-size:12px;text-align:left;max-width:100%;overflow-wrap:anywhere}
+/* A card whose model has a kept record not in the tab: where to restore it (not a control) */
+.card-kept{display:block;margin-top:6px;font-size:11px;font-weight:600;color:#2f5f8f}
 .bottom{flex:none;background:#fff;border-top:1px solid #b9c6d7}
 .dock-title{display:flex;align-items:center;gap:20px;height:26px;padding:0 16px;background:#edf1f6;border-bottom:1px solid #d9e0e9;font-size:11px}
 .dock-title strong{font-weight:600}
