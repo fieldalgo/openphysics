@@ -36,6 +36,68 @@ def _points(points) -> np.ndarray:
     return p
 
 
+#: graded size field (``h`` as a function): the background octree splits a cell while its
+#: edge exceeds SIZE_CELL times the smallest size sampled on it (8 corners and centre), so
+#: that a change of the size function wider than the tetrahedra there is sampled. Our own
+#: choice, not calibrated on a case: on V14's graded cube at s = 0.137 (860,058
+#: tetrahedra), 0.5 (cells of half the size) needed more than 1,000,000 cells, and 1 needs
+#: 770,185 (2026-11-26, plan 5).
+SIZE_CELL = 1.0
+#: at most this many octree cells (72 bytes each: 288 MB), and this many levels below the cube
+SIZE_MAX_CELLS = 4_000_000
+SIZE_MAX_DEPTH = 24
+
+
+def _size_field(fn, p: np.ndarray):
+    """Samples a size function on a background octree over the cube holding the points.
+
+    Returns (cube (x, y, z, edge), child index per cell (int64, -1 for a leaf; the 8
+    children of a cell are consecutive and after it), 8 corner sizes per cell (index
+    ix + 2 iy + 4 iz)) and the largest size sampled. ``fn`` takes an (n, 3) float64 array
+    and returns n finite sizes > 0; it is called once per octree level.
+    """
+    lo = p.min(axis=0)
+    edge = float(np.max(p.max(axis=0) - lo))
+    if not (math.isfinite(edge) and edge > 0):
+        raise ValueError("h as a function needs points spanning a box of positive size")
+    offs = np.array([[i & 1, i >> 1 & 1, i >> 2 & 1] for i in range(8)], dtype=np.float64)
+    child, corner = [], []
+    level = lo[None, :].copy()
+    length = edge
+    total = 1
+    for depth in range(SIZE_MAX_DEPTH + 1):
+        m = len(level)
+        q = np.concatenate([(level[:, None, :] + length * offs[None, :, :]).reshape(-1, 3),
+                            level + 0.5 * length])
+        try:
+            v = np.asarray(fn(q), dtype=np.float64)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"h as a function: calling it on an (n, 3) array failed: {e}") from None
+        if v.shape != (len(q),):
+            raise ValueError(f"h as a function must return one size per point, shape ({len(q)},), got {v.shape}")
+        if not (np.isfinite(v).all() and (v > 0).all()):
+            raise ValueError("h as a function must return finite sizes > 0")
+        corners, centre = v[:8 * m].reshape(m, 8), v[8 * m:]
+        split = (length > SIZE_CELL * np.minimum(corners.min(axis=1), centre)) & (depth < SIZE_MAX_DEPTH)
+        ns = int(split.sum())
+        kids = np.full(m, -1, dtype=np.int64)
+        kids[split] = total + 8 * np.arange(ns, dtype=np.int64)
+        child.append(kids)
+        corner.append(corners)
+        total += 8 * ns
+        if total > SIZE_MAX_CELLS:
+            raise ValueError(f"h as a function needs more than {SIZE_MAX_CELLS} octree cells "
+                             f"(smallest size {float(v.min())!r} in a cube of edge {edge!r})")
+        if not ns:
+            break
+        half = 0.5 * length
+        level = (level[split][:, None, :] + half * offs[None, :, :]).reshape(-1, 3)
+        length = half
+    child = np.ascontiguousarray(np.concatenate(child), dtype="<i8")
+    corner = np.ascontiguousarray(np.concatenate(corner), dtype="<f8")
+    return ([float(x) for x in lo] + [edge], child.tobytes(), corner.tobytes()), float(corner.max())
+
+
 def predicate_signs(kind: str, coords, ids=None, axis: int = 2) -> np.ndarray:
     """Exact signs of one predicate over a batch.
 
@@ -211,7 +273,10 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     Refinement (constrained Delaunay refinement, before rounding) runs when ``h`` (a
     size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split; one number, or
     with ``region_points`` a mapping from region name to size, which every named region
-    must have; holes are not refined) or
+    must have; holes are not refined; or a graded size, a function from an (n, 3) float64
+    array of points to n sizes > 0, sampled once on a background octree, see
+    ``SIZE_CELL``, and read at each tetrahedron's and subfacet's circumcentre and each
+    subsegment's midpoint) or
     ``ratio`` (a bound B on the radius-edge ratio, circumradius over shortest edge) is
     given. It splits encroached subsegments and subfacets and bad tetrahedra at their
     circumcentres until none is left. Near input angles below 60 degrees (segments or
@@ -240,7 +305,10 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
         return isinstance(value, (int, float, np.integer, np.floating)) and not isinstance(value, bool)
 
     region_h = None
-    if isinstance(h, Mapping):
+    size_fn = None
+    if callable(h):
+        size_fn, h = h, None
+    elif isinstance(h, Mapping):
         if region_points is None:
             raise ValueError("h as a mapping of region names needs region_points")
         region_h = dict(h)
@@ -293,12 +361,16 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
                 raise ValueError(f"locked_facets holds facet indices in [0, {len(facets)}), got {fi!r}")
             locked.append(int(fi))
         locked = sorted(set(locked))
+    size_field = None
+    if size_fn is not None:
+        size_field, h = _size_field(size_fn, p)
     f = [[np.ascontiguousarray(lp, dtype="<i8").tobytes() for lp in facet] for facet in facets]
     seeds = ((np.ascontiguousarray(seed_xyz, dtype="<f8").tobytes(),
               np.ascontiguousarray(seed_label, dtype="<i8").tobytes()) if seed_xyz else (None, None))
     try:
         out, stats = kernel.mesh_plc(p.tobytes(), s.tobytes(), f, domain, max_depth, *seeds, float(h or 0.0),
-                                     float(ratio or 0.0), float(alpha), int(max_points), label_h, locked)
+                                     float(ratio or 0.0), float(alpha), int(max_points), label_h, locked,
+                                     size_field)
     except ValueError as e:
         if len(e.args) == 4:  # the kernel's PLC check, as in check_plc
             msg, wtype, wkind, wids = e.args

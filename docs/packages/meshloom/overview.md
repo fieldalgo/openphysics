@@ -8,14 +8,13 @@
 tetrahedral mesher for multi-material piecewise-linear inputs: constrained Delaunay
 tetrahedralization with exact predicates, boundary recovery, quality refinement and
 (later) mesh improvement, in a compiled Rust kernel. `meshloom.generate3d` meshes a
-piecewise-linear complex to a size `h` (one number, or one per named region) with a
-radius-edge bound: `quality="practical"` (the default, `PRACTICAL_RATIO` = 1.4) or
+piecewise-linear complex to a size `h` (one number, one per named region, or a function
+of position) with a radius-edge bound: `quality="practical"` (the default, `PRACTICAL_RATIO` = 1.4) or
 `quality="guaranteed"` (`GUARANTEED_RATIO` = 2, the bound V7 grades), then improves
 the mesh (sliver removal, smoothing and flips). `meshloom.builder` adds curved
 primitives (spheres, cylinder vias), sampled on their surfaces. The quality gates
-measured so far pass, V10 on all 15 of its pairs included, but meshloom has no graded
-sizes and no refinement on curved surfaces yet, and it is slower than the baseline (see
-Limits).
+measured so far pass, V10 on all 15 of its pairs included, but meshloom has no
+refinement on curved surfaces yet, and it is slower than the baseline (see Limits).
 
 ```python
 import numpy as np
@@ -28,6 +27,28 @@ facets = [[[0, 3, 2, 1]], [[4, 5, 6, 7]], [[0, 1, 5, 4]],
 mesh = meshloom.generate3d(points, facets, h=0.1)
 mesh["nodes"], mesh["tetrahedra"], mesh["boundary_faces"]   # the output contract
 ```
+
+A graded size is a function from an (n, 3) float64 array of points to n sizes > 0:
+
+```python
+centre = np.array([0.5, 0.5, 0.5])
+h = lambda x: np.minimum(0.2, 0.02 + 0.3 * np.linalg.norm(x - centre, axis=1))
+mesh = meshloom.generate3d(points, facets, h=h)   # V8's graded cube
+```
+
+- **Sampled once.** Before refinement, the function is sampled on a background octree
+  over the cube that holds the input points. A cell is split while its edge exceeds
+  the smallest size sampled at its corners and centre (`meshloom._core.SIZE_CELL` = 1),
+  up to 4,000,000 cells (`SIZE_MAX_CELLS`, 72 bytes each). Refinement then reads the
+  octree, by trilinear interpolation, and never calls Python.
+- **Where it is read.** At each tetrahedron's and subfacet's circumcentre and each
+  subsegment's midpoint: a tetrahedron is split when its circumradius exceeds
+  `alpha` times the size there. Points outside the cube read its nearest face.
+- **What it misses.** A change of the size function narrower than the cells that
+  sample it, and so narrower than the sizes there, can be missed.
+- **Errors.** A function that returns the wrong shape or a size that is not finite and
+  > 0, or that needs more cells than the cap, raises `ValueError`. A constant function
+  meshes exactly as the number does; a number or a mapping meshes exactly as before.
 
 Curved inputs come from `meshloom.builder`. Each builder returns the keyword arguments
 of `generate3d`: `sphere(h)` (C1), `nested_spheres(h, radii=..., names=...)` (C11; a None
@@ -313,6 +334,19 @@ See [third-party software](../../third-party.md).
   - V9 on C1: smallest angle 25.2 / 21.1 / 19.0°, smallest q ≥ 0.43, mean q above the
     floor.
   - V8 on C1, C2 and C3 with the die at h/2 (every region).
+  - V8 graded on C2 (2026-11-26): 97.1% of the edges have r_e / 1.281 in [0.5, 1.5]
+    (the gate is 90%).
+  - V26 on C1–C9 at h = 0.1 (2026-11-26): the same SHA-256 per case over 3 fresh
+    processes and 2 runs in one process, on Python 3.12.13 and 3.15.0b4 with the same
+    wheel. CI runs it without C3, whose mesh has about 1.27 million tetrahedra (513 s
+    and 2.1 GiB on one core).
+  - V27 on C1 at three sizes and C3 at two: scaled by 2⁻²⁰ and 2¹⁰, the mesh is the
+    same and its nodes are the scaled nodes, bit for bit.
+  - V28 on C2, C3 and C5 at two sizes each, from micrometres to 1e6 m: V1–V5 hold,
+    and the volume fractions and tetrahedron counts are within the gates.
+  - V14's graded 1M-tetrahedron cube (benchmark, recorded): **fails** both bounds. V8's
+    graded size times 0.130 gives 1,005,634 tetrahedra in a median of 255 s (5 fresh
+    processes, one thread) at 2.12 GiB peak RSS, against ≤ 60 s and ≤ 1 GiB.
   - V6: sphere volume slope 1.87, e(0.05) = 1.15e-3.
   - V5 on C1, C4, C5 and C11 (at most 2.5e-16).
   - V21 at the plan's CI sizes on C2 (L2 slope 2.08, H1 1.05) and on C1 (L2 2.06).
@@ -331,7 +365,8 @@ See [third-party software](../../third-party.md).
   `ALPHA` (1.0) and the boundary's subfacet size (0.68 `alpha·h`) were chosen on V8's C2
   and C3 rows, so V8 does not check them independently. The curved surface edge
   (`SURFACE_EDGE` = 1) was set before V8 on C1 was measured.
-- No graded or callable sizes (one size per region only). Curved surfaces are limited
+- A graded size is one function for the whole domain; it cannot be combined with a
+  mapping from region name to size. Curved surfaces are limited
   to the builder's primitives, sampled once, uniformly, at h, with no refinement on
   them: a small curved feature needs a small h everywhere.
   Meshing is slow: the unit cube at h = 0.03 (190,000 tetrahedra) takes about 2 minutes

@@ -19,6 +19,7 @@ mod plc;
 mod predicates;
 mod recovery;
 mod refine;
+mod size;
 
 use predicates::{two_product, P3};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -397,18 +398,35 @@ fn recover_boundary<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments
 /// `seed_labels` (k int64; < 0 for a hole) are region seeds, regions mode only.
 #[pyfunction]
 #[pyo3(signature = (coords, segments, facets, domain, max_depth, seed_coords=None, seed_labels=None, h=0.0, ratio=0.0,
-                    alpha=1.0, max_points=0, label_h=None, locked=None))]
+                    alpha=1.0, max_points=0, label_h=None, locked=None, size_field=None))]
 #[allow(clippy::too_many_arguments)]
 fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound<'py, PyBytes>,
                  facets: Vec<Vec<Bound<'py, PyBytes>>>, domain: &str, max_depth: u32,
                  seed_coords: Option<&Bound<'py, PyBytes>>, seed_labels: Option<&Bound<'py, PyBytes>>, h: f64,
-                 ratio: f64, alpha: f64, max_points: usize, label_h: Option<Vec<f64>>, locked: Option<Vec<u32>>)
+                 ratio: f64, alpha: f64, max_points: usize, label_h: Option<Vec<f64>>, locked: Option<Vec<u32>>,
+                 size_field: Option<(Vec<f64>, Bound<'py, PyBytes>, Bound<'py, PyBytes>)>)
     -> PyResult<(Vec<Bound<'py, PyBytes>>, Bound<'py, PyDict>)> {
     check_environment()?;
     let domain = match domain {
         "regions" => mesh::Domain::Regions,
         "parity" => mesh::Domain::Parity,
         _ => return Err(PyValueError::new_err("domain must be 'regions' or 'parity'")),
+    };
+    // a graded size field: the octree's cube (x, y, z, edge), child index per node (int64,
+    // -1 for a leaf) and 8 corner sizes per node (float64), sampled by meshloom._core
+    let size = match size_field {
+        None => None,
+        Some((cube, child, corner)) => {
+            let cube: [f64; 4] = cube.try_into().map_err(|_| PyValueError::new_err("size field cube: 4 numbers"))?;
+            let (cb, kb) = (child.as_bytes(), corner.as_bytes());
+            if cb.len() % 8 != 0 || kb.len() % 64 != 0 {
+                return Err(PyValueError::new_err("size field: int64 children and 8 float64 sizes per node"));
+            }
+            let child: Vec<i64> = cb.chunks_exact(8).map(|c| i64::from_le_bytes(c.try_into().unwrap())).collect();
+            let corner: Vec<[f64; 8]> = kb.chunks_exact(64)
+                .map(|c| std::array::from_fn(|i| f64::from_le_bytes(c[8 * i..8 * i + 8].try_into().unwrap()))).collect();
+            Some(size::SizeField::new(cube, child, corner).map_err(PyValueError::new_err)?)
+        }
     };
     let points = points(coords.as_bytes())?;
     let seg = u32s(segments.as_bytes(), "segment index")?;
@@ -460,10 +478,10 @@ fn mesh_plc<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, segments: &Bound
         }
         let ls = locked::relocate(&plc.points, &mut b, &locked).map_err(|e| ("RecoveryFail", e, vec![]))?;
         let mut rs = refine::RefineStats::default();
-        if h > 0.0 || ratio > 0.0 {
+        if h > 0.0 || ratio > 0.0 || size.is_some() {
             let opt = refine::RefineOptions { h, alpha, ratio, max_points };  // 0: refine() derives the cap from the size field
             let lh = label_h.unwrap_or_default();
-            rs = refine::refine(&plc, &mut b, opt, &seeds, &lh, &locked).map_err(|e| match e.strip_prefix("seed: ") {
+            rs = refine::refine(&plc, &mut b, opt, &seeds, &lh, &locked, size.as_ref()).map_err(|e| match e.strip_prefix("seed: ") {
                 Some(m) => ("RegionSeed", m.to_string(), vec![]),
                 None => ("RefineFail", e, vec![]),
             })?;
