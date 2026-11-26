@@ -1580,8 +1580,12 @@ C2부터 페이지가 [닫힌 창 탐색](#닫힌-창-탐색-문서optical-shape
   touch the window edge.*, 열린 변에 닿는 형상에 주로 있는 모드는 *Mode 2 is mostly in Substrate (93 % of |E|² in the window,
   PML excluded), which continues into the PML at the open window edge.*, 열린 실행의 닫힌 변이면 *…, which touches the closed
   bottom edge; its n_eff depends on that closed edge. Open it in Geometry › Boundaries to leave it open.*(둘 이상이면 *… bottom
-  and left edges; … those closed edges. Open them …*)입니다. 안내는 |E|²가 놓인 곳만 말하고 모드가 갇혔는지 새는지는 말하지
-  않습니다. 그것은 손실 열이 말합니다. Compare의 가장자리 안내 줄과 짝 없음 이유는 닫힌 창에만 씁니다.
+  and left edges; … those closed edges. Open them …*)입니다. 이 말은 |E|²가 놓인 곳만 말합니다. 모드가 샐 수 있는지는
+  그 뒤에 이어지는 [도파/누설](#열린-경계-모드의-도파누설) 문구가 말합니다. Compare의 가장자리 안내 줄과 짝 없음 이유는
+  닫힌 창에만 씁니다.
+- **도파 또는 누설(열린 경계 모드 안내).** 열린 실행의 모드마다 문장이 하나 더 붙습니다. 영역 안내가 있으면 같은
+  안내 안에서 그 뒤에, 없으면 따로 된 안내 행으로 붙습니다. [열린 경계 모드의 도파/누설](#열린-경계-모드의-도파누설)을
+  보세요.
 - slice P3: 새 열린 실행은 엔진의 `te_polarization_fraction`과 `effective_area`(물리 창)도 보존합니다.
   군굴절률을 켜면 `group_index`를 `{"re", "im"}`로, `group_index_method`와 함께 보존합니다. 닫힌 실행의
   `group_index`는 목록 그대로입니다. slice P2가 쓴 실행에는 이 키들이 없습니다. Studio는 그 실행의 TE
@@ -1623,6 +1627,94 @@ OB 단계):
     작습니다;
 - 같은 사례에서 Search near n_eff 1.600, 모드 4개는 등록한 대로 클래딩 굴절률 근처 모드 *1.48642654 +
   7.92e-3i* / *2789 dB/cm*를 찾습니다.
+
+### 열린 경계 모드의 도파/누설
+
+열린 경계 실행의 모드마다, 실행이 이미 저장한 데이터(Re n_eff, 입력 도형, 열린 가장자리, 파장)로 그 모드가 샐 수
+있는지 말하는 문장이 붙습니다. 장은 쓰지 않으므로 장을 압축했거나 뺀 실행도 똑같이 분류합니다. 세션, 프로젝트,
+실행 기록은 바뀌지 않으며, 닫힌 실행에는 이런 문구가 없습니다(화면도 그대로입니다).
+
+**규칙.** 열린 가장자리 너머에서는 구조가 가장자리의 법선 방향으로 바뀌지 않습니다. 그 가장자리를 따라 놓인
+도형이 PML을 지나 이어지므로, 층은 가장자리의 재료 단면을 반무한으로 품습니다. 모드는 Re n_eff가 그 단면의 가장
+높은 횡방향 차단 굴절률보다 낮을 때, 오직 그때 가장자리로 전력을 내보낼 수 있습니다. Studio는 단면을 풀지 않고,
+실행 파장의 재료 굴절률(1400–1700 nm, 10 nm 간격의 고정된 physmat 표, 선형 보간, 모든 나노미터에서 physmat과
+1e-4 이내)로 도형에서 두 경계를 읽습니다.
+
+- n_hi(e): 가장자리 위의 가장 큰 굴절률(밀어 낸 단면, 도형이 덮지 않은 곳은 실리카, 그리고 층을 지나 이어지지
+  않으면서 가장자리에 닿는 도형: 원의 현, 다각형의 꼭짓점). 차단 굴절률은 n_hi(e) 이하입니다.
+- n_lo(e): 가장자리 너머의 반공간(가장자리 전체를 따라 한 재료)이나 사분공간(다른 쪽 가장자리도 열린 끝의 PML
+  모서리: 거기서 두 가장자리를 따라 놓인 다각형, 없으면 실리카)을 채우는 재료의 가장 큰 굴절률. 차단 굴절률은
+  n_lo(e) 이상이며, 둘 다 없으면 n_lo(e)는 −∞입니다.
+
+x = Re n_eff, δ = 0.02로, 열린 가장자리들에 대해:
+
+| 분류 | 조건 | 문구 |
+|---|---|---|
+| R로 누설 | 어떤 n_lo(e) > x + δ(그런 영역 R 모두, 굴절률이 높은 것부터) | *Mode 2 is a leaky mode: Re n_eff 1.773 is below the index of Substrate (3.478), which reaches the open window edge, so light can leak into Substrate. The loss shown is that leakage; it is part of this structure, not a fault of the solve.* |
+| 도파 | 모든 n_hi(e) < x − δ | *Mode 1 is guided: Re n_eff 2.443 is above the index of every material at the open window edges (the highest is the silica background, 1.444), so it cannot leak. The loss shown is numerical (mesh and PML), not leakage.* |
+| 판단 없음(층) | 둘 다 아니고, x + δ보다 높은 재료가 닫힌 모서리 사이의 층으로만 열린 가장자리에 닿음 | *Mode 1: Re n_eff 2.441 is below the index of Substrate (3.478), which reaches the open left and right edges only as a layer. Whether light can leak into it depends on that layer's own modes, which Studio does not compute; Studio does not say whether this mode is guided or leaky.* |
+| 판단 없음(가까움) | 그 밖: x가 가장자리 굴절률과 δ 이내 | *Mode 3: Re n_eff 1.460 is within 0.02 of the index of the silica background (1.444) at the open window edge, closer than this solve resolves; Studio does not say whether it is guided or leaky.* |
+
+|x − n| ≤ δ는 언제나 판단 없음 쪽입니다. Re n_eff와 굴절률은 소수 셋째 자리까지 보이고, 판단은 반올림하지 않은 값으로
+합니다. δ는 측정한 Re n_eff 메시 오차의 최댓값(가장 거친 코어 메시 60 nm에서 1.3e-2 낮음; 거친 메시는 낮게
+읽음)의 1.5배입니다. Studio의 재료 10종은 1400–1700 nm에서 손실이 없으므로, 도파 모드의 정확한 Im n_eff는 0이고
+누설 모드의 손실은 누설입니다.
+
+**자리.** 모드에 [영역 안내](#광학-작업-공간의-열린-경계)(코어 모드, 또는 창 가장자리에 닿는 형상에 주로 있는 모드)가
+있으면 문장은 같은 안내 안에서 그 뒤에 이어지고, 첫머리를 바꿔 씁니다: *Mode 1 is the core mode: 64 % of |E|² in
+the window (PML excluded) is in Core, which does not touch the window edge. It is a leaky mode: Re n_eff 2.441 is below
+…*(*It is guided: …*, *Re n_eff … is within …*). 그렇지 않으면 그 모드 아래의 따로 된 안내 행입니다. 손실 열, PML
+점검 열, 찾음 줄, Compare, 영역 안내의 말은 그대로입니다. *Depends on the PML* 옆의 *leaky*는 서로 맞습니다(통로는
+있고, 손실 값은 수렴하지 않았음).
+
+**검사.** 문구는 엔진의 [이득 경계](pml_modes.md#이득-경계) b = max(1e-10, 1e-2 f_pml) max(1, |Re n_eff|)로 손실과
+맞춰 봅니다. f_pml은 그 모드 후보의 저장된 `pml_l2_fraction`입니다. Im n_eff > b인 도파 모드에는 문구가 없습니다(분류와
+손실이 어긋나며, 틀린 말보다 말하지 않는 편이 낫습니다). Im n_eff ≤ b인 누설 모드는 첫 문장만 두고 *This solve
+resolves no leakage loss.*로 끝납니다.
+
+**말하지 않는 것.** *Guided*는 보이는 손실이 작다는 뜻이 아닙니다. 장이 PML에 닿는 차단 근처 도파 모드는 PML 잡음을
+보일 수 있습니다(위 가장자리만 연 기판 위 스트립에서 0.80 dB/cm 측정, PML 점검에서 −0.65 dB/cm). *Leaky*는 손실이
+수렴했다는 뜻(그것은 메시 세분화와 PML 점검이 말함)도, 결합이 강하다는 뜻도 아닙니다. 통로가 있어도 전력을 조금만,
+대칭으로 보호된 속박 상태라면 전혀 나르지 않을 수 있습니다. 둘 다 |E|²가 놓인 곳은 말하지 않습니다. 복사 모드나
+PML 모드 분류는 없습니다. 물리 비율 필터(0.5)가 PML이 대부분인 후보를 이미 걸러 내고, 저장된 비율로는 PML 모드와
+물리 극을 가를 수 없습니다. PML 의존성은 PML 점검이 확인합니다.
+
+**한계.**
+
+- 1D 풀이가 아니라 경계입니다. 옆으로만 열린 가장자리에 닿는 층은 모드가 새더라도 판단 없음입니다(아래 가장자리를
+  닫은 기판 위 스트립은 기판 층을 지나 옆으로 2.80 dB/cm 샙니다).
+- 차단 근처: Studio는 Re 1.45보다 큰 모드를 싣고, Re 1.464까지의 모든 모드는 실리카와 δ 이내이므로 가장자리가 모두
+  실리카인 실행에서는 *판단 없음(가까움)*입니다.
+- δ는 측정한 메시 오차를 1.5배로 덮습니다. 측정이지 증명은 아닙니다.
+- 경계는 두 편광에 같은 최대 굴절률을 쓰므로 TE만 또는 TM만의 통로 문턱을 가르지 않습니다(둘 다 n_hi 아래이므로
+  *guided*는 그대로 성립).
+- 사파이어, 니오브산리튬, 플루오린화마그네슘은 정상 굴절률의 등방성으로 풀고 규칙도 같은 굴절률을 씁니다. 풀이와는
+  맞지만 실제 결정과는 맞지 않습니다.
+- 닿기만 하는 원이나 꼭짓점은 층을 지나 이어지지 않는데도 n_hi에 들어가므로 *guided*를 *판단 없음*으로 바꿀 수만
+  있습니다.
+- 흡수하는 재료에는 다른 말과 검사의 흡수 추정이 필요합니다. 10종 중 이 대역에서 흡수하는 것은 없습니다.
+
+**검증.** 구현 전에 설계 초안(main 2318e5f)에 미리 등록했고, 이 브랜치에서 Linux로 측정했습니다.
+
+| 관문 | 사례 | 결과 |
+|---|---|---|
+| G1 | T16: 기판 위 스트립, 모든 가장자리 열림, 기본 목표(2.46과 1.95), 모드 4개 | 2.44126325 + 8.28e-5i, 1.77279036 + 2.86e-3i, 1.48642654 + 7.92e-3i: Substrate로 누설, 각 Im n_eff가 b(4.8e-6, 4.8e-5, 3.2e-4)보다 큼; 세 문구가 등록한 그대로, 모드 1은 코어 안내(64 %) 뒤: 통과 |
+| G2 | 템플릿, 모든 가장자리 열림, 모드 2개; 1.600 근처 모드 4개 | 2.44290906, 1.76999578, 1.49230387 도파, 각각 b 이내: 통과 |
+| G3 | 누설 슬랩, 왼쪽과 오른쪽 닫힘, 2.85 근처 | 2.84472916, 2.83267892 Substrate로 누설, b보다 큼: 통과 |
+| G4 | 기판 위 스트립, 위 가장자리만 열림, 2.441, 1.773, 1.49 근처 단일 검색 | 2.44081333, 1.77075412, 1.48502123 도파, b 이내(마지막: Im 2.3e-6, b 1.2e-4): 통과 |
+| G5 | 기판 위 스트립, 아래 가장자리 닫힘, 2.441과 1.773 근처 | 2.44110903, 1.77061893 판단 없음(층, 왼쪽과 오른쪽), 등록한 문구: 통과. 둘 다 샘(7.96e-6, 1.49e-4, b보다 큼). 경계로는 확인할 수 없음 |
+| G6 | G1과 G2를 코어 메시 20, 60 nm로 | 같은 분류; 블라인드: 60 nm에서 T16 모드 3, 1.48211701 + 8.22e-3i, Substrate로 누설: 통과 |
+| G7(블라인드) | G1을 1400, 1700 nm로 | 2.60967516, 1.99870109(1400 nm), 2.27114152, 1.62593635(1700 nm) Substrate로 누설: 통과 |
+| G8 | G1–G5의 모든 모드 | 도파는 b 이내, 누설은 b보다 큼: 통과 |
+| G9 | 세션 fixture의 모든 닫힌 실행(기록 98개) | 분류 문구 없음; 안내, 맵, 실행 기록 그대로: 통과 |
+| G10 | 단위 사례(풀이 없음) | 통과 |
+
+G1–G8은 느린 테스트 `tests/simcase/test_studio_mode_channel_gate.py`(G1–G5, G8)와
+`test_studio_mode_channel_mesh.py`(G6, G7)로, CI에서 나머지 suite와 함께 돕니다. G9와 G10은
+`tests/simcase/studio_mode_channel_page.cjs`와 `studio_mode_channel.cjs`입니다. 작업 공간 브라우저 검사는 누설 사례와
+모드 8개 실행의 T16 안내, 템플릿의 도파 안내를 같은 기계에서 같은 문서를 푼 엔진 실행에 대한 페이지 모듈의 문구와
+비교합니다. Re n_eff는 플랫폼 사이에 약 1e-4 다릅니다. 관문은 같은 기계의 풀이로 분류와 소수 셋째 자리 문구를
+비교합니다.
 
 ### 열린 경계의 모드 식별
 

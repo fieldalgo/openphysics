@@ -1796,6 +1796,8 @@ try {
       return Math.round((Date.now() - started) / 1000);
     };
     // (the mode rows: an open run's region notes, round 25 A4, are rows of their own)
+    // open-mode notes (slice S3): every note cell of the modes table as [mode, region or channel, kind, text]
+    const noteCells = () => ob.eval("[...document.querySelectorAll('#modes-table [data-edge-note],#modes-table [data-core-note],#modes-table [data-channel-note]')].map(td=>[td.dataset.edgeNote??td.dataset.coreNote??td.dataset.channelNote,td.hasAttribute('data-channel-note')?'channel':'region',td.dataset.channelKind??null,td.textContent])");
     const resultsView = () => ob.eval(`(()=>{const t=document.getElementById('modes-table');const rows=[...t.tBodies[0].rows].filter(r=>!r.classList.contains('edge-note-row'));
       return {caption:t.caption.textContent,head:[...t.tHead.rows[0].cells].map(c=>c.textContent),lossTitle:t.tHead.rows[0].cells[3].title,
        neff:rows.map(r=>r.querySelector('[data-neff]').textContent),loss:rows.map(r=>r.querySelector('[data-loss]').textContent),lossTitles:rows.map(r=>r.querySelector('[data-loss]').title),
@@ -1922,6 +1924,14 @@ try {
     const templateSeconds = await obRun(liveCheck);
     await ob.until("document.querySelectorAll('[data-pml-check]').length===2&&!document.getElementById('run-optical').disabled", 'OB PML check', 300000);
     const template = await resultsView(); stage('OB template, all open, PML check', {...template, seconds: templateSeconds});
+    // open-mode notes (slice S3, pre-registered G2 on the page): the template's TE-like mode is guided, a
+    // note row of its own (Core touches no edge, so no region note); Re n_eff to 3 decimals from the screen
+    {
+      const cells = await noteCells(); stage('S3 open-mode notes, template', {cells});
+      const x = Number(template.neff[0].split(' ')[0]).toFixed(3);
+      assert.deepEqual(cells.find(([mode]) => mode === '1'), ['1', 'channel', 'guided', `Mode 1 is guided: Re n_eff ${x} is above the index of every material at the open window edges (the highest is the silica background, 1.444), so it cannot leak. The loss shown is numerical (mesh and PML), not leakage.`]);
+      assert.ok(cells.every(([, where]) => where === 'channel'), JSON.stringify(cells));
+    }
     assert.equal(template.caption, 'Modes (open boundary, PML 1 µm)');
     assert.deepEqual(template.head, ['Mode', 'n_eff', 'Polarization', 'Loss (dB/cm) absorption + leakage into the PML', 'A_eff (µm²)', 'n_g', 'PML check']);
     assert.equal(template.lossTitle, 'Material absorption (k) and leakage into the PML of the open boundary');
@@ -2084,11 +2094,16 @@ try {
     // measured over the window without the PML
     const noteRows = () => ob.eval("[...document.querySelectorAll('#modes-table [data-edge-note],#modes-table [data-core-note]')].map(td=>td.textContent)");
     const leakNotes = await noteRows(); stage('A4 open region notes, leakage case', {notes: leakNotes});
+    const leakCells = await noteCells(); stage('S3 open-mode notes, leakage case', {cells: leakCells});
+    // open-mode notes (slice S3, ruled 2026-11-25): the guided / leaky text follows the region note in
+    // the same note (the A4 rule of no guided or leaky words is superseded for that text); the region
+    // words themselves stay claim-free. The whole cell is checked against the engine run below.
+    const regionPart = t => t.split(' It is ')[0];
     {
       const mode1 = leakNotes.filter(t => t.startsWith('Mode 1 '));
-      const m = mode1.length === 1 ? /^Mode 1 is the core mode: (\d+) % of \|E\|² in the window \(PML excluded\) is in Core, which does not touch the window edge\.$/.exec(mode1[0]) : null;
+      const m = mode1.length === 1 ? /^Mode 1 is the core mode: (\d+) % of \|E\|² in the window \(PML excluded\) is in Core, which does not touch the window edge\. It is a leaky mode: Re n_eff \d\.\d{3} is below the index of Substrate \(3\.478\), which reaches the open window edge, so light can leak into Substrate\. The loss shown is that leakage; it is part of this structure, not a fault of the solve\.$/.exec(mode1[0]) : null;
       assert.ok(m && Number(m[1]) >= 51, JSON.stringify(leakNotes));
-      for (const t of leakNotes) assert.doesNotMatch(t, /\b(?:guided|leaky|bound|radiat\w*)\b/i);
+      for (const t of leakNotes) assert.doesNotMatch(regionPart(t), /\b(?:guided|leaky|bound|radiat\w*)\b/i);
     }
     assert.deepEqual(leak.check.map(([status]) => status), ['independent', 'independent']);
     for (const [, words] of leak.check) { const m = /^PML check: loss changes (\d+(?:\.\d+)?) %$/.exec(words); assert.ok(m && Number(m[1]) < 2, words); }
@@ -2106,7 +2121,7 @@ try {
       's=run(Document.from_dict(json.loads(sys.stdin.read())),False).summary()',
       'ob=s["open_boundary"][0]["candidates"];re=s["effective_index"]["re"][0];im=s["effective_index"]["im"][0]',
       'st=[next((c.get("attenuation_status") for c in ob if c["selected"] and c["effective_index"]["re"]==a and c["effective_index"]["im"]==b),None) for a,b in zip(re,im)]',
-      'print(json.dumps({"re":re,"im":im,"status":st,"static":str(pathlib.Path(simcase.__file__).parent/"studio"/"static")}))'].join('\n')],
+      'print(json.dumps({"re":re,"im":im,"status":st,"record":s["open_boundary"][0],"static":str(pathlib.Path(simcase.__file__).parent/"studio"/"static")}))'].join('\n')],
       {input: p1Leak, encoding: 'utf8', maxBuffer: 1 << 26, env: {...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', MKL_NUM_THREADS: '1'}});
     assert.equal(engineStrings.status, 0, engineStrings.stderr);
     const engine = JSON.parse(engineStrings.stdout);
@@ -2115,6 +2130,24 @@ try {
     stage('OB leakage case, engine on this machine', {...expectedLeak, linuxContainer: {neff: ['2.44126325 + 8.28e-5i', '1.77279036 + 2.86e-3i'], loss: ['29.15 dB/cm', '1006 dB/cm']}});
     assert.deepEqual({neff: leak.neff, loss: leak.loss}, expectedLeak, 'the screen strings are the engine run of the same document on this machine');
     assert.ok(leak.lossTitles.every(t => t.endsWith('At the default mesh this loss is about 3 % above the converged value (TE-like +2.8 %, TM-like +1.8 % on a strip over a substrate).')));
+    // open-mode notes (slice S3, pre-registered G1 on the page): every mode leaky into Substrate, each
+    // note cell exactly the page module's text for the engine run of the same document on this machine
+    // (a region note's own words as the page computed them, the channel text after them)
+    const pageChannel = await import(pathToFileURL(join(engine.static, 'workspace-mode-channel.mjs')).href);
+    const T16_SHAPES = [{name: 'Core', type: 'rect', material: 'Silicon', x: -250, y: 0, w: 500, h: 220}, {name: 'Substrate', type: 'rect', material: 'Silicon', x: -1500, y: -1200, w: 3000, h: 700}];
+    const engineRun = e => { const keep = e.re.map((r, i) => r > 1.45 ? i : -1).filter(i => i >= 0);
+      return {settings: {boundary: 'PML', vacuum_wavelength: '1550 nm', pml: {thickness: '1000 nm', open_edges: ['left', 'right', 'bottom', 'top'], target: '2.460'}},
+        input: {model: {wavelength: 1550, shapes: T16_SHAPES}}, effective_index: keep.map(i => e.re[i]), effective_index_im: keep.map(i => e.im[i]), open_boundary: e.record}; };
+    const channelCells = (cells, e, which) => {
+      const run = engineRun(e), c = pageChannel.modeChannel(run);
+      assert.deepEqual(c.map(m => [m.kind, m.regions.map(r => r.name), m.resolved]), c.map(() => ['leaky', ['Substrate'], true]), which);
+      const expected = pageChannel.channelNotes(run).map(n => { const cell = cells.find(([mode, where]) => mode === String(n.mode + 1) && where === 'region');
+        return cell ? [cell[0], 'region', null, pageChannel.combinedNote(regionPart(cell[3]), n.mode, c[n.mode])] : [String(n.mode + 1), 'channel', n.kind, n.text]; });
+      assert.deepEqual(cells, expected, which);
+      return expected;
+    };
+    stage('S3 open-mode notes, leakage case, engine on this machine', {cells: channelCells(leakCells, engine, 'S3 leakage case')});
+    assert.equal(leakCells[0][1], 'region', 'mode 1 is named the core mode, the channel text after it');
     // round 16 (S8): the multi-shape label in the run list, the Results status line and the Compare
     // headings, with no page overflow at 390 × 844
     {
@@ -2166,9 +2199,18 @@ try {
       const projectFile = await import(pathToFileURL(join(engine.static, 'workspace-project-file.mjs')).href);
       const leakRun = projectFile.readProject(first.text).models.find(m => m.kind === 'workspace').session.runs.at(-1);
       assert.ok(leakRun.settings.boundary === 'PML' && leakRun.input.model.shapes.length === 2 && !!leakRun.field, 'the leakage run with its field');
-      const regionNotes = (await import(pathToFileURL(join(engine.static, 'workspace-modes.mjs')).href)).openRegionNotes(leakRun).map(n => n.text);
+      const fileRegions = (await import(pathToFileURL(join(engine.static, 'workspace-modes.mjs')).href)).openRegionNotes(leakRun), regionNotes = fileRegions.map(n => n.text);
       stage('A4 open region notes from the file', {notes: regionNotes});
-      assert.deepEqual(leakNotes, regionNotes);
+      // open-mode notes (slice S3, ruled 2026-11-26): the region words of each cell are openRegionNotes of
+      // the run as the file holds it; the whole cells are the page module's notes of that run
+      assert.deepEqual(leakNotes.map(regionPart), regionNotes);
+      const edge = new Map(fileRegions.filter(n => n.kind === 'edge').map(n => [n.mode, n.text])), core = new Map(fileRegions.filter(n => n.kind === 'core').map(n => [n.mode, n.text]));
+      const alone = pageChannel.placeChannelNotes(leakRun, edge, core);
+      const fileCells = [...new Set([...edge.keys(), ...core.keys(), ...alone.keys()])].sort((a, b) => a - b).flatMap(m => [
+        ...(edge.has(m) ? [[String(m + 1), 'region', null, edge.get(m)]] : []), ...(core.has(m) ? [[String(m + 1), 'region', null, core.get(m)]] : []),
+        ...(alone.has(m) ? [[String(m + 1), 'channel', alone.get(m).kind, alone.get(m).text]] : [])]);
+      stage('S3 open-mode notes from the file', {cells: fileCells});
+      assert.deepEqual(leakCells, fileCells, 'a run read from the file gets the same notes');
     }
     await obOpen(join(obDownloads, first.name), 'OB V15 open 1');
     const second = await obSave('OB V15 save 2');
@@ -2195,13 +2237,14 @@ try {
     assert.deepEqual({...eightDoc, physics: {em1: {...eightDoc.physics.em1, mode_count: 2}}}, JSON.parse(p1Leak));
     const eightSeconds = await obRun();
     const eight = await resultsView();
+    const eightCells = await noteCells();
     const eightEngine = spawnSync(args.python, ['-c', [
       'import json,sys',
       'from simcase import Document, run',
       's=run(Document.from_dict(json.loads(sys.stdin.read())),False).summary()',
       'ob=s["open_boundary"][0]["candidates"];re=s["effective_index"]["re"][0];im=s["effective_index"]["im"][0]',
       'st=[next((c.get("attenuation_status") for c in ob if c["selected"] and c["effective_index"]["re"]==a and c["effective_index"]["im"]==b),None) for a,b in zip(re,im)]',
-      'print(json.dumps({"re":re,"im":im,"status":st}))'].join('\n')],
+      'print(json.dumps({"re":re,"im":im,"status":st,"record":s["open_boundary"][0]}))'].join('\n')],
       {input: JSON.stringify(eightDoc), encoding: 'utf8', maxBuffer: 1 << 26, env: {...process.env, OPENBLAS_NUM_THREADS: '1', OMP_NUM_THREADS: '1', MKL_NUM_THREADS: '1'}});
     assert.equal(eightEngine.status, 0, eightEngine.stderr);
     const e8 = JSON.parse(eightEngine.stdout), keep8 = e8.re.map((r, i) => r > 1.45 ? i : -1).filter(i => i >= 0);
@@ -2209,6 +2252,9 @@ try {
     stage('W1 strip over a substrate, 8 modes', {neff: eight.neff, loss: eight.loss, found: eight.found, engine: expectedEight, seconds: eightSeconds});
     assert.deepEqual({neff: eight.neff, loss: eight.loss}, expectedEight, 'the screen strings are the engine run of the same document on this machine');
     assert.equal(eight.neff.length, 3, JSON.stringify(eight.neff));
+    // open-mode notes (slice S3, G1's three modes on the page): 2.441, 1.773 and 1.486 leaky into Substrate
+    stage('S3 open-mode notes, W1, engine on this machine', {cells: channelCells(eightCells, e8, 'S3 W1')});
+    assert.deepEqual(eightCells.map(([mode]) => mode), ['1', '2', '3']);
     assert.equal(eight.found, 'Found 3 of 8 modes near n_eff 2.46 and 1.95 (Studio\'s second search, halfway to the silica index). Move Search near n_eff to find other modes.');
     const cladding = eight.neff.map(t => /^(\d\.\d{8}) ([+−]) (\d\.\d{2}e-\d+)i$/.exec(t)).map(m => ({re: Number(m[1]), im: (m[2] === '−' ? -1 : 1) * Number(m[3])}));
     assert.deepEqual(eight.neff.slice(0, 2), leak.neff, 'TE-like and TM-like first, as with 2 modes');
