@@ -154,6 +154,9 @@ internal namespaces that re-export kernels in consistent units for simcase and s
 public name equals one of their names, and no public name is one of their objects. A structural name added after the list was frozen
 carries a reviewer note; the category "deferred to the materials step" (physmat's record
 arguments, such as `datum_temperature`) also names the condition that ends it.
+`galerkin.panel_electrostatics` is the public SI face of the internal boundary- and
+corner-panel modules (`galerkin.laplace_*`), which stay internal and unchanged; its
+results equal theirs bit for bit ([panel electrostatics](packages/galerkin/panel_electrostatics.md)).
 
 **Complex conventions.** Public complex values of galerkin and refsol follow
 exp(−iωt); a kernel that computes in exp(+iωt) is converted only by `to_kernel` and

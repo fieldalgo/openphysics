@@ -62,6 +62,8 @@ Waveguide documents and sweeps have JSON/CLI and Studio routes; 3D cavities have
 
 - [Saved circuit inputs: extraction/network, sources, loads and crosstalk](../packages/sipi/circuit_document.md)
 
+- [Panel electrostatics: the public SI API of the boundary-panel solvers](../packages/galerkin/panel_electrostatics.md)
+
 - [Homogeneous Laplace boundary panels: contract and validation](../packages/galerkin/laplace_boundary.md)
 
 - [Two-ground homogeneous Laplace panels](../packages/galerkin/two-ground.md)

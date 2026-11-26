@@ -1,7 +1,7 @@
 {
- "source": "Validate packages run 45536602993 (branch claude/compassionate-rubin-bypei0-landing d73c387f, 2026-11-25), linux-py312 source-tests-1..12.xml; files added on main after that run take main's times (Validate packages run 45409971229 (PR #349 head 7a3fb38, 2026-11-24), linux-py31)",
+ "source": "Validate packages run 45536602993 (branch claude/compassionate-rubin-bypei0-landing d73c387f, 2026-11-25), linux-py312 source-tests-1..12.xml; files added on main after that run take main's times (Validate packages run 45409971229 (PR #349 head 7a3fb38, 2026-11-24), linux-py31); test_api_units_scan_galerkin.py (with the nine panel string-refusal cases) and test_panel_electrostatics.py: one local Linux run on 2026-11-26, before any CI run",
  "seconds": {
-  "tests/galerkin/test_api_units_scan_galerkin.py": 3.0,
+  "tests/galerkin/test_api_units_scan_galerkin.py": 100.0,
   "tests/galerkin/test_arpack_rng.py": 0.6,
   "tests/galerkin/test_cavity3d_mesh_validation.py": 0.6,
   "tests/galerkin/test_cavity3d_validation.py": 31.0,
@@ -104,6 +104,7 @@
   "tests/galerkin/test_mode_gradients.py": 21.3,
   "tests/galerkin/test_mode_overlap.py": 11.9,
   "tests/galerkin/test_numpy_only_entry_points.py": 4.0,
+  "tests/galerkin/test_panel_electrostatics.py": 10.0,
   "tests/galerkin/test_pipeline.py": 25.1,
   "tests/galerkin/test_pml_modes.py": 6.5,
   "tests/galerkin/test_prescribed_temperature_thermoelasticity.py": 3.7,
