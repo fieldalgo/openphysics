@@ -2015,9 +2015,10 @@ function renderComparison(){
  // a pick whose run is gone: both back to the default pair (workspace-compare.mjs defaultComparison)
  if(!compareIds.every(id=>runs.some(r=>r.job===id))){compareIds=defaultComparison(runs);comparePicked=false;}
  const bar=document.createElement('div');bar.className='toolbar compare-selection';
- for(let side=0;side<2;side++){const label=document.createElement('label');label.textContent=side?'B':'A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';
+ for(let side=0;side<2;side++){const label=document.createElement('label');label.className='compare-pick';label.textContent=side?'Run B':'Run A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';
   // round 17 (U9): the accessible name says what is picked; the full run label is the title, so an
-  // ellipsis at a narrow width hides no part of it (the label starts with the run's number and name)
+  // ellipsis at a narrow width hides no part of it (the label starts with the run's number and name).
+  // Round 31 (K3): the visible label reads the same words, Run A and Run B (it read A and B)
   select.setAttribute('aria-label',side?'Run B':'Run A');for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.title=o.textContent;o.selected=r.job===compareIds[side];select.append(o);}select.title=select.selectedOptions[0]?.textContent||'';select.onchange=()=>{compareIds[side]=select.value;comparePicked=true;compareChoice=null;render();};label.append(select);bar.append(label);}host.append(bar);
  // a kept pair (round 16): the newest run, when newer than both, is offered beside it
  // round 24 (B4): a pair kept because both runs are named, not picked by hand, is offered the two

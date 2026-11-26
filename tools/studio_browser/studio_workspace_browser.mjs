@@ -2556,6 +2556,10 @@ try {
       stage('R17 U9 Compare pickers', {width, pick});
       assert.deepEqual(pick.map(p => [p.label, p.title, p.fits]), [['Run A', true, true], ['Run B', true, true]], JSON.stringify(pick));
       assert.equal((await r.eval('document.documentElement.scrollWidth-document.documentElement.clientWidth')) <= 0, true);
+      // round 31 (K3): each picker's label shows Run A or Run B, on one line, beside or above its select
+      const shown = await r.eval("['compare-a','compare-b'].map(id=>{const s=document.getElementById(id),l=s.closest('label'),t=[...l.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join(''),range=document.createRange();range.selectNodeContents(l.firstChild);return {text:t,lines:range.getClientRects().length,inside:l.getBoundingClientRect().right<=document.documentElement.clientWidth+0.5};})");
+      stage('R31 K3 Compare labels', {width, shown});
+      assert.deepEqual(shown, [{text: 'Run A', lines: 1, inside: true}, {text: 'Run B', lines: 1, inside: true}], JSON.stringify(shown));
     }
     await rSize(1280, 800);
     for (const name of ['Run A', 'Run B']) {
