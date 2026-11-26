@@ -686,8 +686,11 @@ written without a question; and Recompute Run 1's maps brings them back and lets
 H1, the 16 MiB question and the refusal; since compact maps, design *Session versions 16 and 17*,
 re-registered by design, HQ decision 2026-11-26-openphysics-studio-hk10-compact: the maps become
 compact at the result whose maps would not all fit as text, about 1.3 MB a run, so the stage runs
-until the first map is let go and one result more, the results that convert and let Run 1's and
-Run 2's maps go and the run the recompute lets go derived from the file's own records, written by
+until the first map is let go and one result more, the result that converts, the runs the first
+let-go result and the next one let go and the runs the recompute lets go derived from the file's own
+records by the arrival's order rule (no run named in the script: the sizes differ by platform,
+coordinator ruling 2026-11-26), each named exactly in Messages with one **Recompute Run N's maps**
+each, written by
 the script's own encoder of `f32-offset-base64-v1`, and every compact array compared as HQ1, in Node
 and in Python; in the same sequence, HQ: no Messages sentence at the conversion, both notes, Run 1's
 heat, core temperature and index maps before and after it read at each triangle's centroid pixel,
