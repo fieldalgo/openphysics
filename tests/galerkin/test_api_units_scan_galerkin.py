@@ -270,6 +270,38 @@ def _material_cavity():
                                        electrical_conductivity={"z1": 1e6}, mode_count=1, target_frequency=0.8e8)
 
 
+def _panel(name, polygons, **kwargs):
+    """A valid call of a galerkin.panel_electrostatics solver on a small case of tests/galerkin/test_panel_electrostatics.py."""
+    def case():
+        from galerkin import panel_electrostatics
+        return getattr(panel_electrostatics, name), dict(polygons=polygons, box_size=(0.008, 0.002), **kwargs)
+    return case
+
+
+_SQUARE = [[0.0038, 0.000975], [0.0042, 0.000975], [0.0042, 0.001025], [0.0038, 0.001025]]
+_SECOND = [[0.0045, 0.000975], [0.0049, 0.000975], [0.0049, 0.001025], [0.0045, 0.001025]]
+_THREE = [[[0.003425, 0.0006], [0.003775, 0.0006], [0.00375, 0.00065], [0.00345, 0.00065]],
+          [[0.00425, 0.0011], [0.00465, 0.0011], [0.004675, 0.00116], [0.004225, 0.00116]],
+          [[0.0039, 0.00155], [0.0041, 0.00155], [0.00409, 0.00159], [0.00391, 0.00159]]]
+#: the smallest admitted harmonic corner solve of _THREE (16 subdivisions); each takes about 27 s
+_PANEL_CASES = {
+    "solve_grounded_rectangle": _panel("solve_grounded_rectangle", [_SQUARE], panels_per_edge=8),
+    "solve_two_ground_rectangle": _panel("solve_two_ground_rectangle", [_SQUARE], panels_per_edge=8),
+    "solve_two_ground_rectangle_edges": _panel("solve_two_ground_rectangle_edges", [_SQUARE], panels_per_edge=8),
+    "solve_two_ground_corner_rectangle_edges": _panel("solve_two_ground_corner_rectangle_edges", [_SQUARE],
+                                                      panels_per_edge=16),
+    "solve_two_ground_linear_corner_rectangle_edges": _panel("solve_two_ground_linear_corner_rectangle_edges",
+                                                             [_SQUARE], panels_per_edge=16),
+    "solve_two_ground_harmonic_corner_three_active_edges": _panel(
+        "solve_two_ground_harmonic_corner_three_active_edges", _THREE, panels_per_edge=16),
+    "solve_two_ground_harmonic_corner_guard_edges": _panel(
+        "solve_two_ground_harmonic_corner_guard_edges", _THREE, panels_per_edge=16, signal_indices=(0, 1)),
+    "solve_two_ground_harmonic_corner_single_active_edges": _panel(
+        "solve_two_ground_harmonic_corner_single_active_edges", _THREE, panels_per_edge=16, signal_index=2),
+    "solve_open_rectangle": _panel("solve_open_rectangle", [_SQUARE, _SECOND], panels_per_edge=8,
+                                   ground_indices=(1,)),
+}
+
 STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
@@ -306,7 +338,9 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.cavity:solve_cavity": _cavity,
                 "galerkin.material_cavity:CavityMaterialRegion": _material_region,
                 "galerkin.material_cavity:solve_material_cavity_box": _material_cavity_box,
-                "galerkin.material_cavity:solve_material_cavity": _material_cavity}
+                "galerkin.material_cavity:solve_material_cavity": _material_cavity,
+                # panel API (2026-11-26): the public panel solvers in SI (box_size is their one quantity)
+                **{f"galerkin.panel_electrostatics:{name}": case for name, case in _PANEL_CASES.items()}}
 
 
 @pytest.fixture(scope="module")
