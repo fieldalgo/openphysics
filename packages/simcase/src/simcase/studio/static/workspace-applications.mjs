@@ -79,7 +79,8 @@ export function cardRecords(entries,busy=new Set()){
 // reads "Kept in this browser T", a file time "saved F" (a real file save).
 export const RESTORE_NEWEST_TEXT='Restore newest from this browser';
 export const RESUME_HEADING='Continue where you left off';
-export const RESUME_NOTE='Restore brings back completed runs kept in this browser, without recomputing. Open file… at the top opens a project file instead.';
+// Round 31 (K1): the note keeps only its first sentence; the box names one way back per piece of work.
+export const RESUME_NOTE='Restore brings back completed runs kept in this browser, without recomputing.';
 export const earlierCopiesText=n=>`Earlier copies in this browser (${n})`;
 export const cardKeptText=runs=>`Kept in this browser · ${runCount(runs)} · Restore at the top of the page`;
 // Round 20 (Z2): when the newest record's project file also holds the other model and browser
@@ -91,10 +92,12 @@ export const pairLine=(item,pair)=>`${item.model||'Optical waveguide'} (${runCou
 // or "also" words ("Optical waveguide · 1 run · Run 1").
 const plainLine=item=>sessionLine({...item,file:null,also:undefined});
 // How the browser copy compares with the file the record names, after "Kept in this browser T":
-// the six cases of the detail line under the newest button.
-function fileRelation(file,current,savedAt,when){
+// the six cases of the detail line under the newest button. Round 31 (K1): strings 2 and 3 no
+// longer add " · Open file… gives the same runs"; the #resume-other detail keeps it (sameTail).
+const SAME_TAIL=' · Open file… gives the same runs';
+function fileRelation(file,current,savedAt,when,sameTail=''){
  if(!file)return 'not saved to a file';
- if(current===true)return savedAt?`same as ${file}, saved ${when(savedAt)} · Open file… gives the same runs`:`same as ${file} as opened · Open file… gives the same runs`;
+ if(current===true)return (savedAt?`same as ${file}, saved ${when(savedAt)}`:`same as ${file} as opened`)+sameTail;
  if(current===false)return savedAt?`newer than ${file}, saved here ${when(savedAt)}`:`newer than ${file} as opened`;
  return `last linked to ${file}`;
 }
@@ -102,13 +105,13 @@ const newer=(a,b)=>b&&(Date.parse(b)||0)>(Date.parse(a)||0)?b:a;
 // The detail line of the newest offer (strings 1–6). For a pair, "same" needs both records the same
 // as the file, else "newer than"; T is the newer of the two records' times. When the other model's
 // runs are already in the tab: " · <model> · <run names> already in this tab".
-export function resumeDetail(item,when=offerTime){
+export function resumeDetail(item,when=offerTime,sameTail=''){
  const pair=item.pair;let current=item.fileCurrent??null,savedAt=item.savedAt;
  if(pair){savedAt=newer(item.savedAt,pair.savedAt);
   const both=[item.fileCurrent??null,pair.fileCurrent??null];
   current=both.every(c=>c===true)?true:both.every(c=>c===null)?null:false;}
  const inTab=(item.also||[]).filter(o=>o.inTab).map(o=>` · ${o.model} · ${o.names?.length?o.names.join(', '):runCount(o.runs)} already in this tab`).join('');
- return `Kept in this browser ${when(savedAt)} · ${fileRelation(item.file,current,item.fileSavedAt,when)}${pair?'':inTab}`;
+ return `Kept in this browser ${when(savedAt)} · ${fileRelation(item.file,current,item.fileSavedAt,when,sameTail)}${pair?'':inTab}`;
 }
 // An older copy never says "same as" or "newer than": its match with the file may be stale after a
 // later save. It says what it matched when it was kept, or only the file it was last linked to.
@@ -137,7 +140,7 @@ export function resumeChoices(latest,earlier=[],when=offerTime,{inTab=[]}={}){
  const at=first&&!paired?rest.findIndex(e=>e.item.runs>0&&model(e)!==model(first)&&!inTab.includes(model(e))):-1;
  const second=at>=0?rest.splice(at,1)[0]:null;
  const other=second?{...own(second),label:`${RESTORE_TEXT}: ${plainLine(second.item)}`,
-  detail:'Older · '+resumeDetail({...second.item,pair:undefined,also:undefined},when).replace(/^Kept/,'kept')}:null;
+  detail:'Older · '+resumeDetail({...second.item,pair:undefined,also:undefined},when,SAME_TAIL).replace(/^Kept/,'kept')}:null;
  return {newest,other,earlier:rest.map(e=>({...own(e),label:'Restore '+plainLine(e.item),detail:olderCopyDetail(e.item,when,!!first&&time(e)>time(first))}))};
 }
 // resume: optional {latest, earlier, inTab, collapsed, onLatest(button), onEarlier(index, button),

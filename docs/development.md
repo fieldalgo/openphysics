@@ -721,8 +721,7 @@ optical runs (the Optical waveguide card says it keeps them), which come back wi
 named run in the dock and the footer (*Run 1 · Heater 2e14 · …*) and the heated session's save
 message naming the optical runs that are not in its file. Since round 11 the heated model's
 newest record is restored after a reload (until round 30 by its card; now by the box's newest
-offer, whose line reads *Kept in this browser … · same as …json, saved … · Open file… gives the same
-runs*), the restored title reads *same as file …*, and the
+offer, whose line reads *Kept in this browser … · same as …json, saved …*), the restored title reads *same as file …*, and the
 Workspace tools say *Restore earlier session from this browser*. Since round 13 it checks Save after a Save As
 name downloading under it again with no name dialog, after **Download again** since round 25 (*Downloaded heated-design.json again*, the footer
 *heated-design.json · downloaded …* with the “ (1)” title text), and Save after an opened model or
@@ -790,8 +789,7 @@ Runs 21 to 4, 2 and 1; the pins run from Run 2 and 4 to 20, and Run 22 drops Run
 Since round 20 (pre-registered) the project script opens `heater-study.json` in a new profile,
 shows both models, saves `r20-both.json` a minute after the heated record was written, and reloads:
 the box leads with *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon
-waveguide (1 run)*, with *Kept in this browser … · same as r20-both.json, saved … · Open file… gives
-the same runs* under it (until round 30 the label held the file and the time, and the heated card named
+waveguide (1 run)*, with *Kept in this browser … · same as r20-both.json, saved …* under it (until round 30 the label held the file and the time, and the heated card named
 the same time); one click restores both, with *Restored Optical
 waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. …*, the
 header *Heater study · r20-both.json · saved …* and the optical model's Results, and the Library
@@ -846,8 +844,7 @@ record that is not in the tab. The states are:
 
 - no records: 0 buttons;
 - one record: 1 button with its detail line;
-- both models with records the same as the project file: 1 button, *same as …, saved … · Open
-  file… gives the same runs*;
+- both models with records the same as the project file: 1 button, *same as …, saved …*;
 - the browser copy changed since the file: 1 button, *newer than …*, with the earlier copies
   closed;
 - the tab holds runs: 0 buttons.

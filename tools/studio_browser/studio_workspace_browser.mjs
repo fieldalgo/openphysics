@@ -670,8 +670,8 @@ try {
   // the detail line names the session file the record was last sent to
   // round 10 (K3, K7): one phrase for browser recovery, and the file the record still matched
   // round 11 (L9), after rounds 26–30: the record is the same as the file: string 2, with the file's save time
-  assert.ok(routes.latest.startsWith('Kept in this browser ') && routes.latest.includes(' · same as ' + sessionFile + ', saved ') && routes.latest.endsWith(' · Open file… gives the same runs'), routes.latest);
-  assert.match(routes.latest, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · same as \S+, saved \d{1,2}:\d\d(?: [AP]M)? · Open file… gives the same runs$/);
+  assert.ok(routes.latest.startsWith('Kept in this browser ') && routes.latest.includes(' · same as ' + sessionFile + ', saved ') && !routes.latest.includes('Open file…'), routes.latest);
+  assert.match(routes.latest, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · same as \S+, saved \d{1,2}:\d\d(?: [AP]M)?$/);
   assert.doesNotMatch(await text('#canvas'), /Recover|\(this browser/, 'the Library page says Restore from this browser'); assert.equal(routes.open, 'Open file…');
   // round 19 (Y1): the box above leads with the newest stored session, the record the card counts
   assert.equal(routes.listed.length, 1, JSON.stringify(routes.listed)); assert.equal(routes.box, true);
@@ -1178,7 +1178,7 @@ try {
   // after rounds 26–30: the record matched the file it was opened from, which has no save time here:
   // the detail line says so (string 3), with the browser copy's time
   assert.equal(offers.card.text, 'Restore newest from this browser: Optical waveguide · 2 runs · Run 1 · design A, Run 2');
-  assert.ok(offers.card.detail.startsWith('Kept in this browser ') && offers.card.detail.endsWith(' · same as ' + sessionFile + ' as opened · Open file… gives the same runs'), offers.card.detail);
+  assert.ok(offers.card.detail.startsWith('Kept in this browser ') && offers.card.detail.endsWith(' · same as ' + sessionFile + ' as opened'), offers.card.detail);
   assert.equal(offers.card.line, 'Kept in this browser · 2 runs · Restore at the top of the page');
   // round 19 (Y1): the box leads with the newest stored session, which the card line counts
   assert.equal(offers.top[0]?.record, offers.card.record, 'the box leads with the newest record');

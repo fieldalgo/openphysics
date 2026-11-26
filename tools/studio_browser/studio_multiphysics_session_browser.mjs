@@ -707,7 +707,7 @@ print(n)`;
   assert.ok(heatedOffer.text.startsWith('Restore newest from this browser: Heated silicon waveguide · '), heatedOffer.text);
   assert.equal(heatedOffer.application, 'multiphysics', 'the newest offer carries the heated record');
   assert.ok(heatedOffer.detail.includes(' · same as ' + r1Name + ', saved '), heatedOffer.detail);
-  assert.match(heatedOffer.detail, /^Kept in this browser .+ · same as .+, saved .+ · Open file… gives the same runs$/);
+  assert.match(heatedOffer.detail, /^Kept in this browser .+ · same as .+, saved .+$/);
   assert.match(heatedOffer.line, /^Kept in this browser · \d+ runs? · Restore at the top of the page$/);
   assertLibraryRestore(l7, {visible: 1, cards: {'heated-waveguide': Number(heatedOffer.line.match(/· (\d+) runs? ·/)[1])}}, 'L7');
   for (const [width, height, mobile, tag] of [[1440, 900, false, 'wide'], [390, 844, true, 'phone']]) {

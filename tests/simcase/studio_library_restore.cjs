@@ -17,9 +17,9 @@ test('5.1: the detail line under the newest button, strings 1–6',async()=>{
  // 1 no file
  assert.equal(A.resumeDetail({...base,file:null},when),'Kept in this browser T · not saved to a file');
  // 2 same as a file saved here
- assert.equal(A.resumeDetail({...base,file,fileCurrent:true,fileSavedAt:'F'},when),'Kept in this browser T · same as heater-study.json, saved F · Open file… gives the same runs');
+ assert.equal(A.resumeDetail({...base,file,fileCurrent:true,fileSavedAt:'F'},when),'Kept in this browser T · same as heater-study.json, saved F');
  // 3 same as an opened file (no save time)
- assert.equal(A.resumeDetail({...base,file,fileCurrent:true},when),'Kept in this browser T · same as heater-study.json as opened · Open file… gives the same runs');
+ assert.equal(A.resumeDetail({...base,file,fileCurrent:true},when),'Kept in this browser T · same as heater-study.json as opened');
  // 4 changed since a file saved here
  assert.equal(A.resumeDetail({...base,file,fileCurrent:false,fileSavedAt:'F'},when),'Kept in this browser T · newer than heater-study.json, saved here F');
  // 5 changed since an opened file
@@ -43,12 +43,12 @@ test('5.2: a pair is the same as its file only when both records are; T is the n
  assert.equal(A.resumeDetail({...optical,fileCurrent:true,pair:pair(false)},when),'Kept in this browser 2026-11-26T11:40:00Z · newer than heater-study.json, saved here F');
  assert.equal(A.resumeDetail({...optical,fileCurrent:false,pair:pair(true)},when),'Kept in this browser 2026-11-26T11:40:00Z · newer than heater-study.json, saved here F');
  // both same: string 2
- assert.equal(A.resumeDetail({...optical,fileCurrent:true,pair:pair(true)},when),'Kept in this browser 2026-11-26T11:40:00Z · same as heater-study.json, saved F · Open file… gives the same runs');
+ assert.equal(A.resumeDetail({...optical,fileCurrent:true,pair:pair(true)},when),'Kept in this browser 2026-11-26T11:40:00Z · same as heater-study.json, saved F');
  // T is the newer of the two records' times, whichever comes first
- assert.equal(A.resumeDetail({...optical,fileCurrent:true,pair:pair(true,'2026-11-26T11:50:00Z')},when),'Kept in this browser 2026-11-26T11:50:00Z · same as heater-study.json, saved F · Open file… gives the same runs');
+ assert.equal(A.resumeDetail({...optical,fileCurrent:true,pair:pair(true,'2026-11-26T11:50:00Z')},when),'Kept in this browser 2026-11-26T11:50:00Z · same as heater-study.json, saved F');
  // an opened file: strings 3 and 5
  const {fileSavedAt,...opened}=optical;
- assert.equal(A.resumeDetail({...opened,fileCurrent:true,pair:pair(true)},when),'Kept in this browser 2026-11-26T11:40:00Z · same as heater-study.json as opened · Open file… gives the same runs');
+ assert.equal(A.resumeDetail({...opened,fileCurrent:true,pair:pair(true)},when),'Kept in this browser 2026-11-26T11:40:00Z · same as heater-study.json as opened');
  assert.equal(A.resumeDetail({...opened,fileCurrent:true,pair:pair(false)},when),'Kept in this browser 2026-11-26T11:40:00Z · newer than heater-study.json as opened');
  // the newest choice of a pair: label without time or file words, the detail beside it
  const choices=A.resumeChoices({...optical,fileCurrent:false,pair:pair(true)},[],when);
@@ -150,7 +150,7 @@ test('5.5: a model card with a kept record says where to restore it, without a b
  // the newest button has a style of its own, and the box keeps its heading and Not now
  assert.ok(css.includes('.resume-actions .primary'));
  assert.equal(A.RESUME_NOT_NOW_TEXT,'Not now (choose a model below)');
- assert.equal(A.RESUME_NOTE,'Restore brings back completed runs kept in this browser, without recomputing. Open file… at the top opens a project file instead.');
+ assert.equal(A.RESUME_NOTE,'Restore brings back completed runs kept in this browser, without recomputing.');
  assert.equal(A.earlierCopiesText(2),'Earlier copies in this browser (2)');
 });
 

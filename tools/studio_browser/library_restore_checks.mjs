@@ -40,7 +40,11 @@ export function assertLibraryRestore(state, {visible, cards = {}}, tag) {
     assert.equal(state.newest.primary, true, tag); assert.equal(state.newest.describedBy, 'resume-newest-detail', tag);
     assert.ok(state.newest.text.startsWith('Restore newest from this browser: '), state.newest.text);
     assert.ok(state.newest.detail.startsWith('Kept in this browser '), state.newest.detail);
+    // round 31 (K1): the newest offer names one way back; no Open file… words in its line
+    assert.ok(!state.newest.detail.includes('Open file…'), state.newest.detail);
   }
+  // round 31 (K1): the box note keeps only its first sentence
+  if (state.box?.note != null) assert.equal(state.box.note, 'Restore brings back completed runs kept in this browser, without recomputing.', tag);
   if (state.other) assert.ok(state.other.detail.startsWith('Older · kept in this browser '), state.other.detail);
   if (state.copies) {
     assert.equal(state.copies.summary, `Earlier copies in this browser (${state.copies.entries.length})`, tag);

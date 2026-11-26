@@ -54,7 +54,7 @@ test('L2: the browser copy\'s time is "kept"; a file\'s save time stays "saved"'
   ['Restore from this browser: Heated silicon waveguide · 1 run · Run 1','Older · kept in this browser 5:30 AM · not saved to a file'],
   ['Restore Optical waveguide · 5 runs','Older copy · kept in this browser 5:38 AM · last linked to optical-and-heated.json']]);
  // a record that is the same as its file names the file's save time: that is a file save
- assert.equal(A.resumeChoices({runs:2,savedAt:at('46'),file:'x.json',fileCurrent:true,fileSavedAt:'S'},[],w).newest.detail,'Kept in this browser 5:46 AM · same as x.json, saved 9:24 PM · Open file… gives the same runs');
+ assert.equal(A.resumeChoices({runs:2,savedAt:at('46'),file:'x.json',fileCurrent:true,fileSavedAt:'S'},[],w).newest.detail,'Kept in this browser 5:46 AM · same as x.json, saved 9:24 PM');
  // after rounds 26–30 the cards have no offers (and no time): a card line says the record is kept
  assert.equal(A.cardResumeChoice,undefined);
  assert.equal(A.cardKeptText(1),'Kept in this browser · 1 run · Restore at the top of the page');
