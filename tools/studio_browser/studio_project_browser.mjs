@@ -521,7 +521,7 @@ try {
     // S5 and round 18 (X7): the offer names the newest project file and both models of the project
     assert.equal(r16.newest.pair, 'true', JSON.stringify(r16.newest));
     assert.match(r16.newest.text, /^Restore newest from this browser: (?:Optical waveguide \(\d+ runs?\) and Heated silicon waveguide|Heated silicon waveguide \(\d+ runs?\) and Optical waveguide) \(\d+ runs?\)$/);
-    assert.match(r16.newest.detail, /^Kept in this browser .+ · same as design-ab\.json, saved .+ · Open file… gives the same runs$/);
+    assert.match(r16.newest.detail, /^Kept in this browser .+ · same as design-ab\.json, saved .+$/);
     assertLibraryRestore(r16, {visible: 1, cards: Object.fromEntries(Object.entries(r16.cardLines).map(([k, v]) => [k, Number(v.match(/· (\d+) runs? ·/)[1])]))}, 'R16');
     assert.deepEqual(Object.keys(r16.cardLines).sort(), ['heated-waveguide', 'optical']);
     // S4: restore the project's models; the header names the project file and Save suggests it
@@ -746,7 +746,7 @@ try {
     // after rounds 26–30 (state S2, both records the same as the file): the label names the pair, the
     // detail line the browser copy, the file and its save time (string 2)
     assert.equal(offers.newest, 'Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run)');
-    assert.match(offers.detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · same as r20-both\.json, saved \d{1,2}:\d\d(?: [AP]M)? · Open file… gives the same runs$/);
+    assert.match(offers.detail, /^Kept in this browser \d{1,2}:\d\d(?: [AP]M)? · same as r20-both\.json, saved \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.equal(offers.pair, 'true');
     // round 21 (W4, pre-registered): while the newest offer restores the pair, the box does not list the
     // heated record again, neither as a second button nor as an earlier copy

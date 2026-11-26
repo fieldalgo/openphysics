@@ -539,12 +539,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    recovery (**Workspace tools** shows when it was last updated). After a reload or a
    Studio restart, the start page shows **Continue where you left off**: one way back for each
    piece of work (a project file, or a model's records without one). Its note reads *Restore brings
-   back completed runs kept in this browser, without recomputing. Open file… at the top opens a
-   project file instead.* The first and most prominent button (filled) is the newest stored session
+   back completed runs kept in this browser, without recomputing.* (until round 30 it went on
+   to name Open file… as a second way back). The first and most prominent button (filled) is the newest stored session
    with runs, whatever its model (round 19), *Restore newest from this browser: Optical waveguide ·
    6 runs · Run 1, …*, or both models of a project (below). The line under it says how this browser
    copy compares with the file its record names: *Kept in this browser 11:40 AM · not saved to a
-   file*; *… · same as heater-study.json, saved 11:12 AM · Open file… gives the same runs* (or
+   file*; *… · same as heater-study.json, saved 11:12 AM* (or
    *same as heater-study.json as opened* for a file opened here, which has no save time); *… · newer
    than heater-study.json, saved here 11:12 AM* (or *as opened*); *… · last linked to
    heater-study.json* when the record does not say. *Kept in this browser* is the browser copy's

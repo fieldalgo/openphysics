@@ -441,11 +441,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
    켜면 시작 화면에 **Continue where you left off**가 나옵니다: 작업 하나(프로젝트 파일 하나, 또는 파일이 없는 한 모델의
    기록)마다 돌아가는 길이 하나입니다. 안내 문구는 *Restore brings back completed runs kept in this browser, without
-   recomputing. Open file… at the top opens a project file instead.*입니다. 첫째이자 가장 눈에 띄는(채워진) 버튼은 모델과
+   recomputing.*입니다(30차까지는 Open file…을 둘째 길로 덧붙였음). 첫째이자 가장 눈에 띄는(채워진) 버튼은 모델과
    상관없이 실행이 있는 가장 새 세션(round 19)이거나, 아래에 적은 프로젝트의 두 모델입니다: *Restore newest from this
    browser: Optical waveguide · 6 runs · Run 1, …*. 그 아래 줄은 이 브라우저 사본이 기록이 가리키는 파일과 어떤지 밝힙니다:
-   *Kept in this browser 11:40 AM · not saved to a file*, *… · same as heater-study.json, saved 11:12 AM · Open file… gives
-   the same runs*(여기서 연 파일은 저장 시각이 없으므로 *same as heater-study.json as opened*), *… · newer than
+   *Kept in this browser 11:40 AM · not saved to a file*, *… · same as heater-study.json, saved 11:12 AM*(여기서 연 파일은 저장 시각이 없으므로 *same as heater-study.json as opened*), *… · newer than
    heater-study.json, saved here 11:12 AM*(또는 *as opened*), 기록이 밝히지 않으면 *… · last linked to heater-study.json*.
    *Kept in this browser*는 브라우저 사본의 시각이고 *saved*는 언제나 파일을 저장한 시각입니다. *Newer than*은 이 브라우저가
    마지막으로 저장하거나 연 파일과 비교합니다: 다른 컴퓨터나 다른 브라우저 프로필에서 그 파일을 나중에 저장한 것은 여기서

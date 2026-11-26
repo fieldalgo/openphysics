@@ -563,8 +563,7 @@ HQ1로 비교함. 같은 순서열에서 HQ: 변환 때 Messages 문장 없음, 
 제목은 탭을 눌러도 *Opened …*를 유지하고, 복구 목록은 세션마다 한 번씩만 보여 주며, 상자가 광학
 실행을 제안하고(Optical waveguide 카드는 보관 중이라고만 밝힘) 그 실행은 같은 n_eff로 돌아옵니다. 또 도크와 하단의 이름 붙은 실행(*Run 1 · Heater 2e14 · …*)과,
 가열 세션의 저장 메시지가 그 파일에 없는 광학 실행을 밝히는지 확인합니다. 11차부터는 새로고침 뒤 가열 모델의
-가장 새 기록이 복원되고(30차까지는 그 카드로, 이제는 상자의 가장 새 제안으로, 그 줄은 *Kept in this browser … · same as …json, saved … ·
-Open file… gives the same runs*),
+가장 새 기록이 복원되고(30차까지는 그 카드로, 이제는 상자의 가장 새 제안으로, 그 줄은 *Kept in this browser … · same as …json, saved …*),
 복원된 제목이 *same as file …*인지, Workspace tools가 *Restore earlier session from this browser*라고 하는지 확인합니다. 13차부터는 Save As 이름
 뒤의 Save가 이름 대화상자 없이(25차부터 **Download again** 뒤에) 그 이름으로 다시 내려받는지(*Downloaded heated-design.json again*, 바닥글
 “ (1)” title 텍스트와 함께 *heated-design.json · downloaded …*), 연 모델 파일이나 세션 파일 뒤의 Save가 그 파일 이름을
@@ -614,7 +613,7 @@ Run 8이 Run 7을 내보내며 *… was dropped; every other earlier run is pinn
 session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다. 20차부터(사전 등록) project
 스크립트는 새 프로필에서 `heater-study.json`을 열고 두 모델을 보인 뒤 가열 기록이 쓰이고 1분 뒤 `r20-both.json`으로 저장하고
 새로고침합니다: 상자가 *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run)*로 시작하고
-그 아래 *Kept in this browser … · same as r20-both.json, saved … · Open file… gives the same runs*가 있는지(30차까지는 이름표에
+그 아래 *Kept in this browser … · same as r20-both.json, saved …*가 있는지(30차까지는 이름표에
 파일과 시각이 있었고 가열 카드가 같은 시각을 밝혔음); 한 번의
 클릭이 둘 다 복원하여 *Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not
 recomputed. …*, 헤더 *Heater study · r20-both.json · saved …*, 광 모델의 Results가 나오고, Library에는 복원 제안이 남지 않으며
@@ -653,7 +652,7 @@ Library를 읽습니다. 복원 버튼은 `checkVisibility()`가 참일 때만 �
 
 - 기록 없음: 버튼 0개
 - 기록 하나: 버튼 1개와 그 설명 줄
-- 두 모델의 기록이 모두 프로젝트 파일과 같음: 버튼 1개, *same as …, saved … · Open file… gives the same runs*
+- 두 모델의 기록이 모두 프로젝트 파일과 같음: 버튼 1개, *same as …, saved …*
 - 브라우저 사본이 파일 이후로 바뀜: 버튼 1개, *newer than …*, 오래된 사본은 닫혀 있음
 - 탭이 실행을 가짐: 버튼 0개
 
