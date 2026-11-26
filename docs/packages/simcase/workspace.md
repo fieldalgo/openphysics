@@ -244,10 +244,11 @@ is unchanged.*, and the workspace, its runs and Undo stay as they were. The chec
 Results read from a project are marked as from a file (*Loaded from file, not recomputed. Results match
 the file's checksum.*), and opening never starts a run. A session file or a model file opened with File ›
 Open opens as before and becomes an untitled project holding that one model; Save then asks for a name
-and never writes a project file over the session file's name. A restore from this browser (the
-Library's per-card **Restore from this browser**) replaces that one model inside the project. When
-the restored record was the same as the project file it was saved to (its card read *same as file
-…json*), the project names that file and its name again: the header reads *untitled-project ·
+and never writes a project file over the session file's name. A restore from this browser of one
+model's record (a button of the Library's **Continue where you left off**, or Workspace tools)
+replaces that one model inside the project. When
+the restored record was the same as the project file it was saved to (its line reads *same as
+…json, saved …*), the project names that file and its name again: the header reads *untitled-project ·
 untitled-project.json · saved 2:24 PM* and File › Save writes or suggests that file. With another
 model of the tab beside it, the header reads *changed since*. Since round 19 a record changed since
 the project file it was saved to brings back the name and file too: *y3-saved · y3-saved.json ·
@@ -532,16 +533,31 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    typed values are not snapped to the drag step (**More about width and height** under
    the size fields). Wait for *kept for recovery in this browser* before relying on local
    recovery (**Workspace tools** shows when it was last updated). After a reload or a
-   Studio restart, the start page shows **Continue where you left off** with
-   every stored session the tab does not hold, newest first, and **Not now (choose a model
-   below)**, which only closes the box. Since round 19 the first and most prominent offer is the
-   newest stored session with runs, whatever its model, *Restore newest from this browser: Optical
-   waveguide · 6 runs · … · kept 5:46 AM*; each other one says it is older, *Restore from this
-   browser: Optical waveguide · 5 runs · … · older · kept 5:38 AM* (since round 29, L2, *kept*
-   for the browser copy's time, which testers read as a file save when it said *saved*; *saved*
-   stays where the time is a file's save, *same as file x.json · saved 9:24 PM*) (it read *Last session in this
-   browser* and *Restore earlier from this browser: Earlier session*, and an older session could
-   come first). The box stays hidden while the tab holds optical runs. After a restore, the record
+   Studio restart, the start page shows **Continue where you left off**: one way back for each
+   piece of work (a project file, or a model's records without one). Its note reads *Restore brings
+   back completed runs kept in this browser, without recomputing. Open file… at the top opens a
+   project file instead.* The first and most prominent button (filled) is the newest stored session
+   with runs, whatever its model (round 19), *Restore newest from this browser: Optical waveguide ·
+   6 runs · Run 1, …*, or both models of a project (below). The line under it says how this browser
+   copy compares with the file its record names: *Kept in this browser 11:40 AM · not saved to a
+   file*; *… · same as heater-study.json, saved 11:12 AM · Open file… gives the same runs* (or
+   *same as heater-study.json as opened* for a file opened here, which has no save time); *… · newer
+   than heater-study.json, saved here 11:12 AM* (or *as opened*); *… · last linked to
+   heater-study.json* when the record does not say. *Kept in this browser* is the browser copy's
+   time; *saved* is only ever a file's save time. *Newer than* compares with the file as this
+   browser last saved or opened it: a later save of that file on another computer or in another
+   browser profile is not known here (the record stores no file hash or time of its own). When the
+   other model of the project has its newest record apart (not the pair) and its runs are not in
+   the tab, a second button offers it, *Restore from this browser: Heated silicon waveguide · 1 run ·
+   Run 1*, with *Older · kept in this browser …* under it. Every other stored session is folded
+   under the closed **Earlier copies in this browser (N)**: *Restore Optical waveguide · 2 runs ·
+   Run 1, Run 2*, with *Older copy · kept in this browser 11:12 AM · matched heater-study.json as
+   saved 11:12 AM* (or *matched … as opened*, *not saved to a file*, or *last linked to …* when the
+   record had changed since that file or does not say: an older copy never says *same as* or
+   *newer than*, which a later save may have made stale). **Not now (choose a model below)** closes
+   the box to its heading; opening the heading shows the same buttons again. The box stays hidden
+   while the tab holds optical runs. (Until round 30 every session was a button of its own, each
+   with *· saved …* (*· kept …* since round 29, L2) and *· older*, and each model card repeated its model's newest record.) After a restore, the record
    restored is left out of the lists and the remaining ones stay listed under Workspace tools
    (*Restore earlier session from this browser · …*) without a reload. **Open file…** has one
    fixed place, at the top of the Library (the project name at the right of its row) and above the box and the cards,
@@ -566,12 +582,13 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    Opening the heated model over optical runs says in one line of Messages *Optical waveguide runs
    stay in this tab · Library › Optical waveguide returns to them*; **More** after it says that the
    tab holds them until it is closed or reloaded, then what holds them after that: **Library ›
-   Optical waveguide › Restore from this browser** (browser recovery, which keeps the four newest sessions) or **Open
-   session** with the session file that holds them, or that nothing does. While the tab holds no optical
-   runs and browser recovery holds an optical session, for example after a restart, the Optical
-   waveguide card offers it first, *Restore from this browser · Optical waveguide · Run 1 ·
-   design A, Run 2 · 2:25 PM*, next to **Start new (no runs)**, which opens the model without those
-   runs, as the card itself does. Each card ends in **Open model**; the card of a model already in the project, shown or not, ends
+   Continue where you left off › Restore** (browser recovery, which keeps the four newest sessions) or **Open
+   session** with the session file that holds them, or that nothing does. While the tab holds none
+   of a model's runs and browser recovery holds a session of it, for example after a restart, that
+   model's card says so in a line that is not a control, *Kept in this browser · 2 runs · Restore at
+   the top of the page*; the restore itself is in the box above. Choosing the card opens the model
+   without those runs, and the records stay listed. (Until round 30 the card had its own *Restore
+   from this browser · …* button and **Start new (no runs)**, which repeated the box.) Each card ends in **Open model**; the card of a model already in the project, shown or not, ends
    in **Return to Optical waveguide (2 runs)** instead (round 18; *Open model* read as if it might reset
    the model), or **Return to Optical waveguide** for a model without runs; since round 20 the words
    name the model (*Return to Heated silicon waveguide (1 run)*), so two such cards never read alike. Its description ends in
@@ -581,33 +598,22 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    browser's runs. Opening a model of the tab that has
    runs lands on its Results, whatever page it was left on (round 17; round 16 returned to Compare
    too): the optical model with the run last viewed, the heated model with its last result page; a
-   model without runs opens on Model. The page starts at its top. The Heated silicon waveguide card does the
-   same for the newest multiphysics session while the tab holds no multiphysics runs, *Restore
-   from this browser · Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. An
-   offer whose record is the same as the session file it was saved to names the file's save
-   time instead of the record's, *· same as file …json, saved 2:24 PM*; one the same as a file
-   it was opened from says which time it shows, *· browser copy 2:25 PM · same as file …json*.
-   Since round 19 the box above the cards lists every session, a card's included (it listed only the
-   sessions no card offered); a card offering a session that is not the newest with runs says so,
-   *· older · kept 5:30 AM* (*saved* until round 29) (*· older · same as file …json, saved …*, *· older · browser copy … ·
-   same as file …json*). Since round 20 the box names the same time as the card for one record: a
-   record that still matches a file it was saved to gives the file's save time in both (after a
-   project save, the record of the model not shown is linked to the file and its save time, while
-   the record itself was written earlier, so the card read 8:31 AM and the box 8:30 AM); the order,
-   newest first, still follows the records' own times. When the other model of the project is in this tab, *(already in this tab)*
-   names the runs the tab holds. Every recovery entry names its
+   model without runs opens on Model. The page starts at its top. When the other model of the project is
+   in this tab, the line under the newest button ends in *· Heated silicon waveguide · Run 1, Run 2
+   already in this tab*, naming the runs the tab holds. Every recovery entry names its
    model, its run count and its runs (*Run N*, with the run's name if it has one), for example
-   *Optical waveguide · 2 runs · Run 1 · design A, Run 2*, and the session file its record was
-   opened from or last sent to: *· same as file …json* when the record still matched it, *· file
-   …json, changed since* when it did not, *· file …json* for a record written before Studio kept
-   that. A record names one model, but a project file may hold both: since round 18, when browser
-   recovery also holds a record of the other model under the same file, the entry lists it with its
-   runs and says the button does not restore it, *· also in this project: Heated silicon waveguide ·
-   Run 1 (restored separately)*, or *(already in this tab)* when the tab holds that model's runs.
-   The button restores its own model. Since round 20 the newest offer in the box above the cards
-   restores both while the tab holds runs of neither model: *Restore newest from this browser:
-   Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed
-   since · kept 8:44 AM*. It restores the newest record as its own button would, then, once that
+   *Optical waveguide · 2 runs · Run 1 · design A, Run 2*. The Workspace tools list (*Restore earlier
+   session from this browser · …*) also names the session file its record was opened from or last
+   sent to: *· same as file …json* when the record still matched it, *· file …json, changed since*
+   when it did not, *· file …json* for a record written before Studio kept that, and, since round 18,
+   the other model of the same project file when browser recovery holds a record of it, *· also in
+   this project: Heated silicon waveguide · Run 1*, or *· … (already in this tab)* when the tab holds
+   that model's runs (it said *(restored separately)* until round 30).
+   Since round 20 the newest offer in the box above the cards
+   restores both models of a project while the tab holds runs of neither: *Restore newest from this
+   browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)*. Its line says *same as*
+   the file only when both records are the same as it, else *newer than*, with the newer of the two
+   records' times. It restores the newest record as its own button would, then, once that
    restore has completed (a load question answered with Replace; Cancel stops both), the other
    model's record, found again by its model, time and file, and shows the newest record's model on
    Results; Messages reads *Restored Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)
@@ -616,12 +622,12 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    name different projects, the newer record's name); when both
    records still matched the same project file the header reads *… · saved …*. If the second restore
    fails, the first stays, Messages names the model not restored (*Heated silicon waveguide was not
-   restored: …*) and that model's card offer stays. While the tab holds runs of one of the models the
-   offer restores its own model only, as before, and names the other *(already in this tab)*; both
-   cards' offers are unchanged. Since round 21 the box does not list the other model's own record
-   again while the newest offer restores the pair (that model's card still offers it), and an older
-   entry leaves *also in this project* out: it named the other model's newest record, whose runs
-   may have been made after the older entry was saved. Every restore from this browser
+   restored: …*) and that model's record stays offered. While the tab holds runs of one of the models the
+   offer restores its own model only, as before, and its line names the other *already in this tab*.
+   Since round 21 the box does not list the other model's own record again while the newest offer
+   restores the pair (now neither as a second button nor as an earlier copy), and an older entry
+   leaves the other model out: it named the other model's newest record, whose runs may have been
+   made after the older entry was saved. Every restore from this browser
    first writes this tab's pending recovery save (at once, not after its 0.7 s timer), so the record
    it continues is the one stored: before, the second restore of a pair could continue a record
    this tab replaced while the server checked the model, and every later save then read as another
@@ -1167,8 +1173,8 @@ this browser without the maps of 2 runs · File › Save keeps them”; when eve
 limit it writes nothing new (“browser recovery unavailable: session over 16 MiB · File › Save keeps your work”) and the earlier
 record stays. **Restore last session from this browser**, **Restore earlier session from this
 browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · time** (Workspace tools) and
-the Heated silicon waveguide card's **Restore from this browser** run the same checks as Open
-session. A restored record that was the same as the session file it was saved to, or opened
+a restore of a heated record from the Library's **Continue where you left off** run the same
+checks as Open session. A restored record that was the same as the session file it was saved to, or opened
 from, reads *Recovered from this browser · same as file …json*, as an optical one does. A
 template just opened reads *New model · not saved* until its first edit, run or save. When the project
 has a project file and holds another model too, the heated model's status bar speaks about the
@@ -2871,10 +2877,10 @@ recovery is off: this session is over 16 MiB. File › Save keeps your work.* or
 off: this browser’s storage is full. File › Save keeps your work.* (after a run's result message, on
 the same line). An empty new tab does not erase the prior notebook.
 
-After reload, choose the last session on its model's card (**Restore from this browser** under
-Optical waveguide or Heated silicon waveguide), on the start page's **Continue where you left
-off** card (every stored session, newest first), or under Workspace tools → **Restore last session
-from this browser**.
+After reload, choose the session on the start page's **Continue where you left off** box (one
+button per piece of work, the older copies under **Earlier copies in this browser (N)**; a model
+card only says *Kept in this browser · N runs · Restore at the top of the page*), or under
+Workspace tools → **Restore last session from this browser**.
 The complete record is validated before the existing replacement dialog; recovered
 fields are labeled `recovered`, not newly computed. Recovery starts a new input
 undo history and keeps the document unsaved until you save a file/session. No
