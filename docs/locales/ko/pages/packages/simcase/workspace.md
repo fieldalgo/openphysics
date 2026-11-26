@@ -208,8 +208,8 @@ runs (session file)…**에만 나옵니다.
 프로젝트에서 읽은 결과는 파일에서 온 것으로 표시되고(*Loaded from file, not recomputed. Results match the
 file's checksum.*), 열기는 실행을 시작하지 않습니다. File › Open으로 연 세션 파일이나 모델 파일은 전처럼 열리고
 그 모델 하나를 담은 이름 없는 프로젝트가 됩니다. 그 뒤 Save는 이름을 묻고 세션 파일의 이름 위에 프로젝트 파일을
-쓰지 않습니다. 이 브라우저에서 복원(Library 카드의 **Restore from this browser**)하면 프로젝트 안의 그 모델만
-바뀝니다. 복원한 기록이 저장했던 프로젝트 파일과 같았으면(카드에 *same as file …json*) 프로젝트가 그 파일과
+쓰지 않습니다. 이 브라우저에서 한 모델의 기록을 복원하면(Library의 **Continue where you left off** 버튼이나 Workspace tools) 프로젝트 안의 그 모델만
+바뀝니다. 복원한 기록이 저장했던 프로젝트 파일과 같았으면(그 줄에 *same as …json, saved …*) 프로젝트가 그 파일과
 이름을 다시 가리킵니다: 헤더는 *untitled-project · untitled-project.json · saved 2:24 PM*이 되고 File › Save는 그
 파일에 쓰거나 그 이름을 제안합니다. 탭에 다른 모델이 함께 있으면 헤더는 *changed since*로 읽힙니다. round 19부터
 저장했던 프로젝트 파일 이후로 바뀐 기록도 이름과 파일을 되살립니다: *y3-saved · y3-saved.json · changed since saved
@@ -439,12 +439,25 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    to 600 nm. Left x moved to −300 nm to keep the centre.*), 입력한 값은 드래그 간격에 맞춰지지 않습니다(크기
    입력란 아래 **More about width and height**). 로컬 복구를 사용하려면 *kept for recovery in this
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
-   켜면 시작 화면의 **Continue where you left off** 카드에 탭이 가지지 않은 저장된 세션이 모두 최신순으로, 그리고 상자만 닫는
-   **Not now (choose a model below)**가 나옵니다. round 19부터 첫째이자 가장 눈에 띄는 제안은 모델과 상관없이 실행이 있는
-   가장 새 세션입니다: *Restore newest from this browser: Optical waveguide · 6 runs · … · kept 5:46 AM*. 나머지는 더
-   오래되었다고 밝힙니다: *Restore from this browser: Optical waveguide · 5 runs · … · older · kept 5:38 AM*(round 29 L2부터 브라우저 사본의 시각은 *kept*: *saved*이면 테스터들이 파일 저장으로 읽었음; 시각이 파일의 저장 시각이면 *same as file x.json · saved 9:24 PM*처럼 *saved* 그대로)(전에는 *Last
-   session in this browser*와 *Restore earlier from this browser: Earlier session*이었고, 더 오래된 세션이 먼저 나올 수
-   있었습니다). 탭이 광 실행을 가지는 동안 상자는 숨겨집니다. 복원 뒤에는 복원한 기록이 목록에서 빠지고 나머지는 새로고침
+   켜면 시작 화면에 **Continue where you left off**가 나옵니다: 작업 하나(프로젝트 파일 하나, 또는 파일이 없는 한 모델의
+   기록)마다 돌아가는 길이 하나입니다. 안내 문구는 *Restore brings back completed runs kept in this browser, without
+   recomputing. Open file… at the top opens a project file instead.*입니다. 첫째이자 가장 눈에 띄는(채워진) 버튼은 모델과
+   상관없이 실행이 있는 가장 새 세션(round 19)이거나, 아래에 적은 프로젝트의 두 모델입니다: *Restore newest from this
+   browser: Optical waveguide · 6 runs · Run 1, …*. 그 아래 줄은 이 브라우저 사본이 기록이 가리키는 파일과 어떤지 밝힙니다:
+   *Kept in this browser 11:40 AM · not saved to a file*, *… · same as heater-study.json, saved 11:12 AM · Open file… gives
+   the same runs*(여기서 연 파일은 저장 시각이 없으므로 *same as heater-study.json as opened*), *… · newer than
+   heater-study.json, saved here 11:12 AM*(또는 *as opened*), 기록이 밝히지 않으면 *… · last linked to heater-study.json*.
+   *Kept in this browser*는 브라우저 사본의 시각이고 *saved*는 언제나 파일을 저장한 시각입니다. *Newer than*은 이 브라우저가
+   마지막으로 저장하거나 연 파일과 비교합니다: 다른 컴퓨터나 다른 브라우저 프로필에서 그 파일을 나중에 저장한 것은 여기서
+   알 수 없습니다(기록은 파일의 해시나 시각을 따로 보관하지 않음). 프로젝트의 다른 모델의 가장 새 기록이 따로이고(쌍이 아님)
+   그 실행이 탭에 없으면 둘째 버튼이 그것을 제안합니다: *Restore from this browser: Heated silicon waveguide · 1 run · Run 1*,
+   그 아래 *Older · kept in this browser …*. 나머지 저장된 세션은 모두 닫힌 **Earlier copies in this browser (N)** 아래에
+   접혀 있습니다: *Restore Optical waveguide · 2 runs · Run 1, Run 2*, 그 아래 *Older copy · kept in this browser 11:12 AM ·
+   matched heater-study.json as saved 11:12 AM*(또는 *matched … as opened*, *not saved to a file*, 그 파일 이후로 바뀌었거나
+   밝히지 않는 기록은 *last linked to …*: 오래된 사본은 나중의 저장으로 틀릴 수 있는 *same as*나 *newer than*을 쓰지
+   않습니다). **Not now (choose a model below)**는 상자를 제목만 남기고 닫으며, 제목을 열면 같은 버튼이 다시 보입니다. 탭이
+   광 실행을 가지는 동안 상자는 숨겨집니다. (round 30까지는 세션마다 자기 버튼이 있었고 버튼마다 *· saved …*(round 29 L2부터 *· kept …*)와 *· older*가
+   붙었으며, 모델 카드마다 그 모델의 가장 새 기록을 되풀이했습니다.) 복원 뒤에는 복원한 기록이 목록에서 빠지고 나머지는 새로고침
    없이 Workspace tools(*Restore earlier session from this browser · …*)에 남습니다. **Open file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳(그 줄 오른쪽에 프로젝트 이름)에 고정되어
    있고, 프로젝트 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다는 안내가
    함께 있습니다. 이 버튼은 **File › Open…**과 같습니다. Library 페이지는 브라우저 복구를 한 문구 *Restore
@@ -464,45 +477,37 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    광학 실행이 있는 채로 가열 모델을 열면 Messages가 한 줄로 *Optical waveguide runs stay in this tab ·
    Library › Optical waveguide returns to them*이라고 알립니다. 그 뒤의 **More**는 이 탭이 닫거나
    새로고침할 때까지 그 실행을 가진다는 것과, 그 뒤에 무엇이 그 실행을 가지는지를 밝힙니다:
-   **Library › Optical waveguide › Restore from this browser**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
-   세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 광학 실행이 없고 브라우저 복구에 광학 세션이 있으면(예:
-   다시 켠 뒤) Optical waveguide 카드가 그것을 먼저 제안합니다: *Restore from this browser · Optical
-   waveguide · Run 1 · design A, Run 2 · 2:25 PM*, 그 옆에 그 실행 없이 모델을 여는(카드 자체와 같음) **Start new (no
-   runs)**. 카드마다 끝에 **Open model**이 있습니다. 이미 프로젝트에 있는 모델의 카드는 보이든 아니든 대신
+   **Library › Continue where you left off › Restore**(최신 세션 네 개를 보관하는 브라우저 복구), 그 실행을 가진
+   세션 파일로 **Open session**, 또는 아무것도 없음. 탭에 한 모델의 실행이 없고 브라우저 복구에 그 모델의 세션이 있으면(예:
+   다시 켠 뒤) 그 모델의 카드가 컨트롤이 아닌 한 줄로 밝힙니다: *Kept in this browser · 2 runs · Restore at the top of the
+   page*. 복원 자체는 위 상자에 있습니다. 카드를 고르면 그 실행 없이 모델이 열리고 기록은 계속 나열됩니다. (round 30까지는
+   카드에 자기 *Restore from this browser · …* 버튼과 **Start new (no runs)**가 있어 상자를 되풀이했습니다.) 카드마다 끝에 **Open model**이 있습니다. 이미 프로젝트에 있는 모델의 카드는 보이든 아니든 대신
    **Return to Optical waveguide (2 runs)**로 끝나며(round 18; *Open model*이 모델을 초기화할 것처럼 읽혔음), 실행이 없는 모델은
    **Return to Optical waveguide**입니다. round 20부터 문구가 모델 이름을 담으므로(*Return to Heated silicon waveguide (1 run)*)
    두 카드가 같게 읽히지 않습니다. 설명 끝에 *Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.*이 있습니다(round 28, G4; 그 전에는 브라우저 복구와 어긋나는 *Runs stay in this tab until you close it.*):
    모델을 골라도 이 탭의 실행은 남고, 복원 제안은 브라우저의 실행을 되살립니다. 실행이 있는 탭의 모델을 열면 떠날
    때의 페이지와 상관없이 그 Results로 갑니다(round 17; round 16은 Compare로도 돌아갔습니다): 광학 모델은 마지막으로 본 실행과
-   함께, 가열 모델은 마지막 결과 페이지와 함께. 실행이 없는 모델은 Model로 엽니다. 페이지는 맨 위에서 시작합니다. 탭에 다중물리 실행이 없으면 Heated
-   silicon waveguide 카드도 가장 새 다중물리 세션을 같은 방식으로 제안합니다: *Restore from this browser ·
-   Heated silicon waveguide · Run 1, Run 2 · Heater 2e14 · 2:25 PM*. 기록이 저장했던 세션 파일과 같으면
-   기록 시각 대신 파일을 저장한 시각을 씁니다(*· same as file …json, saved 2:24 PM*). 연 파일과 같은 기록은
-   어느 시각인지 밝힙니다(*· browser copy 2:25 PM · same as file …json*). round 19부터 카드 위 상자는 카드가 제안하는
-   세션까지 모든 세션을 나열합니다(전에는 어느 카드도 제안하지 않는 세션만). 실행이 있는 가장 새 세션이 아닌 세션을 제안하는
-   카드는 *· older · kept 5:30 AM*(round 29 전에는 *saved*)이라고 밝힙니다(*· older · same as file …json, saved …*, *· older · browser copy … · same
-   as file …json*). round 20부터 상자는 한 기록에 대해 카드와 같은 시각을 밝힙니다: 저장했던 파일과 아직 같은 기록은 둘 다
-   그 파일의 저장 시각을 씁니다(프로젝트를 저장하면 보이지 않는 모델의 기록이 파일과 그 저장 시각에 이어지지만 기록 자체는
-   더 일찍 쓰였으므로, 카드는 8:31 AM, 상자는 8:30 AM이었음). 새것부터의 순서는 그대로 기록 자신의 시각을 따릅니다.
-   프로젝트의 다른 모델이 이 탭에 있으면 *(already in this tab)*는 탭이 가진 실행을 밝힙니다. 복구 항목은 모두 모델, 실행 수,
-   실행(*Run N*, 이름이 있으면 이름과 함께)을 보여 줍니다. 예: *Optical waveguide · 2 runs · Run 1 ·
-   design A, Run 2*. 기록이 연 세션 파일이나 마지막으로 보낸 세션 파일이 있으면 그 이름도 붙습니다: 기록이
-   그 파일과 아직 같았으면 *· same as file …json*, 아니면 *· file …json, changed since*, Studio가 그것을
-   보관하기 전에 쓴 기록이면 *· file …json*. 기록은 모델 하나를 담지만 프로젝트 파일은 둘 다 담을 수 있습니다: round
-   18부터 브라우저 복구가 같은 파일에 다른 모델의 기록도 가지고 있으면 항목이 그 모델과 실행을 밝히고 이 버튼이 그것을
-   복원하지 않는다고 적습니다(*· also in this project: Heated silicon waveguide · Run 1 (restored separately)*, 탭이 그
-   모델의 실행을 가지고 있으면 *(already in this tab)*). 버튼은 자기 모델만 복원합니다. round 20부터 탭이 두 모델 어느
-   쪽의 실행도 가지고 있지 않으면 카드 위 상자의 가장 새 제안이 둘 다 복원합니다: *Restore newest from this browser: Optical
-   waveguide (6 runs) and Heated silicon waveguide (2 runs) · file both-models.json, changed since · kept 8:44 AM*.
+   함께, 가열 모델은 마지막 결과 페이지와 함께. 실행이 없는 모델은 Model로 엽니다. 페이지는 맨 위에서 시작합니다. 프로젝트의 다른 모델이 이 탭에 있으면 가장 새 버튼 아래 줄이
+   *· Heated silicon waveguide · Run 1, Run 2 already in this tab*으로 끝나 탭이 가진 실행을 밝힙니다. 복구 항목은 모두 모델,
+   실행 수, 실행(*Run N*, 이름이 있으면 이름과 함께)을 보여 줍니다. 예: *Optical waveguide · 2 runs · Run 1 · design A, Run 2*.
+   Workspace tools 목록(*Restore earlier session from this browser · …*)은 기록이 연 세션 파일이나 마지막으로 보낸 세션
+   파일도 밝힙니다: 기록이 그 파일과 아직 같았으면 *· same as file …json*, 아니면 *· file …json, changed since*, Studio가
+   그것을 보관하기 전에 쓴 기록이면 *· file …json*. round 18부터는 브라우저 복구가 같은 프로젝트 파일에 다른 모델의 기록도
+   가지고 있으면 그 모델도 밝힙니다: *· also in this project: Heated silicon waveguide · Run 1*, 탭이 그 모델의 실행을
+   가지고 있으면 *· … (already in this tab)*(round 30까지는 *(restored separately)*를 붙였음).
+   round 20부터 탭이 두 모델 어느
+   쪽의 실행도 가지고 있지 않으면 카드 위 상자의 가장 새 제안이 프로젝트의 두 모델을 다 복원합니다: *Restore newest from this
+   browser: Optical waveguide (6 runs) and Heated silicon waveguide (2 runs)*. 그 줄은 두 기록이 모두 파일과 같을 때만
+   *same as*, 아니면 *newer than*이라고 하며, 두 기록 중 더 새 시각을 씁니다.
    가장 새 기록을 그 버튼처럼 복원하고, 그 복원이 끝나면(불러오기 질문에 Replace로 답한 뒤; Cancel은 둘 다 멈춤) 모델,
    시각, 파일로 다시 찾은 다른 모델의 기록을 복원한 다음 가장 새 기록의 모델을 Results에 보입니다. Messages는 *Restored
    Optical waveguide (6 runs) and Heated silicon waveguide (2 runs) from this browser, not recomputed.*입니다(round 19~21이
    붙이던 번호 문장은 [버전 12](#광학-세션-파일버전-12)부터 없음). 프로젝트 이름과 파일은 각 기록이
    가진 대로 돌아오며(두 기록의 프로젝트 이름이 다르면 더 새 기록의 이름), 두 기록이 모두 같은 프로젝트 파일과 아직 같았으면 헤더가 *… · saved …*로 읽힙니다. 두 번째 복원이 실패하면
-   첫 번째는 남고, Messages가 복원하지 못한 모델을 밝히며(*Heated silicon waveguide was not restored: …*) 그 모델의 카드
-   제안은 그대로 남습니다. 탭이 한 모델의 실행을 가지고 있으면 제안은 전처럼 자기 모델만 복원하고 다른 모델을 *(already in
-   this tab)*로 밝힙니다. 두 카드의 제안은 그대로입니다. round 21부터 가장 새 제안이 둘 다 복원하는 동안 상자는 다른 모델
-   자신의 기록을 다시 나열하지 않고(그 모델의 카드는 여전히 제안함), 오래된 항목은 *also in this project*를 뺍니다: 그것은
+   첫 번째는 남고, Messages가 복원하지 못한 모델을 밝히며(*Heated silicon waveguide was not restored: …*) 그 모델의 기록은
+   계속 제안됩니다. 탭이 한 모델의 실행을 가지고 있으면 제안은 전처럼 자기 모델만 복원하고 그 줄이 다른 모델을 *already in
+   this tab*으로 밝힙니다. round 21부터 가장 새 제안이 둘 다 복원하는 동안 상자는 다른 모델 자신의 기록을 다시 나열하지 않고(이제
+   둘째 버튼으로도, 오래된 사본으로도), 오래된 항목은 다른 모델을 뺍니다: 그것은
    다른 모델의 가장 새 기록을 가리켜, 오래된 항목이 저장된 뒤에 만든 실행을 밝힐 수 있었습니다. 이 브라우저에서의 모든 복원은 먼저 이 탭의
    대기 중인 복구 저장을 씁니다(0.7초 타이머를 기다리지 않고 바로). 그래서 이어 가는 기록이 저장된 기록입니다: 전에는 한 쌍의
    두 번째 복원이 서버가 모델을 확인하는 동안 이 탭이 바꾼 기록을 이어 갈 수 있었고, 그러면 이후의 모든 저장이 다른 탭의 변경으로
@@ -953,8 +958,8 @@ this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부�
 그다음 고정한 실행과 나머지 실행의 맵을 최신부터 맞는 만큼 두고(H1 전에는 고른 실행과 고정한 실행의 맵만), 표시는 “kept for recovery in this browser without the maps of 2 runs · File › Save
 keeps them”입니다. 그래도 한도를 넘으면 새로 쓰지 않고(“browser recovery unavailable: session over 16
 MiB · File › Save keeps your work”) 이전 기록이 남습니다. **Restore last session from this browser**, **Restore earlier session from this
-browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**(Workspace tools)과 Heated silicon
-waveguide 카드의 **Restore from this browser**는 Open session과 같은 검사를 합니다. 저장했던 세션 파일이나
+browser · Heated silicon waveguide · 3 runs · Run 1, Run 2, Run 3 · 시각**(Workspace tools)과 Library의
+**Continue where you left off**에서 가열 기록을 복원하는 것은 Open session과 같은 검사를 합니다. 저장했던 세션 파일이나
 연 세션 파일과 같았던 기록을 복구하면 광학 기록처럼 *Recovered from this browser · same as file …json*으로
 읽힙니다. 방금 연 템플릿은 첫 편집, 실행, 저장 전까지 *New model · not saved*로 읽힙니다. 프로젝트에 프로젝트 파일이
 있고 다른 모델도 있으면 가열 모델의 상태 표시줄은 제목 표시줄의 말로 프로젝트 안의 모델에 대해 말하므로 둘이 서로 어긋나지
@@ -2457,9 +2462,9 @@ session is over 16 MiB. File › Save keeps your work.* 또는 *Browser recovery
 File › Save keeps your work.*(실행 결과 메시지가 있으면 같은 줄 뒤에). 빈 새 탭은 기존 노트북을
 지우지 않습니다.
 
-새로고침 후 모델 카드(Optical waveguide 또는 Heated silicon waveguide 아래 **Restore from this browser**),
-시작 화면의 **Continue where you left off** 카드(저장된 모든 세션, 최신순), 또는 Workspace tools →
-**Restore last session from this browser**로 마지막 세션을 복원합니다. 전체 기록을 검증한 후 기존 교체 확인창을 표시하며, 결과는 새 계산이
+새로고침 후 시작 화면의 **Continue where you left off** 상자(작업마다 버튼 하나, 오래된 사본은 **Earlier copies in this
+browser (N)** 아래; 모델 카드는 *Kept in this browser · N runs · Restore at the top of the page*라고만 밝힘), 또는
+Workspace tools → **Restore last session from this browser**로 세션을 복원합니다. 전체 기록을 검증한 후 기존 교체 확인창을 표시하며, 결과는 새 계산이
 아닌 `recovered`로 표기합니다. 입력 Undo 이력은 새로 시작하고 파일/세션을 저장할
 때까지 미저장 상태를 유지합니다. 솔버는 실행하지 않습니다. 입력만 복구하는 기능과
 대기 작업 복구는 별도입니다.

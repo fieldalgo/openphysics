@@ -408,7 +408,7 @@ Save As, 그 파일을 **File › Open…**으로 열면 이름이 그 파일이
 15차부터 단계 막대의 파장이 접근성 트리에서 *Wavelength 1550 nm, edit*라는 이름의 버튼인지도 확인하고, 다중물리
 검사는 트리 경고 배지가 *Modes 1: Temperature input has no source: …*라는 이름의 이미지인지, 세션 검사는 Library
 카드마다의 *Open model*(16차부터, 이전에는 *Open (runs stay in this tab)*), *Runs stay in this tab when you switch models; this browser can bring completed runs back after you close it.*로
-끝나는 카드 설명(28차 G4; 그 전에는 *Runs stay in this tab until you close it.*)과 1440 × 900, 390 × 844에서 온전한 카드, 카드 제안의 *Start new (no runs)*를 읽습니다.
+끝나는 카드 설명(28차 G4; 그 전에는 *Runs stay in this tab until you close it.*)과 1440 × 900, 390 × 844에서 온전한 카드, (26~30차 이후 Library 복구 변경부터) *Start new (no runs)*가 있던 자리의 카드 줄 *Kept in this browser · N runs · Restore at the top of the page*를 읽습니다.
 16차부터 Save As 안내 *This browser cannot write to the file, so later saves download again under this name and may add
 “ (1)”.*(15차는 *Chrome and Edge save to the same file.*을 확인했으며 이제 사용 안내에만 있음), 파일 이름에서 온 프로젝트
 이름이 Save As를 따라가는지(*chosen*, 그다음 *design-a-ng*), 누설 사례의 기판을 T16 순서(Left x −1500, Bottom y −1200,
@@ -443,7 +443,9 @@ Compare의 선택 목록과 제목이 *closed*를 담고 O2의 24 px가 나오�
 내보내고 Messages가 *… Run 2 (500 × 220 nm · 2 modes) was dropped*와 **Keep Run 2, drop Run 3 (500 × 220 nm · 2 modes)
 instead**를 보이며, 그 버튼이 Run 2를 되돌리고 Run 3를 내보내는지(*Run 2 (…) is back; Run 3 (…) was dropped instead.*, 버튼은
 더 없음, 실행 보관부터 *Runs · 20 of 20 · 15 pinned*); 이전 결과의 교환 버튼을 다음 실행 뒤에 눌러도 아무것도 바뀌지 않는지; 실행 하나의 두 번째 세션 뒤 Library 상자가 *Restore newest from this browser:
-Optical waveguide · 1 run · Run 1 · kept …*(카드가 제안하는 기록)로 시작하고 실행 여섯 개 세션은 *… · older · kept …*(29차 L2 전에는 *saved*)인지;
+Optical waveguide · 1 run · Run 1*로 시작하고 그 아래 *Kept in this browser … · not saved to a file*(카드 줄이 세는 기록)이며,
+오래된 세션은 닫힌 *Earlier copies in this browser (N)* 아래에 *Older copy · kept in this browser … · not saved to a file*로 접혀
+있는지(29차 L2에서는 *… · older · kept …*, 그 전에는 *saved*);
 그 오래된 세션을 복원하면 상자가 숨고, 더 새 세션은 곧바로 마지막 세션으로, 이 탭의 기록이 쓰인 뒤에는 Workspace tools의
 이전 세션으로 제안되며, 복원한 세션은 다시 나오지 않는지. Library의 첫 화면 검사는 이제 카드 위 상자의 가장 새 제안을 보며,
 21차부터 실행 여섯 개를 넘기는 단계는 더는 대화 상자에 답하지 않습니다. 20차부터(사전 등록) 자체 브라우저 컨텍스트의 단계가 하나 더 실행 전 *Closed window*, 어느 경계에서든 범위 안내의 *3 × 2.4 µm window, closed (PEC
@@ -558,10 +560,11 @@ HQ1로 비교함. 같은 순서열에서 HQ: 변환 때 Messages 문장 없음, 
 삼각형마다 중심 픽셀에서 읽어 삼각형의 0.1 %(코어 온도 5 %) 이하에서 색 한 단계 이내, 고른 실행의 캔버스가 Save, Open,
 다시 Save, Restore 뒤에도 비트 단위로 같음), 실행 20개와 21번째 실행의 내보내기(H1 전에는 여섯 개와 일곱 번째), 손상되거나 더 새로운 파일의 거부, 다시 읽기 뒤 브라우저 복구, 이전 세션 세 개,
 두 탭의 충돌, 그리고 다시 켜기입니다: 광학 실행 두 개, 그 위로 가열 세션 파일 열기, 새로고침, 같은 파일 다시 열기. 그 뒤
-제목은 탭을 눌러도 *Opened …*를 유지하고, 복구 목록은 세션마다 한 번씩만 보여 주며, Optical waveguide 카드가 광학
-실행을 제안하고 그 실행은 같은 n_eff로 돌아옵니다. 또 도크와 하단의 이름 붙은 실행(*Run 1 · Heater 2e14 · …*)과,
-가열 세션의 저장 메시지가 그 파일에 없는 광학 실행을 밝히는지 확인합니다. 11차부터는 새로고침 뒤 Heated silicon
-waveguide 카드가 자기 가장 새 기록을 복원하고(19차부터 위 상자는 가장 새 기록인 그 기록으로 시작) 세션 파일의 저장 시각을 밝히는지,
+제목은 탭을 눌러도 *Opened …*를 유지하고, 복구 목록은 세션마다 한 번씩만 보여 주며, 상자가 광학
+실행을 제안하고(Optical waveguide 카드는 보관 중이라고만 밝힘) 그 실행은 같은 n_eff로 돌아옵니다. 또 도크와 하단의 이름 붙은 실행(*Run 1 · Heater 2e14 · …*)과,
+가열 세션의 저장 메시지가 그 파일에 없는 광학 실행을 밝히는지 확인합니다. 11차부터는 새로고침 뒤 가열 모델의
+가장 새 기록이 복원되고(30차까지는 그 카드로, 이제는 상자의 가장 새 제안으로, 그 줄은 *Kept in this browser … · same as …json, saved … ·
+Open file… gives the same runs*),
 복원된 제목이 *same as file …*인지, Workspace tools가 *Restore earlier session from this browser*라고 하는지 확인합니다. 13차부터는 Save As 이름
 뒤의 Save가 이름 대화상자 없이(25차부터 **Download again** 뒤에) 그 이름으로 다시 내려받는지(*Downloaded heated-design.json again*, 바닥글
 “ (1)” title 텍스트와 함께 *heated-design.json · downloaded …*), 연 모델 파일이나 세션 파일 뒤의 Save가 그 파일 이름을
@@ -591,7 +594,8 @@ Heated silicon waveguide; u8-optical.json holds Optical waveguide. Save under th
 *The file will hold Optical waveguide (no runs).*와 Save가 물을 때의 *… and Heated silicon waveguide (no runs).*, 가열
 모델이 합류한 뒤 상태 표시줄 *Heated silicon waveguide · in project u8-optical.json · not saved since it joined · …*와 두
 모델로 저장한 뒤의 *… · downloaded …*(제목 표시줄의 말과 함께), 두 카드의 *Return to Optical waveguide*와 *Return to Heated silicon waveguide*(20차 문구)를 확인합니다. 16차의 다시 불러오기
-단계에서도 두 카드의 제안이 다른 모델을 *· also in this project: … (restored separately)*로 밝힙니다. 19차부터(사전 등록)
+단계에서는 상자가 design-ab.json의 두 모델을 버튼 하나로 제안하고 그 아래 *same as design-ab.json, saved …*가 있습니다(30차까지는 두
+카드의 제안이 다른 모델을 *· also in this project: … (restored separately)*로 밝혔음). 19차부터(사전 등록)
 새 프로필이 `heater-study.json`을 열고 광 모델을 다시 실행한 뒤 새로고침하여 복원하면 헤더가 *Heater study · recovered from this
 browser · not saved to a file · …*(세션 버전 12부터 기록이 프로젝트 이름을 담음; 19차는 *Untitled project · recovered from a copy of
 heater-study.json · …*였고, 이름 없는 기록은 지금도 그렇게 읽힘)이고 상태 표시줄은 *Recovered from this browser (opened from
@@ -609,15 +613,16 @@ Run 8이 Run 7을 내보내며 *… was dropped; every other earlier run is pinn
 4~20, Run 22가 Run 21을 내보냄). P3부터 **File › Save**가 프로젝트 파일을 쓰므로 workspace와
 session 스크립트는 세션을 **File › Export › Model with runs (session file)…**로 저장합니다. 20차부터(사전 등록) project
 스크립트는 새 프로필에서 `heater-study.json`을 열고 두 모델을 보인 뒤 가열 기록이 쓰이고 1분 뒤 `r20-both.json`으로 저장하고
-새로고침합니다: 상자가 *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run) · same
-as file r20-both.json · saved …*로 시작하고, 가열 기록은 카드에서 같은 시각(파일의 저장 시각; 20차에는 상자에서도)을 밝히는지; 한 번의
+새로고침합니다: 상자가 *Restore newest from this browser: Optical waveguide (2 runs) and Heated silicon waveguide (1 run)*로 시작하고
+그 아래 *Kept in this browser … · same as r20-both.json, saved … · Open file… gives the same runs*가 있는지(30차까지는 이름표에
+파일과 시각이 있었고 가열 카드가 같은 시각을 밝혔음); 한 번의
 클릭이 둘 다 복원하여 *Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not
 recomputed. …*, 헤더 *Heater study · r20-both.json · saved …*, 광 모델의 Results가 나오고, Library에는 복원 제안이 남지 않으며
 *Return to Optical waveguide (2 runs)*와 *Return to Heated silicon waveguide (1 run)*로 읽히는지; 1440 × 900과 390 × 844에서
 가로 넘침이 없는지 봅니다. 그 복원에서 서버의 모델 확인은 2초 뒤에 답하고(DevTools Fetch 가로채기, 느린 컴퓨터처럼), 그 뒤의 편집(Modes to
 find 3)이 *Browser recovery updated …*로 쓰이고 헤더나 상태 표시줄에 *changed in another tab*이 없으며 새로고침 뒤에도 돌아오는지
-봅니다. 21차부터(사전 등록) 그 제안 옆에 상자가 가열 항목을 나열하지 않고 가열 카드는 여전히 그 기록을(파일의
-저장 시각과 함께) 제안하는지, 복원과 그 편집 뒤 Modes to find 4의 실행이 실행 목록과 Compare 선택 목록에서 *· closed · 4 modes ·*로 읽히고
+봅니다. 21차부터(사전 등록) 그 제안 옆에 상자가 가열 항목을 나열하지 않는지(26~30차 이후로는 둘째 버튼으로도 오래된
+사본으로도), 복원과 그 편집 뒤 Modes to find 4의 실행이 실행 목록과 Compare 선택 목록에서 *· closed · 4 modes ·*로 읽히고
 그 태그가 1440과 390 px에서 선택 목록 안에 들어가는지 봅니다.
 [세션 버전 12](packages/simcase/workspace.md#광학-세션-파일버전-12)(안정된 실행 번호, 사전 등록 K4·K5)부터 새
 프로필 하나가 `heater-study.json`을 열고 프로젝트 이름을 *both-models*로 바꾼 뒤 광학 모델을 네 번 더 실행하고, 값만 있는
@@ -639,6 +644,23 @@ browser*입니다. 1440 × 900과 390 × 844에서 가로 넘침은 없습니다
 fixture는 `tests/simcase/studio_session_fixtures/optical-v12-numbers.json`(이 Studio가 `numbered_sessions.mjs
 write`로 씀)과 `refusals-v12-fc654fe.json`(main fc654fe가 읽는 결과, 그 커밋의 static 폴더로 임시 worktree에서
 `numbered_sessions.mjs read`로 씀)입니다. session 스크립트의 파일에서 연 실행의 상태 표시줄은 *… · has the results of the current model*, 그 카드는 *Return to Heated silicon waveguide (2 runs)*입니다.
+
+26~30차 이후 Library 복구 변경부터 workspace, session, project 스크립트는 `tools/studio_browser/library_restore_checks.mjs`로
+Library를 읽습니다. 복원 버튼은 `checkVisibility()`가 참일 때만 셉니다. Chromium에서는 닫힌 `<details>`의 내용도 상자를
+가지기 때문입니다. Workspace tools 바닥글은 세지 않습니다. 모든 상태에서 스크립트는 카드 복원 버튼(`#resume-optical`,
+`#resume-heated-waveguide`와 그 *Start new*)이 없는지, **Open file…**이 하나인지, *(restored separately)*가 없는지, 탭에
+없는 보관 기록이 있는 모델에만 카드 줄이 있는지 확인합니다. 상태는 다음과 같습니다:
+
+- 기록 없음: 버튼 0개
+- 기록 하나: 버튼 1개와 그 설명 줄
+- 두 모델의 기록이 모두 프로젝트 파일과 같음: 버튼 1개, *same as …, saved … · Open file… gives the same runs*
+- 브라우저 사본이 파일 이후로 바뀜: 버튼 1개, *newer than …*, 오래된 사본은 닫혀 있음
+- 탭이 실행을 가짐: 버튼 0개
+
+1280 × 800과 390 × 844에서 `#resume-newest`와 `#resume-newest-detail`의 아래 끝은 Library 창(`#canvas`)의 보이는 아래
+끝과 뷰포트의 아래 끝보다 위에 있어야 합니다. `#resume-newest`의 접근성 설명(`Accessibility.getPartialAXTree`)은 그 설명
+줄과 같아야 합니다. **Not now**는 상자를 제목만 남기고 닫아야 하며, 그 제목은 첫 화면에 남고 보이는 복원 버튼은 없어야
+합니다. 제목을 다시 열면 같은 버튼이 다시 보여야 합니다.
 
 **자원 관측.** Linux 실행이 통과하면 정상·과도 Studio 서버와 열전도 영역 문서를 받는 Studio를
 고정 작업량으로 한 번 측정합니다. 관측값이며 성능 기준이 아닙니다. 영역 관측은 작업의 결과
