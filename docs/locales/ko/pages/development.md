@@ -492,9 +492,11 @@ Run 1과 Run 2가 다섯 번째 실행 뒤에도 *Run 5 is newer than this pair 
 열린 실행 앞의 계획 줄이, 열린 실행이 세션 파일(P2의 `optical-v10-open-f8ece10.json`)에서 연 것뿐이면 어림값 없이(*Open
 boundary · … · group index on (3 solves)*), 탭에서 열린 실행 뒤에는 *… · about N s*(또는 *min*), `optical-v10-open-full-083e151.json`
 에서 더 새 열린 실행을 더한 뒤에도 같은 말(시간이 없어 건너뜀; 그 파일의 이름 없는 프로젝트는 바뀐 뒤 *Untitled project ·
-changed since optical-v10-open-f8ece10.json, not saved · …*, P1), 새로고침, **Restore newest from this browser**, 군굴절률 켜기 뒤에는
-다시 어림값 없이 읽히는지(P4). 세션 파일과 복구 기록에는 실제 시간이 없으므로 파일에서 읽은 실행으로 낸 어림값은 확인하지 않습니다: 형식을
-바꾸지 않고는 생길 수 없습니다. 1440 × 900과 390 × 844에서 가로 넘침이 없는지도 확인합니다.
+changed since optical-v10-open-f8ece10.json, not saved · …*, P1), 새로고침, **Restore newest from this browser**, 군굴절률 켜기 뒤에도
+같은 *about* 말로 읽히는지(P4: 광학 세션 버전 16부터 복구 기록이 잰 열린 실행의 시간을 담음; 전에는 어림값이 없었음). 이어서 T18-G1(설계
+*Session versions 16 and 17*, S1)은 Run 5가 군굴절률 없는 열린 실행이고 시간 d5를 담은 `optical-v16-times.json`을 열어, File › Open
+뒤와 Restore 뒤 모두 *Open boundary · 2 modes · 2 searches · group index on (3 solves) · about N min*(N은 `aboutText(3·d5)`,
+fixture의 61.6 s에서는 *about 3 min*)으로, 선택을 끄면 *… · last such run 1:02*로 읽히는지 확인합니다. 1440 × 900과 390 × 844에서 가로 넘침이 없는지도 확인합니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 실행 보관(설계 *Keeping more runs*)부터 광학 모델은 실행 20개를 보관하므로, 실행 여섯 개 한도에 닿던 모든 단계(U2, X3, R21,
 R22 P4, R23 P4, 프로젝트 스크립트의 K4)는 한도에 닿는 실행 바로 앞에서 Add runs from file로

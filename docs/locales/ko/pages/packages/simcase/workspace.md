@@ -289,9 +289,12 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    시간 부분은 이 탭에서 경계 종류가 같은 가장 새 실행(군굴절률 상태와 무관)으로 낸 어림값입니다: 그 실행도 군굴절률을 계산했으면
    그 시간, 아니면 그 시간의 세 배(군굴절률은 풀이 두 번을 더함), *Open boundary · 2 modes · 2 searches · group index on (3 solves) ·
    about 3 min*(1분 30초 미만이면 *about 20 s*). 그런 실행이 없으면 어림값도 없습니다(round 20 규칙). round 24(B5)는 비교할 열린
-   실행이 파일에서 연 것뿐이던 P04의 경우를 확인했습니다: 세션 파일과 브라우저 복구 기록은 실행마다 완료 시각을 담지만 실제
-   시간은 담지 않으므로(세션 형식은 그대로) 그런 실행에는 시간이 없습니다. 어림값은 그 실행을 건너뛰고 이 탭에서 시간이 있는
-   더 오래된 실행을 쓰며, 없으면 어림값을 보이지 않습니다. 선택이 켜져 있는 동안 줄
+   실행이 파일에서 연 것뿐이던 P04의 경우를 확인했습니다: 버전 15 이하의 세션 파일과 그런 파일의 브라우저 복구 기록은 실행마다
+   완료 시각을 담지만 실제 시간은 담지 않으므로 그런 실행에는 시간이 없습니다. 어림값은 그 실행을 건너뛰고 이 탭에서 시간이 있는
+   더 오래된 실행을 쓰며, 없으면 어림값을 보이지 않습니다. [세션 버전 16](#광학-세션-파일버전-16)부터는 열린 경계 실행이 파일,
+   프로젝트 파일, 브라우저 복구에 시간을 담습니다: 그런 파일에서 열거나 더하거나 복원한 실행은 시간이 있어 이 탭의 실행처럼
+   셉니다(Resume으로 다시 따라간 실행은 서버의 계산 시간만 담고, 줄은 그 값을 씀). 닫힌 실행의 실제 시간은 여전히 이 탭에만
+   보존됩니다. 선택이 켜져 있는 동안 줄
    옆에 **Turn off group index** 버튼이 있습니다. 선택 자신의 편집이라(Undo로 되돌리고, Messages는 확인란과 같은 말을 함) 그
    뒤 줄은 선택이 꺼진 때처럼 읽힙니다. 군굴절률은 계속 입력입니다: 어떤 실행도 그것을 끄지 않습니다. round 23 테스터들은
    실행마다 그것을 켜 둔 채 열린 실행을 3:20–4:00 동안 *Computing job … 2:00*만 보며 기다렸습니다. 2026-11-24에 T18 열린 실행은
@@ -934,8 +937,8 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 File › Open이 모델 파일을 읽듯이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-15보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 16, newer than this Studio reads
-(versions 6–15). Open it in a newer Studio.”. 버전 9~14는 [광학 세션](#광학-세션-파일버전-9), 버전 15는 실행이
+16보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 17, newer than this Studio reads
+(versions 6–16). Open it in a newer Studio.”. 버전 9~14와 16은 [광학 세션](#광학-세션-파일버전-9), 버전 15는 실행이
 여섯 개보다 많은 다중물리 세션이며, 버전 9 아래의 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
@@ -2068,6 +2071,42 @@ digest)과 최상위 키가 같습니다. 버전 6~12는 실행을 최대 여섯
   14, newer than this Studio reads (versions 6–13). Open it in a newer Studio.*(프로젝트 파일의 항목은 앞에 *Optical waveguide: *).
   그런 파일을 담은 브라우저 복구 기록은 넘겨받지 않습니다. 프로젝트 파일은 버전 1 그대로이며(광학 항목은 버전 14를 읽음), 복구
   기록도 버전 1 그대로입니다. 광학 문서, 어댑터, 서버 응답, 결과, 다중물리 세션(버전 8)은 바뀌지 않습니다.
+
+### 광학 세션 파일(버전 16)
+
+버전 16은 열린 경계 실행이 자기 시간을 담을 수 있는 [버전 14](#광학-세션-파일버전-14)입니다(설계 "Session versions 16 and
+17", 수정 A1): 최상위 키, 실행 0~20개, 실행 번호, 압축 필드가 같습니다. 실행 기록은 버전 14의 키에 `digest` 앞의 두 키를 더하며,
+둘 다 선택이고 실행의 digest에 들어갑니다:
+
+```json
+"duration": 61552,
+"timings": {"mesh": 2.24, "solve": 57.352},
+```
+
+- **`duration`**은 탭에서 작업 시작부터 결과를 읽기까지의 실제 시간(정수 밀리초)으로, Run study 옆
+  [Compute 줄](#첫-광학-해석)이 이미 보이던 시간입니다. 탭이 시작부터 결과까지 따라간 작업에만 담습니다. **Resume**으로 다시
+  따라간 작업(Stop waiting이나 새로 고침 뒤)은 그 시간이 탭이 떨어져 있던 시간을 포함하므로 담지 않습니다.
+- **`timings`**는 결과의 서버 계산 시간 `{mesh, solve}`(초, 0.001 s로 반올림)로, 결과가 부르는 이름 그대로입니다. 다시 따라간
+  실행도 담습니다.
+- **시간을 쓰는 곳.** 실행의 시간은 `duration`, 없으면 `mesh + solve`입니다. Compute 줄의 *last such run m:ss*, 군굴절률을 켰을
+  때의 어림값(*about N min*), *Recompute Run N's fields · about …*가 이 값을 쓰므로 File › Open, Open project, Restore 뒤에도
+  실행을 계산한 탭에서처럼 읽힙니다. 2026-11-26에 잰 값(이 저장소의 컨테이너, 단일 스레드, 페이지처럼 작업을 따라가는 Node
+  클라이언트): T18 열린 실행 61.6 s(timings 2.24 + 57.35 s), 군굴절률을 켜면 179.2 s(2.235 + 175.21 s), 어림값 *about 3 min*(3 ×
+  61.6 s = 184.7 s, 3.0 % 큼). 실제 시간에는 상태 조회와 결과 내려받기가 들어가며(이 실행들에서 1~2 s), 백그라운드 탭이나 잠든
+  기계에서는 길어질 수 있고 잰 그대로 저장합니다.
+- **열린 실행만.** 닫힌 실행은 파일에 두 키를 담지 않으므로(실제 시간은 이전처럼 탭에만), 버전 16은 이 Studio가 계산한 열린
+  실행이 세션에 있을 때만 씁니다. 그 밖에는 버전 14, 13, 12, 11, 10, 9, 7로 바이트 그대로 씁니다. 이전 버전 파일에 새 닫힌 실행을
+  더하면 버전이 그대로이고, 새 열린 실행을 더하면 버전 16이 되며 이전 실행 기록과 digest는 바뀌지 않습니다.
+- **거부.** 1 ms~7일의 정수가 아닌 `duration`, 정확히 `mesh` 다음 `solve`이고 각각 0~604,800 s의 수가 아닌 `timings`, 닫힌
+  실행의 두 키는 *Run 5: invalid run time.*으로 거부합니다. digest를 새로 계산하지 않고 고친 시간은 *Run 3 changed after it was
+  saved (its check value does not match).*, 버전 14 이하 파일에서는 모르는 키입니다(*Run 2: unknown key "duration".*).
+- **이전 Studio.** 버전 15까지 읽는 Studio(main c0dbc09)는 버전 16 파일을 이름을 들어 거부합니다: *This session file is version
+  16, newer than this Studio reads (versions 6–15). Open it in a newer Studio.*(프로젝트 파일의 항목은 앞에 *Optical waveguide: *).
+  그런 파일을 담은 브라우저 복구 기록은 넘겨받지 않습니다(`refusals-v16-c0dbc09.json`). 그러므로 이 Studio가 저장한, 열린 경계
+  실행을 담은 세션 파일에는 이 Studio 이상이 필요합니다. 프로젝트 파일과 복구 기록은 버전 1 그대로이고, 광학 문서, 어댑터, 서버
+  응답은 바뀌지 않습니다.
+- **검사.** `tests/simcase/studio_run_time_format.cjs`(RT1~RT7과 T18-G1, 실제 실행의 고정 파일 `optical-v16-times.json`)와
+  작업 공간 브라우저 검사의 T18-G1 단계(그 파일을 File › Open으로 연 뒤 Restore).
 
 ### Compare의 모드 짝짓기
 

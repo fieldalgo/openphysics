@@ -5,7 +5,7 @@
 // with their candidate record, or a closed-window search's modes above n = 1.45, with the engine's TE
 // fractions, effective areas and group index of those modes. Run retention's Recompute Run N's fields
 // builds the same run of the recomputed result and compares its values with the stored ones.
-import {DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,validateRun,engineRunValues,engineGroupIndex,engineGroupIndexReasons} from './workspace-notebook.mjs';
+import {DEFAULT_MODE_COUNT,opticalSettings,closedTargetSettings,validateRun,engineRunValues,engineGroupIndex,engineGroupIndexReasons,resultTimings} from './workspace-notebook.mjs';
 import {openResultValues,openSettings,keptValues} from './workspace-open-run.mjs';
 import {closedResultValues} from './workspace-closed-target.mjs';
 import {readOpticalField} from './workspace-field.mjs';
@@ -18,7 +18,8 @@ export function resultModes(result,pending){
  return {asked,re,im};
 }
 /** The run of a result (validated, origin "local"), with groupIndexReasons (this tab only) when the
- * engine gave them. pending: the job's record (job, input, modeCount, openBoundary, searchTarget,
+ * engine gave them. An open run keeps the server's compute time (timings {mesh, solve} in s to
+ * 0.001 s, session version 16) when the result holds both numbers; a closed run keeps none. pending: the job's record (job, input, modeCount, openBoundary, searchTarget,
  * serverVersion). completedAt: the run's time (now unless given). */
 export function runOfResult(result,pending,{completedAt=new Date().toISOString()}={}){
  const {asked,re,im}=resultModes(result,pending),input=pending.input;
@@ -31,6 +32,7 @@ export function runOfResult(result,pending,{completedAt=new Date().toISOString()
  const closedSettings=opticalSettings(input.model.wavelength,input.model.coreMesh,asked);
  const settings=open?openSettings(closedSettings,pending.openBoundary,input.model.shapes):near?closedTargetSettings(closedSettings,target):closedSettings;
  const completed=validateRun({job:pending.job,completedAt,settings,input,effective_index:keptIm?{re:[...kept],im:[...keptIm]}:[...kept],field:readOpticalField(open?open.data:near?near.data:result,kept.length,{open:!!open}),origin:'local',serverVersion:pending.serverVersion,
+  ...(open&&resultTimings(result.timings)?{timings:resultTimings(result.timings)}:{}),
   ...(open?{open_boundary:open.record,...keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},open.keep)}:near?keptValues({...engineRunValues(result.summary,re.length),...engineGroupIndex(result.summary,re.length)},near.keep):{
   // the engine's TE fractions and effective areas, kept with the run (a version 9 file keeps them)
   ...engineRunValues(result.summary,re.length),

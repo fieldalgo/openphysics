@@ -231,7 +231,7 @@ test('P3 (E3): an estimate from the last run with the same boundary: as is with 
 
 test('P3 (E3): Turn off group index beside the plan line turns the option off; the option stays an input',()=>{
  const app=read('workspace-app.mjs'),plan=body(app,'function refreshRunOptions(){','\n}');
- assert.ok(plan.includes('estimate=plan.groupIndex?groupIndexEstimate(runs,plan,kinds):null,text=runPlanText({...plan,last:plan.groupIndex?null:last?.duration??null,estimate});'));
+ assert.ok(plan.includes('estimate=plan.groupIndex?groupIndexEstimate(runs,plan,kinds):null,text=runPlanText({...plan,last:plan.groupIndex?null:last?runTimeMs(last):null,estimate});'));
  assert.ok(plan.includes('refreshGroupIndexOff(plan.groupIndex);'));
  const off=body(app,'function refreshGroupIndexOff(on){','\n}');
  assert.ok(off.includes("button.textContent='Turn off group index';button.onclick=turnOffGroupIndex;"));

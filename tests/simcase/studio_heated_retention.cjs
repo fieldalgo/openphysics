@@ -100,8 +100,8 @@ test('HK3: version 15 holds 7 to 20 runs, is read and written byte for byte, and
  refused(edit(text,d=>{d.runs[0].result.mesh.triangles[0][0]=99999;d.runs[0].digest=M.recordDigest(d.runs[0]);}),"Run 2's stored maps are not well formed: triangle 0 names node 99999, outside 0–1725.");
  refused(edit(text,d=>{d.application='optical';}),'This session file holds a “optical” model, which this Studio does not read.');
  // above 15 by name
- refused(edit(text,d=>{d.version=16;}),'This session file is version 16, newer than this Studio reads (versions 6–15). Open it in a newer Studio.');
- assert.equal(N.HIGHEST_SESSION_VERSION,M.RUNS_MULTIPHYSICS_VERSION);
+ refused(edit(text,d=>{d.version=17;}),'This session file is version 17, newer than this Studio reads (versions 6–16). Open it in a newer Studio.');
+ assert.equal(N.HIGHEST_SESSION_VERSION,N.TIMED_SESSION_VERSION);
 });
 
 test('HK4: main ddb09a1 refuses a version 15 file by name, alone, in a project and in a recovery record, and does not adopt the record',async()=>{

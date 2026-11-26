@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,shortcutRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,runTime as runTimeMs,shortcutRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -26,7 +26,7 @@ import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,SHORTCUT_MODE_COUNT,c
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
-import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText} from './workspace-notebook.mjs';
+import {MAX_SESSION_BYTES,sessionSizeText,fieldsNotKeptText,MODE_COUNT_RANGE,RUN_LIMIT,RUNS_KEPT_TEXT,runsNodeLabel,DEFAULT_MODE_COUNT,isClosedTargetRun,runSearchTarget,validateRunLabel,runTableCsv,appendRun,mergeRuns,createSession,captureSession,parseSession,studySignature,runModeCount,runStampEntry,sessionStudyInput,withPmlCheck,foundText,writeOpticalSession,opticalOverflowQuestion,sessionText,isRunDuration} from './workspace-notebook.mjs';
 import {runHeading,fieldHeading,formatIndex,formatPercent,defaultComparison,compareSide,runDesign,comparisonAfterRun,pairChosen,newerThanPair,newestPairOffer} from './workspace-compare.mjs';
 import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
@@ -1423,7 +1423,7 @@ function refreshFieldWarning(running,matched){
 function refreshRunOptions(){
  const host=$('run-options');if(!host)return;const shown=isOptical()&&!multiView.active()&&applicationChosen();host.hidden=!shown;if(!shown)return;
  const open=!!pmlNow(),plan={open,searches:open&&lowerTarget(effectiveTarget(state.openBoundary,state.shapes))!==null?2:1,groupIndex:state.groupIndex===true,pmlCheck:ui.pmlCheck===true&&hasOpenEdge(state.openBoundary),modeCount:state.modeCount,searchTarget:open?null:closedTargetNow()};
- const kinds={isOpen:isOpenRun,hasGroup:hasGroupIndex},last=lastComparableRun(runs,plan,kinds),estimate=plan.groupIndex?groupIndexEstimate(runs,plan,kinds):null,text=runPlanText({...plan,last:plan.groupIndex?null:last?.duration??null,estimate});
+ const kinds={isOpen:isOpenRun,hasGroup:hasGroupIndex},last=lastComparableRun(runs,plan,kinds),estimate=plan.groupIndex?groupIndexEstimate(runs,plan,kinds):null,text=runPlanText({...plan,last:plan.groupIndex?null:last?runTimeMs(last):null,estimate});
  refreshDropWarning();refreshEdgeWarning();refreshGroupIndexOff(plan.groupIndex);
  const line=$('run-plan');if(line.textContent!==text)line.textContent=text;line.title=plan.groupIndex?'What the next run does; change it in Study or Physics › Optical modes. The estimate is the wall time of the last run in this tab with the same boundary, 3 times it when that run had no group index.':'What the next run does; change it in Study or Physics › Optical modes. The time is the wall time of the last run in this tab with the same boundary and group index setting.';
 }
@@ -2321,6 +2321,9 @@ let jobPhase='idle',jobOperation=0,jobResumeBlocked=false;
 const DONE_BANNER_MS=6000;let doneBannerTimer=0;
 function dismissDoneBanner(){clearTimeout(doneBannerTimer);doneBannerTimer=0;if(jobPhase!=='done')return;jobPhase='idle';refreshJobControls();}
 for(const type of ['pointerdown','keydown','click'])document.addEventListener(type,()=>{if(jobPhase==='done')dismissDoneBanner();},true);
+// The jobs this tab followed again with Resume (after Stop waiting or a reload): their runs keep no
+// wall time (session version 16), in this tab only.
+const resumedJobs=new Set();
 const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  // run retention: a recompute's job reads "Recomputing Run N's fields · about …", and when done says
  // what its result did
@@ -2356,7 +2359,10 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  // closed-window search's modes, with the engine's values of those modes
  const completed=runOfResult(result,pending);
  if(result.summary?.group_index_method&&!completed.group_index)notice('The group index of this result could not be read; the run is kept without it.');
- completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const appended=appendRun(runs,completed),next=prior?inNumberOrder(appended):appended,dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);runs=next;solverRun=runs.find(run=>run.job===completed.job);
+ completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}
+ // session version 16: the wall time only of a job followed from its start to its result (a resumed
+ // job's time holds the time the tab was detached) and of 1 ms to 7 days; timings stay either way
+ if(resumedJobs.has(pending.job)||!isRunDuration(completed.duration))delete completed.duration;resumedJobs.delete(pending.job);const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const appended=appendRun(runs,completed),next=prior?inNumberOrder(appended):appended,dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);runs=next;solverRun=runs.find(run=>run.job===completed.job);
  {const other=dropped.length===1?swapCandidate(runs,solverRun):null;dropSwap=other?{kept:dropped[0],other,newest:solverRun,list:runs}:null;}
  // round 22 (V4): with every other earlier run pinned there is no swap: the dropped words say why
  droppedNote=!dropped.length?'':swapCandidate(runs,solverRun)?droppedAfterText(dropped):droppedNoSwapText(dropped);
@@ -2381,7 +2387,7 @@ try{pendingJob=readPending(sessionStorage);if(pendingJob){jobPhase='detached';$(
 $('stop-waiting').onclick=()=>{if(jobMonitor.busy){jobOperation++;jobMonitor.stop();}};
 $('resume-job').onclick=async()=>{
  if(!pendingJob||solverBusy||!connection.ready||jobResumeBlocked)return;
- jobOperation++;const resumed=pendingJob;try{await jobMonitor.follow(resumed,connection.instance);await followPmlCheck(resumed);}catch(error){if([404,409].includes(error.status))jobResumeBlocked=true;$('job-message').textContent=error.message;}finally{if(solverBusy&&!jobMonitor.busy){solverBusy=false;render();}}
+ jobOperation++;const resumed=pendingJob;resumedJobs.add(resumed.job);try{await jobMonitor.follow(resumed,connection.instance);await followPmlCheck(resumed);}catch(error){if([404,409].includes(error.status))jobResumeBlocked=true;$('job-message').textContent=error.message;}finally{if(solverBusy&&!jobMonitor.busy){solverBusy=false;render();}}
  refreshJobControls();
 };
 $('forget-job').onclick=()=>{if(solverBusy)return;jobOperation++;setPending(null);jobPhase='idle';$('job-message').textContent='Job detached. Server computation was not cancelled.';notice('Job detached. You may start another calculation; server computation was not cancelled.');render();refreshJobControls();};

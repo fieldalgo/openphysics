@@ -619,10 +619,13 @@ group index on (3 solves)*) when the only open runs were opened from a session f
 `optical-v10-open-f8ece10.json`), *… · about N s* (or *min*) after an open run in the tab, the same
 words after a newer open run is added from `optical-v10-open-full-083e151.json` (it has no wall
 time and is skipped; that file's untitled project reads *Untitled project · changed since
-optical-v10-open-f8ece10.json, not saved · …* once changed, P1), and none again after a reload, **Restore newest from this browser** and the
-group index turned on (P4).
-Session files and recovery records hold no wall time, so an estimate from a run read from a file is
-not checked: it cannot occur without a format change. No horizontal overflow at 1440 × 900 or 390 × 844.
+optical-v10-open-f8ece10.json, not saved · …* once changed, P1), and the same *about* words again after a reload, **Restore newest from this browser** and the
+group index turned on (P4: since optical session version 16 the record keeps the measured open run's
+time; it read none before). T18-G1 (design *Session versions 16 and 17*, S1) then opens
+`optical-v16-times.json`, whose Run 5 is open without group index and keeps its time d5, and reads
+*Open boundary · 2 modes · 2 searches · group index on (3 solves) · about N min* with N from
+`aboutText(3·d5)` (*about 3 min* for the fixture's 61.6 s), and *… · last such run 1:02* with the
+option off, both after File › Open and after Restore. No horizontal overflow at 1440 × 900 or 390 × 844.
 Since run retention (design *Keeping more runs*) the optical model keeps 20 runs, so every stage
 that reached the six-run limit (U2, X3, R21, R22 P4, R23 P4 and the project script's K4) adds
 `tests/simcase/studio_session_fixtures/optical-values-only-14.json` by Add runs from file right

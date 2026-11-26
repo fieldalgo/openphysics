@@ -46,7 +46,7 @@ const GUIDED=(head,x)=>`${head} is guided: Re n_eff ${x} is above the index of e
 test('G9: a closed run of the session fixtures gets no category text; its notes and the run are unchanged',()=>{
  // as the page reads them, and every closed run record of every fixture as its file holds it
  const page=pageRuns(),closed=[...page,...fixtureRuns()].filter(r=>r.run.settings.boundary!=='PML');
- assert.equal(page.filter(r=>r.run.settings.boundary!=='PML').length,38);assert.ok(closed.length>=97,`${closed.length} closed runs`);
+ assert.equal(page.filter(r=>r.run.settings.boundary!=='PML').length,39);assert.ok(closed.length>=97,`${closed.length} closed runs`);
  let withNotes=0;
  for(const {file,run} of closed){
   const text=JSON.stringify(run);
@@ -79,7 +79,7 @@ test('G9: the page adds channel rows only from placeChannelNotes, after the regi
 
 test('every open run of the fixtures is classified, with or without its field',()=>{
  const open=pageRuns().filter(r=>r.run.settings.boundary==='PML');
- assert.equal(open.length,6);assert.ok(open.some(r=>r.run.field)&&open.some(r=>!r.run.field));
+ assert.equal(open.length,8);assert.ok(open.some(r=>r.run.field)&&open.some(r=>!r.run.field));
  for(const {file,run} of open){
   const c=C.modeChannel(run);
   assert.equal(c.length,run.effective_index.length,file);

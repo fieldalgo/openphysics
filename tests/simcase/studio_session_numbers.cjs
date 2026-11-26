@@ -104,7 +104,7 @@ test('K2: the version 12 reader refuses a changed, missing, invalid, repeated or
  const eleven=edit(text,d=>{d.version=11;});
  refused(eleven,'Run 1: unknown key "number".');
  // version 14 is the newer one (13 holds more than six runs)
- refused(edit(text,d=>{d.version=16;}),'This session file is version 16, newer than this Studio reads (versions 6–15). Open it in a newer Studio.');
+ refused(edit(text,d=>{d.version=17;}),'This session file is version 17, newer than this Studio reads (versions 6–16). Open it in a newer Studio.');
 });
 
 test('K2: version 12 is written exactly when a run is not numbered by its place',()=>{
@@ -124,7 +124,7 @@ test('K2: version 12 is written exactly when a run is not numbered by its place'
  assert.deepEqual(N.parseSession(fixture('optical-v7-three.json')).runs.map(r=>r.number),[1,2,3]);
  // the number is not an enumerated key of a parsed run: a copy is a run without a number
  const run=s.runs[0];assert.equal(run.number,3);assert.equal(Object.keys(run).includes('number'),false);assert.equal({...run}.number,undefined);
- assert.deepEqual([...N.OPTICAL_SESSION_VERSIONS],[6,7,9,10,11,12,13,14]);assert.deepEqual([...PF.KIND_VERSIONS.workspace],[6,7,9,10,11,12,13,14]);
+ assert.deepEqual([...N.OPTICAL_SESSION_VERSIONS],[6,7,9,10,11,12,13,14,16]);assert.deepEqual([...PF.KIND_VERSIONS.workspace],[6,7,9,10,11,12,13,14,16]);
 });
 
 test('K3 and K9: main fc654fe refuses version 12 by name and does not adopt its record; it reads a version 11 record alike with and without project',()=>{

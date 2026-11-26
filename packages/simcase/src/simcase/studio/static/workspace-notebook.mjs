@@ -65,8 +65,30 @@ export const RUNS_SESSION_VERSION=13;
 // when a run kept with its field holds it compact; otherwise version 13, 12, 11, 10, 9 or 7, byte for
 // byte. The previous Studio reads versions 6 to 13 and refuses a version 14 file by name.
 export const COMPACT_SESSION_VERSION=14;
-/** Whether a version writes and reads the run number (versions 12 to 14). */
-const numbered=version=>version===NUMBERED_SESSION_VERSION||version===RUNS_SESSION_VERSION||version===COMPACT_SESSION_VERSION;
+// Format 16 (run time, design "Session versions 16 and 17", amendment A1): format 14 whose open-boundary
+// runs may hold their time, both inside the run's digest: duration (the wall time in this tab, whole
+// ms, only for a run followed from its start to its result without a resume) and timings (the
+// server's compute time {mesh, solve} in s, rounded to 0.001 s). Written only when an open run holds
+// either; closed runs never hold them, and a session without such a run is written as version 14, 13,
+// 12, 11, 10, 9 or 7, byte for byte. The previous Studio reads versions 6 to 15 and refuses a version
+// 16 file by name.
+export const TIMED_SESSION_VERSION=16;
+/** Whether a version writes and reads the run number (versions 12 to 14 and 16). */
+const numbered=version=>version===NUMBERED_SESSION_VERSION||version===RUNS_SESSION_VERSION||version===COMPACT_SESSION_VERSION||version===TIMED_SESSION_VERSION;
+// The run time a file holds (version 16): a duration of 1 ms to 7 days, compute times of 0 to 7 days.
+export const MAX_RUN_DURATION_MS=7*24*3600*1000;
+/** Whether d is a run's wall time a file holds: a safe integer of 1 ms to 7 days. */
+export const isRunDuration=d=>Number.isSafeInteger(d)&&d>=1&&d<=MAX_RUN_DURATION_MS;
+/** Whether t is a run's compute time a file holds: exactly {mesh, solve}, each finite, 0 to 7 days in s. */
+export const isRunTimings=t=>isObject(t)&&Object.keys(t).join()==='mesh,solve'&&[t.mesh,t.solve].every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=MAX_RUN_DURATION_MS/1000);
+/** The server's compute time of a result (result.timings), each rounded to 0.001 s, or null when it
+ * does not hold both numbers. */
+export function resultTimings(timings){
+ const round=x=>Math.round(x*1000)/1000,t=isObject(timings)?{mesh:round(timings.mesh),solve:round(timings.solve)}:null;
+ return t&&isRunTimings(t)?t:null;
+}
+/** Whether a run holds a time a version 16 file writes: an open run with duration or timings. */
+export const hasRunTime=run=>run?.settings?.adapter===OPEN_ADAPTER&&(run.duration!==undefined||run.timings!==undefined);
 // The adapter of this Studio: optical-shapes-v8 builds the document of optical-shapes-v7 with the
 // mode count asked for (1 to 8). A version 7 run is a v8 run of two modes: its document is the same.
 export const OPTICAL_ADAPTER='optical-shapes-v8';
@@ -228,6 +250,13 @@ export function validateRun(record,imported=false,{format=null,number=null,compa
   if(record.pml_check!==undefined)extra.pml_check=checkPmlCheck(record.pml_check,k,which);
  }else if(record.open_boundary!==undefined||record.pml_check!==undefined)throw new Error(`${which}: a closed window has no open boundary record.`);
  else if(extra.group_index_im!==undefined)throw new Error(`${which}: a closed window has a real group index.`);
+ // the run's time: an open run's in a version 16 file (inside its digest); a run of this tab keeps its
+ // wall time, and a closed run keeps it in the tab only (a file never holds a closed run's time)
+ if(record.duration!==undefined||record.timings!==undefined){
+  if((record.duration!==undefined&&!isRunDuration(record.duration))||(record.timings!==undefined&&!isRunTimings(record.timings))||(format!==null&&settings.adapter!==OPEN_ADAPTER))throw new Error(`${which}: invalid run time.`);
+  if(record.duration!==undefined)extra.duration=record.duration;
+  if(record.timings!==undefined)extra.timings={mesh:record.timings.mesh,solve:record.timings.solve};
+ }
  let f=record.field,field=null,stored=null;
  // a compact field: the record of a version 14 file (its strings decoded and checked), or a field of
  // this tab already compact (its record kept with it); either is then read as nested numbers
@@ -281,6 +310,7 @@ export function engineGroupIndexReasons(summary,k){
 const RUN_KEYS_9=['job','completedAt','label','pinned','origin','serverVersion','settings','input','effective_index','field','te_polarization_fraction','effective_area','group_index','group_index_method','digest'];
 const RUN_KEYS_10=[...RUN_KEYS_9.slice(0,-1),'open_boundary','pml_check','digest'];
 const RUN_KEYS_12=[RUN_KEYS_10[0],'number',...RUN_KEYS_10.slice(1)];
+const RUN_KEYS_16=[...RUN_KEYS_12.slice(0,-1),'duration','timings','digest'];
 /** Whether n is a run number: a safe integer of at least 1. */
 export const isRunNumber=n=>Number.isSafeInteger(n)&&n>=1;
 /** A run's number: its own in the tab, else its place in the list (i: its index). */
@@ -292,7 +322,7 @@ export const fitsVersion7=run=>run.settings.adapter===V7_ADAPTER||(run.settings.
  * left out when keepField is false (the TE fractions and areas the run shows are then written),
  * and the digest of the record. */
 function sessionRun(run,version=SESSION_VERSION,keepField=true,number=null){
- const {signature,field,effective_index_im,te_polarization_fraction,effective_area,group_index,group_index_im,group_index_method,open_boundary,pml_check,...record}=validateRun(run);
+ const {signature,field,effective_index_im,te_polarization_fraction,effective_area,group_index,group_index_im,group_index_method,open_boundary,pml_check,duration,timings,...record}=validateRun(run);
  // a compact field is written again from its record (the strings it was read from or encoded to)
  const fields=field&&(compactRecord(field)??{node_coordinates:field.node_coordinates,triangles:field.triangles,real:field.real,imag:field.imag});
  if(version===SESSION_VERSION)return {...record,settings:v7Settings(record.settings),field:fields};
@@ -307,6 +337,8 @@ function sessionRun(run,version=SESSION_VERSION,keepField=true,number=null){
  if(group_index_method!==undefined)out.group_index_method=group_index_method;
  if(open_boundary)out.open_boundary=open_boundary;
  if(pml_check)out.pml_check=pml_check;
+ // version 16: an open run's time (a closed run's wall time stays in the tab)
+ if(version===TIMED_SESSION_VERSION&&open_boundary){if(duration!==undefined)out.duration=duration;if(timings!==undefined)out.timings=timings;}
  return {...out,digest:recordDigest(out)};
 }
 // The TE fractions and effective areas a run shows (opticalModes keeps them on the run).
@@ -415,6 +447,8 @@ function readView(view){
  * and the input is of version 6 or 7, else 9 (an input of version 8, with study settings, is
  * held by version 9 only). */
 export function sessionVersion(runs,view={mode:0},keep=null,input=null){
+ // version 16 only when an open run holds its time (amendment A1: closed runs never do)
+ if(runs.some(hasRunTime))return TIMED_SESSION_VERSION;
  // version 14 only when a run is written with a compact field
  if(runs.some(run=>isCompactField(run.field)&&(!keep||keep.has(run.job))))return COMPACT_SESSION_VERSION;
  // version 13 only above six runs: a session of six or fewer is written as before
@@ -561,17 +595,16 @@ export const newerVersionText=(version,highest)=>`This session file is version $
 const TOP_KEYS_9=['format','version','application','input','runs','selected','comparison','view'];
 /** The optical session versions parseSession reads (6, 7 and 9): a project file's workspace entry
  * accepts these, so a later version is added here only (workspace-project-file.mjs). */
-export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION,CLOSED_TARGET_SESSION_VERSION,NUMBERED_SESSION_VERSION,RUNS_SESSION_VERSION,COMPACT_SESSION_VERSION]);
-/** The most runs a session file of this version holds: 20 in versions 13 and 14, six in versions 6 to 12. */
-export const sessionRunLimit=version=>version===RUNS_SESSION_VERSION||version===COMPACT_SESSION_VERSION?RUN_LIMIT:PREVIOUS_RUN_LIMIT;
+export const OPTICAL_SESSION_VERSIONS=Object.freeze([6,SESSION_VERSION,OPTICAL_SESSION_VERSION,OPEN_SESSION_VERSION,CLOSED_TARGET_SESSION_VERSION,NUMBERED_SESSION_VERSION,RUNS_SESSION_VERSION,COMPACT_SESSION_VERSION,TIMED_SESSION_VERSION]);
+/** The most runs a session file of this version holds: 20 in versions 13, 14 and 16, six in versions 6 to 12. */
+export const sessionRunLimit=version=>version===RUNS_SESSION_VERSION||version===COMPACT_SESSION_VERSION||version===TIMED_SESSION_VERSION?RUN_LIMIT:PREVIOUS_RUN_LIMIT;
 
 // Versions 6 and 7 are optical sessions, read as before; version 8 is a multiphysics model with
 // its runs (workspace-multiphysics-session.mjs), whose result has application: 'multiphysics';
-// version 9 is an optical session with application: 'optical'; versions 10 to 14 are optical and
-// version 15 is a multiphysics model of more than six runs (run retention of the heated model).
-/** The highest session version this Studio reads: 15, RUNS_MULTIPHYSICS_VERSION (the heated model's
- * run retention), written here as a number since the two modules import each other. */
-export const HIGHEST_SESSION_VERSION=15;
+// version 9 is an optical session with application: 'optical'; versions 10 to 14 and 16 are optical
+// and version 15 is a multiphysics model of more than six runs (run retention of the heated model).
+/** The highest session version this Studio reads: 16, TIMED_SESSION_VERSION (run time on open runs). */
+export const HIGHEST_SESSION_VERSION=16;
 export function parseSession(text,{recovered=false}={}){
  if(new TextEncoder().encode(text).length>MAX_SESSION_BYTES)throw new Error('Session exceeds 16 MiB.');
  let doc;try{doc=JSON.parse(text);}catch{
@@ -581,7 +614,7 @@ export function parseSession(text,{recovered=false}={}){
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
  if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>HIGHEST_SESSION_VERSION)throw new Error(newerVersionText(doc.version,HIGHEST_SESSION_VERSION));
  if(doc?.format==='openphysics-studio-session'&&MULTIPHYSICS_VERSIONS.includes(doc.version))return readMultiphysicsSession(doc,{recovered});
- const twelve=doc?.version===NUMBERED_SESSION_VERSION||doc?.version===RUNS_SESSION_VERSION||doc?.version===COMPACT_SESSION_VERSION,eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION||twelve,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
+ const sixteen=doc?.version===TIMED_SESSION_VERSION,twelve=doc?.version===NUMBERED_SESSION_VERSION||doc?.version===RUNS_SESSION_VERSION||doc?.version===COMPACT_SESSION_VERSION||sixteen,eleven=doc?.version===CLOSED_TARGET_SESSION_VERSION||twelve,ten=doc?.version===OPEN_SESSION_VERSION||eleven,nine=doc?.version===OPTICAL_SESSION_VERSION||ten;
  if(doc?.format!=='openphysics-studio-session'||!OPTICAL_SESSION_VERSIONS.includes(doc.version)||!Array.isArray(doc.runs)||doc.runs.length>sessionRunLimit(doc.version))throw new Error('Unsupported session format or run count.');
  if(nine){
   const unknown=Object.keys(doc).find(k=>!TOP_KEYS_9.includes(k));if(unknown!==undefined)throw new Error(`Unknown key ${JSON.stringify(unknown)} in the session file.`);
@@ -611,7 +644,7 @@ export function parseSession(text,{recovered=false}={}){
   let record=r;
   if(nine){
    if(!isObject(r))throw new Error(`Run ${i+1} is not a run record.`);
-   const unknown=Object.keys(r).find(k=>!(twelve?RUN_KEYS_12:ten?RUN_KEYS_10:RUN_KEYS_9).includes(k));if(unknown!==undefined)throw new Error(`Run ${i+1}: unknown key ${JSON.stringify(unknown)}.`);
+   const unknown=Object.keys(r).find(k=>!(sixteen?RUN_KEYS_16:twelve?RUN_KEYS_12:ten?RUN_KEYS_10:RUN_KEYS_9).includes(k));if(unknown!==undefined)throw new Error(`Run ${i+1}: unknown key ${JSON.stringify(unknown)}.`);
    for(const key of ['label','pinned','origin','serverVersion','settings','input','effective_index','digest'])if(!Object.hasOwn(r,key))throw new Error(`Run ${i+1}: missing ${key}.`);
    if(typeof r.label!=='string'||typeof r.pinned!=='boolean'||!['local','imported','recovered'].includes(r.origin))throw new Error(`Run ${i+1}: invalid name, pin state or origin.`);
    if(typeof r.digest!=='string'||r.digest!==recordDigest(r))throw new Error(`Run ${i+1} changed after it was saved (its check value does not match).`);
@@ -619,7 +652,7 @@ export function parseSession(text,{recovered=false}={}){
    // a version 6 or 7 run: its keys of version 7 only (any other key is not read, as before)
    record={job:r?.job,completedAt:r?.completedAt,label:r?.label,pinned:r?.pinned,origin:r?.origin,serverVersion:r?.serverVersion,settings:r?.settings,input:r?.input,effective_index:r?.effective_index,field:r?.field};
   }
-  const run=validateRun(record,true,{format:eleven?11:ten?10:nine?9:7,number:numbers[i],compact:doc.version===COMPACT_SESSION_VERSION});if(recovered)run.origin='recovered';Object.defineProperty(run,'number',{value:numbers[i],writable:true,configurable:true,enumerable:false});return run;}),ids=runs.map(r=>r.job);
+  const run=validateRun(record,true,{format:eleven?11:ten?10:nine?9:7,number:numbers[i],compact:doc.version===COMPACT_SESSION_VERSION||sixteen});if(recovered)run.origin='recovered';Object.defineProperty(run,'number',{value:numbers[i],writable:true,configurable:true,enumerable:false});return run;}),ids=runs.map(r=>r.job);
  if(new Set(ids).size!==ids.length)throw new Error('Duplicate run identifiers.');
  if(doc.selected!==null&&!ids.includes(doc.selected))throw new Error('Selected run is missing.');
  if(!Array.isArray(doc.comparison)||doc.comparison.length!==2||!doc.comparison.every(id=>id===null||ids.includes(id)))throw new Error('Invalid comparison selection.');

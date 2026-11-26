@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- Studio: **open-boundary runs keep their run time in session files** (optical session version 16). A run computed by this Studio with an open boundary stores its wall time in the tab (`duration`, whole ms, only when the tab followed the job from its start to its result, not after Resume) and the server's compute time (`timings` `{mesh, solve}` in s, to 0.001 s), both inside the run's digest. The Compute label's *last such run m:ss*, its estimate with group index on (*about N min*) and *Recompute Run N's fields · about …* therefore read the same after File › Open, Open project and Restore as in the tab that computed the runs. Closed runs never store a time, so version 16 is written only when a session holds an open run computed by this Studio; every other session is written as before, byte for byte. A damaged time is refused as *Run N: invalid run time.* Session files holding open-boundary runs saved by this Studio need this Studio or later: an earlier Studio refuses them with "This session file is version 16, newer than this Studio reads (versions 6–15)." [Optical session files (version 16)](docs/packages/simcase/workspace.md#optical-session-files-version-16).
+
+## 한국어
+
+- Studio: **열린 경계 실행이 세션 파일에 실행 시간을 담습니다**(광학 세션 버전 16). 이 Studio가 열린 경계로 계산한 실행은 탭에서 잰 실제 시간(`duration`, 정수 ms, 탭이 작업을 시작부터 결과까지 따라갔을 때만, Resume 뒤에는 없음)과 서버 계산 시간(`timings` `{mesh, solve}`, 초, 0.001 s까지)을 실행의 digest 안에 담습니다. 그래서 Compute 줄의 *last such run m:ss*, 군굴절률을 켰을 때의 어림값(*about N min*), *Recompute Run N's fields · about …*가 File › Open, Open project, Restore 뒤에도 실행을 계산한 탭에서와 같이 읽힙니다. 닫힌 실행은 시간을 담지 않으므로 버전 16은 이 Studio가 계산한 열린 실행이 세션에 있을 때만 쓰고, 다른 세션은 이전처럼 바이트 그대로 씁니다. 손상된 시간은 *Run N: invalid run time.*으로 거부합니다. 이 Studio가 저장한, 열린 경계 실행을 담은 세션 파일에는 이 Studio 이상이 필요합니다: 이전 Studio는 "This session file is version 16, newer than this Studio reads (versions 6–15)."로 거부합니다. [광학 세션 파일(버전 16)](packages/simcase/workspace.md#광학-세션-파일버전-16).

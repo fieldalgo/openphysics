@@ -342,10 +342,14 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    three times its time when it did not (the group index adds two solves), *Open boundary · 2 modes ·
    2 searches · group index on (3 solves) · about 3 min* (*about 20 s* under a minute and a half). With
    no such run there is no estimate (the round-20 rule). Round 24 (B5) checked the case of P04, whose
-   only comparable open run had been opened from a file: a session file and a browser-recovery record
-   store each run's completion time but not its wall time (the session format is unchanged), so such
-   a run has none; the estimate skips it and uses an older run of this tab with a wall time, and with
-   none shows no estimate. A **Turn off group index** button sits beside
+   only comparable open run had been opened from a file: a session file of version 15 or earlier and a
+   browser-recovery record of one store each run's completion time but not its wall time, so such a
+   run has none; the estimate skips it and uses an older run of this tab with a wall time, and with
+   none shows no estimate. Since [session version 16](#optical-session-files-version-16) an
+   open-boundary run keeps its time in files, project files and browser recovery: a run opened,
+   added or restored from such a file has a time and counts like a run of this tab (a run that
+   was resumed keeps the server's compute time only, which the line then uses). A closed run's wall
+   time is still kept in this tab only. A **Turn off group index** button sits beside
    the line while the option is on; it is the option's own edit (Undo takes it back, Messages says
    what the check box says), and the line then reads as for the option off. The group index stays an
    input: no run turns it off. Testers of round 23 kept it on from one run to the next and waited
@@ -1139,8 +1143,8 @@ its runs and Undo stay as they were:
   read as File › Open reads a model file (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 15 is refused by name (“This session file is version 16, newer than this Studio
-reads (versions 6–15). Open it in a newer Studio.”; versions 9 to 14 are
+A version above 16 is refused by name (“This session file is version 17, newer than this Studio
+reads (versions 6–16). Open it in a newer Studio.”; versions 9 to 14 and 16 are
 [optical sessions](#optical-session-files-version-9), version 15 a multiphysics session of more
 than six runs, and a version 8 layout under version 9 is refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
@@ -2548,6 +2552,54 @@ field, with these keys in this order and no other:
   browser-recovery record that holds one. The project file stays version 1 (its optical entry reads
   version 14); the recovery record stays version 1; the optical documents, adapters, server replies,
   results and the multiphysics session (version 8) are unchanged.
+
+### Optical session files (version 16)
+
+Version 16 is [version 14](#optical-session-files-version-14) whose open-boundary runs may hold their
+time (design "Session versions 16 and 17", amendment A1): the same top-level keys, 0 to 20 runs, run
+numbers and compact fields. A run record has the keys of version 14 with two more before `digest`,
+both optional and inside the run's digest:
+
+```json
+"duration": 61552,
+"timings": {"mesh": 2.24, "solve": 57.352},
+```
+
+- **`duration`** is the wall time in the tab, from the job's start to its result read, in whole
+  milliseconds: the time the [Compute label](#first-optical-study) already showed beside Run study. It is
+  kept only for a job the tab followed from its start to its result; a job followed again with
+  **Resume** (after Stop waiting or a reload) has none, since its time would hold the time the tab
+  was detached.
+- **`timings`** is the server's compute time of the result, `{mesh, solve}` in seconds rounded to
+  0.001 s, exactly as the result names it; a resumed run keeps it.
+- **Where the time is used.** A run's time is its `duration`, else `mesh + solve`. The Compute
+  label's *last such run m:ss*, the estimate with group index on (*about N min*) and *Recompute Run
+  N's fields · about …* use it, so after File › Open, Open project and Restore they read as in the
+  tab that computed the runs. Measured on 2026-11-26 (this repository's container, single threaded,
+  a Node client that follows a job as the page does): the T18 open run took 61.6 s (timings 2.24 +
+  57.35 s) and with group index 179.2 s (2.235 + 175.21 s): the estimate *about 3 min* (3 × 61.6 s =
+  184.7 s, 3.0 % above). Wall time includes polling and the result download (1 to 2 s on these runs);
+  a background tab or a sleeping machine can lengthen it, and it is stored as measured.
+- **Only open runs.** A closed run never holds either key in a file (its wall time stays in the tab,
+  as before), so version 16 is written only when a session holds an open run computed by this Studio;
+  otherwise version 14, 13, 12, 11, 10, 9 or 7, byte for byte. A file of an earlier version with a
+  new closed run keeps its version; with a new open run it is version 16, and its older run records
+  and digests are unchanged.
+- **Refusals.** *Run 5: invalid run time.* for a `duration` that is not a whole number of 1 ms to 7
+  days, `timings` other than exactly `mesh` then `solve`, each a number of 0 to 604,800 s, or either
+  key on a closed run; an edited time without a new digest is refused as *Run 3 changed after it was
+  saved (its check value does not match).*; in a file of version 14 or earlier the keys are unknown
+  (*Run 2: unknown key "duration".*).
+- **Earlier Studios.** A Studio that reads up to version 15 (main c0dbc09) refuses a version 16 file
+  by name: *This session file is version 16, newer than this Studio reads (versions 6–15). Open it in
+  a newer Studio.*, after *Optical waveguide: * for a project file's entry, and does not take over a
+  browser-recovery record that holds one (`refusals-v16-c0dbc09.json`). Session files holding
+  open-boundary runs saved by this Studio therefore need this Studio or later. The project file and
+  the recovery record stay version 1; the optical documents, adapters and server replies are
+  unchanged.
+- **Checks.** `tests/simcase/studio_run_time_format.cjs` (RT1 to RT7 and T18-G1, with the fixture
+  `optical-v16-times.json` of real runs) and the T18-G1 stage of the workspace browser check (File ›
+  Open of that file, then Restore).
 
 ### Matching modes in Compare
 
