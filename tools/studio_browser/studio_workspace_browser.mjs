@@ -257,10 +257,11 @@ try {
   const libraryOpenFile = async tag => {
     for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
       await page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300);
-      const seen = await page.eval("(()=>{const all=[...document.querySelectorAll('#canvas button')].filter(b=>/^Open file…$/.test(b.textContent)),b=all[0],r=b?.getBoundingClientRect(),first=document.querySelector('#canvas>*:not(.library-files)')?.getBoundingClientRect();return {count:all.length,id:b?.id,underCard:!!b?.closest('.card-slot,.resume-card,[data-template]'),above:!!(r&&first&&r.bottom<=first.top),left:Math.round(r?.left??-1),right:Math.round(r?.right??-1),width:innerWidth}})()");
+      const seen = await page.eval("(()=>{const all=[...document.querySelectorAll('#canvas button')].filter(b=>/^Open file…$/.test(b.textContent)),b=all[0],r=b?.getBoundingClientRect(),first=document.querySelector('#canvas>*:not(.library-files)')?.getBoundingClientRect();return {note:document.querySelector('.library-files p,.library-portable')?.textContent??null,count:all.length,id:b?.id,underCard:!!b?.closest('.card-slot,.resume-card,[data-template]'),above:!!(r&&first&&r.bottom<=first.top),left:Math.round(r?.left??-1),right:Math.round(r?.right??-1),width:innerWidth}})()");
       stage('P2 one Open file ' + tag, {width, height, ...seen});
       assert.deepEqual([seen.count, seen.id, seen.underCard, seen.above], [1, 'library-open-file', false, true], `${tag} at ${width} × ${height}`);
       assert.ok(seen.left >= 0 && seen.right <= seen.width, `${tag}: the button is inside the page at ${width}`);
+      assert.equal(seen.note, null, `${tag}: no note beside Open file… at ${width}`); // round 32 (K4)
     }
     await page.call('Emulation.setDeviceMetricsOverride', {width: 1280, height: 800, deviceScaleFactor: 1, mobile: false}); await sleep(300);
   };
@@ -677,7 +678,7 @@ try {
   // the first screen, tightened: the button and its detail line at 1280 × 800 and 390 × 844
   stage('first screen J3', await assertFirstScreen(page, (width, height, mobile) => page.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}), 'J3', [1280, 800, false]));
   // the routes back say which copy is durable
-  const routes = await page.eval("({latest:document.getElementById('resume-newest-detail').textContent,listed:[...document.querySelectorAll('[data-resume-record]')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('library-open-file').textContent,beside:!!document.getElementById('library-open-file').closest('.card-slot,.resume-card'),top:document.getElementById('canvas').firstElementChild?.contains(document.getElementById('library-open-file')),count:[...document.querySelectorAll('button')].filter(b=>/^Open file…$/.test(b.textContent)).length,note:document.querySelector('.library-portable')?.textContent,footer:document.getElementById('autosave-status').textContent})");
+  const routes = await page.eval("({latest:document.getElementById('resume-newest-detail').textContent,listed:[...document.querySelectorAll('[data-resume-record]')].map(b=>b.textContent),box:!!document.querySelector('.resume-card'),open:document.getElementById('library-open-file').textContent,beside:!!document.getElementById('library-open-file').closest('.card-slot,.resume-card'),top:document.getElementById('canvas').firstElementChild?.contains(document.getElementById('library-open-file')),count:[...document.querySelectorAll('button')].filter(b=>/^Open file…$/.test(b.textContent)).length,note:document.querySelector('.library-files p,.library-portable')?.textContent??null,footer:document.getElementById('autosave-status').textContent})");
   stage('routes back', routes);
   const restoreJ3 = await libraryRestore(page); stage('J3 Library restore', restoreJ3);
   assertLibraryRestore(restoreJ3, {visible: 1, cards: {optical: 2}}, 'J3');
@@ -696,7 +697,7 @@ try {
   // amendment A1: Not now closes the box; its heading stays and opening it shows the same buttons
   stage('J3 Not now', await assertNotNow(page, 'J3'));
   await libraryOpenFile('with a resume offer');
-  assert.equal(routes.note, 'A project file is the copy that moves between computers; browser recovery stays in this browser.');
+  assert.equal(routes.note, null, 'round 32 (K4): no note beside Open file…');
   assert.equal(routes.footer, 'Last session kept in this browser · 2 runs');
   await page.screenshot('resume-card');
   // a fresh page holds nothing an open would lose, so recovery asks nothing

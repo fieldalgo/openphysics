@@ -22,18 +22,21 @@ export const LIBRARY_RESTORE_STATE = `(()=>{
   cardButtons:['resume-optical','resume-heated-waveguide','optical-start-new','heated-waveguide-start-new'].filter(id=>document.getElementById(id)),
   cardResume:document.querySelectorAll('.card-resume,.card-slot').length,
   openFile:[...document.querySelectorAll('#canvas button')].filter(b=>/^Open file…$/.test(b.textContent)).length,
+  filesBarExtra:[...(document.querySelector('.library-files')?.children??[])].filter(c=>c.id!=='library-open-file'&&c.id!=='project-name-form').map(c=>c.textContent),
   restoredSeparately:document.body.textContent.includes('restored separately')};
 })()`;
 
 export const libraryRestore = page => page.eval(LIBRARY_RESTORE_STATE);
 
-// What holds in every state: no card restore buttons, one Open file…, no "(restored separately)",
+// What holds in every state: no card restore buttons, one Open file… with no note beside it, no "(restored separately)",
 // and card lines exactly for the given models ({template: runs}).
 export function assertLibraryRestore(state, {visible, cards = {}}, tag) {
   const json = JSON.stringify(state);
   assert.equal(state.visible.length, visible, `${tag}: visible restore buttons ${json}`);
   assert.deepEqual(state.cardButtons, [], `${tag}: no card restore buttons`); assert.equal(state.cardResume, 0, tag);
   assert.equal(state.openFile, 1, `${tag}: one Open file…`); assert.equal(state.restoredSeparately, false, tag);
+  // round 32 (K4): the files bar holds Open file… and the project name only, no note beside them
+  assert.deepEqual(state.filesBarExtra, [], `${tag}: nothing beside Open file… ${json}`);
   const kept = runs => `Kept in this browser · ${runs} ${runs === 1 ? 'run' : 'runs'} · Restore at the top of the page`;
   assert.deepEqual(state.cardLines, Object.fromEntries(Object.entries(cards).map(([card, runs]) => [card, kept(runs)])), `${tag}: card lines ${json}`);
   if (state.newest) {
