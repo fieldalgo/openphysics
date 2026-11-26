@@ -1258,7 +1258,9 @@ the project file's entry and browser recovery hold the same maps.
   text are 0.37 MB for the template (1,726 nodes, 3,334 triangles; 2 or 4 modes), 1.49 MB at a
   0.12 µm mesh, 2.79 MB at 0.08 µm and 2.53 MB for the heated slab example. Of 20 results the
   budget keeps the maps of all 20 template runs (7.7 MB), 10 at 0.12 µm, 6 of the slab and 5 at
-  0.08 µm, the newest. Compact (single-precision) maps are not part of H1.
+  0.08 µm, the newest. Compact (single-precision) maps are not part of H1. Since
+  [compact maps](#compact-maps-single-precision) (2026-11-26) the tab keeps 20 at 0.12 µm, 17 of the
+  slab and 15 at 0.08 µm (the template's 20 never convert).
 
 The checks are `tests/simcase/studio_heated_retention.cjs` (HK2 to HK4, HK6 to HK9 and HK12 to
 HK14: the formats, a seeded sequence of 2000 steps, the order, the words, recompute refusals and
@@ -2554,6 +2556,44 @@ The checks are `tests/simcase/studio_field_encoding_format.cjs` (the format, F1,
 main 499a0d3; F11: a seeded sequence of 2000 steps with the conversion; F6 and F8: what Studio computes
 from a compact field), `tests/simcase/test_studio_field_encoding.py` (F5: the same strings as NumPy),
 and `tools/studio_field_encoding.mjs` (`f9`, `f14`, `f16`, `sizes`).
+
+### Compact maps (single precision)
+
+Since the design *Session versions 16 and 17* (S3) a heated run's maps can be kept compact, as
+[compact fields](#compact-fields-single-precision) are, so that more maps fit the 16.8 MB budget of
+[the heated model's run retention](#session-files-of-multiphysics-models-version-15).
+
+- **Only when needed.** While every map of the tab fits as text, nothing changes: the files are
+  version 8 or 15, byte for byte. At the first arrival whose maps would not all fit as text (a result,
+  a recompute, Open, Restore, **Keep Run N's maps** bringing maps back), every map in the tab is made
+  compact in place, then the order of run retention applies with the smaller sizes; from then on
+  every map that arrives is compact, and the tab never converts back. Open and Restore keep a file's
+  maps as it holds them unless they would not all fit as text. Messages says nothing of it; the files
+  from then on are [version 17](#session-files-of-multiphysics-models-version-17).
+- **What changes.** Node temperatures and the index maps read back as float32 offsets from float64
+  bases: within 2⁻²⁴ of the heat range or of the region's spread (measured: under 1 µK and 7.3·10⁻¹²).
+  The coupled temperature drawn is the mean of each triangle's 3 decoded node temperatures. n_eff, the
+  heat range (*Minimum T*, *Maximum T*), the coupling check and the iteration history are the
+  server's values, unchanged. On the four measured models the map legends and accessible names are the
+  same, no colour of the heat, n and Δn maps changes, and on the core temperature map, which spans only
+  0.03 K, 0.27 to 2.3 % of the core's triangles change by one colour level of 255.
+- **Words.** Under the maps of a run whose maps are compact: *Maps at single precision (float32). The
+  values above are the engine's.* The note under the run list adds *When maps would not all fit, they
+  are kept at single precision.* once the tab holds compact maps. *If you run: …* counts the compact
+  sizes the next arrival will use.
+- **Maps that stay text:** more than 256 region names, a value beyond float32 after its offset, or a
+  coupled map without the node temperatures of its coupling's source.
+- **Measured** (2026-11-26, `node tools/studio_heated_retention.mjs hq6`, 20 results of each model):
+  maps per run compact 0.14 MB for the template (text 0.37 MB), 0.56 MB at 0.12 µm (1.49 MB), 1.03 MB
+  at 0.08 µm (2.79 MB) and 0.95 MB for the slab (2.53 MB); the budget keeps 20 template runs (no
+  conversion), 20 at 0.12 µm (converted at result 12), 15 at 0.08 µm (at 6) and 17 of the slab (at 7).
+  20 of 20 for the finer meshes would take runs that share one stored mesh (coordinates and triangles
+  are two thirds of a compact run), which is not part of this design.
+
+The checks are `tests/simcase/studio_heated_compact_tab.cjs` (the tab rule, the maps that stay text,
+the estimate, the words, a seeded sequence of 600 steps) and, on engine results,
+`tests/simcase/studio_heated_retention_engine.cjs` (HQ5 the Results page, HQ6 the counts; `hq5` and
+`hq6` of `tools/studio_heated_retention.mjs`).
 
 ### Optical session files (version 13)
 

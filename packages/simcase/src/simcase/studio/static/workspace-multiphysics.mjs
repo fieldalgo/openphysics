@@ -351,6 +351,23 @@ export function wireEnds(edges,point){
 // ---- running --------------------------------------------------------------------------------
 const seconds=s=>`${Number(s).toFixed(s<10?1:0)} s`;
 export function formatValue(v){if(v===0)return '0';return Math.abs(v)>=1e-3&&Math.abs(v)<1e5?String(Number(v.toPrecision(3))):v.toExponential(1);}
+// The maps of the Results page (workspace-multiphysics-view.mjs, drawMap), as pure functions so the
+// checks of compact maps (session version 17, HQ5) measure the page's own colours and labels.
+const RAMP=[[48,18,59],[64,98,215],[34,180,180],[150,215,80],[250,200,40],[180,30,20]];
+/** The colour of t in 0 to 1 on the maps' ramp, [r, g, b] in 0 to 255. */
+export function mapColour(t){t=Math.min(1,Math.max(0,t))*(RAMP.length-1);const i=Math.min(RAMP.length-2,Math.floor(t)),f=t-i,a=RAMP[i],b=RAMP[i+1];return a.map((v,k)=>Math.round(v+(b[k]-v)*f));}
+/** The triangles a map draws (those of region, when the mesh has it), each one's value (nodal: the
+ * mean of its 3 node values) and the range {tris, tv, lo, hi}. */
+export function mapValues(result,values,{nodal=false,region=null}={}){
+ const mesh=result.mesh,T=mesh.triangles,keep=region===null?null:mesh.region_names.indexOf(region);
+ const tris=T.map((t,i)=>i).filter(i=>keep===null||keep<0||mesh.regions[i]===keep),tv=i=>nodal?(values[T[i][0]]+values[T[i][1]]+values[T[i][2]])/3:values[i];
+ let lo=Infinity,hi=-Infinity;for(const i of tris){const v=tv(i);lo=Math.min(lo,v);hi=Math.max(hi,v);}
+ return {tris,tv,lo,hi};
+}
+/** The colour bar's two labels [top, bottom] of a map's range. */
+export function mapLegend(lo,hi){const fmt=v=>Math.abs(hi-lo)<1e-3*Math.max(Math.abs(hi),1e-30)?v.toPrecision(7):v.toPrecision(Math.max(3,Math.ceil(Math.log10(Math.max(Math.abs(hi),Math.abs(lo))/Math.max(hi-lo,1e-300)))+2));return [fmt(hi),fmt(lo)];}
+/** A map's accessible name: "Temperature in K: 300 to 319". */
+export const mapAriaLabel=(label,lo,hi)=>`${label}: ${formatValue(lo)} to ${formatValue(hi)}`;
 // One row per solve-order group: its state from the progress events of the run.
 export function progressRows(order,doc,events=[],status='running',error=null){
  const rows=order.map(group=>{const loop=group.length>1?loopIndexOf(doc,group):-1;
