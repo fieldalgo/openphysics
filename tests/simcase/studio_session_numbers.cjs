@@ -104,7 +104,7 @@ test('K2: the version 12 reader refuses a changed, missing, invalid, repeated or
  const eleven=edit(text,d=>{d.version=11;});
  refused(eleven,'Run 1: unknown key "number".');
  // version 14 is the newer one (13 holds more than six runs)
- refused(edit(text,d=>{d.version=17;}),'This session file is version 17, newer than this Studio reads (versions 6–16). Open it in a newer Studio.');
+ refused(edit(text,d=>{d.version=18;}),'This session file is version 18, newer than this Studio reads (versions 6–17). Open it in a newer Studio.');
 });
 
 test('K2: version 12 is written exactly when a run is not numbered by its place',()=>{

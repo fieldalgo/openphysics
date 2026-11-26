@@ -157,7 +157,7 @@ test('RT4: damaged times are refused by name; a hand edit without a new digest b
  const twenty=N.sessionText(N.parseSession(text).input,Array.from({length:20},(_,i)=>openRun(i)),null,[null,null],VIEW);
  refused(edit(twenty,d=>{d.runs.push({...d.runs[0],job:'000000ff',number:21});}),'Unsupported session format or run count.');
  // above 16 by name
- refused(edit(text,d=>{d.version=17;}),'This session file is version 17, newer than this Studio reads (versions 6–16). Open it in a newer Studio.');
+ refused(edit(text,d=>{d.version=18;}),'This session file is version 18, newer than this Studio reads (versions 6–17). Open it in a newer Studio.');
 });
 
 test('RT5: the merge base c0dbc09 refuses version 16 by name, alone, in a project and in a recovery record, and does not adopt the record',async()=>{

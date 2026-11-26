@@ -937,9 +937,9 @@ file, not recomputed; input undo starts here.”이고, 실행에는 “from fil
   today's check: …”), Studio가 실행하는 문서인지, 그리고 지금 모델은 File › Open이 모델 파일을 읽듯이 읽음(그
   문제는 Messages에 나옴). 서버가 없으면 파일을 열지 않습니다.
 
-16보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 17, newer than this Studio reads
-(versions 6–16). Open it in a newer Studio.”. 버전 9~14와 16은 [광학 세션](#광학-세션-파일버전-9), 버전 15는 실행이
-여섯 개보다 많은 다중물리 세션이며, 버전 9 아래의 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
+17보다 큰 버전은 이름을 밝혀 거부합니다(“This session file is version 18, newer than this Studio reads
+(versions 6–17). Open it in a newer Studio.”. 버전 9~14와 16은 [광학 세션](#광학-세션-파일버전-9), 버전 15는 실행이
+여섯 개보다 많은 다중물리 세션, 버전 17은 [압축 맵](#다중물리-모델의-세션-파일버전-17)을 가진 다중물리 세션이며, 버전 9 아래의 버전 8 구성은 처음 만난 모르는 키로 거부합니다). 다른 `application`(“This session file holds a “…” model,
 which this Studio does not read.”), 다른 결과(“Run 2 was saved as result “multiphysics-run-v2”, which
 this Studio does not read.”), 다른 문서 봉투(서버 읽기기의 거부를 실행 이름과 함께)도 마찬가지입니다.
 버전 6과 7 세션 파일은 이전처럼 열리고, 버전 1–5는 이전의 거부를 유지합니다. 버전 8 이전의 Studio는
@@ -1052,6 +1052,63 @@ joined*, 아니면 *… · in project heater-study.json · saved 13:15* 또는 *
 검사는 `tests/simcase/studio_heated_retention.cjs`에 있습니다(HK2: main ddb09a1의 버전 8 세션
 `multiphysics-v8-ddb09a1.json`을 바이트 그대로 다시 씀, HK3: 실행 2와 4~15의 고정 파일
 `multiphysics-v15-thirteen-runs.json`, HK4: main ddb09a1이 읽는 것 `refusals-v15-ddb09a1.json`).
+
+### 다중물리 모델의 세션 파일(버전 17)
+
+버전 17은 실행이 압축 맵을 담을 수 있는 [버전 15](#다중물리-모델의-세션-파일버전-15)입니다(설계 "Session versions 16 and
+17", 3절): 최상위 키, 실행 0~20개, 실행 기록과 다이제스트가 같고 `"maps"`에 `"kept"`, `"not kept"`와 함께 `"compact"`가
+있습니다. 압축 맵을 가진 실행은 맵을 보관한 실행처럼 서버 응답을 담고 모든 값(n_eff, 열 범위, 결합 검사, 반복 기록)은
+그대로이며, 다음 배열만 문자열로 바뀝니다(인코딩 `f32-offset-base64-v1`):
+
+```json
+"mesh": {
+  "encoding": "f32-offset-base64-v1",
+  "counts": {"nodes": 12606, "triangles": 24836},
+  "node_coordinates": "<base64: nodes × 2 float64, little-endian, metres>",
+  "field_units": {"node_coordinates": "m"},
+  "triangles": "<base64: triangles × 3 uint32, little-endian>",
+  "regions": "<base64: triangles × uint8>",
+  "region_names": ["background", "core", "heater"]
+},
+"temperature": {"unit": "K", "location": "node", "values": "<base64: nodes × float32, T − range.min>"},
+"coupled": {
+  "temperature": {"unit": "K", "location": "element"},
+  "refractive_index": {"location": "element", "n": "<base64: triangles × float32, n − n_base[region]>", "n_base": [1.444, 3.4757, 1.444], "k": null},
+  "index_change": "<base64: triangles × float32>", "index_change_base": [0, 1.7e-05, 0]
+}
+```
+
+- **값.** 좌표, 삼각형, 영역은 정확합니다. 노드 온도는 `range.min`에 float32 오프셋을 더한 값으로, 삼각형 맵(n, null이
+  아니면 k, index_change)은 그 영역의 기준값(float64: 영역의 첫 삼각형 값, 삼각형이 없는 영역은 0)에 float32 오프셋을 더한
+  값으로 읽습니다. 오프셋을 float32로 한 번 반올림한 차이는 열 범위(19 K에서 약 1 µK) 또는 영역 안 퍼짐(코어 n에서 약
+  7·10⁻¹²)의 2⁻²⁴ 이하입니다. 결합 온도는 저장하지 않습니다: 삼각형마다 해독한 노드 온도 3개의 평균으로 읽으며, 버전 8이
+  1e-12로 검사하는 규칙입니다. 평범한 float32 값은 굴절률 맵에 맞지 않습니다: 코어의 n은 3.48 근처에서 약 5·10⁻⁶에 걸치고,
+  거기서 float32 간격은 2.4·10⁻⁷입니다.
+- **크기.** 메시는 4⌈16N/3⌉ + 4⌈12M/3⌉ + 4⌈M/3⌉ 문자, 열 물리마다 4⌈4N/3⌉, 삼각형 맵마다 4⌈4M/3⌉, 대략 26.7·N + 28.0·M
+  바이트(N 노드, M 삼각형)이고 키와 기준값(0.2 KB 미만)은 따로입니다. 버전 15 실행의 텍스트 맵은 약 2.7배입니다. 압축은 없습니다:
+  크기가 개수로 정해지고 모든 브라우저가 같은 바이트를 씁니다.
+- **언제 쓰는가.** 세션의 실행이 압축 맵을 가질 때만 씁니다(실행 수와 무관). 그 밖에는 버전 15나 8로 바이트 그대로 씁니다.
+  압축 기록은 읽은 문자열 그대로 다시 쓰므로 읽고 다시 쓴 버전 17 파일은 원래 바이트와 같습니다. 압축할 수 없는 맵은 버전 17
+  파일에서도 텍스트로 남습니다: 영역 이름이 256개보다 많거나, 오프셋이 float32를 넘거나(넘침, 또는 2⁻¹²⁶보다 작은 0 아닌
+  오프셋), 결합 맵에 결합 원천의 노드 온도가 없을 때입니다.
+- **거부**(각각 기존 머리 *Run 2's stored maps are not well formed: * 뒤), 그다음 해독한 맵에 버전 8의 모든 검사: *the maps
+  are encoded as "…", which this Studio does not read.*; *a compact mesh holds counts, encoding, field_units, node_coordinates,
+  region_names, regions, triangles and nothing else.*; *its counts must be whole numbers of nodes and triangles, at least 1.*;
+  *triangles holds 123 bytes; its counts give 120.*; *regions is not canonical base64.*; *heat1 node temperature holds a value
+  that is not a finite number.*; *refractive_index.n_base must hold 2 finite numbers, one per region.*; *a compact coupled
+  temperature holds no values (it is the mean of the node temperatures).*; *regions must hold 10 integers in 0–1.*; 버전 15
+  이하 파일에서는 *compact maps are read from a version 17 session file only.* 압축 맵에서 버전 8의 열 범위 검사는 해독한
+  최솟값이 `range.min`, 최댓값이 `range.min`에 `range.max − range.min`의 float32를 더한 값인지 봅니다.
+- **이전 Studio.** 버전 15까지 읽는 Studio(main c0dbc09)는 버전 17 파일을 이름을 밝혀 거부합니다: *This session file is
+  version 17, newer than this Studio reads (versions 6–15). Open it in a newer Studio.*(프로젝트 파일의 항목이면 앞에
+  *Heated silicon waveguide: *). 그런 파일을 담은 브라우저 복구 기록은 넘겨받지 않습니다(`refusals-v17-c0dbc09.json`).
+  프로젝트 파일은 버전 1 그대로이며(다중물리 항목은 버전 8, 15, 17), 복구 기록도 버전 1 그대로입니다.
+
+검사는 `tests/simcase/studio_heated_compact_format.cjs`(HQ1 인코딩, HQ7 고정 파일 `multiphysics-v17-compact.json`의 왕복,
+HQ8 버전 8·15 고정 파일의 바이트 보존, HQ9 거부, HQ10 main c0dbc09가 읽는 것, HQ11 텍스트로 남는 맵)와 엔진 결과에서
+`tests/simcase/studio_heated_retention_engine.cjs`(HQ1~HQ4; `node tools/studio_heated_retention.mjs hq <dir> <out>`)에
+있습니다. 2026-11-26에 잰 값(템플릿, 0.12 µm, 0.08 µm, 가열 슬래브): 노드 온도 9.53·10⁻⁷ K 이내(한계 2⁻²⁴·span + 2⁻⁵²·|T|의
+0.84배 이하), 결합 온도 9.13·10⁻⁷ K 이내, n과 index_change 7.27·10⁻¹² 이내, 범위는 정확히 보존.
 
 ## 결과와 파일
 

@@ -1143,10 +1143,10 @@ its runs and Undo stay as they were:
   read as File › Open reads a model file (its problems open into Messages). Without the server the
   file is not opened.
 
-A version above 16 is refused by name (“This session file is version 17, newer than this Studio
-reads (versions 6–16). Open it in a newer Studio.”; versions 9 to 14 and 16 are
+A version above 17 is refused by name (“This session file is version 18, newer than this Studio
+reads (versions 6–17). Open it in a newer Studio.”; versions 9 to 14 and 16 are
 [optical sessions](#optical-session-files-version-9), version 15 a multiphysics session of more
-than six runs, and a version 8 layout under version 9 is refused by its first unknown key), as are another `application` (“This session
+than six runs, version 17 one with [compact maps](#session-files-of-multiphysics-models-version-17), and a version 8 layout under version 9 is refused by its first unknown key), as are another `application` (“This session
 file holds a “…” model, which this Studio does not read.”), another result (“Run 2 was saved as
 result “multiphysics-run-v2”, which this Studio does not read.”) and another document envelope
 (the server reader's refusal, named in the run). Session files of versions 6 and 7 open as
@@ -1290,6 +1290,76 @@ The checks are in `tests/simcase/studio_heated_retention.cjs` (HK2: the version 
 main ddb09a1, `multiphysics-v8-ddb09a1.json`, written again byte for byte; HK3: the fixture
 `multiphysics-v15-thirteen-runs.json` of runs 2 and 4 to 15; HK4: what main ddb09a1 reads,
 `refusals-v15-ddb09a1.json`).
+
+### Session files of multiphysics models (version 17)
+
+Version 17 is [version 15](#session-files-of-multiphysics-models-version-15) whose runs may hold
+compact maps (design "Session versions 16 and 17", section 3): the same top-level keys, 0 to 20 runs,
+the same run records and digest, with `"maps": "compact"` beside `"kept"` and `"not kept"`. A run
+with compact maps keeps the server's reply as a kept run does, every value unchanged (n_eff, the heat
+range, the coupling check, the iteration history), with these arrays replaced by strings
+(encoding `f32-offset-base64-v1`):
+
+```json
+"mesh": {
+  "encoding": "f32-offset-base64-v1",
+  "counts": {"nodes": 12606, "triangles": 24836},
+  "node_coordinates": "<base64: nodes × 2 float64, little-endian, metres>",
+  "field_units": {"node_coordinates": "m"},
+  "triangles": "<base64: triangles × 3 uint32, little-endian>",
+  "regions": "<base64: triangles × uint8>",
+  "region_names": ["background", "core", "heater"]
+},
+"temperature": {"unit": "K", "location": "node", "values": "<base64: nodes × float32, T − range.min>"},
+"coupled": {
+  "temperature": {"unit": "K", "location": "element"},
+  "refractive_index": {"location": "element", "n": "<base64: triangles × float32, n − n_base[region]>", "n_base": [1.444, 3.4757, 1.444], "k": null},
+  "index_change": "<base64: triangles × float32>", "index_change_base": [0, 1.7e-05, 0]
+}
+```
+
+- **Values.** Coordinates, triangles and regions are exact. A node temperature reads as `range.min`
+  plus its float32 offset, and a triangle map (n, k when it is not null, index_change) as its
+  region's base (float64: the value at the region's first triangle, 0 for a region without
+  triangles) plus its float32 offset. One rounding of the offset to float32 is at most 2⁻²⁴ of the
+  heat range (about 1 µK over 19 K) or of the region's spread (about 7·10⁻¹² for the core's n). The
+  coupled temperature is not stored: it reads as the mean of each triangle's 3 decoded node
+  temperatures, the rule version 8 checks to 1e-12. Plain float32 values would not do for the index
+  map: the core's n spans about 5·10⁻⁶ around 3.48, where the float32 step is 2.4·10⁻⁷.
+- **Size.** 4⌈16N/3⌉ + 4⌈12M/3⌉ + 4⌈M/3⌉ characters for the mesh, 4⌈4N/3⌉ per heat physics and
+  4⌈4M/3⌉ per triangle map, about 26.7·N + 28.0·M bytes (N nodes, M triangles), with the keys and
+  bases (under 0.2 KB) extra; a version 15 run's maps as text take about 2.7 times as much. No
+  compression: the size follows from the counts, and every browser writes the same bytes.
+- **When it is written.** Only when a run of the session holds compact maps (any run count);
+  otherwise version 15 or 8, byte for byte. A compact record is written again from the strings it was
+  read from, so a version 17 file read and written again is its own bytes. Maps that cannot be kept
+  compact stay text in a version 17 file: more than 256 region names, an offset beyond float32 (an
+  overflow, or a nonzero offset below 2⁻¹²⁶), or a coupled map without the node temperatures of its
+  coupling's source.
+- **Refusals,** each after *Run 2's stored maps are not well formed: * (the existing prefix), then
+  every check of version 8 on the decoded maps: *the maps are encoded as "…", which this Studio does
+  not read.*; *a compact mesh holds counts, encoding, field_units, node_coordinates, region_names,
+  regions, triangles and nothing else.*; *its counts must be whole numbers of nodes and triangles, at
+  least 1.*; *triangles holds 123 bytes; its counts give 120.*; *regions is not canonical base64.*;
+  *heat1 node temperature holds a value that is not a finite number.*; *refractive_index.n_base must
+  hold 2 finite numbers, one per region.*; *a compact coupled temperature holds no values (it is the
+  mean of the node temperatures).*; *regions must hold 10 integers in 0–1.*; and in a file of version
+  15 or earlier *compact maps are read from a version 17 session file only.* The heat range check of
+  version 8 reads, for compact maps: the decoded minimum is `range.min` and the decoded maximum
+  `range.min` plus the float32 of `range.max − range.min`.
+- **Earlier Studios.** A Studio that reads up to version 15 (main c0dbc09) refuses a version 17 file
+  by name: *This session file is version 17, newer than this Studio reads (versions 6–15). Open it in
+  a newer Studio.*, after *Heated silicon waveguide: * for a project file's entry, and does not take
+  over a browser-recovery record that holds one (`refusals-v17-c0dbc09.json`). The project file stays
+  version 1 (its multiphysics entry reads version 8, 15 or 17); the recovery record stays version 1.
+
+The checks are in `tests/simcase/studio_heated_compact_format.cjs` (HQ1 the encoding, HQ7 the round
+trip of the fixture `multiphysics-v17-compact.json`, HQ8 the version 8 and 15 fixtures byte for byte,
+HQ9 the refusals, HQ10 what main c0dbc09 reads, HQ11 maps that stay text) and, on engine results,
+`tests/simcase/studio_heated_retention_engine.cjs` (HQ1 to HQ4; `node tools/studio_heated_retention.mjs
+hq <dir> <out>`). Measured on 2026-11-26 (the template, 0.12 µm, 0.08 µm and the heated slab): node
+temperatures within 9.53·10⁻⁷ K (at most 0.84 of the bound 2⁻²⁴·span + 2⁻⁵²·|T|), coupled
+temperatures within 9.13·10⁻⁷ K, n and index_change within 7.27·10⁻¹²; the range kept exactly.
 
 ## Results and files
 
