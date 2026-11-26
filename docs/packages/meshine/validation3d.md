@@ -420,6 +420,23 @@ run on C11 at h = 0.2, 0.1 and 0.05 (relative capacitance errors 3.25e-2, 1.05e-
 log). No run at h = 0.025 had been made. V24 is graded on the new sizes, and the sizes are not changed after it is
 measured.
 
+**2026-11-26, C8 dimensions; sizes of V27 and V28; the graded 1M-tetrahedron cube of V14; C3 in V26's CI run.**
+These fill in definitions and change no threshold. They were fixed before the runs they govern and reported to the
+project owner, who approved the plan for these rows (graded sizes, V26–V28) on 2026-11-26.
+- C8. Old: "thin-layer stack, aspect ratio 1:50", with no dimensions. New: three layers 0.02 thick (1/50) on
+  [0,1]², z ∈ {0, 0.02, 0.04, 0.06}, 3 regions. Reason: without dimensions C8 could not be built for V26 and V29.
+- V27 and V28. Old: no sizes. New: V27 on C1 at h ∈ {0.2, 0.1, 0.05} and C3 at {0.8, 0.4}; V28 on the two coarser
+  sizes of each case (C2 {0.12, 0.06}, C3 {0.8, 0.4}, C5 {0.24, 0.12}), with the size and the region points scaled
+  with the input. V28 compares with the metre mesh; V4 is graded on C2 and C3 (exact volumes), V5 on C5.
+- V14. Old: "a graded 1M-tetrahedron cube", with no size field. New: the unit cube with V8's graded size scaled by s,
+  h(x) = s·min(0.2, 0.02 + 0.3‖x − (½,½,½)‖), s = 0.130, fixed by the tetrahedron count alone (1,005,634; s = 0.137
+  gave 860,058, outside [0.9, 1.1]·10⁶) before any time was measured. Reason: the form first written down,
+  min(0.2, h0 + 0.3‖x − c‖), cannot reach 1M tetrahedra: its count grows only logarithmically as h0 falls (about
+  10,000 at h0 = 0.001).
+- V26 in CI. C3 at h = 0.1 has about 1.27 million tetrahedra (513 s and 2.1 GiB per run on one core), so its five
+  runs do not fit one CI test part. CI runs V26 on the other eight cases; C3 runs with `MESHLOOM_V26_FULL=1`, and
+  the full nine-case run on Python 3.12 and 3.15 is recorded with the pull request that adds V26.
+
 ## Limits
 
 - The baseline constants come from one Linux machine. Time ratios (V14) are always
