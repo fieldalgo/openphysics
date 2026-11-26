@@ -107,3 +107,16 @@ test('K2: never with the slab question; Turn off and run is the checkbox\'s own 
  // the question's text from the plan line's own estimate (an open run)
  assert.ok(app.includes("groupCarryText(groupIndexEstimate(runs,{open:true},{isOpen:isOpenRun,hasGroup:hasGroupIndex}))"));
 });
+
+test('K3: the Compare pickers have visible labels Run A and Run B, their accessible names',()=>{
+ const app=read('workspace-app.mjs'),css=read('workspace.css');
+ // the label wraps its select (an implicit label) and reads Run A or Run B; the aria-label is the same words
+ assert.ok(app.includes("const label=document.createElement('label');label.className='compare-pick';label.textContent=side?'Run B':'Run A';const select=document.createElement('select');select.id=side?'compare-b':'compare-a';"));
+ assert.ok(!app.includes("label.textContent=side?'B':'A';"));
+ assert.ok(app.includes("select.setAttribute('aria-label',side?'Run B':'Run A')"));
+ assert.ok(app.includes('label.append(select);bar.append(label);'));
+ // the option texts are the run labels, unchanged
+ assert.ok(app.includes("for(const r of runs){const o=document.createElement('option');o.value=r.job;o.textContent=runLabel(r);o.title=o.textContent;"));
+ // the label never shrinks the run's words: it does not wrap and the select takes the rest
+ assert.ok(css.includes('.compare-selection .compare-pick{white-space:nowrap}'));
+});

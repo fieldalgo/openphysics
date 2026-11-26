@@ -420,7 +420,7 @@ Optical modes*에서 고른다고 말하는지, 선택을 켜면 Run study 옆�
 20 runs are kept; pin a run to keep it.*가 나오며 상태 표시줄이 Run 7인지, Run 5와 Run 6에 이름을 붙여 비교한 뒤 여덟 번째
 실행이 Run 2를 내보내고 *Run 8 is newer than this pair · Compare Run 8 with B*가 나오는지, Compare 선택 목록이 접근성
 트리에서 *Run A*, *Run B*이고 전체 이름을 제목으로 가지며 1440 × 900과 390 × 844에서 실행 번호와 이름이 보이는 너비에
-들어가는지, 닫힌 창에서 T18 기판((−1500, −1200)의 3000 × 700 nm)으로 모드 1과 2 아래에 안내 행(*Mode 1 is mostly in
+들어가는지(31차 K3부터 두 크기 모두 보이는 이름표가 한 줄의 *Run A*, *Run B*로 화면 안에 있는지), 닫힌 창에서 T18 기판((−1500, −1200)의 3000 × 700 nm)으로 모드 1과 2 아래에 안내 행(*Mode 1 is mostly in
 Substrate (… % of |E|²), which touches the window edge; …*, 50 % 초과)이 나오는지, 파장 편집 뒤 상태 표시줄이 *Run 9 ·
 Core 500 × 220 + Substrate 3000 × 700 nm …*인지, 템플릿 코어와 기판 실행을 Compare에서 비교하면 B의 안내, 짝이 없는 행마다
 *best x (< 0.8, not matched)*, 1440 × 900에서 O2의 24 px가 나오는지 봅니다.

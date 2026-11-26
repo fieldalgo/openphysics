@@ -523,7 +523,8 @@ was dropped: up to 20 runs are kept; pin a run to keep it.* and the status line 
 and Run 6 named and compared, an eighth run dropping Run 2 and reading *Run 8 is newer than this
 pair · Compare Run 8 with B*; the Compare pickers named *Run A* and *Run B* in the accessibility
 tree, titled with the full label, the run number and name fitting the visible width at 1440 × 900
-and 390 × 844; the T18 substrate (3000 × 700 nm at (−1500, −1200)) in a closed window with a note
+and 390 × 844 (since round 31, K3, their visible labels read *Run A* and *Run B* on one line inside
+the page at both sizes); the T18 substrate (3000 × 700 nm at (−1500, −1200)) in a closed window with a note
 row under modes 1 and 2 (*Mode 1 is mostly in Substrate (… % of |E|²), which touches the window
 edge; …*, more than 50 %); after a wavelength edit the status line *Run 9 · Core 500 × 220 +
 Substrate 3000 × 700 nm …*; and the template core against the substrate run on Compare with the

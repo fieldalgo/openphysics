@@ -486,7 +486,9 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    reads as selected (the pointer over another card changes only its border). On Compare a click on
    a run in the run list selects it (Run name and the run commands act on it) and Compare stays
    as it is: A and B are chosen with the pickers above the plots (named *Run A* and *Run B* for assistive
-   technology, with the full run label as their title, round 17), and **Open Run 1 · design A in
+   technology, with the full run label as their title, round 17; since round 31, K3, their visible
+   labels read *Run A* and *Run B* too, where they read *A* and *B* and three of five testers did not
+   find how to choose runs; no horizontal scroll at 1440 × 900 or 390 × 844), and **Open Run 1 · design A in
    Results** under the list shows the selected run in Results. While something holds Run (input
    errors, a computation or job in progress, an unsupported input), the heading repeats the
    status bar's words instead.

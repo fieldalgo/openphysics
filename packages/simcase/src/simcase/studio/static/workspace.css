@@ -313,6 +313,7 @@ main.comparing>.divider-inspector{left:calc(var(--inspector-width,320px) - 3px)}
 .compare-selection{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:8px 0}
 .compare-selection label,.compare-options label{min-width:0;margin:0}
 .compare-selection select{min-width:0;max-width:100%;text-overflow:ellipsis}
+.compare-selection .compare-pick{white-space:nowrap}
 .compare-options{flex-wrap:wrap;padding:10px 0;gap:12px}
 .compare-options label{flex:0 1 160px}
 /* the matched-modes picker shows the whole pair when closed: its own row, as wide as the pane */
