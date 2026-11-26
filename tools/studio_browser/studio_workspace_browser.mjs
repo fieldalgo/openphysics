@@ -3542,9 +3542,12 @@ try {
     const latest = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>resolve(g.result?.session??null);};})`);
     let session = null;
     for (let i = 0; i < 60 && !(session?.runs?.length === 4); i++) { const text = await latest(); session = text ? JSON.parse(text) : null; if (session?.runs?.length !== 4) await sleep(500); }
-    const strip = run => { const {job, completedAt, number, digest, label, pinned, ...rest} = run; return JSON.stringify(rest); };
+    // the run's own: its job, number and time, and its measured times (wall time, the server's mesh and solve)
+    const strip = run => { const {job, completedAt, number, digest, label, pinned, duration, timings, ...rest} = run; return JSON.stringify(rest); };
     k2.runs = session ? session.runs.map(x => ({open: !!x.settings?.pml, group: x.group_index_method !== undefined, neff: x.effective_index})) : null;
     k2.same = session ? strip(session.runs[1]) === strip(session.runs[3]) : null;
+    // the fields in which the two records differ (the times of a run are its own: duration, timings)
+    k2.differ = session ? [...new Set([...Object.keys(session.runs[1]), ...Object.keys(session.runs[3])])].filter(key => JSON.stringify(session.runs[1][key]) !== JSON.stringify(session.runs[3][key])).map(key => [key, key === 'field' ? '…' : session.runs[1][key], key === 'field' ? '…' : session.runs[3][key]]) : null;
     stage('R31 K2 group index question', {...k2, docs: k2.docs.length});
     const QUESTION = 'This open-boundary run with group index takes about three times as long (3 solves).';
     for (const [tag, v] of [['first', k2.first], ['Cancel', k2.cancel], ['Turn off', k2.off]])
@@ -3555,7 +3558,8 @@ try {
     assert.deepEqual(k2.estimate, {dialogs: 1, modal: true, text: `This open-boundary run with group index takes about ${about[1]} (3 solves).`, buttons: BUTTONS, focus: 'group-carry-run', described: 'group-carry-text', slab: false});
     assert.equal(k2.docs.length, 4); assert.equal(k2.docs[1], k2.docs[3], 'Run 2 and Run 4 send the same document');
     assert.deepEqual(k2.runs.map(x => [x.open, x.group]), [[false, true], [true, false], [false, true], [true, false]]);
-    assert.equal(k2.same, true, JSON.stringify(k2.runs)); assert.deepEqual(k2.runs[1].neff, k2.runs[3].neff);
+    assert.equal(k2.same, true, JSON.stringify(k2.differ)); assert.deepEqual(k2.runs[1].neff, k2.runs[3].neff);
+    assert.deepEqual(k2.differ.map(d => d[0]).filter(key => !['job', 'number', 'completedAt', 'digest', 'duration', 'timings'].includes(key)), [], JSON.stringify(k2.differ));
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 

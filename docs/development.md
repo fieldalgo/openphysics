@@ -652,7 +652,8 @@ at 1440 × 900 or 390 × 844); Escape and Cancel leave the run list, the box, th
 next-run line as they were and send nothing; **Turn off group index and run** gives Run 2 (open, no
 n_g, the box off); Run 3 closed with the box ticked again is not asked; open again asks with the
 plan line's *about N*, and Cancel; unticking the box and Run study gives Run 4 without asking. Run 2
-and Run 4 send the same document to `/api/run` and keep the same record but for job, time and number.
+and Run 4 send the same document to `/api/run` and keep the same record but for job, number, completion time,
+digest and measured times (`duration`, `timings`).
 Earlier stages that run open with group index carried over answer **Run with group index**, which
 runs as before, and the report lists each such question (`groupCarryQuestions`), as for the slab
 question; the project and session scripts do the same.

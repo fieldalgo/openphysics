@@ -513,7 +513,8 @@ fixture의 61.6 s에서는 *about 3 min*)으로, 선택을 끄면 *… · last s
 1440 × 900과 390 × 844에서 넘침 없음); Escape와 Cancel이 실행 목록, 확인란, 계획 줄, 다음 실행 줄을 그대로 두고 아무것도 보내지
 않는지; **Turn off group index and run**이 Run 2(열린 경계, n_g 없음, 확인란 꺼짐)를 주는지; 확인란을 다시 켠 닫힌 Run 3은 묻지
 않는지; 다시 열린 경계에서 계획 줄의 *about N*으로 묻는지와 Cancel; 확인란을 끄고 Run study를 누르면 묻지 않고 Run 4가 되는지.
-Run 2와 Run 4는 `/api/run`에 같은 문서를 보내고 job, 시각, 번호 말고는 같은 기록을 담습니다. 군굴절률이 이어진 채 열린 경계로
+Run 2와 Run 4는 `/api/run`에 같은 문서를 보내고 job, 번호, 완료 시각, digest, 잰 시간(`duration`, `timings`) 말고는
+같은 기록을 담습니다. 군굴절률이 이어진 채 열린 경계로
 실행하는 앞선 단계들은 **Run with group index**로 답해 전과 같이 실행하고, 보고서는 슬래브 질문처럼 그런 질문을 모두
 (`groupCarryQuestions`) 남깁니다. 프로젝트와 세션 스크립트도 같습니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
