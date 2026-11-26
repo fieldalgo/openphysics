@@ -2199,9 +2199,18 @@ try {
       const projectFile = await import(pathToFileURL(join(engine.static, 'workspace-project-file.mjs')).href);
       const leakRun = projectFile.readProject(first.text).models.find(m => m.kind === 'workspace').session.runs.at(-1);
       assert.ok(leakRun.settings.boundary === 'PML' && leakRun.input.model.shapes.length === 2 && !!leakRun.field, 'the leakage run with its field');
-      const regionNotes = (await import(pathToFileURL(join(engine.static, 'workspace-modes.mjs')).href)).openRegionNotes(leakRun).map(n => n.text);
+      const fileRegions = (await import(pathToFileURL(join(engine.static, 'workspace-modes.mjs')).href)).openRegionNotes(leakRun), regionNotes = fileRegions.map(n => n.text);
       stage('A4 open region notes from the file', {notes: regionNotes});
-      assert.deepEqual(leakNotes, regionNotes);
+      // open-mode notes (slice S3, ruled 2026-11-26): the region words of each cell are openRegionNotes of
+      // the run as the file holds it; the whole cells are the page module's notes of that run
+      assert.deepEqual(leakNotes.map(regionPart), regionNotes);
+      const edge = new Map(fileRegions.filter(n => n.kind === 'edge').map(n => [n.mode, n.text])), core = new Map(fileRegions.filter(n => n.kind === 'core').map(n => [n.mode, n.text]));
+      const alone = pageChannel.placeChannelNotes(leakRun, edge, core);
+      const fileCells = [...new Set([...edge.keys(), ...core.keys(), ...alone.keys()])].sort((a, b) => a - b).flatMap(m => [
+        ...(edge.has(m) ? [[String(m + 1), 'region', null, edge.get(m)]] : []), ...(core.has(m) ? [[String(m + 1), 'region', null, core.get(m)]] : []),
+        ...(alone.has(m) ? [[String(m + 1), 'channel', alone.get(m).kind, alone.get(m).text]] : [])]);
+      stage('S3 open-mode notes from the file', {cells: fileCells});
+      assert.deepEqual(leakCells, fileCells, 'a run read from the file gets the same notes');
     }
     await obOpen(join(obDownloads, first.name), 'OB V15 open 1');
     const second = await obSave('OB V15 save 2');
