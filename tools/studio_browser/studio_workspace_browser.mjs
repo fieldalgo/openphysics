@@ -162,7 +162,7 @@ class Page {
       .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
     return (await Promise.all(roles.map(read))).flat();
   }
-  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') await this.answerSlabQuestion(); return out; }
+  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') { await this.answerGroupCarry(); await this.answerSlabQuestion(); } return out; }
   // Round 27 (D2): Run study in a closed window with the slab warning shown and Highest n_eff asks
   // once first. The stages written before the question answer Run as set, which runs exactly as
   // before; each question is checked (its words and buttons) and noted after the last stage name.
@@ -175,6 +175,20 @@ class Page {
     assert.match(q.text, /^.+ touches the window edge, so a closed-window run returns its slab modes first\. Search near the core instead\?$/);
     assert.match(q.buttons[0], /^Set search near [\d.]+ · 4 modes and run$/); assert.deepEqual(q.buttons.slice(1), ['Run as set', 'Cancel']);
     await CLICK.call(this, '#slab-question-run');
+  }
+  // Round 31 (K2): Run study for an open boundary with group index carried over from the last run
+  // completed in the tab asks first. The stages written before the question answer Run with group
+  // index, which runs exactly as before; each question is checked and noted like the slab question.
+  // A stage that tests the question itself sets groupCarryAsIs = false.
+  async answerGroupCarry() {
+    if (this.groupCarryAsIs === false) return;
+    const q = await this.eval("(()=>{const d=document.getElementById('group-carry-question');return d&&d.open?{title:document.getElementById('group-carry-title').textContent,text:document.getElementById('group-carry-text').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}:null})()");
+    if (!q) return;
+    (report.groupCarryQuestions ??= []).push({after: report.stages.at(-1)?.name ?? null, ...q}); console.log('[group index question] after', JSON.stringify(report.stages.at(-1)?.name ?? null));
+    assert.equal(q.title, 'Group index is still on');
+    assert.match(q.text, /^This open-boundary run with group index takes about (?:\d+ (?:s|min)|three times as long) \(3 solves\)\.$/);
+    assert.deepEqual(q.buttons, ['Run with group index', 'Turn off group index and run', 'Cancel']);
+    await CLICK.call(this, '#group-carry-run');
   }
 
   // Typing as a user does: focus, select, insert text, leave the field.
@@ -3442,6 +3456,102 @@ try {
     assert.match(g3.after.plan, /^Closed window · near n_eff 2\.46 · 4 modes(?: · last such run \d+:\d\d)?$/);
     assert.ok(g3.after.message.includes('No need to run: Run 3 already has these results.'), g3.after.message);
     assert.equal(g3.after.nearest, true); assert.equal(g3.after.modes, '4');
+    await browserPage.call('Target.disposeBrowserContext', {browserContextId});
+  }
+
+  // Round 31 (K2), in a browser context of its own: the optical template (no slab warning). Run 1
+  // closed with group index; then an open boundary with group index carried over asks, in a modal
+  // dialog named "Group index is still on" with focus on its first button, the estimate words
+  // "about three times as long" without a timed open run; Escape and Cancel run nothing and change
+  // nothing; "Turn off group index and run" gives Run 2. Run 3 closed with group index (not asked:
+  // a closed window, and turned on after Run 2); open again: asked with the plan line's "about N";
+  // Cancel; unticking the box and Run study gives Run 4 without asking. Run 2 and Run 4 are the same
+  // run: the same document sent to /api/run and the same record but for its job, time and number.
+  {
+    const devtools = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+    const browserPage = new Page(devtools.webSocketDebuggerUrl); await browserPage.ready;
+    const {browserContextId} = await browserPage.call('Target.createBrowserContext');
+    const {targetId} = await browserPage.call('Target.createTarget', {url: 'about:blank', browserContextId});
+    const r = new Page(`ws://127.0.0.1:${debugPort}/devtools/page/${targetId}`); await r.ready; r.groupCarryAsIs = false;
+    await r.call('Runtime.enable'); await r.call('Page.enable'); await r.call('DOM.enable'); await r.call('Accessibility.enable');
+    const rSize = async (width, height, mobile = false) => { await r.call('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 1, mobile}); await sleep(300); };
+    await rSize(1440, 900);
+    const rText = selector => r.onElement('function(selector){const e=this.querySelector(selector);return e?e.textContent:null}', selector);
+    const rTree = async (name, ready) => { await r.click('nav [data-page=Model]'); await sleep(200); await r.clickTreeItem(name); await r.until(ready, name); };
+    const modes = () => rTree('Optical modes', "!!document.getElementById('group-index-check')");
+    const runItems = () => r.eval("[...document.querySelectorAll('.run-item')].map(b=>b.textContent)");
+    const isOpen = () => r.eval("document.getElementById('group-carry-question').open");
+    const TITLE = 'Group index is still on', BUTTONS = ['Run with group index', 'Turn off group index and run', 'Cancel'];
+    const dialogView = async () => {
+      const {result: document} = await r.call('Runtime.evaluate', {expression: 'document'});
+      const {nodes} = await r.call('Accessibility.queryAXTree', {objectId: document.objectId, accessibleName: TITLE, role: 'dialog'});
+      const found = nodes.filter(n => !n.ignored);
+      return {dialogs: found.length, modal: found[0]?.properties?.find(p => p.name === 'modal')?.value?.value ?? null,
+        text: await rText('#group-carry-text'), buttons: await r.eval("[...document.querySelectorAll('#group-carry-question button')].map(b=>b.textContent)"),
+        focus: await r.eval('document.activeElement?.id??null'), described: await r.eval("document.getElementById('group-carry-question').getAttribute('aria-describedby')"),
+        slab: await r.eval("document.getElementById('slab-question').open")};
+    };
+    // what a Cancel must leave as it was: the run list, the box, the plan line and the next-run line
+    const stateNow = async () => ({items: await runItems(), box: await r.eval("document.getElementById('group-index-check')?.checked??null"), plan: await rText('#run-plan'), next: await rText('#next-run-inputs'), runs: await r.eval('window.__runDocs.length')});
+    const pressRun = async () => { await r.until("!document.getElementById('run-optical').disabled", 'K2 Run enabled'); await r.click('#run-optical'); };
+    const waitRun = async before => r.until(`JSON.stringify([...document.querySelectorAll('.run-item')].map(b=>b.textContent))!==${JSON.stringify(JSON.stringify(before))}&&!document.getElementById('run-optical').disabled&&document.getElementById('run-optical').textContent==='Run study'&&!!document.getElementById('modes-table')`, 'K2 run done', 600000);
+    const asked = async tag => { await pressRun(); await r.until("document.getElementById('group-carry-question').open", 'K2 asks ' + tag); return dialogView(); };
+    const notAsked = async (before, tag) => { await pressRun(); await sleep(300); assert.equal(await isOpen(), false, tag + ': not asked'); await waitRun(before); };
+    const noRun = async (before, tag) => { await sleep(1500); assert.equal(await isOpen(), false, tag); await modes(); assert.deepEqual(await stateNow(), before, tag + ': nothing run, nothing changed'); assert.equal(await r.eval("document.getElementById('run-optical').textContent"), 'Run study', tag); };
+    const escape = async () => { for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27}); };
+    await r.call('Page.navigate', {url: base + '/workspace'});
+    await r.until("/^Connected/.test(document.getElementById('connection-status').textContent)&&!!document.querySelector('[data-template=optical]')", 'K2 start page');
+    // the documents Run study sends (the page's own fetch, recorded)
+    await r.eval("(()=>{window.__runDocs=[];const f=window.fetch;window.fetch=(u,o)=>{if(/\\/api\\/run\\?/.test(String(u)))window.__runDocs.push(o?.body??null);return f(u,o);};return true})()");
+    await r.click('[data-template=optical]'); await r.until("!!document.getElementById('shape-w')", 'K2 optical model');
+    const k2 = {};
+    // Run 1: closed, group index on (no run before it: not asked)
+    await modes(); await r.click('#group-index-check'); await sleep(300);
+    let before = await runItems(); await notAsked(before, 'Run 1 closed');
+    // an open boundary: asked; Escape and Cancel run nothing and change nothing
+    await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
+    let held = await stateNow();
+    k2.first = await asked('first');
+    for (const [width, height, mobile] of [[1440, 900, false], [390, 844, true]]) {
+      await rSize(width, height, mobile);
+      const o = await r.eval("(()=>{const d=document.getElementById('group-carry-question'),b=d.getBoundingClientRect();return {page:document.documentElement.scrollWidth-document.documentElement.clientWidth,dialog:d.scrollWidth-d.clientWidth,left:b.left,right:b.right-innerWidth,buttons:[...d.querySelectorAll('button')].every(x=>{const q=x.getBoundingClientRect();return q.left>=b.left-1&&q.right<=b.right+1;})};})()");
+      stage('R31 K2 overflow', {width, height, ...o});
+      assert.ok(o.page <= 0 && o.dialog <= 0 && o.left >= 0 && o.right <= 0 && o.buttons, `K2 dialog at ${width} × ${height}: ${JSON.stringify(o)}`);
+    }
+    await rSize(1440, 900);
+    await escape(); await noRun(held, 'K2 Escape');
+    k2.cancel = await asked('again'); await r.click('#group-carry-cancel'); await noRun(held, 'K2 Cancel');
+    // Turn off group index and run: Run 2, open, without group index, as unticking and Run study
+    before = await runItems(); k2.off = await asked('Turn off'); await r.click('#group-carry-off'); await waitRun(before);
+    await modes(); k2.afterOff = {box: await r.eval("document.getElementById('group-index-check').checked"), plan: await rText('#run-plan')};
+    // Run 3: closed, group index turned on again: not asked (a closed window)
+    await r.click('input[name="outer-boundary"][value="closed"]'); await sleep(400); await r.click('#group-index-check'); await sleep(300);
+    before = await runItems(); await notAsked(before, 'Run 3 closed');
+    // open again, carried over from Run 3: asked, with the estimate of the plan line (Run 2 is timed)
+    await modes(); await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
+    held = await stateNow(); k2.estimate = await asked('with an estimate'); await r.click('#group-carry-cancel'); await noRun(held, 'K2 Cancel with an estimate');
+    // Run 4: untick the box and Run study: not asked
+    await r.click('#group-index-check'); await sleep(300);
+    before = await runItems(); await notAsked(before, 'Run 4 unticked');
+    // Run 2 and Run 4: the same document and record
+    k2.docs = await r.eval('window.__runDocs');
+    const latest = () => r.eval(`new Promise((resolve,reject)=>{const o=indexedDB.open('openphysics-studio-notebook',1);o.onerror=()=>reject(o.error);o.onsuccess=()=>{const g=o.result.transaction('snapshots','readonly').objectStore('snapshots').get('latest');g.onerror=()=>reject(g.error);g.onsuccess=()=>resolve(g.result?.session??null);};})`);
+    let session = null;
+    for (let i = 0; i < 60 && !(session?.runs?.length === 4); i++) { const text = await latest(); session = text ? JSON.parse(text) : null; if (session?.runs?.length !== 4) await sleep(500); }
+    const strip = run => { const {job, completedAt, number, digest, label, pinned, ...rest} = run; return JSON.stringify(rest); };
+    k2.runs = session ? session.runs.map(x => ({open: !!x.settings?.pml, group: x.group_index_method !== undefined, neff: x.effective_index})) : null;
+    k2.same = session ? strip(session.runs[1]) === strip(session.runs[3]) : null;
+    stage('R31 K2 group index question', {...k2, docs: k2.docs.length});
+    const QUESTION = 'This open-boundary run with group index takes about three times as long (3 solves).';
+    for (const [tag, v] of [['first', k2.first], ['Cancel', k2.cancel], ['Turn off', k2.off]])
+      assert.deepEqual(v, {dialogs: 1, modal: true, text: QUESTION, buttons: BUTTONS, focus: 'group-carry-run', described: 'group-carry-text', slab: false}, tag);
+    assert.deepEqual(k2.afterOff, {box: false, plan: k2.afterOff.plan}); assert.ok(!k2.afterOff.plan.includes('group index'), k2.afterOff.plan);
+    const about = / · about (\d+ (?:s|min))$/.exec(held.plan);
+    assert.ok(about, held.plan);
+    assert.deepEqual(k2.estimate, {dialogs: 1, modal: true, text: `This open-boundary run with group index takes about ${about[1]} (3 solves).`, buttons: BUTTONS, focus: 'group-carry-run', described: 'group-carry-text', slab: false});
+    assert.equal(k2.docs.length, 4); assert.equal(k2.docs[1], k2.docs[3], 'Run 2 and Run 4 send the same document');
+    assert.deepEqual(k2.runs.map(x => [x.open, x.group]), [[false, true], [true, false], [false, true], [true, false]]);
+    assert.equal(k2.same, true, JSON.stringify(k2.runs)); assert.deepEqual(k2.runs[1].neff, k2.runs[3].neff);
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 

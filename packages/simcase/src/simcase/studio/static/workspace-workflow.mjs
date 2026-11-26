@@ -93,6 +93,28 @@ export function groupIndexEstimate(runs,{open},{isOpen,hasGroup}){
  const last=runs.findLast(r=>runTime(r)!==null&&isOpen(r)===!!open);
  return last?(hasGroup(last)?runTime(last):3*runTime(last)):null;
 }
+// Round 31 (K2): group index ticked for one run stays on, and later open-boundary runs took about
+// three times as long without the task asking for n_g. Before an open-boundary run (settings.pml)
+// with group index on, Studio asks, but only when the option was carried over: on before the last
+// run completed in this tab and not turned off since. Not when it was turned on since that run, for
+// a closed window (the slab question's case) or for the multiphysics model. The words use the plan
+// line's estimate (groupIndexEstimate, aboutText): "This open-boundary run with group index takes
+// about 3 min (3 solves)."; without one, "… about three times as long (3 solves).".
+export const GROUP_CARRY_TITLE='Group index is still on';
+export const GROUP_CARRY_BUTTONS=['Run with group index','Turn off group index and run','Cancel'];
+export const groupCarryText=estimate=>`This open-boundary run with group index takes about ${Number.isFinite(estimate)?aboutText(estimate):'three times as long'} (3 solves).`;
+/** The memory: seen(on) on every render (group index off forgets both); started(on) when a new
+ * optical run starts; completed() when its result arrives in this tab: carried over when the option
+ * was on at that start and has stayed on; due({open, groupIndex, multiphysics}) when Run study asks. */
+export function groupCarryMemory(){
+ let armed=false,carried=false;
+ return {
+  seen(on){if(on!==true){armed=false;carried=false;}},
+  started(on){armed=on===true;},
+  completed(){carried=armed;armed=false;},
+  due({open=false,groupIndex=false,multiphysics=false}={}){return !!open&&groupIndex===true&&!multiphysics&&carried;},
+ };
+}
 /** A run's time in ms (session version 16): its wall time when it has one (measured in this tab, or
  * kept by a version 16 file), else the server's compute time mesh + solve, else null (a run of an
  * earlier file, or a closed run opened or restored). */
