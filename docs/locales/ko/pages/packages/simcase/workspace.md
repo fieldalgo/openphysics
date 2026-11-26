@@ -465,8 +465,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    광 실행을 가지는 동안 상자는 숨겨집니다. (round 30까지는 세션마다 자기 버튼이 있었고 버튼마다 *· saved …*(round 29 L2부터 *· kept …*)와 *· older*가
    붙었으며, 모델 카드마다 그 모델의 가장 새 기록을 되풀이했습니다.) 복원 뒤에는 복원한 기록이 목록에서 빠지고 나머지는 새로고침
    없이 Workspace tools(*Restore earlier session from this browser · …*)에 남습니다. **Open file…**은 제안 상자와 카드가 무엇을 제안하든 Library 맨 위 한 곳(그 줄 오른쪽에 프로젝트 이름)에 고정되어
-   있고, 프로젝트 파일은 컴퓨터 사이를 옮길 수 있는 사본이며 브라우저 복구는 이 브라우저에만 남는다는 안내가
-   함께 있습니다. 이 버튼은 **File › Open…**과 같습니다. Library 페이지는 브라우저 복구를 한 문구 *Restore
+   있고, 옆에 안내 문구는 없습니다(round 32까지는 *A project file is the copy that moves between computers;
+   browser recovery stays in this browser.*라는 줄이 있었습니다). 이 버튼은 **File › Open…**과 같습니다. Library 페이지는 브라우저 복구를 한 문구 *Restore
    from this browser*로 부릅니다. 복구는 기록을 쓸 때 보이던 페이지(Model, Results, Compare)를
    그때 고른 실행과 함께 엽니다. Studio가 페이지를 보관하기 전에 쓴 기록과, 페이지를 담지 않는 세션 파일을 열
    때는 실행이 둘 이상이면 Compare, 아니면 Results를 엽니다.

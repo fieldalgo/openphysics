@@ -578,8 +578,8 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    restored is left out of the lists and the remaining ones stay listed under Workspace tools
    (*Restore earlier session from this browser · …*) without a reload. **Open file…** has one
    fixed place, at the top of the Library (the project name at the right of its row) and above the box and the cards,
-   whatever they offer, with the note that a project file is the copy that moves between computers; browser
-   recovery stays in this browser. It does what **File › Open…** does. The Library page has one phrase for browser recovery,
+   whatever they offer, with no note beside it (until round 32 a line there read *A project file is the copy
+   that moves between computers; browser recovery stays in this browser.*). It does what **File › Open…** does. The Library page has one phrase for browser recovery,
    *Restore from this browser*; **Open file…** is for files. A restore opens the page
    shown when the record was written (Model, Results or Compare) with the run that was
    selected; a record written before Studio kept the page, and an opened session file (which

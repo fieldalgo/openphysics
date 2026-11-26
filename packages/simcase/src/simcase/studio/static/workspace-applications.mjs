@@ -190,14 +190,12 @@ export const CHOOSER_NOTES=Object.freeze([
  'Heated silicon waveguide: a multiphysics model of steady heat and optical modes on one mesh. Add or remove physics and couplings, check them before running, and run every physics in solve order. File › Save keeps the model with its runs, their names and pins, and the without-heater results.'
 ]);
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
-const PORTABLE_NOTE='A project file is the copy that moves between computers; browser recovery stays in this browser.';
 // "Open file…" has one place, at the top of the Library: it opens a project file, a session file or
 // a model file (File › Open), whatever the cards below offer.
 function libraryFiles(onOpenFile,extra=null){
  const bar=document.createElement('div');bar.className='library-files';
  const open=document.createElement('button');open.type='button';open.id='library-open-file';open.textContent='Open file…';open.setAttribute('aria-keyshortcuts','Control+O Meta+O');open.onclick=()=>onOpenFile();
- const portable=document.createElement('p');portable.className='library-portable';portable.textContent=PORTABLE_NOTE;
- bar.append(open,portable);if(extra)bar.append(extra);return bar;
+ bar.append(open);if(extra)bar.append(extra);return bar;
 }
 // The project's name on the Library (P3), at the right of the Open file… row, so the cards and
 // their restore offers stay in the first screen; the project line heads the page in its view title
