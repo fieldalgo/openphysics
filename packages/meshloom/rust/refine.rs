@@ -126,6 +126,9 @@ struct State<'a> {
     /// slivers (minimum dihedral below DIHEDRAL_MIN), the lowest priority, worst first
     dihq: BinaryHeap<(std::cmp::Reverse<u64>, std::cmp::Reverse<[u32; 4]>, u32)>,
     n: MixedCounters,
+    /// a graded size field (`h` given as a function): the size at a point is the smaller of
+    /// its region's and the field's there
+    size: Option<&'a crate::size::SizeField>,
     _p: std::marker::PhantomData<&'a ()>,
 }
 
@@ -264,6 +267,15 @@ impl State<'_> {
         (0..3).all(|k| self.proj(axis, f[k], f[(k + 1) % 3], p) * s0 >= 0)
     }
 
+    /// The size at x of a simplex whose regions' size is `hs`: `hs`, or with a graded size
+    /// field the smaller of `hs` and the field at x (`hs` <= 0: no size, or a hole).
+    fn size_at(&self, hs: f64, x: &P3) -> f64 {
+        match self.size {
+            Some(f) if hs > 0.0 => hs.min(f.at(x)),
+            _ => hs,
+        }
+    }
+
     fn quality(&self, id: u32) -> Option<f64> {
         let hs = self.hsz[id as usize];
         if hs < 0.0 {
@@ -273,6 +285,7 @@ impl State<'_> {
         let p = t.map(|v| self.xyz[v as usize]);
         let c = circumcentre(p)?;
         let r = dot(&sub3(&c, &p[0]), &sub3(&c, &p[0])).sqrt();
+        let hs = self.size_at(hs, &c);
         let mut lmin = f64::INFINITY;
         let mut short = (0, 1);
         for i in 0..4 {
@@ -1365,8 +1378,9 @@ impl State<'_> {
     fn segment_too_long(&self, e: (u32, u32)) -> bool {
         let ts = self.cx.star[e.0 as usize].iter().copied()
             .filter(|&t| self.cx.alive[t as usize] && self.cx.tets[t as usize].contains(&e.1));
-        let h = self.local_h(ts);
-        let d = sub3(&self.xyz[e.1 as usize], &self.xyz[e.0 as usize]);
+        let (a, b) = (self.xyz[e.0 as usize], self.xyz[e.1 as usize]);
+        let h = self.size_at(self.local_h(ts), &[0, 1, 2].map(|k| 0.5 * (a[k] + b[k])));
+        let d = sub3(&b, &a);
         // an unsplit input segment whose facets are all single triangles is bounded as their
         // edges are: it is too long when no triangle on it meets the subfacet size bound (half
         // its length, the smallest circumradius of a triangle on it, above FAC_C alpha h);
@@ -1390,6 +1404,21 @@ impl State<'_> {
         let (a, b) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]));
         let n = cross(&a, &b);
         let nn = dot(&n, &n);
+        let h = if self.size.is_some() {
+            // the field at the subfacet's circumcentre (its centroid when degenerate)
+            let c = if nn > 0.0 {
+                let (la, lb) = (dot(&a, &a), dot(&b, &b));
+                let u = cross(&n, &a);
+                let v = cross(&b, &n);
+                let w = [0, 1, 2].map(|k| (lb * u[k] + la * v[k]) / (2.0 * nn));
+                [0, 1, 2].map(|k| x[0][k] + w[k])
+            } else {
+                [0, 1, 2].map(|k| (x[0][k] + x[1][k] + x[2][k]) / 3.0)
+            };
+            self.size_at(h, &c)
+        } else {
+            h
+        };
         let cc = sub3(&a, &b);
         let (la, lb, lc) = (dot(&a, &a), dot(&b, &b), dot(&cc, &cc));
         let (u, v) = if la <= lb && la <= lc { (f[0], f[1]) } else if lb <= lc { (f[0], f[2]) } else { (f[1], f[2]) };
@@ -2440,7 +2469,7 @@ impl State<'_> {
                                 // a tetrahedron far above the size field is not left: the
                                 // circumcentre's projection on the facet lies in its
                                 // circumsphere, so a facet point there removes it
-                                let hs = self.hsz[t as usize];
+                                let hs = self.size_at(self.hsz[t as usize], &c);
                                 let xs = v.map(|q| self.xyz[q as usize]);
                                 let longest = (0..4).flat_map(|a| (a + 1..4).map(move |b| (a, b)))
                                     .map(|(a, b)| dot(&sub3(&xs[a], &xs[b]), &sub3(&xs[a], &xs[b])).sqrt())
@@ -2528,8 +2557,11 @@ impl State<'_> {
 /// smallest if several seeds name it; `opt.h` where `label_h[L]` is not positive), a hole
 /// (label < 0) is not refined for quality or size, and every other component to `opt.h`.
 /// A seed that `mesh::build` would refuse is refused here with the same message.
+/// `size` (a graded size field, `h` given as a function) bounds the size further: a
+/// simplex is sized by the smaller of its region's size and the field at its circumcentre
+/// (a subsegment: its midpoint); without it the output is the same as before the field.
 pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds: &[crate::mesh::Seed],
-              label_h: &[f64], locked: &[u32]) -> Result<RefineStats, String> {
+              label_h: &[f64], locked: &[u32], size: Option<&crate::size::SizeField>) -> Result<RefineStats, String> {
     let mut g = MixedPoints::new(plc.points.clone());
     for s in &b.plc.rec.s {
         g.push(*s);
@@ -2639,6 +2671,8 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     }
     let hsz: Vec<f64> = comp.iter().map(|&c| comp_h[c as usize]).collect();
     let hmin = comp_h.iter().copied().filter(|h| *h > 0.0).fold(f64::INFINITY, f64::min);
+    // with a graded size field, the cap's estimate uses its smallest size
+    let hmin = size.map_or(hmin, |f| if hmin.is_finite() { hmin.min(f.min) } else { hmin });
     let mut rins = vec![f64::INFINITY; xyz.len()];
     for (t, v) in cx.tets.iter().enumerate() {
         if !cx.alive[t] {
@@ -2775,6 +2809,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     let mut st = State {
         g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, shape_memo: std::cell::RefCell::new(None), clean_faces: std::collections::HashSet::with_hasher(FastKey), clean_e32: std::collections::HashSet::with_hasher(FastKey), clean_er: std::collections::HashSet::with_hasher(FastKey), track_clean: false, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
+        size,
         _p: std::marker::PhantomData,
     };
     // the tetrahedra outside the domain (the rest of the convex hull and the holes) take no
@@ -2878,6 +2913,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             let x = st.cx.tets[t as usize].map(|q| st.xyz[q as usize]);
             let Some(c) = circumcentre(x) else { continue };
             let r = dot(&sub3(&c, &x[0]), &sub3(&c, &x[0])).sqrt();
+            let hs = st.size_at(hs, &c);
             // the filter leaves small slivers to the perturbation, which moves volume vertices
             // only: a sliver with none (its vertices all on the boundary, as across a layer
             // thinner than h) is split whatever its size

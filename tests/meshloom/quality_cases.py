@@ -13,9 +13,9 @@ import numpy as np
 from meshloom import builder
 
 try:  # the box assembly of the refinement tests; the installed-wheel check renames it
-    from test_refine import C3_SEEDS, c2, c3, grid_plc
+    from test_refine import C3_SEEDS, c2, c3, c9, grid_plc
 except ImportError:
-    from test_meshloom_refine import C3_SEEDS, c2, c3, grid_plc
+    from test_meshloom_refine import C3_SEEDS, c2, c3, c9, grid_plc
 
 
 def c6():
@@ -25,21 +25,51 @@ def c6():
     return grid_plc(g, g, g, cells)
 
 
-def generate(case, h):
-    if case == "C2":
-        (pts, facets), _ = c2()
-        return meshloom.generate3d(pts, facets, h=h)
-    if case == "C3":
-        (pts, facets), _ = c3()
-        return meshloom.generate3d(pts, facets, h=h, region_points=C3_SEEDS)
-    if case == "C4":
-        return meshloom.generate3d(h=h, **builder.via_in_slab(h))
-    if case == "C5":
-        return meshloom.generate3d(h=h, **builder.sphere_in_box(h))
+def c7():
+    """C7: the prism of length 1 over the isosceles triangle with legs 1 and a 15 degree
+    apex at the origin, along z."""
+    a = np.radians(15.0)
+    tri = [(0.0, 0.0), (1.0, 0.0), (float(np.cos(a)), float(np.sin(a)))]
+    pts = np.array([(x, y, z) for z in (0.0, 1.0) for x, y in tri])
+    facets = [[[0, 2, 1]], [[3, 4, 5]], [[0, 1, 4, 3]], [[1, 2, 5, 4]], [[2, 0, 3, 5]]]
+    return pts, facets
+
+
+#: C8: [0,1]^2 with three layers 0.02 thick (aspect ratio 1:50), three regions; the size of
+#: this thin-layer stack is fixed in the plan 5 criteria, as validation3d.md gives only the ratio
+C8_LAYERS = [0.0, 0.02, 0.04, 0.06]
+
+
+def c8():
+    cells = {(0, 0, k): f"layer {k}" for k in range(3)}
+    return grid_plc([0.0, 1.0], [0.0, 1.0], C8_LAYERS, cells), [0.02, 0.02, 0.02]
+
+
+C8_SEEDS = [((0.5, 0.5, 0.01 + 0.02 * k), f"layer {k}") for k in range(3)]
+
+
+def case_kwargs(case, h):
+    """The arguments of ``meshloom.generate3d`` for case C1-C9 at size h."""
     if case == "C1":
-        return meshloom.generate3d(h=h, **builder.sphere(h))
-    pts, facets = c6()
-    return meshloom.generate3d(pts, facets, h=h)
+        return dict(h=h, **builder.sphere(h))
+    if case == "C4":
+        return dict(h=h, **builder.via_in_slab(h))
+    if case == "C5":
+        return dict(h=h, **builder.sphere_in_box(h))
+    if case in ("C2", "C3", "C8", "C9"):
+        (pts, facets), _ = {"C2": c2, "C3": c3, "C8": c8, "C9": c9}[case]()
+        kw = dict(points=pts, facets=facets, h=h)
+        if case == "C3":
+            kw["region_points"] = C3_SEEDS
+        if case == "C8":
+            kw["region_points"] = C8_SEEDS
+        return kw
+    pts, facets = {"C6": c6, "C7": c7}[case]()
+    return dict(points=pts, facets=facets, h=h)
+
+
+def generate(case, h):
+    return meshloom.generate3d(**case_kwargs(case, h))
 
 
 def dihedral_and_q(m):

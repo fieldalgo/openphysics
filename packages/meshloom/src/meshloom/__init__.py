@@ -65,7 +65,10 @@ def generate3d(points, facets, segments=None, *, h, domain="regions", region_poi
     loop the outer boundary) describe the input; ``segments`` (m x 2) adds edges. ``h``
     is the target size, one number or (with ``region_points``) a mapping from region
     name to size: a tetrahedron whose circumradius exceeds ``alpha * h`` is split
-    (``ALPHA`` by default, calibrated against the plan's baseline).
+    (``ALPHA`` by default, calibrated against the plan's baseline). ``h`` may also be a
+    graded size, a function from an (n, 3) float64 array of points to n sizes > 0: it
+    is sampled once on a background octree (``meshloom._core.SIZE_CELL``) and read at
+    each tetrahedron's circumcentre.
     ``quality`` bounds the radius-edge ratio, circumradius over shortest edge:
     ``"guaranteed"`` (``GUARANTEED_RATIO``, provably terminating without input angles
     below 90 degrees) or ``"practical"`` (``PRACTICAL_RATIO``). Near input angles below
@@ -91,7 +94,7 @@ def generate3d(points, facets, segments=None, *, h, domain="regions", region_poi
     if quality not in ratios:
         raise ValueError(f"quality must be 'guaranteed' or 'practical', got {quality!r}")
     if h is None:
-        raise ValueError("h is required: a size, or a mapping from region name to size")
+        raise ValueError("h is required: a size, a mapping from region name to size, or a function")
     n = len(facets)
     if facet_tags is None:
         tags = [str(i) for i in range(n)]
