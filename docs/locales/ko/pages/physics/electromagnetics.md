@@ -64,6 +64,8 @@ SIPI는 [단면 템플릿·버전 JSON·목표 임피던스 설계](../packages/
 
 - [회로 입력 저장: 형상/네트워크·소스·부하·누화](../packages/sipi/circuit_document.md)
 
+- [패널 정전기: 경계 패널 계산기의 공개 SI API](../packages/galerkin/panel_electrostatics.md)
+
 - [균질 Laplace 경계 패널: 계약과 검증](../packages/galerkin/laplace_boundary.md)
 
 - [양면 접지 균질 Laplace 패널](../packages/galerkin/two-ground.md)

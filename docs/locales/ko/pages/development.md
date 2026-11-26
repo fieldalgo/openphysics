@@ -136,6 +136,9 @@ docstring에 "Internal module, consistent units"라고 적습니다. 패키지�
 `radius`를 받습니다. `galerkin.kernels`와 `physmat.kernels`는 simcase와 sipi를 위해 일관 단위의
 커널을 다시 내보내는 내부 이름공간입니다. 어떤 공개 이름도 그 이름과 같지 않고, 그 객체도 아닙니다. 목록을 닫은 뒤 더한 구조 이름에는 검토 메모가 붙고, "deferred to the
 materials step" 범주(`datum_temperature` 같은 physmat 레코드 인수)는 그 항목을 끝낼 조건도 적습니다.
+`galerkin.panel_electrostatics`는 내부 경계·코너 패널 모듈(`galerkin.laplace_*`)의 공개 SI 창구이며,
+내부 모듈은 내부인 채로 바뀌지 않습니다. 그 결과는 내부 모듈의 결과와 비트 단위로 같습니다
+([패널 정전기](packages/galerkin/panel_electrostatics.md)).
 
 **복소 규약.** galerkin과 refsol의 공개 복소 값은 exp(−iωt)를 따릅니다. exp(+iωt)로 계산하는 커널은
 패키지의 비공개 모듈 `_conventions`의 `to_kernel`과 `to_public`으로만 변환합니다.

@@ -24,7 +24,8 @@
       "galerkin.interop",
       "galerkin.waveguide",
       "galerkin.cavity",
-      "galerkin.material_cavity"
+      "galerkin.material_cavity",
+      "galerkin.panel_electrostatics"
     ],
     "refsol": [
       "refsol",
