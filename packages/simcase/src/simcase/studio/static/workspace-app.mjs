@@ -38,7 +38,7 @@ import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,per
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
 import {installProviderList} from './workspace-providers.mjs';
-import {renderApplications,templatePhysics,sessionRunNames,sessionLine,cardRecords,APPLICATIONS,pairLine} from './workspace-applications.mjs';
+import {renderApplications,templatePhysics,sessionRunNames,sessionLine,cardRecords,APPLICATIONS,pairLine,recoveryReadGate} from './workspace-applications.mjs';
 import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocument,sideText,thermalSummary} from './workspace-heat.mjs';
 import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
@@ -1087,13 +1087,13 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
 }});
 async function loadNotebookRecovery(){
  const version=notebookLoadVersion;
- try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;ownLatest=false;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
+ try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);recoveryRead.latestRead();if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;ownLatest=false;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
   latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered),entry:recoveredEntry(recovered),recovered}:null;
   if(recovered){$('notebook-recovery-detail').textContent='Saved '+new Date(recovered.savedAt).toLocaleString()+'. Restore last session from this browser brings back inputs and completed results. Latest snapshot is shared across tabs on this origin.';}
   refreshSaveIndicator();
   await renderEarlierSessions();
   if(ui.page==='Applications')render();
- }catch(error){if(version!==notebookLoadVersion)return;recoveryState='unavailable';refreshSaveIndicator();$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
+ }catch(error){recoveryRead.latestRead();if(version!==notebookLoadVersion)return;recoveryState='unavailable';refreshSaveIndicator();$('notebook-recovery-detail').textContent=error.message;$('retry-notebook').disabled=false;}
 }
 // The model a recovered multiphysics session names in the footer; null for optical ones.
 const recoveredModel=recovered=>recovered.session.application==='multiphysics'?String(recovered.session.document.name||'Multiphysics model'):null;
@@ -1154,9 +1154,13 @@ function cardKept(){return Object.fromEntries(Object.entries(cardRecordMap()).ma
 // The landing page offers to resume until the page has runs. Not now closes the box (a disclosure)
 // instead of hiding it: its heading stays, and opening it shows the same buttons again.
 let resumeCollapsed=false;
+// The box is offered once the latest and the earlier stored records have been read, so its first
+// offer is final (a pair's newest button never restores one model first).
+const recoveryRead=recoveryReadGate();
 // Round 19 (Y1): every stored session, newest first, the newest with runs leading (resumeChoices):
 // one button per piece of work, older copies folded. Still hidden while the tab holds optical runs.
 function resumeOffer(){
+ if(!recoveryRead.ready)return null;
  if(runs.length)return null;
  const list=recoveryList(),latest=list.find(e=>e.kind==='latest');
  // round 20 (Z2): the pair only while the tab holds runs of neither model
@@ -1193,8 +1197,9 @@ function restoredFrom(index){if(!Number.isInteger(index))return;restoredIndex=in
 let earlierGeneration=0;
 async function renderEarlierSessions(){
  const generation=++earlierGeneration;
- let list=[];try{list=await notebookStore.loadEarlier();}catch{return;}
+ let list=[];try{list=await notebookStore.loadEarlier();}catch{if(generation===earlierGeneration){recoveryRead.earlierRead();if(ui.page==='Applications')render();}return;}
  if(generation!==earlierGeneration)return;
+ recoveryRead.earlierRead();
  const box=$('earlier-sessions');box.replaceChildren();earlierSessions=[];earlierRecords=list;
  list.forEach((record,index)=>{let recovered;try{recovered=readNotebookRecovery(record);}catch{return;}
   // keep the storage index: a record that does not parse is skipped, not renumbered

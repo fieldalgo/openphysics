@@ -190,6 +190,13 @@ export const CHOOSER_NOTES=Object.freeze([
  'Heated silicon waveguide: a multiphysics model of steady heat and optical modes on one mesh. Add or remove physics and couplings, check them before running, and run every physics in solve order. File › Save keeps the model with its runs, their names and pins, and the without-heater results.'
 ]);
 export const CHOOSER_CHOICE='Choosing a model sets which physics it solves. Dimensions you entered and runs you completed are kept, and Undo takes the choice back between the optical, steady heat and Joule heating models. The heated silicon waveguide has its own Undo for its edits: to leave it, choose another model here.';
+// The restore box waits until the stored records have been read: the latest record and the
+// earlier ones. Until both are read the newest offer is not final (it could restore one model of a
+// pair a moment before it becomes the pair), so the Library is drawn without the box.
+export function recoveryReadGate(){
+ let latest=false,earlier=false;
+ return {latestRead(){latest=true;},earlierRead(){earlier=true;},get ready(){return latest&&earlier;}};
+}
 // "Open file…" has one place, at the top of the Library: it opens a project file, a session file or
 // a model file (File › Open), whatever the cards below offer.
 function libraryFiles(onOpenFile,extra=null){

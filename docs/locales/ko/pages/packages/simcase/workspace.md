@@ -448,7 +448,9 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    browser*를 확인합니다(마지막 갱신 시각은 **Workspace tools**에 나옴). 새로고침하거나 Studio를 다시
    켜면 시작 화면에 **Continue where you left off**가 나옵니다: 작업 하나(프로젝트 파일 하나, 또는 파일이 없는 한 모델의
    기록)마다 돌아가는 길이 하나입니다. 안내 문구는 *Restore brings back completed runs kept in this browser, without
-   recomputing.*입니다(30차까지는 Open file…을 둘째 길로 덧붙였음). 첫째이자 가장 눈에 띄는(채워진) 버튼은 모델과
+   recomputing.*입니다(30차까지는 Open file…을 둘째 길로 덧붙였음). 상자는 Studio가 이 브라우저에 보관된 기록을 모두 읽은 뒤에
+   나타나므로 처음 보이는 제안이 최종입니다. 그 전까지 Library는 상자 없이 Open file…과 카드를 보여 줍니다(전에는 가장 새 버튼이
+   잠깐 프로젝트의 한 모델만 복원하다가 두 모델을 제안할 수 있었습니다). 첫째이자 가장 눈에 띄는(채워진) 버튼은 모델과
    상관없이 실행이 있는 가장 새 세션(round 19)이거나, 아래에 적은 프로젝트의 두 모델입니다: *Restore newest from this
    browser: Optical waveguide · 6 runs · Run 1, …*. 그 아래 줄은 이 브라우저 사본이 기록이 가리키는 파일과 어떤지 밝힙니다:
    *Kept in this browser 11:40 AM · not saved to a file*, *… · same as heater-study.json, saved 11:12 AM*(여기서 연 파일은 저장 시각이 없으므로 *same as heater-study.json as opened*), *… · newer than

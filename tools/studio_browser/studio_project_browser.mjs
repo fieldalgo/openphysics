@@ -810,7 +810,14 @@ try {
     for (const state of [settled, edited]) { assert.ok(!(state.title + state.footer).includes('another tab'), JSON.stringify(state)); }
     assert.match(edited.detail, /^Browser recovery updated /);
     // after rounds 26–30 the edited optical record is the newest offer (the pair): it restores the edit
+    // the first #resume-newest the page shows after the reload is already the pair: the box waits
+    // until the earlier records are read (before, a click in that window restored one model; macos-15,
+    // run 45891974567). The observer records the button as a click could find it, after each task.
+    const firstNewest = await page.call('Page.addScriptToEvaluateOnNewDocument', {source: "new MutationObserver(()=>{const b=document.getElementById('resume-newest');if(b&&!window.__firstNewest)window.__firstNewest={pair:b.dataset.resumePair??null,text:b.textContent};}).observe(document,{subtree:true,childList:true,attributes:true});"});
     await page.call('Page.reload'); await page.until("!!document.getElementById('resume-newest')", 'R20 offers after the edit', 30000);
+    await page.call('Page.removeScriptToEvaluateOnNewDocument', {identifier: firstNewest.identifier});
+    const firstSeen = await page.eval('window.__firstNewest ?? null'); stage('R20 first offer after the reload', firstSeen);
+    assert.equal(firstSeen?.pair, 'true', `R20: the first newest offer is the pair ${JSON.stringify(firstSeen)}`);
     await page.click('#resume-newest');
     for (let i = 0; i < 2; i++) { await sleep(800); if (await page.eval("!!document.getElementById('load-confirm')?.open")) await page.eval("document.getElementById('confirm-load').click()"); }
     await page.until("/^Restored Optical waveguide \\(2 runs\\) and Heated silicon waveguide \\(1 run\\) from this browser/.test(document.getElementById('file-status').textContent)", 'R20 edited record restored', 60000);
