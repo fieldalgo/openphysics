@@ -49,8 +49,10 @@ mesh["region_names"]           # ['via', 'slab']
   1e-15, at most 2.5e-16 measured on C1, C4, C5 and C11).
 - **Locked facets.** The curved triangles are passed as `locked_facets`: the mesher adds
   no point on them or on their edges. Recovery needs none there, because the triangles
-  are strictly Delaunay on their surface. If one were missing, meshing raises
-  `RecoveryError` and never returns a node off the surface.
+  are strictly Delaunay on their surface. Where recovery would need one (a locked
+  surface whose triangles are not Delaunay faces), the point is moved into the domain
+  instead, and the mesh never has a node off the surface; where that fails, meshing
+  raises `RecoveryError`.
 - **Planar facets.** The box faces and the via's end disks are refined as usual.
 
 A closed triangle surface (an STL-like input: points and triangles, with a tag per
@@ -389,8 +391,16 @@ See [third-party software](../../third-party.md).
     and passes the volume and area checks: 7.7 s, 33 s and 182 s at h = 0.06, 0.03 and
     0.015 (one run each, 2026-11-24). The other rows were not measured again. The cube
     from its triangles takes 0.07–3.6 s, and as six polygons 0.06–3.6 s.
-  - Locking those triangles (`locked_facets`) raises `RecoveryError` on C2–C7: recovery
-    would need a point on a locked facet.
+  - Locking those triangles (`locked_facets`) keeps them exactly. Recovery puts points on
+    them, and each such point is then moved into the domain: the fans of facet triangles
+    around it are triangulated again without it, and the space around it is refilled
+    from a new point inside (exact `orient3d` > 0 for every new tetrahedron), or the
+    point is collapsed onto a neighbour on its segment. The method follows the papers
+    that relocate boundary Steiner points into the interior (Si and Gärtner 2011).
+    C1–C6 mesh at all sizes with every boundary and interface face an input triangle.
+    On C7, the 15° wedge, it fails at all three sizes with `RecoveryError`: 18–38 points
+    near the wedge's edges cannot move. There, the space a new point would have to lie
+    in is thinner than double resolution.
 - The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
   triangulation uses linear scans: both are meant for builder-sized inputs and are
   not yet tuned for very large surfaces.
