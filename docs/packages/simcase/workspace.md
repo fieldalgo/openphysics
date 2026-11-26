@@ -363,7 +363,18 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    fixed size, so the ribbon does not move when it changes (round 23: except while the slab warning
    below needs more room). Choosing **Open boundary** while the
    group index is on adds a warning to Messages: *Group index is on: open-boundary runs with it take
-   about three times as long.* The options keep their state between tasks.
+   about three times as long.* The options keep their state between tasks. Since round 31 (K2), when
+   the group index was carried over (on before the last run completed in this tab, and not turned
+   off since), **Run study** for an open boundary asks first, in a dialog *Group index is still on*:
+   *This open-boundary run with group index takes about 3 min (3 solves).* (the line's estimate; *…
+   about three times as long (3 solves).* without one) with **Run with group index** (the run as set),
+   **Turn off group index and run** (the check box's own change, then the same run as unticking it and
+   pressing Run study: the same document, values and record) and **Cancel** (Escape too; nothing is
+   run or changed). Focus starts on the first button. It does not ask when the group index was turned
+   on after the last completed run, for a closed window (where only the slab question below can ask),
+   or for the multiphysics model; both questions never apply to one run. Round 31's testers ticked
+   the group index for one task and two of five then ran open-boundary runs of about 4 minutes with
+   it on that the task did not ask for.
    Set the core mesh size in **Mesh**.
 3. Optionally generate **Mesh** and review **Study → Check inputs**. These actions
    do not calculate optical fields. Inspect or export the solver JSON if needed.

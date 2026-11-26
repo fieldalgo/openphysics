@@ -643,6 +643,18 @@ time; it read none before). T18-G1 (design *Session versions 16 and 17*, S1) the
 *Open boundary · 2 modes · 2 searches · group index on (3 solves) · about N min* with N from
 `aboutText(3·d5)` (*about 3 min* for the fixture's 61.6 s), and *… · last such run 1:02* with the
 option off, both after File › Open and after Restore. No horizontal overflow at 1440 × 900 or 390 × 844.
+Since round 31 (K2) a stage in its own browser context (R31 K2) runs the optical template: Run 1
+closed with group index (not asked: no run before it); then Open boundary asks *Group index is still
+on* (one modal dialog by that name, described by its text, focus on **Run with group index**, the
+slab question closed, *… about three times as long (3 solves).* with no timed open run, no overflow
+at 1440 × 900 or 390 × 844); Escape and Cancel leave the run list, the box, the plan line and the
+next-run line as they were and send nothing; **Turn off group index and run** gives Run 2 (open, no
+n_g, the box off); Run 3 closed with the box ticked again is not asked; open again asks with the
+plan line's *about N*, and Cancel; unticking the box and Run study gives Run 4 without asking. Run 2
+and Run 4 send the same document to `/api/run` and keep the same record but for job, time and number.
+Earlier stages that run open with group index carried over answer **Run with group index**, which
+runs as before, and the report lists each such question (`groupCarryQuestions`), as for the slab
+question; the project and session scripts do the same.
 Since run retention (design *Keeping more runs*) the optical model keeps 20 runs, so every stage
 that reached the six-run limit (U2, X3, R21, R22 P4, R23 P4 and the project script's K4) adds
 `tests/simcase/studio_session_fixtures/optical-values-only-14.json` by Add runs from file right

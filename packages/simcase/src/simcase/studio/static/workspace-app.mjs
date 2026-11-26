@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,runTime as runTimeMs,shortcutRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,runTime as runTimeMs,shortcutRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText,GROUP_CARRY_TITLE,GROUP_CARRY_BUTTONS,groupCarryText,groupCarryMemory} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -483,7 +483,7 @@ function renderConnectionOverview(){return renderConnectionGraph(state,ui.select
 let panelKey=null;
 // Round 16 (S9): the page each model was last shown on (not the Library), so its Library card returns there
 function rememberReturn(){if(ui.page==='Applications')return;if(multiView.active())multiView.rememberPage(ui.page);else if(workspaceInProject())workspaceReturn={page:ui.page,run:solverRun?.job||null};}
-function render(){rememberReturn();if(ui.page!=='Compare')compareOpen=false;const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
+function render(){groupCarry.seen(state.groupIndex);rememberReturn();if(ui.page!=='Compare')compareOpen=false;const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
  // only a field whose focus was restored onto a new element is brought into view; a background redraw does not move a panel the user scrolled
  const focused=document.activeElement;if(focused&&focused!==before&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
 function renderPanels(){if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?projectLine():'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));markPageTabs(document.querySelector('.page-tabs'),ui.page);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');drawModelTree();
@@ -1345,6 +1345,8 @@ const closedNearDraft=()=>{try{if(ui.closedNear!=null)return checkClosedTarget(u
 // gone with Nearest to n_eff or Open boundary. The result-side edge note stays as it is.
 const edgeWarning=()=>isOptical()&&applicationChosen()&&!state.openBoundary&&state.searchTarget==null?edgeSlabRisk(state.shapes):null;
 // round 27 (D2): the slab question's memory (asked once per geometry, boundary and Modes to return)
+// round 31 (K2): whether group index was carried over from the last run completed in this tab
+const groupCarry=groupCarryMemory();
 const slabQuestion=slabQuestionMemory(),slabKeyNow=()=>slabQuestionKey({shapes:state.shapes,openBoundary:state.openBoundary,searchTarget:state.searchTarget});
 // its two buttons, in the plan line and in Physics › Optical modes: the edge note's shortcut (the same
 // target estimate, defaultTarget) and Use Open boundary; each sets the inputs and runs nothing
@@ -2381,7 +2383,7 @@ const jobMonitor=new OpticalJobMonitor({api:watchedApi,onState:state=>{
  completed.inputRevision=pending.revision;{const started=Date.parse(pending.startedAt);if(Number.isFinite(started))completed.duration=Date.now()-started;}
  // session version 16: the wall time only of a job followed from its start to its result (a resumed
  // job's time holds the time the tab was detached) and of 1 ms to 7 days; timings stay either way
- if(resumedJobs.has(pending.job)||!isRunDuration(completed.duration))delete completed.duration;resumedJobs.delete(pending.job);const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const appended=appendRun(runs,completed),next=prior?inNumberOrder(appended):appended,dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);runs=next;solverRun=runs.find(run=>run.job===completed.job);
+ if(resumedJobs.has(pending.job)||!isRunDuration(completed.duration))delete completed.duration;resumedJobs.delete(pending.job);const prior=runs.find(r=>r.job===completed.job);if(prior)completed.number=prior.number;runNumbersUsed=numberRuns([completed],runNumbersUsed);const appended=appendRun(runs,completed),next=prior?inNumberOrder(appended):appended,dropped=runs.filter(r=>!next.includes(r)&&r.job!==completed.job);runs=next;solverRun=runs.find(run=>run.job===completed.job);groupCarry.completed();
  {const other=dropped.length===1?swapCandidate(runs,solverRun):null;dropSwap=other?{kept:dropped[0],other,newest:solverRun,list:runs}:null;}
  // round 22 (V4): with every other earlier run pinned there is no swap: the dropped words say why
  droppedNote=!dropped.length?'':swapCandidate(runs,solverRun)?droppedAfterText(dropped):droppedNoSwapText(dropped);
@@ -2436,9 +2438,38 @@ $('slab-question-search').onclick=()=>slabAnswer?.('search');
 $('slab-question-run').onclick=()=>slabAnswer?.('run');
 $('slab-question-cancel').onclick=()=>slabAnswer?.(null);
 slabDialog.oncancel=event=>{event.preventDefault();slabAnswer?.(null);};
+// Round 31 (K2): the question before an open-boundary run whose group index was carried over from
+// the last run completed in this tab (groupCarryMemory), in the slab question's dialog pattern. Run
+// with group index runs as set; Turn off group index and run makes the box's own change (Turn off
+// group index, as unticking it does) and then runs exactly as Run study would; Cancel or Escape runs
+// nothing and changes nothing. It is never asked with the slab question (a closed window only).
+let carryAnswer=null;
+const carryDialog=document.createElement('dialog');carryDialog.id='group-carry-question';carryDialog.setAttribute('aria-labelledby','group-carry-title');carryDialog.setAttribute('aria-describedby','group-carry-text');
+carryDialog.innerHTML='<h2 id="group-carry-title">'+GROUP_CARRY_TITLE+'</h2><p id="group-carry-text"></p><div class="leave-actions"><button type="button" id="group-carry-run" class="primary"></button> <button type="button" id="group-carry-off"></button> <button type="button" id="group-carry-cancel"></button></div>';
+document.body.append(carryDialog);
+// Resolves 'run', 'off' or null (Cancel or Escape).
+function askGroupCarry(){
+ return new Promise(resolve=>{
+  const opener=document.activeElement,[run,off,cancel]=GROUP_CARRY_BUTTONS;
+  carryAnswer=value=>{carryAnswer=null;if(carryDialog.open)carryDialog.close();restoreDialogFocus(opener);resolve(value);};
+  $('group-carry-text').textContent=groupCarryText(groupIndexEstimate(runs,{open:true},{isOpen:isOpenRun,hasGroup:hasGroupIndex}));$('group-carry-run').textContent=run;$('group-carry-off').textContent=off;$('group-carry-cancel').textContent=cancel;
+  carryDialog.showModal();$('group-carry-run').focus();
+ });
+}
+$('group-carry-run').onclick=()=>carryAnswer?.('run');
+$('group-carry-off').onclick=()=>carryAnswer?.('off');
+$('group-carry-cancel').onclick=()=>carryAnswer?.(null);
+carryDialog.oncancel=event=>{event.preventDefault();carryAnswer?.(null);};
 $('run-optical').onclick=async()=>{
- if(solverBusy||pendingJob||opticalBlock()||retentionBlock()||slabDialog.open)return;
+ if(solverBusy||pendingJob||opticalBlock()||retentionBlock()||slabDialog.open||carryDialog.open)return;
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
+ // round 31 (K2): an open run only (pmlNow), so never with the slab question below (a closed window)
+ if(groupCarry.due({open:!!pmlNow(),groupIndex:state.groupIndex,multiphysics:multiView.active()})){
+  const answer=await askGroupCarry();
+  if(!answer)return;
+  if(answer==='off')turnOffGroupIndex();
+  if(solverBusy||pendingJob||opticalBlock()||retentionBlock())return;
+ }
  const risk=edgeWarning(),key=slabKeyNow();
  if(slabQuestion.due(risk,key)){
   const near=defaultTarget(state.shapes);slabQuestion.asked(key);
@@ -2450,7 +2481,7 @@ $('run-optical').onclick=async()=>{
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
  // round 21 (W2): no question before the run; a swap offered after the last drop ends here
  dropSwap=null;
- const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
+ const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();groupCarry.started(state.groupIndex);solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
   // a closed-window search names capabilities v10 (slice C1)
   const em=doc.physics.em1,closedTarget=!em.pml&&em.target_effective_index!==undefined?em.target_effective_index:null,query=closedTarget===null?'':'&'+CLOSED_TARGET_QUERY;

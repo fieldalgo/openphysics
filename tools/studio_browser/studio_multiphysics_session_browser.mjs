@@ -142,7 +142,7 @@ class Page {
       .map(n => ({role, name: n.name?.value ?? '', level: prop(n, 'level') ?? null, selected: prop(n, 'selected') ?? null, expanded: prop(n, 'expanded') ?? null}));
     return [...await read('tree'), ...await read('treeitem')];
   }
-  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') await this.answerSlabQuestion(); return out; }
+  async click(selector) { const out = await CLICK.call(this, selector); if (selector === '#run-optical') { await this.answerGroupCarry(); await this.answerSlabQuestion(); } return out; }
   // Round 27 (D2): Run study in a closed window with the slab warning shown and Highest n_eff asks
   // once first. The stages written before the question answer Run as set, which runs exactly as
   // before; each question is checked (its words and buttons) and noted after the last stage name.
@@ -155,6 +155,20 @@ class Page {
     assert.match(q.text, /^.+ touches the window edge, so a closed-window run returns its slab modes first\. Search near the core instead\?$/);
     assert.match(q.buttons[0], /^Set search near [\d.]+ · 4 modes and run$/); assert.deepEqual(q.buttons.slice(1), ['Run as set', 'Cancel']);
     await CLICK.call(this, '#slab-question-run');
+  }
+  // Round 31 (K2): Run study for an open boundary with group index carried over from the last run
+  // completed in the tab asks first. The stages written before the question answer Run with group
+  // index, which runs exactly as before; each question is checked and noted like the slab question.
+  // A stage that tests the question itself sets groupCarryAsIs = false.
+  async answerGroupCarry() {
+    if (this.groupCarryAsIs === false) return;
+    const q = await this.eval("(()=>{const d=document.getElementById('group-carry-question');return d&&d.open?{title:document.getElementById('group-carry-title').textContent,text:document.getElementById('group-carry-text').textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}:null})()");
+    if (!q) return;
+    (report.groupCarryQuestions ??= []).push({after: report.stages.at(-1)?.name ?? null, ...q}); console.log('[group index question] after', JSON.stringify(report.stages.at(-1)?.name ?? null));
+    assert.equal(q.title, 'Group index is still on');
+    assert.match(q.text, /^This open-boundary run with group index takes about (?:\d+ (?:s|min)|three times as long) \(3 solves\)\.$/);
+    assert.deepEqual(q.buttons, ['Run with group index', 'Turn off group index and run', 'Cancel']);
+    await CLICK.call(this, '#group-carry-run');
   }
 
   text(selector) { return this.on('function(s){const e=this.querySelector(s);return e?e.innerText.replace(/\\s+/g," ").trim():null}', selector); }

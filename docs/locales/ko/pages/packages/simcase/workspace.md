@@ -300,7 +300,14 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    실행마다 그것을 켜 둔 채 열린 실행을 3:20–4:00 동안 *Computing job … 2:00*만 보며 기다렸습니다. 2026-11-24에 T18 열린 실행은
    군굴절률 없이 68 s, 함께 199 s 걸렸습니다. 가열 모델에는 군굴절률이 없어 그 줄은 그대로입니다. 이 줄은 크기가 고정된 상자에 있어
    바뀌어도 리본이 움직이지 않습니다(round 23: 아래 슬래브 경고에 자리가 더 필요할 때는 예외). 군굴절률이 켜진 채 **Open boundary**를 고르면 Messages에 경고가 붙습니다: *Group index
-   is on: open-boundary runs with it take about three times as long.* 선택은 작업 사이에도 그 상태를 유지합니다.
+   is on: open-boundary runs with it take about three times as long.* 선택은 작업 사이에도 그 상태를 유지합니다. round 31(K2)부터
+   군굴절률이 이어져 켜져 있으면(이 탭에서 마지막으로 완료된 실행 전부터 켜져 있었고 그 뒤 끄지 않음), 열린 경계의 **Run study**는
+   먼저 대화상자 *Group index is still on*으로 묻습니다: *This open-boundary run with group index takes about 3 min (3 solves).*(줄의
+   어림값, 없으면 *… about three times as long (3 solves).*)와 **Run with group index**(설정대로 실행), **Turn off group index and
+   run**(확인란 자신의 변경 뒤, 확인란을 끄고 Run study를 누른 것과 같은 실행: 같은 문서, 값, 기록), **Cancel**(Escape도 같음,
+   아무것도 실행하거나 바꾸지 않음). 초점은 첫 버튼에서 시작합니다. 마지막으로 완료된 실행 뒤에 군굴절률을 켰을 때, 닫힌 창(아래
+   슬래브 질문만 물을 수 있음), 다중물리 모델에서는 묻지 않으며, 두 질문이 한 실행에 함께 나오는 일은 없습니다. round 31 테스터들은
+   한 작업에서 군굴절률을 켰고, 다섯 중 둘이 그 뒤 작업이 요구하지 않은 약 4분짜리 열린 경계 실행을 켠 채로 돌렸습니다.
    코어 메시 크기는 **Mesh**에서 바꿉니다.
 3. 필요하면 **Mesh**를 생성하고 **Study → Check inputs**로 문서를 점검합니다.
    두 동작은 광학 장을 계산하지 않습니다. 필요 시 솔버 JSON도 확인·내보내기 합니다.

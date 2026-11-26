@@ -507,6 +507,15 @@ changed since optical-v10-open-f8ece10.json, not saved · …*, P1), 새로고�
 *Session versions 16 and 17*, S1)은 Run 5가 군굴절률 없는 열린 실행이고 시간 d5를 담은 `optical-v16-times.json`을 열어, File › Open
 뒤와 Restore 뒤 모두 *Open boundary · 2 modes · 2 searches · group index on (3 solves) · about N min*(N은 `aboutText(3·d5)`,
 fixture의 61.6 s에서는 *about 3 min*)으로, 선택을 끄면 *… · last such run 1:02*로 읽히는지 확인합니다. 1440 × 900과 390 × 844에서 가로 넘침이 없는지도 확인합니다.
+31차(K2)부터 브라우저 컨텍스트 하나를 더 쓰는 단계(R31 K2)가 광학 템플릿으로 확인합니다: Run 1은 군굴절률을 켠 닫힌 실행(앞선
+실행이 없어 묻지 않음); 그다음 Open boundary에서 *Group index is still on*을 묻는지(그 이름의 모달 대화상자 하나, 문구로 설명됨,
+초점은 **Run with group index**, 슬래브 질문은 닫힘, 시간이 있는 열린 실행이 없으면 *… about three times as long (3 solves).*,
+1440 × 900과 390 × 844에서 넘침 없음); Escape와 Cancel이 실행 목록, 확인란, 계획 줄, 다음 실행 줄을 그대로 두고 아무것도 보내지
+않는지; **Turn off group index and run**이 Run 2(열린 경계, n_g 없음, 확인란 꺼짐)를 주는지; 확인란을 다시 켠 닫힌 Run 3은 묻지
+않는지; 다시 열린 경계에서 계획 줄의 *about N*으로 묻는지와 Cancel; 확인란을 끄고 Run study를 누르면 묻지 않고 Run 4가 되는지.
+Run 2와 Run 4는 `/api/run`에 같은 문서를 보내고 job, 시각, 번호 말고는 같은 기록을 담습니다. 군굴절률이 이어진 채 열린 경계로
+실행하는 앞선 단계들은 **Run with group index**로 답해 전과 같이 실행하고, 보고서는 슬래브 질문처럼 그런 질문을 모두
+(`groupCarryQuestions`) 남깁니다. 프로젝트와 세션 스크립트도 같습니다.
 광학 트리의 Results 그룹(사전 등록)은 실행 둘에서 역할과 이름으로(*Results · run 1*은 수준 1, 고른 *Runs · 2 of 6*과
 실행 보관(설계 *Keeping more runs*)부터 광학 모델은 실행 20개를 보관하므로, 실행 여섯 개 한도에 닿던 모든 단계(U2, X3, R21,
 R22 P4, R23 P4, 프로젝트 스크립트의 K4)는 한도에 닿는 실행 바로 앞에서 Add runs from file로
