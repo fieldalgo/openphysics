@@ -533,11 +533,20 @@ pub fn recover_facets_with(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[
     let mut cx = Complex::new(n, tets);
     let constraints: HashSet<[u32; 3]> = subfacets.iter().flatten().map(|t| key(*t)).collect();
     let mut stats = FacetStats::default();
+    // the subfacets in order, and the indices of those that are not faces: only the
+    // faces of removed and added tetrahedra change, so the set is updated from them
+    let all: Vec<(usize, [u32; 3])> = subfacets.iter().enumerate()
+        .flat_map(|(f, ts)| ts.iter().map(move |t| (f, *t)))
+        .collect();
+    let mut by_key: HashMap<[u32; 3], Vec<usize>> = HashMap::new();
+    for (i, (_, t)) in all.iter().enumerate() {
+        by_key.entry(key(*t)).or_default().push(i);
+    }
+    let mut missing_idx: std::collections::BTreeSet<usize> = (0..all.len())
+        .filter(|&i| !cx.faces.contains_key(&key(all[i].1)))
+        .collect();
     for _pass in 0..4 * (constraints.len() + 1) {
-        let missing: Vec<(usize, [u32; 3])> = subfacets.iter().enumerate()
-            .flat_map(|(f, ts)| ts.iter().map(move |t| (f, *t)))
-            .filter(|(_, t)| !cx.faces.contains_key(&key(*t)))
-            .collect();
+        let missing: Vec<(usize, [u32; 3])> = missing_idx.iter().map(|&i| all[i]).collect();
         let Some(&(f0, t0)) = missing.first() else {
             return Ok((cx.live(), stats));
         };
@@ -635,11 +644,27 @@ pub fn recover_facets_with(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[
         stats.removed += cav.len() as u32;
         stats.created += new.len() as u32;
         stats.largest_cavity = stats.largest_cavity.max(cav.len() as u32);
+        let mut changed: Vec<[u32; 3]> = Vec::new();
         for t in cav {
+            let v = cx.tets[t as usize];
+            changed.extend((0..4).map(|i| key(face(&v, i))));
             cx.remove(t);
         }
         for t in new {
+            changed.extend((0..4).map(|i| key(face(&t, i))));
             cx.add(t);
+        }
+        for k in changed {
+            if let Some(ids) = by_key.get(&k) {
+                let present = cx.faces.contains_key(&k);
+                for &i in ids {
+                    if present {
+                        missing_idx.remove(&i);
+                    } else {
+                        missing_idx.insert(i);
+                    }
+                }
+            }
         }
     }
     Err("facet recovery made no progress".into())
