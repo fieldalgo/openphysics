@@ -116,7 +116,7 @@ test('V-P3 one mutation per reading check, each refused by name',()=>{
  refused(mutate(text,d=>{d.models[0].card='thermal';}),'Optical waveguide names an unknown Library card.');
  refused(mutate(text,d=>{d.models[0].digest='sha256:abc';}),'Optical waveguide has an invalid check value.');
  refused(mutate(text,d=>{d.savedAt='yesterday';}),'The project file has an invalid save time.');
- refused(mutate(text,d=>{d.version=2;}),'This project file is version 2, newer than this Studio reads (version 1). Open it in a newer Studio.');
+ refused(mutate(text,d=>{d.version=3;}),'This project file is version 3, newer than this Studio reads (version 2). Open it in a newer Studio.');
  refused(mutate(text,d=>{d.version=0;}),'Unsupported project file version.');
  refused(text.slice(0,-1),'This project file is not valid JSON.');
  refused('{"format":"openphysics-studio-session","version":7}','This is not a project file.');

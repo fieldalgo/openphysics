@@ -87,7 +87,7 @@ What each kind of file holds:
 
 | Kind | Holds | Named | Made by |
 |---|---|---|---|
-| Project file | Every model of the tab, each as its session file, in one file (version 1, [Project files](#project-files)). | The name chosen in Save As, `untitled-project.json` suggested for an untitled project | **File › Save**, **Save As…** |
+| Project file | Every model of the tab, each as its session file, in one file (version 1, or version 2 with a [3D model](#3d-models-experimental); [Project files](#project-files)). | The name chosen in Save As, `untitled-project.json` suggested for an untitled project | **File › Save**, **Save As…** |
 | Session file | One model's inputs with its completed runs, their names and pins and the comparison (optical, version 9, or 10 with an [open boundary](#open-boundary-in-the-optical-workspace)); the inputs of steady heat and Joule heating; or a multiphysics model with its runs and without-heater results (version 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, or the name chosen | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
 | Model file | The model's inputs only: no runs and no computed results (optical, steady heat and Joule heating inputs, version 7 or 8, or 9 with an open boundary; or a multiphysics document). | After the model, for example `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | Browser draft | The optical inputs, in this browser only (not a file). | — | **File › Browser copy › Save browser draft** |
@@ -232,9 +232,10 @@ tab changes; one failure refuses the whole file with *Project not opened: <reaso
 is unchanged.*, and the workspace, its runs and Undo stay as they were. The checks, in order:
 
 1. the size, at most 64 MiB, before the text is parsed; valid JSON, a leading byte order mark removed;
-2. the envelope: `format`, `version` (a newer one is refused by name: *This project file is version 2,
-   newer than this Studio reads (version 1). Open it in a newer Studio.*), no unknown key, the types,
-   1 to 8 models with unique ids, at most one workspace model, and `active` naming one of them;
+2. the envelope: `format`, `version` 1 or 2 (a newer one is refused by name: *This project file is
+   version 3, newer than this Studio reads (version 2). Open it in a newer Studio.*), no unknown key,
+   the types, 1 to 8 models with unique ids, at most one workspace model, at most one 3D model (kind
+   `model3d`, version 2 only), and `active` naming one of them;
 3. for each model, its kind against its session's version, then the session's text rebuilt from the
    file and its size and SHA-256 compared with the entry's (*Heated silicon waveguide changed after it
    was saved (its check value does not match).*), then the session read as a session file is, every
@@ -282,7 +283,13 @@ unchanged: written alone by its writer it is byte for byte the session file Stud
 through `JSON.stringify`, versions 8 and 9 with negative zero kept as `-0.0`). `bytes` and `digest`
 are the UTF-8 length and `sha256:` of that text. They detect a damaged or edited file; they do not
 authenticate it, as the per-run digests inside versions 8 and 9 do not. Each model is at most 16 MiB,
-so every model still exports as a session file older Studios open. Not in version 1: comparisons
+so every model still exports as a session file older Studios open. **Version 2** (decision F1) is
+version 1 plus the kind `model3d` (card `layer-stack-3d`), whose session is the
+[3D model's session file](#3d-models-experimental). Studio writes version 2 only for a project that
+holds a 3D model; a project without one is written as version 1, byte for byte as before, and version
+1 files are read as before (a `model3d` entry in a version 1 file is *of an unknown kind*). A model's
+kind must match its session: *Via in a layer stack (3D heat) is a model3d model, but its session is of
+version 9 (an optical session).* Not in version 1: comparisons
 across models, heat and Joule heating results (their inputs are in the workspace model), undo
 history, the provider list, failed or stopped runs. Browser recovery keeps its records per model, as
 before; it does not restore a whole project.
@@ -301,6 +308,31 @@ named *Heater study* and saved under its suggested name `heater-study.json`, the
 back the same values with no run started (V-P7, V-P13); Save again under the remembered name (V-P11);
 the save dialog stubbed at `window.showSaveFilePicker` (V-P10); three damaged files refused with the
 tab unchanged (V-P3). With `--old-python`, it also opens the file in an older Studio (V-P9).
+
+## 3D models (experimental)
+
+Status: **experimental**, files only in this step. A 3D model holds one document (format 0.3 with a
+version 1 geometry block, for example the card document "Via in a layer stack (3D heat)",
+`static/model3d-layer-stack-3d.json`, checked by the [3D view's routes](studio_3d.md#what-it-sends-and-answers)).
+The workspace builder that opens, edits and saves it comes with the next step; until then nothing in
+Studio creates a 3D model, so a version 2 project file or a model3d session file is one made by hand.
+
+**The session file** (decision F2) is
+`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, with an
+optional `view` object and the 16 MiB session limit. It holds the document now; runs come with a later
+version. File › Open routes a session whose `application` is `"model3d"` to its own rules, before the
+version rules of the optical and multiphysics sessions, which are unchanged (a version 1 file of before
+the units batch keeps its refusal). Its refusals name the file: *This model3d session is version 2,
+newer than this Studio reads (version 1). Open it in a newer Studio.*, *Unknown key "runs" in the
+model3d session.*, *The model3d session holds no document.*, *The model3d session holds a document
+that is not format 0.3.*, *The model3d session holds a document without a version 1 geometry block.*,
+*The model3d session has an invalid view.*
+
+**Checks** (W11 without runs, file part, pre-registered): the document digest (SHA-256 of the
+session JSON of the document) is equal after save and read, for the session and for the project file;
+a second save writes the same bytes; a project without a 3D model is written as version 1 byte for
+byte (the committed `project-v1.json` fixture). Measured: equal, and unchanged
+(`tests/simcase/studio_model3d_files.cjs`).
 
 ## First optical study
 

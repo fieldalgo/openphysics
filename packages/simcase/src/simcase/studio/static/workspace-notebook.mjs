@@ -10,6 +10,7 @@ import {shapesBlock,shapeText} from './workspace-shapes.mjs';
 import {opticalModes} from './workspace-modes.mjs';
 import {MULTIPHYSICS_VERSION,MULTIPHYSICS_VERSIONS,readMultiphysicsSession,sessionJson,recordDigest,sizeText} from './workspace-multiphysics-session.mjs';
 import {MAX_SESSION_BYTES,FIELD_HEADROOM_BYTES,FIELD_BUDGET_BYTES,mbText} from './workspace-budget.mjs';
+import {isModel3dSession,readModel3dSession} from './workspace-model3d-session.mjs';
 export {MAX_SESSION_BYTES};
 // Run retention (design "Keeping more runs"): up to 20 runs keep their values in the tab, in files and
 // in browser recovery; their fields are kept within the 16 MiB session (workspace-retention.mjs).
@@ -613,6 +614,9 @@ export function parseSession(text,{recovered=false}={}){
   // a leading byte order mark is removed for version 8 files only: optical files read as before
   try{doc=text.startsWith('\uFEFF')?JSON.parse(text.slice(1)):undefined;}catch{}
   if(doc?.format!=='openphysics-studio-session'||!MULTIPHYSICS_VERSIONS.includes(doc.version))throw new Error('Session is not valid JSON.');}
+ // a 3D model's session (application "model3d", its own versions from 1) is read before the
+ // version rules of the optical and multiphysics sessions below, which stay as they were
+ if(isModel3dSession(doc))return readModel3dSession(doc);
  if(doc?.format==='openphysics-studio-session'&&[1,2,3,4,5].includes(doc.version))throw new Error(`This session (version ${doc.version}) was saved before the units and naming batch; its results are not read. Re-run the design and save a new session.`);
  if(doc?.format==='openphysics-studio-session'&&Number.isInteger(doc.version)&&doc.version>HIGHEST_SESSION_VERSION)throw new Error(newerVersionText(doc.version,HIGHEST_SESSION_VERSION));
  if(doc?.format==='openphysics-studio-session'&&MULTIPHYSICS_VERSIONS.includes(doc.version))return readMultiphysicsSession(doc,{recovered});
