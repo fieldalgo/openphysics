@@ -58,6 +58,7 @@ electrical heating and mechanical deformation do not run in this workspace's cou
 | Steady heat | Yes | Rectangular `thermal.steady2d` | Dedicated view; workspace heat plate |
 | Transient heat | Yes | Rectangular `thermal.transient2d` | Dedicated views |
 | Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | Dedicated views, within region limits |
+| 3D static elasticity and prescribed-temperature thermoelasticity | [Tetrahedral solids](docs/packages/galerkin/elasticity3d.md) and [thermal stress](docs/packages/galerkin/thermoelasticity3d.md) | No | No |
 | Linear elasticity | Yes | Homogeneous rectangle `mechanics.elasticity2d` | No |
 | Steady heat→thermal stress | Yes | Homogeneous rectangle `mechanics.thermoelastic2d` | No |
 | Prescribed-temperature and transient heat→mechanics | Yes | No | No |

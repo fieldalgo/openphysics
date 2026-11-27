@@ -8,6 +8,9 @@
 
 ## 첫 Python 해석 튜토리얼
 
+- [3D 하중과 변위 구속](../packages/galerkin/elasticity3d.md)
+- [전류가 흐르는 도체의 3D 열응력 계산](../packages/galerkin/electrothermomechanical_3d.md)
+
 - [첫 열탄성 해석: 열전도에서 역학으로](../packages/galerkin/thermoelastic_tutorial.md)
 
 ## 실행 경로와 한계
