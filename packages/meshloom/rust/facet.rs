@@ -485,12 +485,22 @@ pub fn triangulate(pts: &[P3], loops: &[Vec<u32>]) -> Result<Facet, InputError> 
 /// through a point or cross each other or a loop edge.
 pub fn triangulate_with(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], extra_edges: &[(u32, u32)])
                         -> Result<Facet, InputError> {
+    if loops.is_empty() {
+        return Err(InputError::new(None, "a facet needs at least one loop".to_string()));
+    }
+    check_points(pts)?;
+    triangulate_checked(pts, loops, extra_points, extra_edges)
+}
+
+/// [`triangulate_with`] on points the caller has already checked with
+/// [`check_points`] (the PLC check checks them once, not once per facet).
+pub(crate) fn triangulate_checked(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], extra_edges: &[(u32, u32)])
+                                  -> Result<Facet, InputError> {
     let malformed = |m: String| InputError::new(None, m);
     let bad = |w: u8, m: String| InputError::new(Some(w), m);
     if loops.is_empty() {
         return Err(malformed("a facet needs at least one loop".into()));
     }
-    check_points(pts)?;
     let mut seen = HashSet::new();
     for (l, lp) in loops.iter().enumerate() {
         if lp.len() < 3 {

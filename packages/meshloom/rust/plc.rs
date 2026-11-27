@@ -10,8 +10,12 @@
 //! points on them and each facet is triangulated with the points and sub-segments on
 //! it by [`facet::triangulate_with`]; the intersection tests then work on these pieces
 //! with exact orient3d (and 2D orientation in a projection for coplanar pieces), so
-//! there is no tolerance. Candidate pairs come from a sweep over bounding boxes. Any
-//! violation is an error naming the cells, with its witness type.
+//! there is no tolerance. Candidate pairs of cells without a common vertex come from a
+//! uniform grid ([`grid_pairs`]); pairs that share a vertex can meet only near it (both
+//! are convex) and are checked in that vertex's star ([`star_pairs`]), a large planar
+//! fan at once by the angular order of its rays. Any violation is an error naming the
+//! cells, with its witness type: the first failing pair of the bounding-box sweep, so
+//! the witness does not depend on the broad phase.
 
 use crate::facet::{self, At, CellRef, Detail, InputError};
 use crate::predicates::{self as pr, Counters, P3};
@@ -134,6 +138,16 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     let mut n = Counters::default();
     let mut tested = 0usize;
 
+    // the broad phase's grid: cells about the median edge extent
+    let grid = {
+        let mut ext: Vec<f64> = out.segments.iter()
+            .map(|&[a, b]| (0..3).map(|k| (pts[a as usize][k] - pts[b as usize][k]).abs()).fold(0.0, f64::max))
+            .collect();
+        let mid = ext.len() / 2;
+        let cell = if ext.is_empty() { 0.0 } else { *ext.select_nth_unstable_by(mid, |a, b| a.total_cmp(b)).1 };
+        Grid::new(pts, cell)
+    };
+
     // 1. points inside edges split them into elementary sub-segments
     let edges = out.segments.clone();
     let mut on_edge: Vec<Vec<u32>> = vec![Vec::new(); edges.len()];
@@ -146,19 +160,23 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
             let (lo, hi) = bbox(pts, ed);
             items.push((false, e as u32, lo, hi));
         }
-        for_overlapping(&items.iter().map(|x| (x.2, x.3)).collect::<Vec<_>>(), |x, y| {
+        let verts: Vec<Verts> = items.iter()
+            .map(|x| if x.0 { [x.1, u32::MAX, u32::MAX] } else { let [p, q] = edges[x.1 as usize]; [p, q, u32::MAX] })
+            .collect();
+        let cells: Vec<Vec<u64>> = items.iter().zip(&verts)
+            .map(|(x, vs)| if x.0 { grid.cells(&[pts[x.1 as usize]]) } else { grid.cells(&[pts[vs[0] as usize], pts[vs[1] as usize]]) })
+            .collect();
+        let boxes: Vec<_> = items.iter().map(|x| (x.2, x.3)).collect();
+        grid_pairs(&cells, &verts, &boxes, |x, y| items[x].0 != items[y].0, |x, y| {
             let (a, b) = (&items[x], &items[y]);
-            let (v, e) = match (a.0, b.0) {
-                (true, false) => (a.1, b.1),
-                (false, true) => (b.1, a.1),
-                _ => return,
-            };
+            let (v, e) = if a.0 { (a.1, b.1) } else { (b.1, a.1) };
             let [p, q] = edges[e as usize];
             if v != p && v != q && pr::collinear(&pts[p as usize], &pts[q as usize], &pts[v as usize])
                 && strictly_inside(&pts[p as usize], &pts[q as usize], &pts[v as usize])
             {
                 on_edge[e as usize].push(v);
             }
+            true
         });
     }
     let mut edge_subs: Vec<HashSet<(u32, u32)>> = Vec::with_capacity(edges.len());
@@ -218,17 +236,36 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     // 2. two sub-segments meet only at a shared end (an identical piece is one key)
     {
         let boxes: Vec<_> = subs.iter().map(|&(a, b)| bbox(pts, &[a, b])).collect();
-        let mut found = None;
-        for_overlapping(&boxes, |x, y| {
-            if found.is_some() {
-                return;
-            }
+        let verts: Vec<Verts> = subs.iter().map(|&(a, b)| [a, b, u32::MAX]).collect();
+        let cells: Vec<Vec<u64>> = subs.iter().map(|&(a, b)| grid.cells(&[pts[a as usize], pts[b as usize]])).collect();
+        let mut bad_pair = false;
+        let mut test = |x: usize, y: usize| -> bool {
             tested += 1;
             let (s, t) = (subs[x], subs[y]);
-            if !seg_seg_ok(pts, [s.0, s.1], [t.0, t.1], &mut n) {
-                found = Some((s, t));
-            }
-        });
+            bad_pair = !seg_seg_ok(pts, [s.0, s.1], [t.0, t.1], &mut n);
+            !bad_pair
+        };
+        let ok = grid_pairs(&cells, &verts, &boxes, |_, _| true, &mut test)
+            && star_pairs(pts.len(), &verts, |v, star| {
+                if star.len() <= 32 {
+                    return None;
+                }
+                let mut ends: Vec<u32> = star.iter().map(|&i| { let s = subs[i as usize]; if s.0 == v { s.1 } else { s.0 } }).collect();
+                segment_star_ok(pts, v, &mut ends).then_some(true)
+            }, &mut test);
+        // a failure: the witness is the first failing pair of the full sweep
+        let mut found = None;
+        if !ok {
+            for_overlapping(&boxes, |x, y| {
+                if found.is_some() {
+                    return;
+                }
+                let (s, t) = (subs[x], subs[y]);
+                if !seg_seg_ok(pts, [s.0, s.1], [t.0, t.1], &mut n) {
+                    found = Some((s, t));
+                }
+            });
+        }
         if let Some((s, t)) = found {
             let e = bad(5, format!("{} and {} intersect", edge_name(sub_edges[&s][0]), edge_name(sub_edges[&t][0])));
             let at = At::SegSeg([s.0, s.1], [t.0, t.1]);
@@ -243,6 +280,15 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     let mut by_x: Vec<u32> = (0..pts.len() as u32).collect();
     by_x.sort_unstable_by(|&i, &j| pts[i as usize][0].total_cmp(&pts[j as usize][0]));
     let edge_index: HashMap<(u32, u32), usize> = edges.iter().enumerate().map(|(e, &[a, b])| ((a, b), e)).collect();
+    // the points by grid cell (sorted), and each point's place in by_x: a facet visits
+    // the points in its box's cells, in the order of by_x; a facet whose box spans many
+    // more cells than there are points scans by_x instead
+    let mut x_rank = vec![0u32; pts.len()];
+    for (r, &v) in by_x.iter().enumerate() {
+        x_rank[v as usize] = r as u32;
+    }
+    let mut point_cells: Vec<(u64, u32)> = (0..pts.len() as u32).map(|v| (grid.cells(&[pts[v as usize]])[0], v)).collect();
+    point_cells.sort_unstable();
     // the sub-segments at each point, so that a facet visits only those at its members
     let mut subs_at: Vec<Vec<u32>> = vec![Vec::new(); pts.len()];
     for (i, &(a, b)) in subs.iter().enumerate() {
@@ -255,13 +301,24 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         let plane = plane_of(pts, &loops[0]);
         let mut extra = Vec::new();
         if let Some((a, b, c)) = plane {
-            let start = by_x.partition_point(|&i| pts[i as usize][0] < lo[0]);
-            for &v in &by_x[start..] {
-                let pv = &pts[v as usize];
-                if pv[0] > hi[0] {
-                    break;
+            let mut near: Vec<u32> = Vec::new();
+            if grid.box_cells(&lo, &hi) <= 64 + pts.len() as u64 / 8 {
+                // the points in the cells of the box widened by the margin (all of the
+                // listed points with a cell there: a point lies in its own cell)
+                let mut keys = Vec::new();
+                grid.cells_of_box(&lo, &hi, &mut keys);
+                for k in keys {
+                    let start = point_cells.partition_point(|x| x.0 < k);
+                    near.extend(point_cells[start..].iter().take_while(|x| x.0 == k).map(|x| x.1));
                 }
-                if own.contains(&v) || (1..3).any(|k| pv[k] < lo[k] || pv[k] > hi[k]) {
+                near.sort_unstable_by_key(|&v| x_rank[v as usize]);
+            } else {
+                let start = by_x.partition_point(|&i| pts[i as usize][0] < lo[0]);
+                near.extend(by_x[start..].iter().take_while(|&&v| pts[v as usize][0] <= hi[0]));
+            }
+            for v in near {
+                let pv = &pts[v as usize];
+                if own.contains(&v) || (0..3).any(|k| pv[k] < lo[k] || pv[k] > hi[k]) {
                     continue;
                 }
                 if pr::orient3d(&pts[a as usize], &pts[b as usize], &pts[c as usize], pv, &mut n) == 0 {
@@ -276,7 +333,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         at.sort_unstable();
         at.dedup();
         let inner: Vec<(u32, u32)> = at.iter().map(|&i| subs[i as usize]).collect();
-        let t = facet::triangulate_with(pts, loops, &extra, &inner).map_err(|e| {
+        let t = facet::triangulate_checked(pts, loops, &extra, &inner).map_err(|e| {
             let named = InputError::new(e.witness, format!("facet {f}: {}", e.msg));
             match e.witness {
                 Some(2 | 3) => named.with(Detail::Facet(f as u32)),
@@ -410,7 +467,89 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     }).collect();
     let mut found: Option<((bool, usize), (bool, usize))> = None;
     let tri_cell: Vec<&Vec<Cell>> = tri_keys.iter().map(|k| &tri_cells[k]).collect();
-    for_overlapping(&boxes, |x, y| {
+    let pair_ok = |x: usize, y: usize, n: &mut Counters| -> Option<bool> {
+        match (items[x], items[y]) {
+            ((true, _), (true, _)) => None,
+            ((true, i), (false, j)) | ((false, j), (true, i)) => Some(seg_tri_ok(pts, [subs[i].0, subs[i].1], tri_keys[j], n)),
+            ((false, i), (false, j)) => {
+                let (ci, cj) = (tri_cell[i], tri_cell[j]);
+                if ci.iter().any(|c| cj.contains(c)) {
+                    return None;
+                }
+                Some(tri_tri_ok(pts, tri_keys[i], tri_keys[j], n))
+            }
+        }
+    };
+    let verts: Vec<Verts> = items.iter()
+        .map(|&(is_seg, i)| if is_seg { [subs[i].0, subs[i].1, u32::MAX] } else { tri_keys[i] })
+        .collect();
+    let cells: Vec<Vec<u64>> = verts.iter()
+        .map(|vs| grid.cells(&vs.iter().filter(|&&v| v != u32::MAX).map(|&v| pts[v as usize]).collect::<Vec<_>>()))
+        .collect();
+    let failed = std::cell::Cell::new(false);
+    {
+        let nc = std::cell::RefCell::new(&mut n);
+        let count = std::cell::Cell::new(0usize);
+        let test = |x: usize, y: usize| -> bool {
+            if let Some(ok) = pair_ok(x, y, &mut nc.borrow_mut()) {
+                count.set(count.get() + 1);
+                if !ok {
+                    failed.set(true);
+                }
+            }
+            !failed.get()
+        };
+        let fast = |v: u32, star: &[u32]| -> Option<bool> {
+            if star.len() <= 48 {
+                return None;
+            }
+            // the plane of the first triangle at v; items in it are checked by their
+            // angular order, the others pair by pair
+            let t = star.iter().find(|&&i| !items[i as usize].0)?;
+            let others = |i: u32| -> Vec<u32> { verts[i as usize].iter().copied().filter(|&w| w != v && w != u32::MAX).collect() };
+            let o = others(*t);
+            let (pa, pb) = (&pts[o[0] as usize], &pts[o[1] as usize]);
+            let axis = plane_axis(&pts[v as usize], pa, pb)?;
+            let mut inplane = Vec::new();
+            let mut rest = Vec::new();
+            for &i in star {
+                let w = others(i);
+                if w.iter().all(|&x| pr::orient3d(&pts[v as usize], pa, pb, &pts[x as usize], &mut Counters::default()) == 0) {
+                    inplane.push((w[0], *w.get(1).unwrap_or(&u32::MAX)));
+                } else {
+                    rest.push(i);
+                }
+            }
+            if rest.len() * star.len() > 1 << 22 || !planar_star_ok(pts, v, axis, &inplane) {
+                return None;
+            }
+            // the pairs with an item off the plane, at their smallest shared vertex
+            for &r in &rest {
+                for &x in star {
+                    if x == r || (rest.contains(&x) && x < r) {
+                        continue;
+                    }
+                    let (i, j) = (r.min(x) as usize, r.max(x) as usize);
+                    let low = verts[i].iter().filter(|&&w| w != u32::MAX && verts[j].contains(&w)).min();
+                    if low == Some(&v) && !test(i, j) {
+                        return Some(false);
+                    }
+                }
+            }
+            Some(true)
+        };
+        let ok = grid_pairs(&cells, &verts, &boxes, |x, y| !(items[x].0 && items[y].0), test);
+        let ok = ok && !failed.get() && star_pairs(pts.len(), &verts, |v, star| {
+            let r = fast(v, star);
+            if r == Some(false) { None } else { r }
+        }, test);
+        if !ok {
+            failed.set(true);
+        }
+        tested += count.get();
+    }
+    // a failure: the witness is the first failing pair of the full sweep
+    if failed.get() { for_overlapping(&boxes, |x, y| {
         if found.is_some() {
             return;
         }
@@ -433,7 +572,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         if !ok {
             found = Some((a, b));
         }
-    });
+    }); }
     if let Some((a, b)) = found {
         let cells = |(is_seg, i): (bool, usize)| -> &Vec<Cell> {
             if is_seg { &sub_cells[&subs[i]] } else { &tri_cells[&tri_keys[i]] }
@@ -631,6 +770,361 @@ fn tri_tri_ok(pts: &[P3], t: [u32; 3], u: [u32; 3], n: &mut Counters) -> bool {
     }
 }
 
+// ------------------------------------------------------------ broad phase
+
+/// A uniform grid of cubes of edge `cell` over the points' bounding box, for the
+/// candidate pairs of the intersection tests. An item (point, segment or triangle) is
+/// listed in the cells met by the boxes of its pieces: it is bisected (longest edge, in
+/// doubles) until a piece's box spans at most one cell edge per axis, and each piece's
+/// box is widened by a margin far above the rounding of the midpoints, so every cell the
+/// exact item meets is listed; extra cells only cost time.
+struct Grid {
+    lo: [f64; 3],
+    cell: f64,
+    margin: f64,
+    n: [u64; 3],
+}
+
+impl Grid {
+    fn new(pts: &[P3], cell: f64) -> Grid {
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        let mut m = 0.0f64;
+        for p in pts {
+            for k in 0..3 {
+                lo[k] = lo[k].min(p[k]);
+                hi[k] = hi[k].max(p[k]);
+                m = m.max(p[k].abs());
+            }
+        }
+        let ext = (0..3).map(|k| hi[k] - lo[k]).fold(0.0, f64::max);
+        // at most 2^20 cells along an axis
+        let floor = ext / (1u64 << 20) as f64;
+        let cell = if cell.is_finite() && cell > 0.0 { cell.max(floor) } else { ext / 64.0 };
+        let cell = if cell > 0.0 && cell.is_finite() { cell } else { 1.0 };
+        let n = std::array::from_fn(|k| (((hi[k] - lo[k]) / cell) as u64 + 1).min(1 << 21));
+        Grid { lo, cell, margin: m * 1e-12 + f64::MIN_POSITIVE, n }
+    }
+
+    fn coord(&self, x: f64, k: usize) -> u64 {
+        let c = ((x - self.lo[k]) / self.cell).floor();
+        if c >= 0.0 { (c as u64).min(self.n[k] - 1) } else { 0 }
+    }
+
+    fn key(c: [u64; 3]) -> u64 {
+        (c[0] << 42) | (c[1] << 21) | c[2]
+    }
+
+    /// The number of cells of a box widened by the margin.
+    fn box_cells(&self, lo: &[f64; 3], hi: &[f64; 3]) -> u64 {
+        (0..3).map(|k| self.coord(hi[k] + self.margin, k) - self.coord(lo[k] - self.margin, k) + 1).product()
+    }
+
+    fn cells_of_box(&self, lo: &[f64; 3], hi: &[f64; 3], out: &mut Vec<u64>) {
+        let a: [u64; 3] = std::array::from_fn(|k| self.coord(lo[k] - self.margin, k));
+        let b: [u64; 3] = std::array::from_fn(|k| self.coord(hi[k] + self.margin, k));
+        for x in a[0]..=b[0] {
+            for y in a[1]..=b[1] {
+                for z in a[2]..=b[2] {
+                    out.push(Grid::key([x, y, z]));
+                }
+            }
+        }
+    }
+
+    /// The cells of the simplex with 1, 2 or 3 vertices `v`, sorted, without repeats.
+    fn cells(&self, v: &[P3]) -> Vec<u64> {
+        let mut out = Vec::new();
+        self.cells_rec(v, 48, &mut out);
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
+    fn cells_rec(&self, v: &[P3], depth: u32, out: &mut Vec<u64>) {
+        let mut lo = v[0];
+        let mut hi = v[0];
+        for p in &v[1..] {
+            for k in 0..3 {
+                lo[k] = lo[k].min(p[k]);
+                hi[k] = hi[k].max(p[k]);
+            }
+        }
+        if v.len() == 1 || depth == 0 || (0..3).all(|k| hi[k] - lo[k] <= self.cell) {
+            self.cells_of_box(&lo, &hi, out);
+            return;
+        }
+        let len2 = |a: &P3, b: &P3| (0..3).map(|k| (a[k] - b[k]) * (a[k] - b[k])).sum::<f64>();
+        let mid = |a: &P3, b: &P3| -> P3 { std::array::from_fn(|k| 0.5 * a[k] + 0.5 * b[k]) };
+        if v.len() == 2 {
+            let m = mid(&v[0], &v[1]);
+            self.cells_rec(&[v[0], m], depth - 1, out);
+            self.cells_rec(&[m, v[1]], depth - 1, out);
+            return;
+        }
+        let (i, j, k) = [(0, 1, 2), (1, 2, 0), (2, 0, 1)].into_iter()
+            .max_by(|x, y| len2(&v[x.0], &v[x.1]).total_cmp(&len2(&v[y.0], &v[y.1]))).unwrap();
+        let m = mid(&v[i], &v[j]);
+        self.cells_rec(&[v[i], m, v[k]], depth - 1, out);
+        self.cells_rec(&[m, v[j], v[k]], depth - 1, out);
+    }
+}
+
+/// The vertices of an item (u32::MAX for none).
+type Verts = [u32; 3];
+
+fn share_vertex(a: &Verts, b: &Verts) -> bool {
+    a.iter().any(|&v| v != u32::MAX && b.contains(&v))
+}
+
+fn boxes_meet(a: &([f64; 3], [f64; 3]), b: &([f64; 3], [f64; 3])) -> bool {
+    (0..3).all(|k| a.0[k] <= b.1[k] && b.0[k] <= a.1[k])
+}
+
+/// The first cell two sorted cell lists have in common.
+fn first_common(a: &[u64], b: &[u64]) -> Option<u64> {
+    let (mut i, mut j) = (0, 0);
+    while i < a.len() && j < b.len() {
+        match a[i].cmp(&b[j]) {
+            std::cmp::Ordering::Less => i += 1,
+            std::cmp::Ordering::Greater => j += 1,
+            std::cmp::Ordering::Equal => return Some(a[i]),
+        }
+    }
+    None
+}
+
+/// Calls `f(i, j)` (i < j) once for each pair of items that share a grid cell, share no
+/// vertex, have meeting closed boxes and pass `keep`; stops when `f` returns false. Two
+/// items that share a vertex v meet beyond v only arbitrarily close to v (both are
+/// convex), so those pairs are the stars' business ([`star_pairs`]). In a crowded cell
+/// the items through the vertex most of them share are not paired with each other.
+fn grid_pairs(cells: &[Vec<u64>], verts: &[Verts], boxes: &[([f64; 3], [f64; 3])],
+              keep: impl Fn(usize, usize) -> bool, mut f: impl FnMut(usize, usize) -> bool) -> bool {
+    let mut reg: Vec<(u64, u32)> = cells.iter().enumerate()
+        .flat_map(|(i, cs)| cs.iter().map(move |&c| (c, i as u32))).collect();
+    reg.sort_unstable();
+    let mut emit = |c: u64, x: u32, y: u32| -> bool {
+        let (i, j) = (x.min(y) as usize, x.max(y) as usize);
+        if i == j || share_vertex(&verts[i], &verts[j]) || !boxes_meet(&boxes[i], &boxes[j]) || !keep(i, j) {
+            return true;
+        }
+        if cells[i].len() > 1 && cells[j].len() > 1 && first_common(&cells[i], &cells[j]) != Some(c) {
+            return true; // met in an earlier cell
+        }
+        f(i, j)
+    };
+    let mut s = 0;
+    while s < reg.len() {
+        let c = reg[s].0;
+        let mut e = s;
+        while e < reg.len() && reg[e].0 == c {
+            e += 1;
+        }
+        let items: Vec<u32> = reg[s..e].iter().map(|x| x.1).collect();
+        if !cell_pairs(&items, verts, &mut |x, y| emit(c, x, y)) {
+            return false;
+        }
+        s = e;
+    }
+    true
+}
+
+fn cell_pairs(items: &[u32], verts: &[Verts], emit: &mut impl FnMut(u32, u32) -> bool) -> bool {
+    let all = |emit: &mut dyn FnMut(u32, u32) -> bool| {
+        for a in 0..items.len() {
+            for b in a + 1..items.len() {
+                if !emit(items[a], items[b]) {
+                    return false;
+                }
+            }
+        }
+        true
+    };
+    if items.len() <= 32 {
+        return all(emit);
+    }
+    let mut count: HashMap<u32, u32> = HashMap::new();
+    for &i in items {
+        for &v in &verts[i as usize] {
+            if v != u32::MAX {
+                *count.entry(v).or_default() += 1;
+            }
+        }
+    }
+    let (h, k) = count.iter().map(|(&v, &c)| (v, c)).max_by_key(|&(v, c)| (c, std::cmp::Reverse(v))).unwrap_or((0, 0));
+    if (k as usize) * 8 <= items.len() {
+        return all(emit);
+    }
+    let (hub, rest): (Vec<u32>, Vec<u32>) = items.iter().partition(|&&i| verts[i as usize].contains(&h));
+    if !cell_pairs(&rest, verts, emit) {
+        return false;
+    }
+    for &r in &rest {
+        for &x in &hub {
+            if !emit(r, x) {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+/// Calls `f(i, j)` (i < j) once for each pair of items that share a vertex, at the
+/// smallest vertex they share, until it returns false. `fast(v, star)` may decide a whole
+/// star at once: Some(true) when every pair there passes, then those pairs are skipped
+/// (pairs it cannot decide are visited as usual).
+fn star_pairs(n: usize, verts: &[Verts], mut fast: impl FnMut(u32, &[u32]) -> Option<bool>,
+              mut f: impl FnMut(usize, usize) -> bool) -> bool {
+    let mut at: Vec<Vec<u32>> = vec![Vec::new(); n];
+    for (i, vs) in verts.iter().enumerate() {
+        for &v in vs {
+            if v != u32::MAX {
+                at[v as usize].push(i as u32);
+            }
+        }
+    }
+    for v in 0..n as u32 {
+        let star = &at[v as usize];
+        if star.len() < 2 || fast(v, star) == Some(true) {
+            continue;
+        }
+        for a in 0..star.len() {
+            for b in a + 1..star.len() {
+                let (i, j) = (star[a].min(star[b]) as usize, star[a].max(star[b]) as usize);
+                let low = verts[i].iter().filter(|&&w| w != u32::MAX && verts[j].contains(&w)).min();
+                if low == Some(&v) && !f(i, j) {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+/// Sign of each coordinate of p - v.
+fn signs3(v: &P3, p: &P3) -> [i8; 3] {
+    std::array::from_fn(|k| (p[k] > v[k]) as i8 - (p[k] < v[k]) as i8)
+}
+
+/// A strict weak order of directions from v (exact): by the signs of the coordinates,
+/// then by angle in the xy, xz and yz projections in turn (inside one orthant every
+/// projection spans at most a quarter turn). Equal exactly for the same direction.
+fn dir_cmp(v: &P3, p: &P3, q: &P3) -> std::cmp::Ordering {
+    let (sp, sq) = (signs3(v, p), signs3(v, q));
+    if sp != sq {
+        return sp.cmp(&sq);
+    }
+    for axis in [2, 1, 0] {
+        match pr::orient2d_proj(axis, v, p, q) {
+            0 => continue,
+            o if o > 0 => return std::cmp::Ordering::Less,
+            _ => return std::cmp::Ordering::Greater,
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
+/// Sub-segments at v (their other ends `ends`) meet only at v when no two point the
+/// same way.
+fn segment_star_ok(pts: &[P3], v: u32, ends: &mut [u32]) -> bool {
+    let pv = &pts[v as usize];
+    ends.sort_by(|&x, &y| dir_cmp(pv, &pts[x as usize], &pts[y as usize]));
+    ends.windows(2).all(|w| dir_cmp(pv, &pts[w[0] as usize], &pts[w[1] as usize]) != std::cmp::Ordering::Equal)
+}
+
+/// For the items at v in the plane of the triangle `plane` (each a triangle v-a-b or a
+/// segment v-x, given by its other vertices): true when they meet pairwise only at v or
+/// along a common edge, triangles on opposite sides of it (exact, by the angular order of
+/// their rays around v); false when that cannot be shown this way.
+fn planar_star_ok(pts: &[P3], v: u32, axis: usize, items: &[(u32, u32)]) -> bool {
+    let p = |i: u32| &pts[i as usize];
+    let pv = p(v);
+    let o2 = |a: u32, b: u32| pr::orient2d_proj(axis, pv, p(a), p(b));
+    let (ki, kj) = pr::kept_axes(axis);
+    let rays: Vec<u32> = {
+        let mut r: Vec<u32> = items.iter().flat_map(|&(a, b)| if b == u32::MAX { vec![a] } else { vec![a, b] }).collect();
+        r.sort_unstable();
+        r.dedup();
+        r
+    };
+    let d0 = rays[0];
+    let class = |r: u32| -> u8 {
+        match o2(d0, r) {
+            o if o > 0 => 1,
+            o if o < 0 => 3,
+            _ => {
+                let sg = |x: &P3, k: usize| (x[k] > pv[k]) as i8 - (x[k] < pv[k]) as i8;
+                let same = [ki, kj].iter().all(|&k| sg(p(r), k) == sg(p(d0), k));
+                if same { 0 } else { 2 }
+            }
+        }
+    };
+    let cmp = |a: &(u8, u32), b: &(u8, u32)| -> std::cmp::Ordering {
+        if a.0 != b.0 {
+            return a.0.cmp(&b.0);
+        }
+        if a.0 == 1 || a.0 == 3 {
+            match o2(a.1, b.1) {
+                o if o > 0 => return std::cmp::Ordering::Less,
+                o if o < 0 => return std::cmp::Ordering::Greater,
+                _ => {}
+            }
+        }
+        std::cmp::Ordering::Equal
+    };
+    let mut keyed: Vec<(u8, u32)> = rays.iter().map(|&r| (class(r), r)).collect();
+    keyed.sort_by(cmp);
+    let mut rank: HashMap<u32, usize> = HashMap::new();
+    let mut owner: Vec<u32> = Vec::new(); // the vertex on each rank (two different: overlap)
+    for (i, x) in keyed.iter().enumerate() {
+        if i > 0 && cmp(&keyed[i - 1], x) == std::cmp::Ordering::Equal {
+            return false; // two vertices on one ray from v
+        }
+        rank.insert(x.1, owner.len());
+        owner.push(x.1);
+    }
+    let r = owner.len();
+    if r < 2 {
+        return false;
+    }
+    // sectors cover the gaps between consecutive ranks (gap g: rank g to g + 1 mod r)
+    let mut gaps = vec![0i32; r + 1];
+    let mut inner = vec![0i32; r + 1]; // ranks strictly inside a sector
+    let cover = |s: usize, e: usize, d: &mut Vec<i32>, from_next: bool| {
+        // the cyclic range s..e (gaps) or s+1..e (ranks)
+        let s0 = if from_next { (s + 1) % r } else { s };
+        if s0 == e {
+            return;
+        }
+        if s0 < e {
+            d[s0] += 1;
+            d[e] -= 1;
+        } else {
+            d[s0] += 1;
+            d[r] -= 1;
+            d[0] += 1;
+            d[e] -= 1;
+        }
+    };
+    let mut segs = Vec::new();
+    for &(a, b) in items {
+        if b == u32::MAX {
+            segs.push(rank[&a]);
+            continue;
+        }
+        let (s, e) = if o2(a, b) > 0 { (rank[&a], rank[&b]) } else { (rank[&b], rank[&a]) };
+        cover(s, e, &mut gaps, false);
+        cover(s, e, &mut inner, true);
+    }
+    let prefix = |d: &Vec<i32>| -> Vec<i32> {
+        let mut acc = 0;
+        d[..r].iter().map(|x| { acc += x; acc }).collect()
+    };
+    let (g, inn) = (prefix(&gaps), prefix(&inner));
+    g.iter().all(|&c| c <= 1) && segs.iter().all(|&k| inn[k] == 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -645,6 +1139,195 @@ mod tests {
             vec![vec![2, 6, 7, 3]], vec![vec![0, 4, 6, 2]], vec![vec![1, 3, 7, 5]],
         ];
         Plc { points, segments: Vec::new(), facets }
+    }
+
+    fn lcg(s: &mut u64) -> f64 {
+        *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (*s >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    /// Random points (some on a coarse grid, so many boxes touch exactly), items of 1-3
+    /// of them, and a hub vertex in many items (a fan).
+    fn random_items(seed: u64) -> (Vec<P3>, Vec<Verts>) {
+        let mut s = seed;
+        let mut pts = Vec::new();
+        for k in 0..60 {
+            let g = [(lcg(&mut s) * 6.0).floor(), (lcg(&mut s) * 6.0).floor(), (lcg(&mut s) * 2.0).floor()];
+            if k % 2 == 0 && !pts.contains(&g) {
+                pts.push(g);
+            } else {
+                pts.push([lcg(&mut s) * 6.0, lcg(&mut s) * 6.0, lcg(&mut s) * 2.0]);
+            }
+        }
+        let mut items = Vec::new();
+        for k in 0..400 {
+            let mut pick = || (lcg(&mut s) * pts.len() as f64) as u32;
+            let mut v = [pick(), pick(), pick()];
+            if k % 3 == 0 {
+                v[0] = 7; // the hub
+            }
+            match k % 4 {
+                0 => v[2] = u32::MAX,
+                1 if k % 8 == 1 => { v[1] = u32::MAX; v[2] = u32::MAX; }
+                _ => {}
+            }
+            let used: Vec<u32> = v.iter().copied().filter(|&x| x != u32::MAX).collect();
+            let mut d = used.clone();
+            d.sort_unstable();
+            d.dedup();
+            let flat = used.len() == 3 && pr::collinear(&pts[used[0] as usize], &pts[used[1] as usize], &pts[used[2] as usize]);
+            if d.len() == used.len() && !flat {
+                items.push(v);
+            }
+        }
+        (pts, items)
+    }
+
+    #[test]
+    fn grid_and_stars_visit_the_pairs_of_the_sweep() {
+        for seed in 1..6 {
+            let (pts, items) = random_items(seed);
+            for cell in [0.3, 1.0, 5.0] {
+                let grid = Grid::new(&pts, cell);
+                let at = |vs: &Verts| vs.iter().filter(|&&v| v != u32::MAX).map(|&v| pts[v as usize]).collect::<Vec<_>>();
+                let cells: Vec<Vec<u64>> = items.iter().map(|vs| grid.cells(&at(vs))).collect();
+                let boxes: Vec<_> = items.iter()
+                    .map(|vs| bbox(&pts, &vs.iter().copied().filter(|&v| v != u32::MAX).collect::<Vec<_>>())).collect();
+                let mut want_disjoint = HashSet::new();
+                let mut want_shared = HashSet::new();
+                for_overlapping(&boxes, |x, y| {
+                    let p = (x.min(y), x.max(y));
+                    if share_vertex(&items[x], &items[y]) { want_shared.insert(p) } else { want_disjoint.insert(p) };
+                });
+                let mut got = Vec::new();
+                grid_pairs(&cells, &items, &boxes, |_, _| true, |i, j| { got.push((i, j)); true });
+                let n = got.len();
+                let got_set: HashSet<_> = got.into_iter().collect();
+                assert_eq!(n, got_set.len(), "a pair visited twice");
+                // only pairs of the sweep, and every disjoint pair that meets (exactly)
+                assert!(got_set.is_subset(&want_disjoint), "seed {seed}, cell {cell}: a pair outside the sweep");
+                let mut n = Counters::default();
+                let mut meeting = 0;
+                for &(i, j) in &want_disjoint {
+                    let used = |vs: &Verts| vs.iter().copied().filter(|&v| v != u32::MAX).collect::<Vec<_>>();
+                    let (a, b) = (used(&items[i]), used(&items[j]));
+                    let meets = match (a.len(), b.len()) {
+                        (2, 2) => !seg_seg_ok(&pts, [a[0], a[1]], [b[0], b[1]], &mut n),
+                        (2, 3) => !seg_tri_ok(&pts, [a[0], a[1]], [b[0], b[1], b[2]], &mut n),
+                        (3, 2) => !seg_tri_ok(&pts, [b[0], b[1]], [a[0], a[1], a[2]], &mut n),
+                        (3, 3) => !tri_tri_ok(&pts, [a[0], a[1], a[2]], [b[0], b[1], b[2]], &mut n),
+                        _ => false,
+                    };
+                    if meets {
+                        meeting += 1;
+                        assert!(got_set.contains(&(i, j)), "seed {seed}, cell {cell}: missed {:?} {:?} pts {:?} cells {:?} {:?}", items[i], items[j],
+                            items[i].iter().chain(items[j].iter()).filter(|&&v| v != u32::MAX).map(|&v| pts[v as usize]).collect::<Vec<_>>(), cells[i], cells[j]);
+                    }
+                }
+                assert!(meeting > 50, "too few meeting pairs: {meeting}");
+                let mut star = Vec::new();
+                star_pairs(pts.len(), &items, |_, _| None, |i, j| { star.push((i, j)); true });
+                let n = star.len();
+                let star_set: HashSet<_> = star.into_iter().collect();
+                assert_eq!(n, star_set.len(), "a shared pair visited twice");
+                assert_eq!(star_set, want_shared);
+            }
+        }
+    }
+
+    /// A fan of triangles (and spokes) around v in a tilted plane; with `overlap`, one
+    /// extra triangle overlaps a neighbour or a spoke enters a triangle.
+    fn fan(k: usize, overlap: usize) -> (Vec<P3>, u32, Vec<(u32, u32)>) {
+        // the plane z = x + 2 y - 1, exactly (x and y on a 2^-20 grid)
+        let at = |a: f64, r: f64| -> P3 {
+            let q = |t: f64| (t * 1048576.0).round() / 1048576.0;
+            let (x, y) = (q(0.25 + r * a.cos()), q(-1.5 + r * a.sin()));
+            [x, y, x + 2.0 * y - 1.0]
+        };
+        let o = at(0.0, 0.0);
+        let mut pts = vec![o];
+        for i in 0..k {
+            pts.push(at(2.0 * std::f64::consts::PI * i as f64 / k as f64, 1.0 + (i % 3) as f64 * 0.25));
+        }
+        let mut items: Vec<(u32, u32)> = (0..k as u32).map(|i| (1 + i, 1 + (i + 1) % k as u32)).collect();
+        items.extend((0..k as u32).step_by(5).map(|i| (1 + i, u32::MAX)));
+        match overlap {
+            1 => items.push((1, 3)),                    // covers the first two triangles' common ray
+            2 => {
+                pts.push(at(0.5 * 2.0 * std::f64::consts::PI / k as f64, 0.5));
+                items.push((pts.len() as u32 - 1, u32::MAX)); // a spoke inside the first triangle
+            }
+            3 => {
+                pts.push(at(0.0, 0.5));
+                items.push((pts.len() as u32 - 1, u32::MAX)); // a spoke along the first ray, shorter
+            }
+            _ => {}
+        }
+        (pts, 0, items)
+    }
+
+    #[test]
+    fn the_planar_star_check_is_never_wrong() {
+        for k in [3, 4, 7, 40, 200] {
+            for overlap in 0..4 {
+                let (pts, v, items) = fan(k, overlap);
+                let axis = plane_axis(&pts[0], &pts[1], &pts[2]).unwrap();
+                let ok = planar_star_ok(&pts, v, axis, &items);
+                let mut n = Counters::default();
+                let all_ok = (0..items.len()).all(|x| (x + 1..items.len()).all(|y| {
+                    let (a, b) = (items[x], items[y]);
+                    match (a.1 == u32::MAX, b.1 == u32::MAX) {
+                        (true, true) => true,
+                        (true, false) => seg_tri_ok(&pts, [v, a.0], [v, b.0, b.1], &mut n),
+                        (false, true) => seg_tri_ok(&pts, [v, b.0], [v, a.0, a.1], &mut n),
+                        (false, false) => tri_tri_ok(&pts, [v, a.0, a.1], [v, b.0, b.1], &mut n),
+                    }
+                }));
+                assert!(!ok || all_ok, "k {k}, overlap {overlap}: the fast check passed an invalid star");
+                if overlap == 0 && k >= 4 {
+                    assert!(ok, "k {k}: a valid fan should pass the fast check");
+                }
+                if overlap > 0 {
+                    assert!(!all_ok, "k {k}, overlap {overlap}: the test case should be invalid");
+                }
+            }
+        }
+    }
+
+    /// A closed cylinder with fan caps of k sides.
+    fn cylinder(k: usize) -> Plc {
+        let mut points = Vec::new();
+        for z in [0.0, 1.0] {
+            for i in 0..k {
+                let a = 2.0 * std::f64::consts::PI * i as f64 / k as f64;
+                points.push([a.cos(), a.sin(), z]);
+            }
+        }
+        points.push([0.0, 0.0, 0.0]);
+        points.push([0.0, 0.0, 1.0]);
+        let (k32, cb, ct) = (k as u32, 2 * k as u32, 2 * k as u32 + 1);
+        let mut facets = Vec::new();
+        for i in 0..k32 {
+            let j = (i + 1) % k32;
+            facets.push(vec![vec![cb, j, i]]);
+            facets.push(vec![vec![ct, i + k32, j + k32]]);
+            facets.push(vec![vec![i, j, j + k32]]);
+            facets.push(vec![vec![i, j + k32, i + k32]]);
+        }
+        Plc { points, segments: Vec::new(), facets }
+    }
+
+    #[test]
+    fn fans_are_checked_through_their_stars() {
+        let c = check(&cylinder(300)).unwrap();
+        assert!(c.open_subsegments.is_empty());
+        assert!(c.pairs_tested < 300 * 300, "the fan pairs should not all be tested: {}", c.pairs_tested);
+        // a cap triangle folded over its neighbour: the same witness as the full sweep's
+        let mut bad = cylinder(300);
+        let ct = 2 * 300 + 1;
+        bad.facets.push(vec![vec![ct, 300, 302]]);
+        let e = check(&bad).unwrap_err();
+        assert_eq!(e.witness, Some(5), "{}", e.msg);
     }
 
     #[test]
