@@ -364,7 +364,21 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
     }
     let m = mesh.g.view();
     let (pu, pv) = (m.from_id(p.u), m.from_id(p.v));
-    let (xu, xv) = (m.rounded(pu), m.rounded(pv));
+    // a point's coordinates rounded to doubles (segment points without big integers)
+    let rounded = |m: &crate::mixed::Mixed, q: crate::mixed::Pt| -> P3 {
+        if let crate::mixed::Pt::S(k) = q {
+            let sp = m.s[k as usize];
+            if sp.kind() == crate::mixed::Kind::Segment {
+                let (a, b) = (&m.input[sp.a as usize], &m.input[sp.b as usize]);
+                if let (Some(x), Some(y), Some(z)) = (rounded_coordinate(a[0], b[0], sp.t), rounded_coordinate(a[1], b[1], sp.t),
+                                                      rounded_coordinate(a[2], b[2], sp.t)) {
+                    return [x, y, z];
+                }
+            }
+        }
+        m.rounded(q)
+    };
+    let (xu, xv) = (rounded(&m, pu), rounded(&m, pv));
     let mut cand = mesh.neighbours(p.u);
     for w in mesh.neighbours(p.v) {
         if !cand.contains(&w) {
@@ -381,7 +395,7 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
         if !m.in_diametral_ball(pw, pu, pv) {
             continue;
         }
-        let x = m.rounded(pw);
+        let x = rounded(&m, pw);
         // cos of the angle u-w-v: smaller is wider
         let (a, b) = (sub(&xu, &x), sub(&xv, &x));
         let c = dot(&a, &b) / (dot(&a, &a) * dot(&b, &b)).sqrt();
@@ -462,6 +476,94 @@ fn exact_point(a: &P3, b: &P3, t: f64) -> bool {
     crate::mixed::Mixed { input: &input, s: &s }.is_exact(crate::mixed::Pt::S(0))
 }
 
+fn two_sum(a: f64, b: f64) -> (f64, f64) {
+    let s = a + b;
+    let bb = s - a;
+    (s, (a - (s - bb)) + (b - bb))
+}
+
+fn two_product(a: f64, b: f64) -> (f64, f64) {
+    let p = a * b;
+    (p, a.mul_add(b, -p))
+}
+
+/// Adds b to the nonoverlapping expansion e[..*n] (Shewchuk's grow-expansion, zeros
+/// dropped).
+fn grow(e: &mut [f64; 12], n: &mut usize, b: f64) {
+    let mut q = b;
+    let mut m = 0;
+    for i in 0..*n {
+        let (s, h) = two_sum(q, e[i]);
+        q = s;
+        if h != 0.0 {
+            e[m] = h;
+            m += 1;
+        }
+    }
+    if q != 0.0 {
+        e[m] = q;
+        m += 1;
+    }
+    *n = m;
+}
+
+/// The exact a + t (b - a) as a nonoverlapping expansion (zeros dropped), with its
+/// length; None when a term is not finite.
+fn coordinate_expansion(a: f64, b: f64, t: f64) -> Option<([f64; 12], usize)> {
+    let (s, es) = two_sum(b, -a);
+    let (p, ep) = two_product(t, s);
+    let (q, eq) = two_product(t, es);
+    let terms = [a, p, ep, q, eq];
+    if !terms.iter().all(|x| x.is_finite()) {
+        return None;
+    }
+    let mut e = [0.0; 12];
+    let mut n = 0;
+    for x in terms {
+        grow(&mut e, &mut n, x);
+    }
+    Some((e, n))
+}
+
+/// Sign of the expansion e[..n] minus x minus y, exactly.
+fn sign_minus(e: &[f64; 12], n: usize, x: f64, y: f64) -> i8 {
+    let mut f = *e;
+    let mut m = n;
+    grow(&mut f, &mut m, -x);
+    grow(&mut f, &mut m, -y);
+    if m == 0 { 0 } else if f[m - 1] > 0.0 { 1 } else { -1 }
+}
+
+/// a + t (b - a) rounded to the nearest double, ties to even (as
+/// [`crate::mixed::Mixed::rounded`] for a segment point, without big integers).
+fn rounded_coordinate(a: f64, b: f64, t: f64) -> Option<f64> {
+    let (e, n) = coordinate_expansion(a, b, t)?;
+    if n == 0 {
+        return Some(0.0); // an exact zero is +0
+    }
+    let mut h: f64 = e[..n].iter().fold(0.0, |x, y| x + y);
+    if !h.is_finite() {
+        return None;
+    }
+    // move h to the double nearest the exact value: the exact value lies between the
+    // midpoints to h's neighbours, a tie going to the even neighbour
+    for _ in 0..4 {
+        let (lo, hi) = (h.next_down(), h.next_up());
+        // the midpoints h + (hi - h)/2 and h + (lo - h)/2, kept as two exact terms
+        let above = sign_minus(&e, n, h, (hi - h) / 2.0);
+        let below = sign_minus(&e, n, h, (lo - h) / 2.0);
+        let even = |x: f64| x.to_bits() & 1 == 0;
+        if above > 0 || (above == 0 && !even(h)) {
+            h = hi;
+        } else if below < 0 || (below == 0 && !even(h)) {
+            h = lo;
+        } else {
+            return Some(h);
+        }
+    }
+    None
+}
+
 fn insert_s(mesh: &mut Mesh<MixedPoints>, sp: SPoint, stats: &mut RecoveryStats) -> Result<u32, Error> {
     let id = mesh.g.push(sp);
     if exact_point(&mesh.g.input[sp.a as usize], &mesh.g.input[sp.b as usize], sp.t) {
@@ -529,6 +631,28 @@ mod tests {
         let r = check(&pts, &segs);
         assert!(r.stats.bisection_points > 0, "{:?}", r.stats);
         eprintln!("cloud: {:?} {:?}", r.stats, r.mixed);
+    }
+
+    /// The rounded segment points agree with the big-integer rounding.
+    #[test]
+    fn rounded_segment_points_agree_with_dyadic_arithmetic() {
+        let mut s = 5u64;
+        for k in 0..20000 {
+            let pick = |s: &mut u64| match k % 3 {
+                0 => (lcg(s) * 64.0).floor() / 8.0 - 4.0,
+                1 => lcg(s) * 10.0 - 5.0,
+                _ => (lcg(s) - 0.5) * 1e-20,
+            };
+            let a = [pick(&mut s), pick(&mut s), pick(&mut s)];
+            let b = [pick(&mut s), pick(&mut s), pick(&mut s)];
+            let t = if k % 2 == 0 { (lcg(&mut s) * 4096.0).floor().max(1.0) / 4096.0 } else { lcg(&mut s).max(1e-9) };
+            let input = [a, b];
+            let sp = [SPoint::seg(0, 1, t)];
+            let want = crate::mixed::Mixed { input: &input, s: &sp }.rounded(crate::mixed::Pt::S(0));
+            let got: Vec<f64> = (0..3).map(|c| rounded_coordinate(a[c], b[c], t).unwrap()).collect();
+            assert_eq!(got.iter().map(|x| x.to_bits()).collect::<Vec<_>>(), want.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+                       "{a:?} {b:?} {t}");
+        }
     }
 
     #[test]
