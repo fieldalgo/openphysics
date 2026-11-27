@@ -149,7 +149,7 @@ this name or another.*(round 17). 저장 선택 창에서 기억한 파일은 �
 **프로젝트 파일**은 Studio 탭의 모든 모델을 담으므로, 파일 하나로 광 도파로와 가열 실리콘 도파로를 실행과
 함께 되돌립니다. **File › Save**와 **Save As…**가 쓰고 **File › Open…**이 읽습니다. 프로젝트에는 작업 공간
 모델(광학, 정상 열 또는 Joule 가열 입력과 광학 실행)이 그 카드를 고르거나 작업 공간 파일을 연 때부터, 다중물리
-모델이 그것을 연 때부터 들어갑니다.
+모델이 그것을 연 때부터, [3D 모델](#3d-모델실험적)이 그 카드를 고르거나 그 세션 파일을 연 때부터 들어갑니다.
 
 **탭의 프로젝트.** 제목 표시줄은 저장 표시의 말로 프로젝트와 그 파일을 알립니다.
 
@@ -263,23 +263,88 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 
 ## 3D 모델(실험적)
 
-상태: **실험적**, 이 단계에서는 파일만. 3D 모델은 문서 하나를 담습니다(버전 1 geometry 블록이 있는 형식 0.3, 예를 들어
-카드 문서 "Via in a layer stack (3D heat)", `static/model3d-layer-stack-3d.json`, [3D 보기의 경로](studio_3d.md#보내는-것과-응답)가
-검사). 그것을 열고 편집하고 저장하는 작업 공간 빌더는 다음 단계에서 옵니다. 그때까지 Studio의 어떤 것도 3D 모델을
-만들지 않으므로, 버전 2 프로젝트 파일이나 model3d 세션 파일은 손으로 만든 것뿐입니다.
+상태: **실험적.** Library의 **3D models (experimental)** 묶음에 카드 **Via in a layer stack (3D heat)**
+(`layer-stack-3d`)가 응용 카드들 옆에, 그 사이가 아니라 따로 있습니다. µm 단위, 200 × 200 µm 영역(z는 0–610 µm)의 3d
+구성 요소이며, `layers` 특징 `stack` 하나(기판 Si 500 µm, k = 130 W/(m K); 산화막 SiO2 10 µm, k = 1.4 W/(m K); 위 실리콘
+Si 100 µm)와 산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어
+있습니다. 원기둥이 오기 전까지 via는 정사각형입니다: *Square via (a round via needs cylinders, coming with the next
+geometry step)*. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
+그 모델로 돌아갑니다. 3D 모델에는 아직 메시, 실행, 결과가 없습니다. **Mesh**와 **Run**은 이유(*Meshing and heat come
+in a later step of the 3D model.*)와 함께 꺼진 채 보입니다.
 
-**세션 파일**(결정 F2)은
-`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`이며, 선택적 `view` 객체와
-세션 한도 16 MiB를 따릅니다. 지금은 문서를 담고, 실행은 나중 버전에서 옵니다. File › Open은 `application`이
-`"model3d"`인 세션을 광학과 다중물리 세션의 버전 규칙보다 먼저 자체 규칙으로 보내며, 그 규칙은 바뀌지 않습니다(단위
-배치 이전의 버전 1 파일은 거부를 유지). 거부는 파일 종류를 밝힙니다: *This model3d session is version 2, newer than this
-Studio reads (version 1). Open it in a newer Studio.*, *Unknown key "runs" in the model3d session.*, *The model3d session
-holds no document.*, *The model3d session holds a document that is not format 0.3.*, *The model3d session holds a
-document without a version 1 geometry block.*, *The model3d session has an invalid view.*
+**트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 적힌 그대로의 매개변수,
+*t_ox = 10 um · via_w = 20 um*), **Geometry 1**과 그 아래 **Domain**(*200 × 200 × 610 µm*, 또는 *200 × 200 µm, z from the
+features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*,
+*2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*3 regions · 22 faces*, 서버 검사에서), 그다음 **Materials**(*Si · SiO2 ·
+Cu*)가 있습니다. 덮임 말은 정확한 complex에서 옵니다: *covered in part by 2 (via)*, 또는 나중 특징이 전부 차지하면
+*covered by 2 (b), 3 (c); adds no region*. Heat transfer, Mesh, Study, Results는 다음 단계에서 옵니다. Geometry 1의
+**Add feature**는 **Box**와 **Layers**를 내놓고, **Extrude**, **Cylinder**, **Sphere**는 이유와 함께 흐리게 보입니다
+(*Extrude comes with a later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
+geometry step*). 특징 설정에는 **Move up**, **Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**(*via
+deleted; Undo restores it.*)가 있고, layers 특징에는 **Add layer**와 **Remove layer**(층 1–32개)도 있습니다. 끌어 옮기기는
+없습니다. **Form result**는 영역과 선택을 나열하고, 면은 보기 아래에 나열됩니다.
 
-**검사**(W11 실행 없음, 파일 부분, 미리 정함): 문서 digest(문서의 세션 JSON의 SHA-256)가 세션과 프로젝트 파일 모두에서
-저장하고 읽은 뒤 같음; 두 번째 저장은 같은 바이트를 씀; 3D 모델이 없는 프로젝트는 바이트까지 같은 버전 1로 씀(커밋된
-`project-v1.json` fixture). 측정: 같음, 바뀌지 않음(`tests/simcase/studio_model3d_files.cjs`).
+**칸.** 길이 칸마다 구성 요소 단위의 수, 물리량(`0.1 mm`), 매개변수 이름 또는 식(`100 - w / 2`)을 받습니다. 옆에는
+수나 물리량의 SI 값(*= 0.00009 m*), 또는 적힌 값과 함께 매개변수(*= t_ox (10 µm)*)를 보이고, 식은 서버가 계산합니다.
+서버 전에 Studio가 지키는 범위(쓸 수 있는 크기를 지키는 것이며 계약 규칙이 아님: 다른 값을 가진 파일에서 연 문서는 적힌
+그대로 읽음):
+
+| 칸 | 허용 |
+|---|---|
+| name | 글자나 `_`로 시작하고 글자, 숫자, `_`; 특징 사이에서 겹치지 않음(층 이름은 그 특징 안에서) |
+| material | 모델의 재료 중 하나, 또는 빈 값(void) |
+| box xmin … zmax | 축마다 min < max; 영역이 수이면 영역 안 |
+| layers thickness | 0보다 큼; 층 1–32개 |
+| element_size(선택) | 영역 대각선 / 400 ~ 영역 대각선 / 4 |
+| Domain xmin … zmax | min < max |
+
+거부한 값은 2D 빌더의 범위 문장을 쓰고(*Via x max must be between 90–200 µm.*, *Stack oxide thickness must be greater
+than 0 µm.*, *Via element size must be between 1.68–168 µm.*) **Restore last valid value**가 붙은 강조된 초안으로 남습니다.
+초안이 있는 동안 File › Save, Save As, Export는 꺼지고, Mesh와 Run은 초안을 이유로 밝힙니다. 특징의 조합은 서버만
+검사합니다. **Parameters** 표는 매개변수마다 이름, 값, 종류(length 또는 ratio), 범위(문서가 줄 때), SI 값, 그것을 쓰는 칸의
+수를 보이며, 매개변수에 관한 거부(E-DOMAIN, E-EXPRESSION-KIND, 순환)는 그 행에 보입니다. 쓰이는 매개변수는 지우지 않으며,
+거부는 쓰는 곳을 특징 순서로 밝힙니다: *t_ox is used by stack.oxide thickness.*(여럿이면 *w is used by domain xmax,
+stack.oxide thickness, via xmin, via xmax.*).
+
+**편집마다 검사합니다.** 문서 전체가 `POST /api/model3d/check`로 갑니다([3D 보기](studio_3d.md#보내는-것과-응답)).
+거부는 Messages에 엔진의 말 그대로 보이고, 그 코드와 경로는 **Details** 아래에 있습니다(예: *sphere 'ball' is not taken
+yet in a 3d component; boxes and slab layers are* · `geometry.components.c.features[2]`의 `E-3D-COMBINATION`). Studio는
+거기에 제 말을 더하지 않습니다. 트리는 거부가 가리키는 (나중) 특징을 표시하고, 보기는 만들 수 있었던 마지막 형상을 흐리게
+*Last shape that could be formed*라는 이름과 함께 유지하며, Mesh와 Run은 *Fix 1 problem in Messages to mesh*라고 말합니다.
+
+**보기와 선택.** 보기는 [3D 보기](studio_3d.md)와 그 조작입니다(보기에서 화살표는 회전, Shift+화살표는 이동, +와 −는
+확대·축소, F는 맞춤, 1–6은 축 방향 보기, 0은 등각). 보기에서 고르거나 **Faces** 목록에서 고른(Tab, Enter) 면은 그
+이름들을 보입니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
+`selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은
+선택으로 만들지 않고 그렇게 말합니다.
+
+**Undo.** 3D 모델은 다른 모델과 따로 문서 기록 하나를 갖습니다(Ctrl+Z와 Ctrl+Y는 보이는 모델을 따름). 확정한 편집마다
+한 단계입니다: Enter나 칸을 떠날 때 확정한 칸, 추가, 삭제, 복제, 이동, 층 추가·삭제, 매개변수, 골라서 만든 선택. 서버가
+거부한 편집도 기록에 남으므로 Undo로 되돌립니다. 페이지, 트리의 선택, 고른 면, 카메라는 기록에 없습니다.
+
+**파일.** File › Save는 3D 모델 항목과 함께 프로젝트 파일을 버전 2로 씁니다. **File › Export › Model with runs (session
+file)…**는 3D 모델만 세션 파일로 씁니다(결정 F2):
+`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, 선택적 `view` 객체와 세션
+한도 16 MiB. 지금은 문서를 담고, 실행은 나중 버전에서 옵니다. File › Open은 둘 다 읽습니다. `application`이 `"model3d"`인
+세션은 광학과 다중물리 세션의 버전 규칙보다 먼저 자체 규칙으로 읽으며, 그 규칙은 바뀌지 않습니다(단위 배치 이전의 버전 1
+파일은 거부를 유지). 거부는 파일 종류를 밝힙니다: *This model3d session is version 2, newer than this Studio reads (version
+1). Open it in a newer Studio.*, *Unknown key "runs" in the model3d session.*, *The model3d session holds no document.*,
+*The model3d session holds a document that is not format 0.3.*, *The model3d session holds a document without a version 1
+geometry block.*, *The model3d session has an invalid view.* 3D 모델은 아직 브라우저 복구에 보관하지 않습니다.
+
+**검사.** 측정 전에 미리 정했습니다:
+
+| 검사 | 무엇 | 기준 | 측정 | 위치 |
+|---|---|---|---|---|
+| W4 | 카드의 목록 면 10개(`stack.sub.domain.x0`, `stack.oxide.domain.y1`, `stack.top.domain.x1`, `stack.top.top`, `via.x0`, `via.x1`, `via.y0`, `via.y1`, `via.z0`, `via.z1`)를 골라 Use for → New selection; 쓴 선택과 손으로 친 목록 이름이 고른 면으로 풀림(서버: `build_mesh3d`를 거쳐 고른 면의 메시 면으로) | 10/10 | 10/10(서버와 브라우저; 보기에서 둘, 면 목록에서 여덟) | `tests/simcase/test_studio_model3d_check.py`, `tools/studio_browser/model3d_builder_browser.mjs` |
+| W5 | 검사가 내는 E-3D-COMBINATION 줄기마다 문서 하나(footprint layers만; 다른 특징 옆; extrude, cylinder, sphere 아직 받지 않음): Messages에 엔진의 말, Details에 코드, features[i]의 트리 표시, Mesh와 Run의 이유 | 100% | 5/5. 줄기 "… round to the same coordinate"와 circle_segments는 메시할 때 `build_mesh3d`에서 나옴(나중 단계) | 같음 |
+| W11(실행 없음) | Save와 Open 뒤 문서 digest, 프로젝트와 세션; 3D 없는 버전 1 프로젝트는 전처럼 바이트까지 같게 씀 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음 | `tests/simcase/studio_model3d_files.cjs`, 브라우저 검사 |
+| W12 | Library와 카드를 연 Model, 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록에 닿음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 브라우저 검사 |
+| W13(B 부분) | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → New selection | 포인터 이벤트 없음 | 포인터 이벤트 0 | 브라우저 검사 |
+
+순수 도우미(`workspace-model3d.mjs`)는 `tests/simcase/studio_model3d_builder.cjs`가 검사하고, 브라우저 검사는 트리의 행과
+말도 서버 응답과 비교합니다. 브라우저 검사는 로컬입니다(실행 가능한 Chromium과 Playwright, CI에는 없음). 실행 중인
+Studio에 대해 `node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`로 실행합니다.
 
 ## 첫 광학 해석
 
