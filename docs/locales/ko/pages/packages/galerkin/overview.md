@@ -26,6 +26,7 @@
 | 사면체 메시의 정상 3D 열전도, 영역별 등방성, Dirichlet 면과 단열 | `galerkin.thermal3d.solve_steady_heat_3d` | [계약과 검증](thermal3d.md) | — |
 | 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../../../examples/galerkin/thermal_steady2d.py) |
 | 정상 2D 전기전도: 등방 영역별 전기전도도, 전압·전류·절연 변과 명시적 Neumann 기준 전위, V·E·J와 요소별 Joule 발열 | `galerkin.electric.solve_steady_electric` | [계약과 검증](electric_steady2d.md) | [electric_steady2d.py](../../../../../../examples/galerkin/electric_steady2d.py) |
+| 면 태그 전위 단자, 절연, 요소별 줄 발열을 지원하는 3D 정상 직류 전기전도 | `galerkin.electric3d.solve_steady_electric_3d` | [계약과 검증](electric_steady3d.md) | — |
 | 같은 메시의 정상 전기→열 단방향 연성 | `galerkin.joule_heating.solve_steady_joule_heat` | [API·단위·검증](joule_heating.md) | [joule_heating.py](../../../../../../examples/galerkin/joule_heating.py) |
 | 온도 의존 정상 Joule heating: 유효 범위가 있는 등방 σ(T)를 완화 Picard 또는 Newton으로 | `galerkin.temperature_joule_heating.solve_temperature_joule_heat`, `ConductivityModel` | [계약과 검증](temperature_joule_heating.md) | [temperature_joule_heating.py](../../../../../../examples/galerkin/temperature_joule_heating.py) |
 | 정상 열전도의 처방 경계 열유속(내향)과 Robin 대류 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_flux_robin.md), [검증](thermal_flux_robin_independent_validation.md) | [thermal_flux_robin.py](../../../../../../examples/galerkin/thermal_flux_robin.py) |
