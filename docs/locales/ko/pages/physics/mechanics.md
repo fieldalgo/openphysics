@@ -10,6 +10,7 @@
 
 - [3D 하중과 변위 구속](../packages/galerkin/elasticity3d.md)
 - [전류가 흐르는 도체의 3D 열응력 계산](../packages/galerkin/electrothermomechanical_3d.md)
+- [3D 히터를 켜고 끌 때의 열응력 추적](../packages/galerkin/transient_heater_3d.md)
 
 - [첫 열탄성 해석: 열전도에서 역학으로](../packages/galerkin/thermoelastic_tutorial.md)
 

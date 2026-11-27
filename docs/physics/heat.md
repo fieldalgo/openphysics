@@ -31,6 +31,7 @@ Python and JSON/CLI support rectangular and region models. Studio supports recta
 
 - [Steady two-dimensional heat conduction](../packages/galerkin/thermal_steady2d.md)
 - [Steady heat conduction on tetrahedral meshes](../packages/galerkin/thermal3d.md)
+- [Transient heat conduction and energy balance on tetrahedral meshes](../packages/galerkin/transient_heat3d.md)
 - [Steady 2D outward heat flux and convection](../packages/galerkin/thermal_flux_robin.md)
 - [Transient heat on a fixed P1 mesh](../packages/galerkin/transient_heat.md)
 - [Piecewise-constant materials on named regions](../packages/galerkin/multimaterial.md)

@@ -2,6 +2,8 @@
 
 **English** | [한국어](../../locales/ko/pages/packages/galerkin/electrothermomechanical_3d.md)
 
+For heating and cooling in time, see the [3D heater pulse example](transient_heater_3d.md).
+
 Run the [powered bar example](../../../examples/galerkin/electrothermomechanical_3d.py)
 from the repository root with `python examples/galerkin/electrothermomechanical_3d.py`.
 The first two solves can also be run by calling the example's `solve_electrothermal_bar(nx)`.
