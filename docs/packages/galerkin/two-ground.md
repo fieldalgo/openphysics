@@ -46,6 +46,19 @@ or 16 (default12), compared with degree−2. Ground modes are explicitly 64–40
 (default128), compared with twice that count and higher quadrature. The solver
 never silently changes a requested setting.
 
+Lateral side-wall images are summed up to a fixed image count, but an image
+is skipped when it cannot change any entry: over a whole target–source block,
+|image| ≤ x/(1−x) with x = 2e+e² and e = exp(−πd/H) for the block's nearest
+horizontal offset d, and the image is skipped when twice that bound is below
+2⁻⁵⁴ times the smallest entry magnitude, where a floating-point sum ignores it.
+Results are therefore bit for bit those of the full sum. In wide, low
+rectangles most lateral images lie below 1e-24 and are skipped: the layered
+coplanar striplines of the SIPI catalog (W/H ≈ 20, up to 42 interpolation
+boxes) took 144–213 s before and about a tenth of that after. For the same
+reason the degree−2 comparison, which also adds two images, did not test
+image truncation in such rectangles: the added images were already below
+rounding.
+
 The smooth part is first interpolated on one box around every conductor. When
 that degree−2 comparison exceeds 1e-10, the same comparison is repeated once,
 with the same degree, panels and quadrature, on boxes that split each conductor

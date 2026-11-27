@@ -56,15 +56,44 @@ def _admit(polygons, width, height, count, side_walls=True, max_aspect=16):
         raise ValueError('conductor cluster must be one cluster extent away from side walls')
     return (accepted, unit, w, h)
 
+def _image_bound(low, high, height):
+    """Upper bound of |dd| for every horizontal shift in [low, high].
+
+    dd is half the difference of log1p(-2e cos(a)+e^2) and log1p(-2e cos(b)+e^2)
+    with e = exp(-pi |shift| / height), so |dd| <= x/(1-x), x = 2e+e^2.
+    """
+    nearest = 0.0 if low <= 0 <= high else min(abs(low), abs(high))
+    e = np.exp(-np.pi * nearest / height)
+    x = 2 * e + e * e
+    return x / (1 - x) if x < 1 else np.inf
+
+def _add_image(out, bound, term):
+    """Add one image term unless it cannot change any entry of ``out``.
+
+    fl(v + t) == v whenever |t| < |v| 2**-54 (below half an ulp of v), so an
+    image whose doubled bound is below 2**-54 min|out| is skipped with a
+    bit-identical result. Laterally distant images of wide, low rectangles
+    are far below that; the image count itself is unchanged.
+    """
+    if out.size and 2 * bound < 2.0 ** -54 * np.min(np.abs(out)):
+        return out
+    out += term()
+    return out
+
 def _smooth(targets, sources, width, height, images):
     dx = targets[:, None, 0] - sources[None, :, 0]
     yt = targets[:, None, 1]
     ys = sources[None, :, 1]
     out = kernel.dd_minus_half(dx, yt, ys, height / 2)
+    t_low, t_high = targets[:, 0].min(), targets[:, 0].max()
+    s_low, s_high = sources[:, 0].min(), sources[:, 0].max()
     for n in range(-images, images + 1):
+        shift = 2 * n * width
         if n:
-            out += kernel.dd(dx - 2 * n * width, yt, ys, height / 2)
-        out += kernel.dd(targets[:, None, 0] + sources[None, :, 0] - 2 * n * width, yt, ys, height / 2)
+            out = _add_image(out, _image_bound(t_low - s_high - shift, t_high - s_low - shift, height),
+                             lambda: kernel.dd(dx - shift, yt, ys, height / 2))
+        out = _add_image(out, _image_bound(t_low + s_low - shift, t_high + s_high - shift, height),
+                         lambda: kernel.dd(targets[:, None, 0] + sources[None, :, 0] - shift, yt, ys, height / 2))
     return out
 
 def _point_green(targets, sources, width, height, images=8):

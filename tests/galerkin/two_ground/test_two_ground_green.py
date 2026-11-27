@@ -56,3 +56,46 @@ def test_new_admission_keeps_original_dn_contract_unchanged():
     assert _admit(polygons,1.,.4,16)[4] is False
     accepted,unit,w,h=_admit_dual_ground(polygons,1.,.4,16)
     assert len(accepted)==2 and unit==1. and w==1. and h==.4
+
+
+def full_smooth(targets, sources, width, height, images):
+    """The smooth kernel with every image added (the sum before image skipping)."""
+    dx = targets[:, None, 0] - sources[None, :, 0]
+    yt, ys = targets[:, None, 1], sources[None, :, 1]
+    out = kernel.dd_minus_half(dx, yt, ys, height / 2)
+    for n in range(-images, images + 1):
+        if n:
+            out += kernel.dd(dx - 2 * n * width, yt, ys, height / 2)
+        out += kernel.dd(targets[:, None, 0] + sources[None, :, 0] - 2 * n * width, yt, ys, height / 2)
+    return out
+
+
+@pytest.mark.parametrize('height', [.05, .4, 1., 4.])
+def test_image_bound_is_above_every_sampled_image(height):
+    from galerkin.laplace_two_ground import _image_bound
+    rng = np.random.default_rng(7)
+    for low in (-.3, .02, .2, 1.5, -2.):
+        high = low + .25
+        dx = rng.uniform(low, high, 400)
+        y = rng.uniform(0, height, (2, 400))
+        values = abs(kernel.dd(dx, y[0], y[1], height / 2))
+        assert np.all(values <= _image_bound(low, high, height))
+
+
+@pytest.mark.parametrize('width,height,images', [(1., .05, 8), (1., .4, 8), (.25, 1., 20)])
+def test_skipped_images_leave_the_smooth_kernel_bit_identical(width, height, images, monkeypatch):
+    from galerkin.laplace_two_ground import smooth
+    rng = np.random.default_rng(3)
+    boxes = [(.1, .2), (.45, .5), (.7, .95)]
+    points = [np.column_stack((rng.uniform(*box, 30) * width, rng.uniform(.05, .95, 30) * height)) for box in boxes]
+    calls = []
+    original = kernel.dd
+    monkeypatch.setattr(kernel, 'dd', lambda *args: calls.append(1) or original(*args))
+    for targets in points:
+        for sources in points:
+            assert np.array_equal(smooth(targets, sources, width, height, images),
+                                  full_smooth(targets, sources, width, height, images))
+    full_calls = 2 * len(points) ** 2 * (2 * images + 1) - len(points) ** 2
+    skipped = full_calls - (len(calls) - full_calls)
+    # Wide, low rectangles skip the laterally distant images; tall ones keep them.
+    assert skipped > (full_calls // 2 if height < .1 else -1)
