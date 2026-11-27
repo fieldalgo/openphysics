@@ -32,6 +32,8 @@ export function editNoticeText(key,value,{leftX=null,afterResult=false,kept=null
  const more=also.map(a=>` ${INPUT_FIELDS[a.key].label} set to ${signed(a.value)}${unit(INPUT_FIELDS[a.key])} too.`).join('');
  return `${field.label} set to ${signed(value)}${unit(field)}.${moved}${more} `+(afterResult?'Inputs changed since the last result. Run again to compute the new inputs.':'Run explicitly to compute new results.');
 }
+/** The range sentence of a refused value ("Core width must be between 300–900 nm."); the 3D builder uses it too. */
+export const betweenText=(label,min,max,unit)=>`${label} must be between ${min}–${max}${unit?' '+unit:''}.`;
 export function parseNumeric(key,raw){
  const field=INPUT_FIELDS[key];if(!field)throw new Error('Unknown numeric field.');
  const text=String(raw).trim(),range=`${field.min}–${field.max} ${field.unit}`;
@@ -41,7 +43,7 @@ export function parseNumeric(key,raw){
  if(!text)return {ok:false,message:`${field.label} is required. Enter ${range}.`};
  if(!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)||!Number.isFinite(Number(text)))return {ok:false,message:`${field.label} must be a finite number in ${range}.`};
  const value=Number(text);
- if(value<field.min||value>field.max)return {ok:false,message:`${field.label} must be between ${range}.`};
+ if(value<field.min||value>field.max)return {ok:false,message:betweenText(field.label,field.min,field.max,field.unit)};
  return {ok:true,value};
 }
 export class NumericDrafts {
