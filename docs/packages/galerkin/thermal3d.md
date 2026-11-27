@@ -9,13 +9,13 @@ solves isotropic stationary conduction with P1 tetrahedra on any mesh of the
 ```text
 -div(k grad T) = Q,       q = -k grad T
 T = prescribed value on Dirichlet nodes
-q.n = 0 on every other face (insulation, the natural condition)
+q.n = h (T - T_ambient) - inward_heat_flux on specified natural faces
+q.n = 0 on the remaining faces
 ```
 
 It reuses `Mesh3D`, the P1 tetrahedron stiffness `assemble_stiffness_3d` and
 the Dirichlet solver; the source load is assembled in the module. It is the 3D
-counterpart of [steady 2D heat](thermal_steady2d.md) without the flux and Robin
-extensions, and the solver behind the layered conduction check of
+counterpart of [steady 2D heat](thermal_steady2d.md), and the solver behind the layered conduction check of
 `meshine.extrude`.
 
 ## API and SI units
@@ -40,10 +40,19 @@ result = solve_steady_heat_3d(
 
 | Input | Contract / units |
 | --- | --- |
-| mesh | `galerkin.Mesh3D` in metres: `from_mesher` of a meshine or gmshio mesh, or `box_mesh`. Face tags are needed only by `dirichlet_from_faces`. |
+| mesh | `galerkin.Mesh3D` in metres: `from_mesher` of a meshine or gmshio mesh, or `box_mesh`. Natural boundary maps use `mesh.tagged_faces`. |
 | thermal_conductivity | finite k > 0 in W/(m K), or `{region name: k}` with exactly the entries of `mesh.region_names` |
-| prescribed_temperature | `{node index: temperature K}`; every node on the exterior boundary and every connected component of the mesh anchored by at least one |
-| heat_source_density | Q in W/m^3, `{region name: Q}`, or a callable taking the read-only `(T, 3)` tetrahedron centroids and returning `(T,)` values; default `None`, no source |
+| prescribed_temperature | `{node index: temperature K}`; every node on the exterior boundary and each connected component needs a fixed node or a face with positive h |
+| heat_source_density | Q in W/m^3, `{region name: Q}`, a finite real `(T,)` array in `mesh.tets` order, or a callable taking the read-only `(T, 3)` tetrahedron centroids and returning `(T,)` values; default `None`, no source |
+| inward_heat_flux | `{face tag: flux}` in W/m^2, positive into the body |
+| convection | `{face tag: (h, T_ambient)}`, h >= 0 in W/(m^2 K), ambient in K |
+
+Values are constant on each selected tag. Flux and convection on the same triangle
+are additive. Unknown, empty, or non-exterior selections, duplicate faces within
+one condition type, and natural data on fully fixed triangles raise `ValueError`.
+Natural boundary data are supported on static meshes. For elementwise Joule
+heating, pass the one-dimensional J·E array from the same mesh as
+`heat_source_density`. Its total power is `density @ mesh.volumes()` in W.
 
 `dirichlet_from_faces(mesh, {face tag: T})` turns tags into the node map and
 refuses a node that two tags would set to different temperatures. It is a helper of
@@ -54,10 +63,12 @@ the internal `galerkin.kernels` (consistent units: kelvin here), not of the publ
 | `temperature` | `(N,)` K |
 | `heat_flux` | `(T, 3)` W/m^2, `-k grad T` per tetrahedron |
 | `generated_heat_rate` | `(N,)` W, the source load `Q V / 4` per node of each tetrahedron |
-| `reaction_heat_rate` | `(N,)` W, `K T - load` on the Dirichlet nodes, zero elsewhere; positive injects heat |
-| `residual_heat_rate` | `(N,)` W, `K T - load` everywhere |
+| `reaction_heat_rate` | `(N,)` W, the full system residual on the Dirichlet nodes, zero elsewhere; positive injects heat |
+| `residual_heat_rate` | `(N,)` W, the full system residual, including natural boundary terms |
 | `thermal_conductivity`, `heat_source_density` | `(T,)` values used |
-| `relative_conservation_residual` | `abs(sum(load) + sum(reaction))` over the total absolute nodal heat |
+| `outward_prescribed_heat_rate` | `(N,)` W, nodal integrals of minus the prescribed inward flux |
+| `outward_convective_heat_rate` | `(N,)` W, nodal integrals of h (T - T_ambient) |
+| `relative_conservation_residual` | absolute sum of generated plus reaction minus both outward rates, divided by the sum of absolute nodal rates |
 | `prescribed_node_ids` | sorted node indices that were fixed |
 
 Nodal heat rates are watts, not per depth, so the fields have no `_per_depth`
@@ -69,6 +80,14 @@ the free residual exceeds `1e-10` of the system scale or the heat balance exceed
 JAX or PyTorch t ([shape derivatives](shape_derivative.md#3d-steady-heat)).
 
 ## Validation
+
+`tests/galerkin/test_thermal3d_boundaries.py` also compares a homogeneous
+slab at three mesh resolutions with a direct linear solution and the independent
+`refsol.thermal_boundary` references. It checks face-integrated rates, the signed
+balance, and the total elementwise source power. With a uniform volume source and both
+natural terms on the same face, comparison with the independent SciPy
+`solve_bvp` collocation solver gives observed orders of 2.18 for RMS nodal
+temperature and 0.975 for volume-weighted RMS axial flux at element centroids.
 
 `refsol.thermal3d` provides two independent closed forms:
 

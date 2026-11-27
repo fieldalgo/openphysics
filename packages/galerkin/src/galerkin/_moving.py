@@ -259,7 +259,8 @@ def solve_steady_heat_3d_moving(mesh, motion: MeshMotion, *, thermal_conductivit
     return thermal3d.SteadyHeat3DResult(temperature, flux, load, reaction, residual, base.thermal_conductivity,
                                         Q if sampled_source else base.heat_source_density,
                                         base.relative_conservation_residual,
-                                        base.prescribed_node_ids)
+                                        base.prescribed_node_ids, xp.zeros_like(load),
+                                        xp.zeros_like(load))
 
 
 def _cross3(xp, u, v):
