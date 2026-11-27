@@ -122,7 +122,8 @@ def _prisms(comp: Component, *, lone_layers: bool) -> list[_Prism]:
                                   (dom["xmin"], dom["xmax"], dom["ymin"], dom["ymax"], z, z1)))
                 z = z1
         else:
-            _refuse(f"{f.type} {f.name!r} is not taken yet in a 3d component; boxes and slab layers are", path)
+            from .geometry_builders3d import STAGED
+            _refuse(f"{f.type} {f.name!r} {STAGED}", path)
     _check_regions(comp, out)
     return out
 
@@ -283,6 +284,12 @@ def _evaluate(comp: Component, *, through_meshloom: bool) -> Complex3D:
     if comp.dimension != "3d":
         raise GeometryError(f"component {comp.name!r}: the 3D engine takes 3d components; 2d and axisymmetric "
                             "ones go through simcase.geometry_engine")
+    from . import geometry_builders3d as builders
+    if builders.has_curved(comp):
+        shape, _ = builders.recognise(comp)        # refuses by name what no builder takes
+        _refuse(f"component {comp.name!r} holds sampled surfaces (meshloom builder.{shape}): the exact 3D complex "
+                "of a sampled surface is not built yet; simcase.build_mesh3d meshes the component",
+                f"geometry.components.{comp.name}")
     lone = len(comp.features) == 1 and comp.features[0].type == "layers"
     if lone and not through_meshloom:
         path = _feature_path(comp, 0)
@@ -1105,6 +1112,11 @@ def build_mesh3d(document, component: str | None = None) -> Mesh3DResult:
 def _build(document, component=None, *, through_meshloom: bool = False) -> Mesh3DResult:
     """``build_mesh3d``; ``through_meshloom`` (tests only) sends a lone slab ``layers`` feature through
     meshloom instead of refusing it for the extrude route."""
+    data = getattr(document, "data", document)
+    comp = _pick(parse(data), component)
+    from . import geometry_builders3d as builders
+    if comp.dimension == "3d" and builders.has_curved(comp):
+        return builders.build(data, comp, _mesh_options(data, comp))
     cx, comp, ho, info = _prepare(document, component, through_meshloom=through_meshloom)
     result = _mesh(cx, comp, ho)
     result.diagnostics.append(info)
