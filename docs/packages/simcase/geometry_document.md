@@ -13,7 +13,12 @@ provenance of 2D and axisymmetric components and meshes version 1 documents
 (2026-11-04); the runners do not read the complex itself yet. The stage 4 amendment
 (2026-11-08) defines the design velocity and the topology probe, which
 [`simcase.geometry_velocity`](geometry_engine.md#design-velocity-stage-4)
-implements. Repository facts were checked against `main` at `015a6d8`.
+implements. The stage 5 amendment (2026-11-27) fixes the 3D compile conditions,
+the hand-off to meshloom and the mesher route of a `3d` component (see the
+[stage 5 compile conditions](#stage-5-compile-conditions-amended-2026-11-27));
+the 3D route through meshloom is experimental until meshloom's own acceptance.
+Repository facts were checked against `main` at `015a6d8`, and those of the stage 5
+amendment against `b4177fa`.
 
 How the page is organised:
 - Sections marked **frozen** are fixed since the page was accepted. The SHA-256 of
@@ -42,7 +47,7 @@ is written in several separate ways:
   (`packages/sipi/src/sipi/crosssection.py:175-206`,
   `packages/sipi/src/sipi/conductor_mesh.py:59-164`,
   `packages/sipi/src/sipi/plane.py:181-218`)
-- cavity boxes (`packages/simcase/src/simcase/cavity.py:104-145`)
+- cavity boxes (`packages/simcase/src/simcase/cavity.py:124-209`)
 - galerkin structured generators (`packages/galerkin/src/galerkin/mesh.py:81-260`,
   `packages/galerkin/src/galerkin/mesh3d.py:124-161`)
 - Studio workspace files (`packages/simcase/src/simcase/studio/static/workspace-project.mjs:21-70`)
@@ -61,7 +66,8 @@ This page defines the one geometry block that all of them compile to.
 - the mapping of current representations.
 
 **Defined, but with no consumer before a later stage:** `path` and `segment`
-in FEM (stage 2); `cylinder` and `sphere` (stage 5).
+in FEM (stage 2); `cylinder` and `sphere`, which meshloom takes from slice 3 of
+stage 5 (amended 2026-11-27).
 
 **Reserved:**
 - component and feature keywords: `periodic`, `ellipse`, `rotation`, `axis` values
@@ -75,7 +81,7 @@ in FEM (stage 2); `cylinder` and `sphere` (stage 5).
 **Not decided here:**
 - the stage 2 exact 2D engine, or any code;
 - mesh deformation and adjoints, which belong to galerkin;
-- 3D arrangements beyond the box rule;
+- 3D arrangements beyond the stage 5 combinations (amended 2026-11-27);
 - periodic boundaries in meshers or galerkin;
 - the Wavebit adapter (see the [stage 3 preview](#stage-3-preview-wavebit-not-frozen));
 - ECAD and STEP import, curved B-rep and NURBS;
@@ -222,12 +228,17 @@ Bitwise identity with today's meshes is not an acceptance criterion. Analytic,
 independent-reference and stored-value checks must still pass at their current
 thresholds.
 
-**Hand-off to meshloom (a proposal for the meshloom 3D work, not decided here).**
-meshloom would receive integer pm counts as doubles (exact for |k| ≤ 2⁵³, about
-9 km) together with a separate scale. Whatever form is chosen, the output
-guarantees in `docs/packages/meshine/validation3d.md:44` must hold on the
-coordinates galerkin finally receives. That includes exact `orient3d > 0` on the
-output doubles.
+**Hand-off to meshloom: rule H1 (amended 2026-11-27).**
+- Coordinates go to meshloom in metres. Each defining value of k pm becomes
+  `float(Fraction(k, 10**12))`, rounded once. Points of an axis-aligned plane
+  therefore share one double, and the plane stays exact.
+- Points on curved surfaces come from meshloom's builder.
+- The output guarantees must hold on the doubles galerkin receives: exact
+  `orient3d > 0` for every tetrahedron and the rest of the output contract table
+  (`docs/packages/meshine/validation3d.md:45`).
+- Dropped: the earlier proposal sent integer pm counts as doubles together with a
+  separate scale. A later ×1e-12 would round every node again, and 1e-12 is not a
+  power of two.
 
 ### Parameters (frozen)
 
@@ -270,7 +281,7 @@ A component is one geometric model with one dimension.
     `codex/axisymmetric-thermal-lens` at `2c58b05` was not checked. When it lands,
     its tag names are aligned with this rule.
 - **`3d`**: `domain` is `{xmin, xmax, ymin, ymax, zmin, zmax}`, as in the cavity
-  (`packages/simcase/src/simcase/cavity.py:104-145`).
+  (`packages/simcase/src/simcase/cavity.py:144-157`).
 
 **`background`** is the region that fills the rest of the domain. It is named
 `background`, and that name stays reserved
@@ -386,8 +397,13 @@ Rules:
 
 | `type` | Fields | Parts |
 |---|---|---|
-| `extrude` | `profile` (one inline 2D feature without `id`), `zmin, zmax`; `axis: "z"` | `bottom, top`; the sides take the profile's part names (`pad.left`, `via.boundary`) |
+| `extrude` | `profile` (one inline 2D feature without `id`), `zmin, zmax`; `axis: "z"` | `bottom, top`; the sides take the profile's part names (`pad.left`, `via.boundary`), except that a `rect` or `trapezoid` profile's `bottom` and `top` become `y0` and `y1` (`pad.y0`; amended 2026-11-27) |
 | `layers` | `z0` (base); `layers: [{name, thickness, material \| footprint + map, region?}]` | see below |
+
+**Profile parts in an `extrude` (amended 2026-11-27).** A `rect` or `trapezoid`
+profile's parts `bottom` and `top` become `y0` and `y1`, so an extruded rect reads
+like a box and its sides no longer share names with the caps `bottom` and `top`.
+There is no 3D `extrude` consumer today, so no existing document changes.
 
 Rules for `layers`:
 - **Slab layer.** A layer with `material` and no `footprint` is a slab across the
@@ -416,27 +432,79 @@ Rules for `layers`:
 
 | `type` | Fields | Parts | Consumers |
 |---|---|---|---|
-| `box` | `xmin, xmax, ymin, ymax, zmin, zmax` (the cavity form) | `x0, x1, y0, y1, z0, z1` | `em.cavity3d` now; meshloom from stage 5 |
-| `cylinder` | `cx, cy, r, zmin, zmax`; `axis: "z"` | `side, bottom, top` | none before stage 5 |
-| `sphere` | `cx, cy, cz, r` | `surface` | none before stage 5 |
+| `box` | `xmin, xmax, ymin, ymax, zmin, zmax` (the cavity form) | `x0, x1, y0, y1, z0, z1` | `em.cavity3d`; meshloom from stage 5 |
+| `cylinder` | `cx, cy, r, zmin, zmax`; `axis: "z"` | `side, bottom, top` | meshloom from slice 3 of stage 5; none before |
+| `sphere` | `cx, cy, cz, r` | `surface` | meshloom from slice 3 of stage 5; none before |
 
 `docs/packages/meshine/validation3d.md:76-95` lists the pre-registered 3D cases,
 which use boxes, cylinders and spheres.
-
-**Proposed compile conditions for stage 5 (not frozen).** These still need
-agreement with meshloom's 3D plan:
-- Boxes may overlap, and the later box wins.
-- A cylinder runs along z. Each cap lies on a layer plane, on a domain z face, or
-  inside one region. Where it crosses a box face, the cap lies entirely inside
-  that face.
-- Spheres touch nothing: they are standalone or strictly nested.
-- Anything else goes to gmshio in a separate process, which is new work. Until
-  that exists, it is refused, and the refusal names the features.
 
 **Inputs that stay meshloom API inputs.** Raw piecewise-linear complexes, fuzz
 inputs and imported surfaces with arbitrary doubles (cases C7, C10, C13 and C14 in
 `docs/packages/meshine/validation3d.md:76-95`) are not geometry documents.
 Rounding them to a grid would defeat what those cases test.
+
+### Stage 5 compile conditions (amended 2026-11-27)
+
+These rules replace the proposal that stood here ("Proposed compile conditions for
+stage 5", not frozen). Every test is exact, on the pm integers, before any rounding.
+
+**Arrangement.**
+- Every `box`, `extrude`, `cylinder` and slab layer is a vertical prism. A slab layer
+  is a `layers` entry with a material and no footprint: a box over the domain's x–y
+  extent between its exact z levels.
+- The component is cut at every distinct z level. In each slab, the active prisms
+  form a 2D later-wins arrangement, resolved by the stage 2 exact 2D engine and
+  clipped to the domain. Feature order is list order.
+- Horizontal faces exist where the cells above and below differ in region, or where
+  one side is exterior. Their provenance set holds every prism part that lies in
+  that plane and contains the face, whether or not that prism owns an adjacent cell.
+- Vertical faces are a 2D curve × slab, carrying the curve's provenance. Pieces in
+  adjacent slabs merge when the curve, both side regions and the provenance set are
+  equal and no horizontal face meets the curve between them.
+- `finalize: "imprint"` stays refused in 3D.
+
+**Allowed and refused.**
+- `box` and `extrude` with `box` and `extrude`: any overlap, touch or nesting; the
+  later feature wins.
+- A cylinder must stay a whole circle in every slab it spans. A circle cut by a line
+  or by another circle is refused, and so is a tangent circle. A cap lies inside one
+  face, or on none.
+- Two cylinders: disjoint, strictly nested, or equal disks stacked cap to cap.
+- A sphere lies strictly inside one cell. Its bounding box must meet no face, which
+  is conservative.
+- Two spheres: strictly disjoint or strictly nested.
+- A sphere that contains a prism: refused.
+- Footprint `layers` together with other features: refused. Alone, they keep the
+  extrude route.
+- A `mesh.controls` `circle_segments` entry on a 3D surface: refused.
+- Two distinct defining values of one axis that round to the same metre double
+  (rule H1): refused, naming both.
+
+Anything else is refused by name; a gmshio route is not planned.
+
+**`E-3D-COMBINATION`** means that a component is valid but outside the stage 5
+combinations. It is distinct from `E-CONTRACT`, `E-VALUE-FORM` and `E-DOMAIN`, which
+keep their meaning. Its path is the later feature's `features[i]`. The message stems
+are fixed:
+
+| Case | Message stem |
+|---|---|
+| a cylinder crossing a side | `cylinder {a!r} crosses the side {b}.{part} between z = {z0} and {z1} {unit}; a cylinder must lie inside or outside every side it spans` |
+| a cylinder tangent to a side | `cylinder {a!r} touches {b}.{part} at one line; move it inside or away` |
+| a cap partly on a face | `cap {a}.{bottom\|top} lies partly on {b}.{part}; a cap lies inside one face or on none` |
+| two cylinders crossing | `cylinders {a!r} and {b!r} cross between z = {z0} and {z1} {unit}; they must be disjoint, nested or stacked cap to cap` |
+| a sphere meeting a face | `sphere {a!r} touches or crosses {b}.{part}; a sphere lies strictly inside one region` |
+| two spheres meeting | `spheres {a!r} and {b!r} touch or cross; they must be disjoint or strictly nested` |
+| a sphere containing a prism | `sphere {a!r} contains {b!r}; stage 5 takes spheres inside one region only` |
+| footprint layers with other features | `layers {a!r} has footprint layers; with other features a 3d component takes slab layers only` |
+| `circle_segments` on a 3D surface | `mesh.controls: circle_segments on {sel!r} is not taken for 3d surfaces yet; use size` |
+| two values rounding together | `{a}.{part} and {b}.{part} round to the same coordinate {x} m` |
+
+**Mesher route.** A `3d` component that holds only one `layers` feature keeps the
+`meshine.extrude` route, unchanged. Every other `3d` component goes to meshloom.
+Existing `em.cavity3d` documents keep their current route and results. The 3D route
+through meshloom is **experimental** until meshloom's own acceptance.
 
 ## Boolean rule (frozen)
 
@@ -520,6 +588,7 @@ changes.
 | axisymmetric | the same, with `axis` replacing `left` when `xmin == 0` |
 | 2.5D through `meshine.extrude` | `z0`, `z1`, the footprint's own side tags, and `void` (`packages/meshine/src/meshine/extrude.py:33-60`) |
 | `em.cavity3d` | `x0`–`z1`, with `xmin`–`zmax` as aliases (`packages/simcase/src/simcase/cavity.py:46`) |
+| 3D through meshloom (stage 5; added 2026-11-27) | `x0`–`z1` on the domain faces; `void` for every other exterior face, as on the extrude route |
 
 **`boundary_tags`** is an optional ordered list of `{"tag": ..., "select": <boundary selector>}`.
 - An exterior entity takes the tag of the first entry whose selection contains it.
@@ -726,7 +795,7 @@ keyword.
 | [region mechanics](mechanics2d.md#material-regions-and-named-boundaries) (`mechanics.elasticity2d`, `mechanics.thermoelastic2d`) | `2d` components through the stage 2 engine, with E, ν, α and k from `materials` and the boundary names of region heat for displacement, traction and pressure (2026-11-08) | `axisymmetric`; a void background; interface selections for displacement, traction and pressure (galerkin fixes exterior nodes only) |
 | FEM 2.5D (`meshine.extrude`) | `layers`, and `extrude` along z | sloped or curved sidewalls: the extruder makes vertical prisms only (`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | `box` with the grid-plane rule | other 3D features |
-| FEM 3D (meshloom, stage 5) | the stage 5 combinations | everything else, until a gmshio route exists |
+| FEM 3D (meshloom, stage 5; experimental) | every `3d` component but a lone `layers` feature (the extrude route) and `em.cavity3d` documents: the [stage 5 combinations](#stage-5-compile-conditions-amended-2026-11-27) | everything else, refused by name (`E-3D-COMBINATION`); a gmshio route is not planned |
 | sipi | `2d` components through its adapter, which keeps sipi's overlap refusals (`packages/sipi/src/sipi/crosssection.py:216-239`) | — |
 | Wavebit RCWA and FDTD | defined by the stage 3 amendment | — |
 
@@ -833,7 +902,7 @@ Terms used in the table:
 | Occluded circle (128-gon) | `packages/simcase/src/simcase/geometry.py:46` | `circle`; after booleans, the arcs come with stage 2 | None in the document. Until stage 2 the mesh still uses the polygon. |
 | MultiPolygon region; sliver rules | `packages/simcase/src/simcase/geometry.py:27-38,213-216` | One region with several faces; the same `AREA_EPS` rule | None |
 | Rectangle documents (thermal, electric, Joule, uniform transient) | `packages/simcase/src/simcase/thermal.py:80-99`; `packages/simcase/src/simcase/steady_boundary_contract.py:59-71`; `packages/simcase/src/simcase/electric_joule.py:27-37` | A `2d` component with a domain, no features and a background without a `material` key. `mesh.subdivisions` stays in `mesh`. | None. A 0.2 document keeps today's dispatch by key presence (`packages/simcase/src/simcase/thermal_regions.py:30-36`); in version 1 the background without a `material` key marks the homogeneous body. |
-| `em.cavity3d` boxes and wall keys | `packages/simcase/src/simcase/cavity.py:46,104-145` | A `3d` component with `box` features and later-wins. Default tags are `x0`–`z1`, with the `xmin`–`zmax` aliases. The grid-plane and centroid rules stay mesh checks. | Rename: a box named `background` (legal today, `packages/simcase/src/simcase/cavity.py:121-124`) is renamed. Gain: box names now reach the region complex (today only bounds and material reach the solver, `packages/simcase/src/simcase/cavity.py:400-406`). |
+| `em.cavity3d` boxes and wall keys | `packages/simcase/src/simcase/cavity.py:46,124-209` | A `3d` component with `box` features and later-wins. Default tags are `x0`–`z1`, with the `xmin`–`zmax` aliases. The grid-plane and centroid rules stay mesh checks. | Rename: a box named `background` (legal today, `packages/simcase/src/simcase/cavity.py:121-124`) is renamed. Gain: box names now reach the region complex (today only bounds and material reach the solver, `packages/simcase/src/simcase/cavity.py:400-406`). |
 | PML thickness, bend, grading centre | `packages/simcase/src/simcase/pml_contract.py:18-41`; `packages/simcase/src/simcase/schema.py:351-355` | Unchanged physics and mesh fields | None |
 | Region complexity guard; Studio limits | `packages/simcase/src/simcase/complexity.py:46-93`; `packages/simcase/src/simcase/studio/thermal_regions_api.py:47-60` | Unchanged, counted on features | None |
 | Classic Studio | `packages/simcase/src/simcase/studio/static/index.html:750` | Edits the document, as now | None |
@@ -978,3 +1047,17 @@ listed here too.
   accepted text of the Units section is summarised in place; the rest of the
   frozen text is unchanged. Also: the status sentence and the appendix (not
   frozen sections).
+- 2026-11-27: Stage 5 amendment, approved by the founder on 2026-11-27 (A1–A5).
+  A1: the proposed compile conditions for stage 5 are replaced by the stage 5
+  compile conditions (arrangement; allowed and refused), the code `E-3D-COMBINATION`
+  with its message stems and the mesher route; what stage 5 does not take is refused
+  by name, and a gmshio route is not planned. A2: a default-tags row, 3D through
+  meshloom (`x0`–`z1` on the domain faces, `void` elsewhere), additive only. A3: the
+  hand-off to meshloom is rule H1 (metres, each pm value rounded once; the pm-count
+  proposal is dropped, with the reason). A4: in an `extrude`, a `rect` or `trapezoid`
+  profile's `bottom` and `top` become `y0` and `y1`; no existing document changes. A5:
+  the consumers of `box`, `cylinder` and `sphere`, the "defined, but with no consumer"
+  and "not decided here" lists, the status lines and the consumers table; stale
+  citations fixed (`validation3d.md:44` is now `:45`; `cavity.py:104-145` is now
+  `:124-209` for the cavity boxes and `:144-157` for the 3D domain). The rest of the
+  frozen text is unchanged.

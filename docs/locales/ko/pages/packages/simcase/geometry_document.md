@@ -8,8 +8,11 @@
 형상 블록을 읽으며, 구성 요소마다 `length_unit`을 선언합니다(2026-11-10 보완, [단위](#단위) 참고). [2단계 엔진](geometry_engine.md)이 2D·축대칭
 구성 요소의 영역 구성·선택자·출처 이름을 만들고 버전 1 문서를 메시하며(2026-11-04), 실행기는 아직 복합체
 자체를 읽지 않습니다. 4단계 보완(2026-11-08)이 설계 속도와 위상 탐침을 정하고,
-[`simcase.geometry_velocity`](geometry_engine.md#설계-속도-4단계)가 구현합니다.
-저장소 사실은 `main` `015a6d8`에서 확인했습니다.
+[`simcase.geometry_velocity`](geometry_engine.md#설계-속도-4단계)가 구현합니다. 5단계 보완(2026-11-27)이
+`3d` 구성 요소의 3D 컴파일 조건, meshloom 넘기기, 메시 생성기 경로를 정합니다
+([5단계 컴파일 조건](#5단계-컴파일-조건2026-11-27-보완) 참고). meshloom을 거치는 3D 경로는 meshloom 자체가
+수용되기 전까지 실험 단계입니다. 저장소 사실은 `main` `015a6d8`에서, 5단계 보완의 사실은 `b4177fa`에서
+확인했습니다.
 
 이 문서의 구성은 다음과 같습니다.
 - **동결** 표시 절은 승인 뒤로 고정입니다. 승인본의 SHA-256을 기록했으며, 동결 절은 이제
@@ -32,7 +35,7 @@ OpenPhysics의 모든 물리는 하나의 형상 문서를 참조해야 합니�
   (`packages/sipi/src/sipi/crosssection.py:175-206`,
   `packages/sipi/src/sipi/conductor_mesh.py:59-164`,
   `packages/sipi/src/sipi/plane.py:181-218`)
-- 공동 상자(`packages/simcase/src/simcase/cavity.py:104-145`)
+- 공동 상자(`packages/simcase/src/simcase/cavity.py:124-209`)
 - galerkin 구조 격자 생성기(`packages/galerkin/src/galerkin/mesh.py:81-260`,
   `packages/galerkin/src/galerkin/mesh3d.py:124-161`)
 - Studio 작업공간 파일(`packages/simcase/src/simcase/studio/static/workspace-project.mjs:21-70`)
@@ -51,7 +54,7 @@ OpenPhysics의 모든 물리는 하나의 형상 문서를 참조해야 합니�
 - 현재 표현 대응표
 
 **정의하지만 뒤 단계 전에는 소비자가 없는 것:** FEM의 `path`·`segment`(2단계),
-`cylinder`·`sphere`(5단계).
+`cylinder`·`sphere`(5단계의 슬라이스 3부터 meshloom이 받음, 2026-11-27 보완).
 
 **예약:**
 - 구성 요소·피처 키워드: `periodic`, `ellipse`, `rotation`, `"z"`가 아닌 `axis`, `offset`,
@@ -65,7 +68,7 @@ OpenPhysics의 모든 물리는 하나의 형상 문서를 참조해야 합니�
 **여기서 정하지 않는 것:**
 - 2단계 정확 2D 엔진이나 그 밖의 코드
 - 메시 변형과 adjoint(galerkin 소관)
-- 상자 규칙을 넘는 3D 배열
+- 5단계 조합을 넘는 3D 배열(2026-11-27 보완)
 - 메시 생성기·galerkin의 주기 경계
 - Wavebit 어댑터([3단계 미리보기](#3단계-미리보기-wavebit-동결-아님) 참고)
 - ECAD·STEP 가져오기, 곡면 B-rep·NURBS
@@ -187,10 +190,14 @@ BSD-3-Clause입니다. 실행기 묶음은 shapely를 import하므로(`packages/
 지금 메시와 비트 단위로 같은지는 수용 기준이 아닙니다. 해석해, 독립 기준, 저장값 검사는 지금 기준
 그대로 통과해야 합니다.
 
-**meshloom에 넘기기(meshloom 3D 작업에 대한 제안이며 여기서 정하지 않음).** meshloom은 정수 pm 개수를
-double로(|k| ≤ 2⁵³, 약 9 km까지 정확) 받고 배율을 따로 받습니다. 어떤 형태를 고르든
-`docs/packages/meshine/validation3d.md:44`의 출력 보장은 galerkin이 최종으로 받는 좌표에서 성립해야
-합니다. 여기에는 출력 double에서 정확한 `orient3d > 0`이 포함됩니다.
+**meshloom에 넘기기: 규칙 H1(2026-11-27 보완).**
+- 좌표는 미터로 meshloom에 갑니다. k pm인 정의값마다 `float(Fraction(k, 10**12))`가 되며 한 번만
+  반올림합니다. 그래서 축에 정렬된 평면의 점들은 double 하나를 공유하고, 평면은 정확하게 남습니다.
+- 곡면 위의 점은 meshloom의 빌더가 만듭니다.
+- 출력 보장은 galerkin이 받는 double에서 성립해야 합니다. 모든 사면체의 정확한 `orient3d > 0`과 출력
+  계약 표의 나머지입니다(`docs/packages/meshine/validation3d.md:45`).
+- 버린 것: 앞선 제안은 정수 pm 개수를 double로, 배율을 따로 보내는 것이었습니다. 뒤에 ×1e-12를 하면 모든
+  노드를 다시 반올림하게 되고, 1e-12는 2의 거듭제곱이 아닙니다.
 
 ### 파라미터(동결)
 
@@ -228,7 +235,7 @@ double로(|k| ≤ 2⁵³, 약 9 km까지 정확) 받고 배율을 따로 받습�
   - `main` `015a6d8`에는 축대칭 러너가 없습니다. 브랜치 `codex/axisymmetric-thermal-lens` `2c58b05`는
     확인하지 않았습니다. 그 브랜치가 들어오면 태그 이름을 이 규칙에 맞춥니다.
 - **`3d`**: `domain`은 공동처럼 `{xmin, xmax, ymin, ymax, zmin, zmax}`입니다
-  (`packages/simcase/src/simcase/cavity.py:104-145`).
+  (`packages/simcase/src/simcase/cavity.py:144-157`).
 
 **`background`**는 도메인의 나머지를 채우는 영역입니다. 이름은 `background`이고 예약 이름으로
 남습니다(`packages/simcase/src/simcase/geometry.py:133-136`;
@@ -326,8 +333,12 @@ double로(|k| ≤ 2⁵³, 약 9 km까지 정확) 받고 배율을 따로 받습�
 
 | `type` | 필드 | 부분 |
 |---|---|---|
-| `extrude` | `profile`(`id` 없는 인라인 2D 피처 하나), `zmin, zmax`; `axis: "z"` | `bottom, top`; 옆면은 프로파일 부분 이름(`pad.left`, `via.boundary`) |
+| `extrude` | `profile`(`id` 없는 인라인 2D 피처 하나), `zmin, zmax`; `axis: "z"` | `bottom, top`; 옆면은 프로파일 부분 이름(`pad.left`, `via.boundary`). 다만 `rect`·`trapezoid` 프로파일의 `bottom`·`top`은 `y0`·`y1`이 됨(`pad.y0`, 2026-11-27 보완) |
 | `layers` | `z0`(바닥); `layers: [{name, thickness, material \| footprint + map, region?}]` | 아래 참고 |
+
+**`extrude`의 프로파일 부분(2026-11-27 보완).** `rect`·`trapezoid` 프로파일의 부분 `bottom`·`top`은
+`y0`·`y1`이 됩니다. 그래서 압출한 사각형이 상자처럼 읽히고, 옆면이 뚜껑 `bottom`·`top`과 이름을 나누지
+않습니다. 지금 3D `extrude` 소비자가 없으므로 바뀌는 기존 문서는 없습니다.
 
 `layers` 규칙:
 - **판 층.** `material`이 있고 `footprint`가 없는 층은 도메인 x–y 범위 전체에 걸친 판입니다.
@@ -351,24 +362,68 @@ double로(|k| ≤ 2⁵³, 약 9 km까지 정확) 받고 배율을 따로 받습�
 
 | `type` | 필드 | 부분 | 소비자 |
 |---|---|---|---|
-| `box` | `xmin, xmax, ymin, ymax, zmin, zmax`(공동 형식) | `x0, x1, y0, y1, z0, z1` | 지금 `em.cavity3d`; 5단계부터 meshloom |
-| `cylinder` | `cx, cy, r, zmin, zmax`; `axis: "z"` | `side, bottom, top` | 5단계 전에는 없음 |
-| `sphere` | `cx, cy, cz, r` | `surface` | 5단계 전에는 없음 |
+| `box` | `xmin, xmax, ymin, ymax, zmin, zmax`(공동 형식) | `x0, x1, y0, y1, z0, z1` | `em.cavity3d`; 5단계부터 meshloom |
+| `cylinder` | `cx, cy, r, zmin, zmax`; `axis: "z"` | `side, bottom, top` | 5단계의 슬라이스 3부터 meshloom; 그 전에는 없음 |
+| `sphere` | `cx, cy, cz, r` | `surface` | 5단계의 슬라이스 3부터 meshloom; 그 전에는 없음 |
 
 `docs/packages/meshine/validation3d.md:76-95`가 사전 등록된 3D 사례를 나열하며, 이 사례들은 상자·원통·구를
 씁니다.
 
-**5단계 컴파일 조건 제안(동결 아님).** meshloom 3D 계획과의 합의가 아직 필요합니다.
-- 상자는 겹칠 수 있고 나중 상자가 이깁니다.
-- 원통은 z 방향입니다. 각 뚜껑은 층 평면, 도메인 z 면, 또는 한 영역 안에 놓입니다. 상자 면을 가로지르는
-  곳에서는 뚜껑이 그 면 안에 완전히 들어가야 합니다.
-- 구는 아무것과도 닿지 않습니다. 단독이거나 엄격히 중첩됩니다.
-- 그 밖의 형상은 별도 프로세스 gmshio로 보냅니다. 이는 새 작업이며, 그 경로가 생기기 전에는 피처 이름을
-  밝혀 거부합니다.
-
 **meshloom API 입력으로 남는 것.** 원시 조각선형 복합체, 퍼즈 입력, 임의 double 가져오기 곡면
 (`docs/packages/meshine/validation3d.md:76-95`의 C7, C10, C13, C14)은 형상 문서가 아닙니다. 격자로
 반올림하면 이 사례들이 시험하는 것이 망가집니다.
+
+### 5단계 컴파일 조건(2026-11-27 보완)
+
+이 규칙은 여기 있던 제안("5단계 컴파일 조건 제안", 동결 아님)을 대체합니다. 모든 판정은 반올림하기 전에
+pm 정수에서 정확하게 합니다.
+
+**배열.**
+- 모든 `box`, `extrude`, `cylinder`와 판 층은 수직 프리즘입니다. 판 층은 재료가 있고 발자국이 없는
+  `layers` 항목이며, 정확한 z 높이 사이에서 도메인 x–y 범위 전체를 덮는 상자입니다.
+- 구성 요소를 서로 다른 모든 z 높이에서 자릅니다. 각 판 구간에서 활성 프리즘은 2D "나중 피처가 이김"
+  배열을 이루며, 2단계 정확 2D 엔진이 풀고 도메인으로 자릅니다. 피처 순서는 목록 순서입니다.
+- 수평면은 위아래 셀의 영역이 다르거나 한쪽이 외부인 곳에 있습니다. 그 출처 집합은 그 평면에 놓이고 그
+  면을 포함하는 모든 프리즘 부분을 담습니다. 그 프리즘이 이웃 셀을 가졌는지와 상관없습니다.
+- 수직면은 2D 곡선 × 판 구간이며 곡선의 출처를 가집니다. 이웃한 판 구간의 조각은 곡선, 양쪽 영역,
+  출처 집합이 같고 그 사이에서 곡선과 만나는 수평면이 없을 때 합쳐집니다.
+- 3D에서 `finalize: "imprint"`는 계속 거부합니다.
+
+**받는 것과 거부하는 것.**
+- `box`·`extrude`와 `box`·`extrude`: 어떤 겹침, 닿음, 중첩도 되며 나중 피처가 이깁니다.
+- 원통은 걸치는 모든 판 구간에서 온전한 원이어야 합니다. 직선이나 다른 원에 잘리는 원은 거부하고, 접하는
+  원도 거부합니다. 뚜껑은 면 하나 안에 놓이거나 어떤 면에도 놓이지 않습니다.
+- 원통 둘: 떨어져 있거나, 엄격히 중첩되거나, 같은 원판이 뚜껑끼리 쌓인 경우입니다.
+- 구는 셀 하나 안에 엄격히 들어갑니다. 구의 경계 상자는 어떤 면과도 만나지 않아야 하며, 이는 보수적인
+  판정입니다.
+- 구 둘: 엄격히 떨어져 있거나 엄격히 중첩됩니다.
+- 프리즘을 품는 구: 거부합니다.
+- 다른 피처와 함께 쓴 발자국 `layers`: 거부합니다. 혼자이면 압출 경로를 유지합니다.
+- 3D 곡면에 거는 `mesh.controls` `circle_segments` 항목: 거부합니다.
+- 한 축의 서로 다른 두 정의값이 같은 미터 double로 반올림되는 경우(규칙 H1): 둘 다 밝혀 거부합니다.
+
+그 밖의 것은 이름을 밝혀 거부합니다. gmshio 경로는 계획하지 않습니다.
+
+**`E-3D-COMBINATION`**은 구성 요소가 유효하지만 5단계 조합 밖에 있다는 뜻입니다. `E-CONTRACT`,
+`E-VALUE-FORM`, `E-DOMAIN`과 구별되며, 그 코드들은 뜻이 그대로입니다. 경로는 나중 피처의 `features[i]`입니다.
+메시지 줄기는 고정입니다(메시지는 영어로 나옵니다).
+
+| 경우 | 메시지 줄기 |
+|---|---|
+| 옆면을 가로지르는 원통 | `cylinder {a!r} crosses the side {b}.{part} between z = {z0} and {z1} {unit}; a cylinder must lie inside or outside every side it spans` |
+| 옆면에 접하는 원통 | `cylinder {a!r} touches {b}.{part} at one line; move it inside or away` |
+| 면에 일부만 놓인 뚜껑 | `cap {a}.{bottom\|top} lies partly on {b}.{part}; a cap lies inside one face or on none` |
+| 서로 가로지르는 원통 둘 | `cylinders {a!r} and {b!r} cross between z = {z0} and {z1} {unit}; they must be disjoint, nested or stacked cap to cap` |
+| 면과 만나는 구 | `sphere {a!r} touches or crosses {b}.{part}; a sphere lies strictly inside one region` |
+| 서로 만나는 구 둘 | `spheres {a!r} and {b!r} touch or cross; they must be disjoint or strictly nested` |
+| 프리즘을 품는 구 | `sphere {a!r} contains {b!r}; stage 5 takes spheres inside one region only` |
+| 다른 피처와 함께 쓴 발자국 층 | `layers {a!r} has footprint layers; with other features a 3d component takes slab layers only` |
+| 3D 곡면의 `circle_segments` | `mesh.controls: circle_segments on {sel!r} is not taken for 3d surfaces yet; use size` |
+| 함께 반올림되는 두 값 | `{a}.{part} and {b}.{part} round to the same coordinate {x} m` |
+
+**메시 생성기 경로.** `layers` 피처 하나만 가진 `3d` 구성 요소는 `meshine.extrude` 경로를 그대로
+유지합니다. 그 밖의 모든 `3d` 구성 요소는 meshloom으로 갑니다. 기존 `em.cavity3d` 문서는 지금 경로와 결과를
+유지합니다. meshloom을 거치는 3D 경로는 meshloom 자체가 수용되기 전까지 **실험 단계**입니다.
 
 ## 불리언 규칙(동결)
 
@@ -439,6 +494,7 @@ part       := [A-Za-z0-9_-]+
 | 축대칭 | 같음. `xmin == 0`이면 `left` 대신 `axis` |
 | `meshine.extrude`를 거치는 2.5D | `z0`, `z1`, 발자국 자체의 변 태그, `void`(`packages/meshine/src/meshine/extrude.py:33-60`) |
 | `em.cavity3d` | `x0`–`z1`, 별칭 `xmin`–`zmax`(`packages/simcase/src/simcase/cavity.py:46`) |
+| meshloom을 거치는 3D(5단계, 2026-11-27 추가) | 도메인 면에 `x0`–`z1`; 그 밖의 모든 외부 면은 압출 경로처럼 `void` |
 
 **`boundary_tags`**는 `{"tag": ..., "select": <경계 선택자>}`의 순서 있는 선택 목록입니다.
 - 외부 개체는 그것을 포함하는 첫 항목의 태그를 받습니다. 어느 항목에도 없으면 기본 태그를 유지합니다.
@@ -605,7 +661,7 @@ part       := [A-Za-z0-9_-]+
 | [영역 기계](mechanics2d.md#재료-영역과-이름-있는-경계)(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`) | 2단계 엔진을 거친 `2d` 구성 요소. E·ν·α·k는 `materials`에서, 변위·traction·압력은 영역 열과 같은 경계 이름으로(2026-11-08) | `axisymmetric`; 빈 공간 배경; 변위·traction·압력의 경계면 선택(galerkin은 외부 절점만 고정) |
 | FEM 2.5D(`meshine.extrude`) | `layers`, z 방향 `extrude` | 기울거나 휜 옆면. 압출기는 수직 프리즘만 만듦(`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | 격자면 규칙을 지키는 `box` | 다른 3D 피처 |
-| FEM 3D(meshloom, 5단계) | 5단계 조합 | 그 밖의 모든 것(gmshio 경로가 생길 때까지) |
+| FEM 3D(meshloom, 5단계, 실험 단계) | 단독 `layers` 피처(압출 경로)와 `em.cavity3d` 문서를 뺀 모든 `3d` 구성 요소: [5단계 조합](#5단계-컴파일-조건2026-11-27-보완) | 그 밖의 모든 것, 이름을 밝혀 거부(`E-3D-COMBINATION`); gmshio 경로는 계획하지 않음 |
 | sipi | 어댑터를 거친 `2d` 구성 요소. 어댑터는 sipi의 겹침 거부를 유지(`packages/sipi/src/sipi/crosssection.py:216-239`) | — |
 | Wavebit RCWA·FDTD | 3단계 보완이 정의 | — |
 
@@ -706,7 +762,7 @@ sipi에서 옮기는 방식:
 | 가려진 원(128각형) | `packages/simcase/src/simcase/geometry.py:46` | `circle`. 불리언 뒤의 원호는 2단계에서 | 문서에서는 없음. 2단계 전까지 메시는 여전히 다각형을 씀 |
 | MultiPolygon 영역; 슬리버 규칙 | `packages/simcase/src/simcase/geometry.py:27-38,213-216` | 면이 여럿인 영역 하나; 같은 `AREA_EPS` 규칙 | 없음 |
 | 사각형 문서(열, 전기, 줄, 균일 과도) | `packages/simcase/src/simcase/thermal.py:80-99`; `packages/simcase/src/simcase/steady_boundary_contract.py:59-71`; `packages/simcase/src/simcase/electric_joule.py:27-37` | 도메인만 있고 피처가 없으며 배경에 `material` 키가 없는 `2d` 구성 요소. `mesh.subdivisions`는 `mesh`에 남음 | 없음. 0.2 문서는 지금처럼 키 유무로 가름(`packages/simcase/src/simcase/thermal_regions.py:30-36`). 버전 1에서는 `material` 키가 없는 배경이 균질체 표시 |
-| `em.cavity3d` 상자와 벽 키 | `packages/simcase/src/simcase/cavity.py:46,104-145` | `box` 피처와 나중 피처 우선 규칙을 쓰는 `3d` 구성 요소. 기본 태그 `x0`–`z1`, 별칭 `xmin`–`zmax`. 격자면·중심점 규칙은 메시 검사로 남음 | 이름 변경: `background`라는 상자(지금은 허용, `packages/simcase/src/simcase/cavity.py:121-124`)는 이름이 바뀜. 이득: 상자 이름이 이제 영역 구성까지 감(지금은 경계와 재료만 솔버에 전달, `packages/simcase/src/simcase/cavity.py:400-406`) |
+| `em.cavity3d` 상자와 벽 키 | `packages/simcase/src/simcase/cavity.py:46,124-209` | `box` 피처와 나중 피처 우선 규칙을 쓰는 `3d` 구성 요소. 기본 태그 `x0`–`z1`, 별칭 `xmin`–`zmax`. 격자면·중심점 규칙은 메시 검사로 남음 | 이름 변경: `background`라는 상자(지금은 허용, `packages/simcase/src/simcase/cavity.py:121-124`)는 이름이 바뀜. 이득: 상자 이름이 이제 영역 구성까지 감(지금은 경계와 재료만 솔버에 전달, `packages/simcase/src/simcase/cavity.py:400-406`) |
 | PML 두께, 굽힘, 등급 중심 | `packages/simcase/src/simcase/pml_contract.py:18-41`; `packages/simcase/src/simcase/schema.py:351-355` | 그대로인 물리·메시 필드 | 없음 |
 | 영역 복잡도 검사; Studio 한도 | `packages/simcase/src/simcase/complexity.py:46-93`; `packages/simcase/src/simcase/studio/thermal_regions_api.py:47-60` | 그대로, 피처 기준으로 셈 | 없음 |
 | 기존 Studio | `packages/simcase/src/simcase/studio/static/index.html:750` | 지금처럼 문서를 편집 | 없음 |
@@ -820,3 +876,12 @@ sipi에서 옮기는 방식:
   구조와 버전 절이 그렇게 적으며, JSON 계약 문구는 봉투가 `"0.3"`이고 형식 0.2 문서는 이름을 밝혀 거부한다고
   적음. 단위 절의 승인 본문은 그 자리에 요약하고, 나머지 동결 본문은 그대로. 상태 문장과 부록도 고침(동결 절
   아님).
+- 2026-11-27: 5단계 보완(2026-11-27 사용자 승인, A1–A5). A1: 5단계 컴파일 조건 제안을 5단계 컴파일
+  조건(배열; 받는 것과 거부하는 것), 메시지 줄기가 있는 코드 `E-3D-COMBINATION`, 메시 생성기 경로로 대체.
+  5단계가 받지 않는 것은 이름을 밝혀 거부하고 gmshio 경로는 계획하지 않음. A2: 기본 태그 표에 meshloom을
+  거치는 3D 행 추가(도메인 면에 `x0`–`z1`, 그 밖에 `void`), 추가만 함. A3: meshloom 넘기기를 규칙 H1로
+  정함(미터, pm 값마다 한 번 반올림; pm 개수 제안은 이유와 함께 버림). A4: `extrude`에서 `rect`·`trapezoid`
+  프로파일의 `bottom`·`top`이 `y0`·`y1`이 됨. 바뀌는 기존 문서는 없음. A5: `box`·`cylinder`·`sphere`의
+  소비자, "정의하지만 소비자가 없는 것"과 "여기서 정하지 않는 것" 목록, 상태 문장, 소비자 표를 고치고 낡은
+  인용을 바로잡음(`validation3d.md:44`는 이제 `:45`, `cavity.py:104-145`는 공동 상자에 대해 `:124-209`, 3D
+  도메인에 대해 `:144-157`). 나머지 동결 본문은 그대로.
