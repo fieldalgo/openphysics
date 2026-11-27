@@ -238,6 +238,9 @@ G8 and G9 run on main pushes and manual dispatch only (`geometry3d-full`).
   features they are refused until a later slice. Cylinders and spheres only in the four
   builder shapes, with one element size; general cylinders and spheres in a later-wins
   arrangement wait for meshloom's composable samplers.
+- Builder-shaped components are meshed by `build_mesh3d`, but `evaluate3d` and
+  `display_complex3d` refuse them by name (no exact complex of a sampled surface is built
+  yet), so a 3D view cannot draw them yet.
 - One size per region; no graded sizes or sizes on surfaces yet.
 - Pieces thinner than about 1e-7 of the diagonal, though above the tolerance, can make meshloom
   not return: two boxes with a face offset by 862 pm (6e-8 of a 14.4 mm diagonal) at h = 0.8 mm
