@@ -74,6 +74,13 @@ enum Cell {
 /// that lie on them. Two pieces then meet only in shared faces, or the input is
 /// invalid; and every piece shared by two cells must lie in a cell contained in both.
 pub fn check(plc: &Plc) -> Result<Checked, InputError> {
+    let clock = crate::recovery::StageClock::start();
+    let r = check_inner(plc);
+    clock.lap("PLC check");
+    r
+}
+
+fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     let malformed = |m: String| InputError::new(None, m);
     let bad = |w: u8, m: String| InputError::new(Some(w), m);
     let pts = &plc.points;
