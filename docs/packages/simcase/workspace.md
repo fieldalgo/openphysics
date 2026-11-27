@@ -524,6 +524,11 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    run's inputs (the newest such run, as for *has the results of the current inputs*; *Current
    inputs are Run 3's.* for a run without a name), else *Current inputs (650 × 300 nm) have no run
    yet.*; nothing is added when the model has no runs. The heated model's messages are unchanged.
+   Since round 34 (M2) a line that names more than one model (the project open line and the
+   two-model restore line) starts that sentence with the optical model's title as the line names
+   it: *Optical waveguide: current inputs are Run 2 · Design B's.*, *Optical waveguide: current
+   inputs are Run 3's.* or *Optical waveguide: current inputs (650 × 300 nm) have no run yet.*; a
+   line that names one model keeps *Current inputs are Run 2 · Design B's.*
    The header holds the one save indicator, and the footer repeats it word for word: the
    current file's name and its state, *design-a.json · downloaded 03:42* (or *design-a.json
    · saved 03:42* after the save dialog's write) until the next edit or run, then *design-a.json ·

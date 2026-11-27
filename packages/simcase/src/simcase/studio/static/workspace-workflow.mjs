@@ -288,11 +288,13 @@ export const HAS_RESULTS_INPUTS='has the results of the current inputs';
 // browser: the newest run whose study signature is that of the current inputs (the comparison behind
 // HAS_RESULTS_INPUTS), as "Current inputs are Run 2 · Design B's.", else the save message's words
 // "Current inputs (650 × 300 nm) have no run yet."; nothing without runs, as the save says nothing then.
-export function currentInputsText(runs,signature,geometry){
+// Round 34 (M2): in a line that names more than one model, model is the optical model's title as that
+// line names it, and the sentence starts with it: "Optical waveguide: current inputs are Run 2 · Design B's."
+export function currentInputsText(runs,signature,geometry,model=''){
  if(!runs.length)return '';
- const own=runs.findLastIndex(r=>r.signature===signature);
- if(own<0)return `Current inputs (${geometry}) have no run yet.`;
- const r=runs[own];return `Current inputs are ${runTitle(Number.isInteger(r.number)?r.number:own+1,r.label||'')}'s.`;
+ const own=runs.findLastIndex(r=>r.signature===signature),lead=model?`${model}: current inputs`:'Current inputs';
+ if(own<0)return `${lead} (${geometry}) have no run yet.`;
+ const r=runs[own];return `${lead} are ${runTitle(Number.isInteger(r.number)?r.number:own+1,r.label||'')}'s.`;
 }
 // Round 20 (Z1): an edit that leaves the inputs equal to a run's says only that no run is needed:
 // the edit's own sentence stays and its request to run ("Run explicitly to compute new results.",

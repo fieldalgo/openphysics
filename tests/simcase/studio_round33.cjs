@@ -40,12 +40,12 @@ test('M1: the open, restore, project open and two-model restore messages carry t
  const app=read('workspace-app.mjs');
  // the optical model's own inputs, also while the multiphysics model is shown (its placeholder physics are not them)
  assert.ok(app.includes("const opticalInputsNow=()=>mpFlags&&workspacePhysics?snapshot({...state,...workspacePhysics},setup):current();"));
- assert.ok(app.includes("return currentInputsText(runs,studySignature(input,state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()),geometryWords(input.model));"));
+ assert.ok(app.includes("return currentInputsText(runs,studySignature(input,state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()),geometryWords(input.model),model);"));
  // the optical open and restore line (one notice for both)
  assert.ok(app.includes("'File › Save keeps it in a file; input undo starts here.')));appendCurrentInputs();"));
  // the project open line, and the two-model restore line (after the second model's restore)
- assert.ok(app.includes("Results were read from the file, not recomputed; nothing was run.`);if(ws)appendCurrentInputs();"));
- assert.ok(app.includes("const options={then:()=>{done();appendCurrentInputs();}"));
+ assert.ok(app.includes("Results were read from the file, not recomputed; nothing was run.`);if(ws)appendCurrentInputs(mp?ws.title:'');"));
+ assert.ok(app.includes("const options={then:()=>{done();appendCurrentInputs(opticalTitle);}"));
  // the heated model's messages are not changed
  assert.ok(!read('workspace-multiphysics-view.mjs').includes('currentInputs'));
 });

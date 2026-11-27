@@ -426,7 +426,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    광학 모델 부분)은 그 입력을 밝히는 문장 하나로 끝납니다: 실행의 입력과 같으면 *Current inputs are Run 2 · Design B's.*
    (그런 실행 중 가장 새것으로, *has the results of the current inputs*와 같은 비교; 이름 없는 실행이면 *Current inputs are
    Run 3's.*), 아니면 *Current inputs (650 × 300 nm) have no run yet.*입니다. 모델에 실행이 없으면 아무것도 붙지 않습니다.
-   가열 모델의 메시지는 바뀌지 않습니다. 저장 표시는
+   가열 모델의 메시지는 바뀌지 않습니다. 34차(M2)부터 모델을 둘 이상 밝히는 줄(프로젝트 열기 줄과 두 모델 복원 줄)은
+   그 문장을 그 줄이 쓰는 광학 모델 제목으로 시작합니다: *Optical waveguide: current inputs are Run 2 · Design B's.*,
+   *Optical waveguide: current inputs are Run 3's.* 또는 *Optical waveguide: current inputs (650 × 300 nm) have no run
+   yet.* 모델 하나를 밝히는 줄은 *Current inputs are Run 2 · Design B's.*를 그대로 씁니다. 저장 표시는
    헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 현재 파일 이름과 상태가 나오며,
    다음 편집이나 실행 전까지 *design-a.json · downloaded 03:42*(저장 대화상자로 쓴 뒤에는
    *design-a.json · saved 03:42*), 그 뒤에는 *design-a.json · changed since downloaded*(저장 대화상자로 쓴

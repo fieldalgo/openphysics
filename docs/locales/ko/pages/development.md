@@ -639,7 +639,8 @@ find 3)이 *Browser recovery updated …*로 쓰이고 헤더나 상태 표시�
 Open project를 하면 실행 목록, 내보내기 줄과 **Pin Run 2**, *No need to run: Run 5*, Compare 선택 목록이 전과 같은
 번호를 읽고, 번호 문장은 없으며, 다음 실행은 Run 22입니다. 브라우저를 다시 닫고 **Restore newest from this browser**로
 두 모델을 복원하면 광학과 가열 번호가 같고, *Restored Optical waveguide (20 runs) and Heated silicon waveguide (1 run)
-from this browser, not recomputed. Current inputs are Run 5's.*(33차 M1: 현재 입력을 밝히는 문장; 입력은 560 nm인 Run 5의 것),
+from this browser, not recomputed. Optical waveguide: current inputs are Run 5's.*(33차 M1: 현재 입력을 밝히는 문장; 입력은 560 nm인 Run 5의 것;
+34차 M2: 두 모델 줄은 광학 모델을 먼저 밝힘),
 헤더 *both-models · recovered from this browser · changed since both-models.json, not
 saved · kept for recovery in this browser*(23차 E5; 전에는 *… · not saved to a file · …*, 복구가 복원한 세션을 보존한 뒤
 읽음)입니다. 다음 변경 뒤에는 *both-models · changed since both-models.json, not saved · kept for recovery in this browser*
