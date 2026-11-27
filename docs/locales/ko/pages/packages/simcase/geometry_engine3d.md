@@ -41,9 +41,12 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 
 `simcase.geometry_engine3d.evaluate3d(model, component=None)`은 `simcase.geometry_document.parse`로 읽은
 모델의 영역 구성만 돌려줍니다. 압출 경로로 메시되는, `layers` 피처 하나만 가진 구성 요소는 거부합니다. 표시용(Studio)
-`simcase.geometry_engine3d.display_complex3d(model, component=None)`은 그런 구성 요소를 포함해 슬라이스 1이 받는 모든
+`simcase.display_complex3d(model, component=None)`은 그런 구성 요소를 포함해 슬라이스 1이 받는 모든
 `3d` 구성 요소의 정확한 영역 구성, 곧 meshloom 경로가 만들 구성을 돌려줍니다. 아무것도 메시하지 않으며
-`build_mesh3d`가 하거나 거부하는 것을 바꾸지 않습니다.
+`build_mesh3d`가 하거나 거부하는 것을 바꾸지 않습니다. `model`은 `simcase.parse_geometry`가 돌려주는 것이고,
+`3d` 구성 요소가 정확히 하나이면 `component`를 생략할 수 있습니다(옆의 2d 발자국은 괜찮음). 모르는 이름, `2d`나
+축대칭 구성 요소, `3d` 구성 요소가 없거나 여럿인데 이름을 생략한 경우는 이름을 밝혀 거부합니다
+(`geometry.components.<name>`에서 `E-CONTRACT`).
 
 ## 만드는 것
 

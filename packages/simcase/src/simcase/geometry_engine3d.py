@@ -253,8 +253,29 @@ def display_complex3d(model: GeometryModel, component: str | None = None) -> Com
     """The exact 3D complex of any ``3d`` component slice 1 takes, for display: ``evaluate3d``'s
     complex, and for a component holding one ``layers`` feature of slab layers (which is meshed on
     the ``meshine.extrude`` route) the same complex the meshloom route would build. It meshes nothing
-    and does not change what ``build_mesh3d`` does or refuses."""
-    return _evaluate(_pick(model, component), through_meshloom=True)
+    and does not change what ``build_mesh3d`` does or refuses.
+
+    ``model`` is what ``simcase.parse_geometry`` returns; ``component`` names the component, and may
+    be left out when the model has exactly one ``3d`` component (2d footprint components beside it
+    are allowed). An unknown name, a ``2d`` or axisymmetric component, and an omitted name with no
+    or several ``3d`` components are refused by name (``E-CONTRACT`` at
+    ``geometry.components.<name>``)."""
+    comps = model.components
+    if component is None:
+        three = [n for n, c in comps.items() if c.dimension == "3d"]
+        if len(three) != 1:
+            raise GeometryError(f"name a 3d component: the model has {len(three)} ({three}); components "
+                                f"{sorted(comps)}", path="geometry.components")
+        component = three[0]
+    if component not in comps:
+        raise GeometryError(f"geometry.components.{component}: no component {component!r}; the model has "
+                            f"{sorted(comps)}", path=f"geometry.components.{component}")
+    comp = comps[component]
+    if comp.dimension != "3d":
+        raise GeometryError(f"geometry.components.{component}: component {component!r} is {comp.dimension}; "
+                            "display_complex3d takes a 3d component (2d and axisymmetric components go through "
+                            "simcase.evaluate_geometry)", path=f"geometry.components.{component}.dimension")
+    return _evaluate(comp, through_meshloom=True)
 
 
 def _evaluate(comp: Component, *, through_meshloom: bool) -> Complex3D:
