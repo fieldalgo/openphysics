@@ -25,6 +25,7 @@ supported. In particular, optical dispersion models do not define thermal or ele
 - [gmshio — Gmsh meshes for the galerkin engine, without linking to Gmsh](../packages/gmshio/overview.md)
 - [Geometry document: stage 0 contract](../packages/simcase/geometry_document.md)
 - [Reading version 1 geometry (stage 1)](../packages/simcase/geometry_reader.md)
+- [3D boxes and slab layers through meshloom (stage 5, experimental)](../packages/simcase/geometry_engine3d.md)
 - [Tutorial: analyse your own waveguide](../packages/simcase/waveguide_tutorial.md)
 
 
