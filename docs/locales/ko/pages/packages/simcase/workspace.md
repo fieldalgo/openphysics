@@ -78,7 +78,7 @@ Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 �
 
 | 종류 | 담는 것 | 이름 | 만드는 명령 |
 |---|---|---|---|
-| 프로젝트 파일 | 탭의 모든 모델을 각각 세션 파일로 한 파일에(버전 1, [프로젝트 파일](#프로젝트-파일)). | Save As에서 고른 이름, 이름 없는 프로젝트에는 `untitled-project.json` 제안 | **File › Save**, **Save As…** |
+| 프로젝트 파일 | 탭의 모든 모델을 각각 세션 파일로 한 파일에(버전 1, [3D 모델](#3d-모델실험적)이 있으면 버전 2, [프로젝트 파일](#프로젝트-파일)). | Save As에서 고른 이름, 이름 없는 프로젝트에는 `untitled-project.json` 제안 | **File › Save**, **Save As…** |
 | 세션 파일 | 한 모델의 입력과 완료한 실행, 실행 이름과 고정, 비교(광학, 버전 9, [열린 경계](#광학-작업-공간의-열린-경계)가 있으면 10), 정상 열과 Joule 가열의 입력, 또는 실행과 히터 없는 결과를 포함한 다중물리 모델(버전 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, 또는 고른 이름 | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
 | 모델 파일 | 모델 입력만: 실행도 계산 결과도 없음(광학, 정상 열, Joule 가열 입력, 버전 7 또는 8, 열린 경계가 있으면 9, 또는 다중물리 문서). | 모델 이름. 예: `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | 브라우저 초안 | 광학 입력, 이 브라우저에만(파일 아님). | — | **File › Browser copy › Save browser draft** |
@@ -149,7 +149,7 @@ this name or another.*(round 17). 저장 선택 창에서 기억한 파일은 �
 **프로젝트 파일**은 Studio 탭의 모든 모델을 담으므로, 파일 하나로 광 도파로와 가열 실리콘 도파로를 실행과
 함께 되돌립니다. **File › Save**와 **Save As…**가 쓰고 **File › Open…**이 읽습니다. 프로젝트에는 작업 공간
 모델(광학, 정상 열 또는 Joule 가열 입력과 광학 실행)이 그 카드를 고르거나 작업 공간 파일을 연 때부터, 다중물리
-모델이 그것을 연 때부터 들어갑니다.
+모델이 그것을 연 때부터, [3D 모델](#3d-모델실험적)이 그 카드를 고르거나 그 세션 파일을 연 때부터 들어갑니다.
 
 **탭의 프로젝트.** 제목 표시줄은 저장 표시의 말로 프로젝트와 그 파일을 알립니다.
 
@@ -197,9 +197,9 @@ runs (session file)…**에만 나옵니다.
 작업 공간, 실행, Undo는 그대로입니다. 검사 순서:
 
 1. 텍스트를 해석하기 전에 크기(64 MiB 이하), 그다음 올바른 JSON(맨 앞 byte order mark는 뺌)
-2. 바깥 구조: `format`, `version`(더 새 버전은 이름을 들어 거부: *This project file is version 2, newer than
-   this Studio reads (version 1). Open it in a newer Studio.*), 모르는 키 없음, 형식, id가 겹치지 않는 1–8개
-   모델, 작업 공간 모델은 많아야 하나, `active`가 그중 하나를 가리킴
+2. 바깥 구조: `format`, `version` 1 또는 2(더 새 버전은 이름을 들어 거부: *This project file is version 3, newer
+   than this Studio reads (version 2). Open it in a newer Studio.*), 모르는 키 없음, 형식, id가 겹치지 않는 1–8개
+   모델, 작업 공간 모델은 많아야 하나, 3D 모델(종류 `model3d`, 버전 2에서만)도 많아야 하나, `active`가 그중 하나를 가리킴
 3. 모델마다 종류와 세션 버전, 파일에서 다시 만든 세션 텍스트의 크기와 SHA-256(*Heated silicon waveguide changed
    after it was saved (its check value does not match).*), 그리고 세션 파일처럼 읽은 세션. 메시지마다 모델
    제목이 앞에 붙음
@@ -240,7 +240,10 @@ File › Save하면 저장한 모든 모델의 브라우저 복구 기록이, �
 바이트까지 같습니다(버전 7은 `JSON.stringify`, 버전 8과 9는 음의 0을 `-0.0`으로 유지). `bytes`와 `digest`는 그
 텍스트의 UTF-8 길이와 `sha256:`입니다. 손상되거나 편집된 파일을 찾을 뿐 인증하지는 않으며, 버전 8과 9 안의 실행별
 digest도 마찬가지입니다. 모델 하나는 16 MiB 이하라서 모든 모델을 이전 Studio가 여는 세션 파일로 여전히 내보낼
-수 있습니다. 버전 1에 없는 것: 모델 사이의 비교, 정상 열과 Joule 가열 결과(입력은 작업 공간 모델에 있음), undo
+수 있습니다. **버전 2**(결정 F1)는 버전 1에 종류 `model3d`(카드 `layer-stack-3d`)를 더한 것이며, 그 세션은 3D
+모델의 세션 파일(`application` `"model3d"`, 자체 버전 1)입니다. Studio는 3D 모델이 있는 프로젝트만 버전 2로 쓰고,
+없는 프로젝트는 전처럼 바이트까지 같은 버전 1로 씁니다. 버전 1 파일은 전처럼 읽습니다(버전 1 파일 안의 `model3d`
+항목은 *of an unknown kind*). 버전 1에 없는 것: 모델 사이의 비교, 정상 열과 Joule 가열 결과(입력은 작업 공간 모델에 있음), undo
 기록, provider 목록, 실패하거나 멈춘 실행. 브라우저 복구는 전처럼 모델마다 기록하며 프로젝트 전체를 복원하지
 않습니다.
 
@@ -256,6 +259,67 @@ with runs (session file)…**은 이전 Studio도 여는 파일을 씁니다.
 *Heater study*와 제안 이름 `heater-study.json`으로 Save As, 서버 재시작과 새 브라우저 프로필, File › Open, 두 모델이 실행 없이 같은 값을 다시 읽음(V-P7,
 V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`에서 바꾼 저장 대화상자(V-P10), 손상된 파일
 세 개를 탭 그대로 거부(V-P3). `--old-python`을 주면 이전 Studio에서 파일을 여는 것(V-P9)도 봅니다.
+
+## 3D 모델(실험적)
+
+상태: **실험적.** Library의 **3D models (experimental)** 묶음에 카드 **Via in a layer stack (3D heat)**
+(`layer-stack-3d`)가 응용 카드들 옆에, 그 사이가 아니라 따로 있습니다. µm 단위, 200 × 200 µm 영역의 3d 구성 요소이며,
+`layers` 특징 `stack` 하나(기판 Si 500 µm, k = 130 W/(m K); 산화막 SiO2 10 µm, k = 1.4 W/(m K); 위 실리콘 Si 100 µm)와
+산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어 있습니다.
+원기둥이 오기 전까지 via는 정사각형입니다: *Square via (a round via needs cylinders, coming with the next geometry
+step)*. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는 그
+모델로 돌아갑니다. 3D 모델에는 아직 메시, 실행, 결과가 없습니다. **Mesh**와 **Run**은 이유와 함께 꺼진 채 보입니다.
+
+**트리.** **Parameters**; **Component 1** 아래 **Geometry 1**, **Domain**, 순서대로 번호 붙은 특징(*1 Layers stack*,
+*2 Box via*)과 **Form result**, 그다음 **Materials**; 그리고 **Selections**. 특징 행은 서버가 정확한 complex에서 계산한
+덮임 말을 붙입니다: *covered in part by 2*, 또는 나중 특징이 전부 차지하면 *covered by 2, 3; adds no region*. Geometry 1의
+**Add feature**는 **Box**와 **Layers**를 내놓고, **Extrude**, **Cylinder**, **Sphere**는 이유와 함께 흐리게 보입니다
+(*Cylinder is not taken yet in a 3d component; coming with the next geometry step.*). 특징 설정에는 **Move up**,
+**Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**가 있고, 삭제 뒤 Messages가 **Undo**를
+내놓습니다. 끌어 옮기기는 없습니다.
+
+**칸.** 길이 칸마다 구성 요소 단위의 수, 물리량(`0.1 mm`), 매개변수 이름 또는 식(`100 - w / 2`)을 받습니다. 수나
+물리량이면 칸 옆에 SI 값을 보입니다. 저장할 수 없는 값(빈 칸, 모르는 단위, 0 이하의 두께)은 이유와 **Restore last
+valid value**가 붙은 강조된 초안으로 남습니다. 초안이 있는 동안 File › Save, Save As, Export는 꺼지고, Mesh와 Run은
+초안을 이유로 밝힙니다. **Parameters** 표는 매개변수마다 값, SI 값, 그것을 쓰는 칸의 수(서버 검사에서)를 보입니다.
+쓰이는 매개변수는 지우지 않으며, 거부는 쓰는 곳을 밝힙니다: *w is used by 2 Box via, xmax and 2 Box via, xmin;
+change those first.*
+
+**편집마다 검사합니다.** 문서 전체가 `POST /api/model3d/check`로 갑니다([3D 보기](studio_3d.md#보내는-것과-응답)).
+거부는 Messages에 엔진의 말 그대로 보이고, 그 코드와 경로는 **Details** 아래에 있습니다(예: *sphere 'ball' is not taken
+yet in a 3d component; boxes and slab layers are* · `geometry.components.c.features[2]`의 `E-3D-COMBINATION`). 트리는
+거부가 가리키는 특징을 표시하고, 보기는 만들 수 있었던 마지막 형상을 흐리게 *Last shape that could be formed*라는 이름과
+함께 유지하며, Mesh와 Run은 *The geometry cannot be formed: fix the problem shown in Messages.*라고 말합니다.
+
+**보기와 선택.** 보기는 [3D 보기](studio_3d.md)와 그 조작입니다(보기에서 화살표는 회전, Shift+화살표는 이동, +와 −는
+확대·축소, F는 맞춤, 1–6은 축 방향 보기, 0은 등각). 보기에서 고르거나 **Faces** 목록에서 고른(Tab, Enter) 면은 그
+이름들을 보입니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
+`selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은
+선택으로 만들지 않고 그렇게 말합니다.
+
+**Undo.** 3D 모델은 다른 모델과 따로 문서 기록 하나를 갖습니다(Ctrl+Z와 Ctrl+Y는 보이는 모델을 따름). 페이지, 트리의
+선택, 고른 면, 카메라는 기록에 없습니다.
+
+**파일.** File › Save는 3D 모델 항목과 함께 프로젝트 파일을 버전 2로 씁니다. **File › Export › Model with runs (session
+file)…**는 3D 모델만 세션 파일로 씁니다(결정 F2):
+`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, 세션 한도 16 MiB. 지금은
+문서를 담고, 실행은 나중 버전에서 옵니다. File › Open은 둘 다 읽습니다. `application`이 `"model3d"`인 세션 파일은 광학과
+다중물리 세션의 버전 규칙보다 먼저 자체 규칙으로 읽으며, 그 규칙은 바뀌지 않습니다(단위 배치 이전의 버전 1 파일은 거부를
+유지). 3D 모델은 아직 브라우저 복구에 보관하지 않습니다.
+
+**검사.** 측정 전에 미리 정했습니다:
+
+| 검사 | 무엇 | 기준 | 측정 | 위치 |
+|---|---|---|---|---|
+| W4 | 카드의 목록 면 10개(`stack.sub.domain.x0`, `stack.oxide.domain.y1`, `stack.top.domain.x1`, `stack.top.top`, `via.x0`, `via.x1`, `via.y0`, `via.y1`, `via.z0`, `via.z1`)를 골라 Use for → New selection; 쓴 선택과 손으로 친 목록 이름이 고른 면으로 풀림(서버: `build_mesh3d`를 거쳐 고른 면의 메시 면으로) | 10/10 | 10/10(서버와 브라우저; 보기에서 둘, 면 목록에서 여덟) | `tests/simcase/test_studio_model3d_check.py`, `tools/studio_browser/model3d_builder_browser.mjs` |
+| W5 | 검사가 내는 E-3D-COMBINATION 줄기마다 문서 하나(footprint layers만; 다른 특징 옆; extrude, cylinder, sphere 아직 받지 않음): Messages에 엔진의 말, Details에 코드, features[i]의 트리 표시 | 100% | 5/5. 줄기 "… round to the same coordinate"와 circle_segments는 메시할 때 `build_mesh3d`에서 나옴(나중 단계) | 같음 |
+| W11(실행 없음) | Save와 Open 뒤 문서 digest, 프로젝트와 세션; 3D 없는 버전 1 프로젝트는 전처럼 바이트까지 같게 씀 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음(커밋된 `project-v1.json`을 바이트까지 같게 다시 씀) | `tests/simcase/studio_model3d_files.cjs`, 브라우저 검사 |
+| W12 | Library와 카드를 연 Model, 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록에 닿음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 브라우저 검사 |
+| W13(B 부분) | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → New selection | 포인터 이벤트 없음 | 포인터 이벤트 0 | 브라우저 검사 |
+
+순수 도우미(`workspace-model3d.mjs`)는 `tests/simcase/studio_model3d_builder.cjs`가 검사합니다. 브라우저 검사는
+로컬입니다(실행 가능한 Chromium과 Playwright, CI에는 없음). 실행 중인 Studio에 대해
+`node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`로 실행합니다.
 
 ## 첫 광학 해석
 

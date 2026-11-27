@@ -431,9 +431,9 @@ try {
     assert.equal(message, expected); assert.deepEqual(after, before, name + ': the tab unchanged');
   }
   // a project file newer than this Studio
-  { const file = join(out, 'project-v2.json'); await writeFile(file, once(goodText, '"version":1,', '"version":2,'), 'utf8');
+  { const file = join(out, 'project-v3.json'); await writeFile(file, once(goodText, '"version":1,', '"version":3,'), 'utf8');
     await page.eval("document.getElementById('file-status').textContent=''"); await openFile(file); await page.until("/^Project not opened: /.test(document.getElementById('file-status').textContent)", 'newer version');
-    assert.equal(await status(), 'Project not opened: This project file is version 2, newer than this Studio reads (version 1). Open it in a newer Studio. The current project is unchanged.'); }
+    assert.equal(await status(), 'Project not opened: This project file is version 3, newer than this Studio reads (version 2). Open it in a newer Studio. The current project is unchanged.'); }
 
   // V-P10: the save picker, stubbed at window.showSaveFilePicker with navigator.webdriver false
   await page.eval("Object.defineProperty(navigator,'webdriver',{get:()=>false,configurable:true})");

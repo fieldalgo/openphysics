@@ -87,7 +87,7 @@ What each kind of file holds:
 
 | Kind | Holds | Named | Made by |
 |---|---|---|---|
-| Project file | Every model of the tab, each as its session file, in one file (version 1, [Project files](#project-files)). | The name chosen in Save As, `untitled-project.json` suggested for an untitled project | **File › Save**, **Save As…** |
+| Project file | Every model of the tab, each as its session file, in one file (version 1, or version 2 with a [3D model](#3d-models-experimental); [Project files](#project-files)). | The name chosen in Save As, `untitled-project.json` suggested for an untitled project | **File › Save**, **Save As…** |
 | Session file | One model's inputs with its completed runs, their names and pins and the comparison (optical, version 9, or 10 with an [open boundary](#open-boundary-in-the-optical-workspace)); the inputs of steady heat and Joule heating; or a multiphysics model with its runs and without-heater results (version 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, or the name chosen | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
 | Model file | The model's inputs only: no runs and no computed results (optical, steady heat and Joule heating inputs, version 7 or 8, or 9 with an open boundary; or a multiphysics document). | After the model, for example `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | Browser draft | The optical inputs, in this browser only (not a file). | — | **File › Browser copy › Save browser draft** |
@@ -177,7 +177,8 @@ A **project file** holds every model of a Studio tab, so one file brings back th
 and the heated silicon waveguide with their runs. **File › Save** and **Save As…** write it, and
 **File › Open…** reads it. A project holds the workspace model (the optical, steady heat or Joule
 heating inputs, with the optical runs) once one of its cards was chosen or a workspace file opened,
-and the multiphysics model once one was opened.
+and the multiphysics model once one was opened, and the [3D model](#3d-models-experimental) once its
+card was chosen or its session file opened.
 
 **The project in the tab.** The title bar names the project and its file in the words of the
 indicator:
@@ -232,9 +233,10 @@ tab changes; one failure refuses the whole file with *Project not opened: <reaso
 is unchanged.*, and the workspace, its runs and Undo stay as they were. The checks, in order:
 
 1. the size, at most 64 MiB, before the text is parsed; valid JSON, a leading byte order mark removed;
-2. the envelope: `format`, `version` (a newer one is refused by name: *This project file is version 2,
-   newer than this Studio reads (version 1). Open it in a newer Studio.*), no unknown key, the types,
-   1 to 8 models with unique ids, at most one workspace model, and `active` naming one of them;
+2. the envelope: `format`, `version` 1 or 2 (a newer one is refused by name: *This project file is
+   version 3, newer than this Studio reads (version 2). Open it in a newer Studio.*), no unknown key,
+   the types, 1 to 8 models with unique ids, at most one workspace model, at most one 3D model (kind
+   `model3d`, version 2 only), and `active` naming one of them;
 3. for each model, its kind against its session's version, then the session's text rebuilt from the
    file and its size and SHA-256 compared with the entry's (*Heated silicon waveguide changed after it
    was saved (its check value does not match).*), then the session read as a session file is, every
@@ -282,7 +284,11 @@ unchanged: written alone by its writer it is byte for byte the session file Stud
 through `JSON.stringify`, versions 8 and 9 with negative zero kept as `-0.0`). `bytes` and `digest`
 are the UTF-8 length and `sha256:` of that text. They detect a damaged or edited file; they do not
 authenticate it, as the per-run digests inside versions 8 and 9 do not. Each model is at most 16 MiB,
-so every model still exports as a session file older Studios open. Not in version 1: comparisons
+so every model still exports as a session file older Studios open. **Version 2** (decision F1) is
+version 1 plus the kind `model3d` (card `layer-stack-3d`), whose session is the 3D model's session
+file (`application` `"model3d"`, its own version 1). Studio writes version 2 only for a project that
+holds a 3D model; a project without one is written as version 1, byte for byte as before, and version
+1 files are read as before (a `model3d` entry in a version 1 file is *of an unknown kind*). Not in version 1: comparisons
 across models, heat and Joule heating results (their inputs are in the workspace model), undo
 history, the provider list, failed or stopped runs. Browser recovery keeps its records per model, as
 before; it does not restore a whole project.
@@ -301,6 +307,77 @@ named *Heater study* and saved under its suggested name `heater-study.json`, the
 back the same values with no run started (V-P7, V-P13); Save again under the remembered name (V-P11);
 the save dialog stubbed at `window.showSaveFilePicker` (V-P10); three damaged files refused with the
 tab unchanged (V-P3). With `--old-python`, it also opens the file in an older Studio (V-P9).
+
+## 3D models (experimental)
+
+Status: **experimental.** The Library's group **3D models (experimental)** holds the card **Via in a
+layer stack (3D heat)** (`layer-stack-3d`), beside the application cards, not among them. It is a 3d
+component in µm over a 200 × 200 µm domain: one `layers` feature `stack` (substrate 500 µm of Si,
+k = 130 W/(m K); oxide 10 µm of SiO2, k = 1.4 W/(m K); top silicon 100 µm of Si) and a later box `via`
+(x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through the oxide. The via is
+square until cylinders come: *Square via (a round via needs cylinders, coming with the next geometry
+step)*. Choosing the card adds the 3D model to the tab; the workspace and multiphysics models stay as
+they are, and the card of another model returns to it. The 3D model has no mesh, run or result yet;
+**Mesh** and **Run** are shown disabled with their reason.
+
+**The tree.** **Parameters**; **Component 1** with **Geometry 1**, **Domain**, the features numbered
+in order (*1 Layers stack*, *2 Box via*) and **Form result**, then **Materials**; and **Selections**.
+A feature row carries the server's coverage words, computed from the exact complex: *covered in part
+by 2*, or *covered by 2, 3; adds no region* when later features take all of it. Geometry 1 offers
+**Add feature** with **Box** and **Layers**; **Extrude**, **Cylinder** and **Sphere** are greyed with
+their reason (*Cylinder is not taken yet in a 3d component; coming with the next geometry step.*). A
+feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its tree row),
+**Duplicate** and **Delete**; Messages offers **Undo** after a delete. There is no drag.
+
+**Fields.** Each length takes a number in the component's unit, a quantity (`0.1 mm`), a parameter
+name or an expression (`100 - w / 2`); a number or quantity shows its SI value beside the field. A
+value that cannot be stored (an empty field, an unknown unit, a thickness of 0 or less) stays as a
+highlighted draft with its reason and **Restore last valid value**; while a draft is shown, File ›
+Save, Save As and Export are disabled, and Mesh and Run name the draft as their reason. The
+**Parameters** table lists each parameter's value, its SI value and how many fields use it (from the
+server's check); a used parameter is not deleted, and the refusal names its users: *w is used by 2
+Box via, xmax and 2 Box via, xmin; change those first.*
+
+**Every edit is checked.** The whole document goes to `POST /api/model3d/check`
+([3D view](studio_3d.md#what-it-sends-and-answers)). A refusal is shown in Messages with the engine's
+words as written and its code and path under **Details** (for example *sphere 'ball' is not taken yet
+in a 3d component; boxes and slab layers are* · `E-3D-COMBINATION` at
+`geometry.components.c.features[2]`); the tree marks the feature it names, the view keeps the last
+shape that could be formed, greyed and labelled *Last shape that could be formed*, and Mesh and Run
+say *The geometry cannot be formed: fix the problem shown in Messages.*
+
+**The view and selections.** The view is the [3D view](studio_3d.md) with its controls (keys on the
+view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views, 0 isometric). A face
+picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names; **Use for → New
+selection** with **Apply** writes `selections[<name>] = {"boundary": <name>}` with the first of the
+face's sorted names that selects that face alone (`POST /api/model3d/selection`). A face that no single
+name selects is not made into a selection, and says so.
+
+**Undo.** The 3D model has one history of documents, apart from the other models' (Ctrl+Z and Ctrl+Y
+follow the model shown); the page, the selection in the tree, the picked face and the camera are not
+in it.
+
+**Files.** File › Save writes the project file as version 2 with the 3D model's entry. **File ›
+Export › Model with runs (session file)…** writes the 3D model alone as a session file (decision F2):
+`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, with
+the 16 MiB session limit. It holds the document now; runs come with a later version. File › Open
+reads both; a session file with `application` `"model3d"` is read by its own rules before the version
+rules of the optical and multiphysics sessions, which are unchanged (a version 1 file of before the
+units batch keeps its refusal). The 3D model is not kept in browser recovery yet.
+
+**Checks.** Pre-registered, fixed before measuring:
+
+| Check | What | Threshold | Measured | Where |
+|---|---|---|---|---|
+| W4 | 10 listed faces of the card (`stack.sub.domain.x0`, `stack.oxide.domain.y1`, `stack.top.domain.x1`, `stack.top.top`, `via.x0`, `via.x1`, `via.y0`, `via.y1`, `via.z0`, `via.z1`) picked, Use for → New selection; the written selection and the listed name typed by hand resolve to the picked face (server: through `build_mesh3d`, to the picked face's mesh faces) | 10/10 | 10/10 (server and browser; two faces picked in the view, eight in the faces list) | `tests/simcase/test_studio_model3d_check.py`, `tools/studio_browser/model3d_builder_browser.mjs` |
+| W5 | one document per E-3D-COMBINATION stem the check raises (footprint layers alone; beside other features; extrude, cylinder, sphere not taken yet): the engine's words in Messages, the code under Details, the tree mark on features[i] | 100% | 5/5. The stems "… round to the same coordinate" and circle_segments come from `build_mesh3d` when meshing (a later step) | same |
+| W11 (no runs) | the document digest after Save and Open, project and session; a version 1 project without 3D written byte for byte as before | equal; unchanged | equal; unchanged (the committed `project-v1.json` rewritten byte for byte) | `tests/simcase/studio_model3d_files.cjs`, the browser check |
+| W12 | the Library, and the Model with the card, at 1440 × 900 and 390 × 844: no console error or CSP violation, canvas drawn, no horizontal scroll at 390, faces list reached by Tab; screenshots kept | all hold | all hold | the browser check |
+| W13 (part B) | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → New selection | no pointer event | 0 pointer events | the browser check |
+
+The pure helpers (`workspace-model3d.mjs`) are checked by `tests/simcase/studio_model3d_builder.cjs`.
+The browser check is local (Playwright with a Chromium it can launch, not in CI); run it against a
+running Studio with `node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`.
 
 ## First optical study
 
