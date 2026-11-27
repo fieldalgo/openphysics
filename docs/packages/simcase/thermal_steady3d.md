@@ -103,7 +103,7 @@ counts and tags. Rates are totals in W, under the plain names (there is no depth
 
 ## Validation
 
-Measured on Linux (2026-11-27), `tests/simcase/test_thermal3d.py`:
+Measured on Linux (2026-11-27), `tests/simcase/test_thermal_steady3d.py`:
 
 | Check | Case | Threshold | Measured |
 |---|---|---|---|

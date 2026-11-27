@@ -97,7 +97,7 @@ result.save("out/")                               # summary.json, fields.npz, mo
 
 ## 검증
 
-Linux(2026-11-27)에서 `tests/simcase/test_thermal3d.py`로 측정했습니다.
+Linux(2026-11-27)에서 `tests/simcase/test_thermal_steady3d.py`로 측정했습니다.
 
 | 검사 | 사례 | 기준 | 측정 |
 |---|---|---|---|
