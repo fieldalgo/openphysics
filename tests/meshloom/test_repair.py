@@ -47,8 +47,9 @@ CASES = 60
 # Since segment recovery splits only missing pieces (Si and Gärtner's rules, 2026-11-27):
 # the first 60 seeds give 58 valid meshes and 2 RoundingError; of 400, 374 valid, 25
 # RoundingError and seed 227 as above. Facet flips are now rare (seeds 152 and one other of
-# 400), so seed 152 is added to keep that repair exercised; the floor is not changed.
-MIN_MESHED = 42
+# 400), so seed 152 is added to keep that repair exercised. The floor is raised to the new
+# measurement less a margin of 3 (2026-11-27), so that a regression in recovery shows.
+MIN_MESHED = 55
 #: seeds outside the first CASES that exercise a repair the first CASES no longer reach
 COVERAGE_SEEDS = (152,)
 
