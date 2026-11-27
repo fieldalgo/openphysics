@@ -465,7 +465,8 @@ jobs:
   geometry3d-full:
     # Stage 5 check G1 of the geometry document in full (docs/packages/simcase/geometry_engine3d.md):
     # all 200 seeded box sets against the brute-force oracle, with the rest of
-    # tests/simcase/test_geometry_engine3d.py. The source test parts run the file on every pull
+    # tests/simcase/test_geometry_engine3d.py, and slice 3's main-only volume convergence checks G8
+    # (C4's cylinder) and G9 (C1's sphere) with the rest of tests/simcase/test_geometry_engine3d_curved.py. The source test parts run the file on every pull
     # request with 25 fixed seeds; this job runs all 200 (about 7 min on one core, 2026-11-27) on
     # main pushes and manual dispatch only, so pull requests allocate no runner for it, and is in
     # the tests gate there. It also runs the cavity studies P4 and P5 of
@@ -503,10 +504,12 @@ jobs:
           OPENPHYSICS_GEOMETRY3D_FULL: "1"
         run: |
           mkdir -p "$RUNNER_TEMP/g3d" "$RUNNER_TEMP/g3d-out"
-          cp tests/simcase/test_geometry_engine3d.py "$RUNNER_TEMP/g3d/"
+          cp tests/simcase/test_geometry_engine3d.py tests/simcase/test_geometry_engine3d_curved.py \
+            tests/simcase/geometry3d_slice1_digests.json "$RUNNER_TEMP/g3d/"
           cd "$RUNNER_TEMP/g3d"
           python -c "import meshloom, simcase, sys; assert meshloom.kernel_available(), meshloom.__file__; print(sys.version, meshloom.__file__, simcase.__file__)"
-          python -m pytest -q -ra -p no:cacheprovider test_geometry_engine3d.py --junitxml="$RUNNER_TEMP/g3d-out/geometry3d.xml"
+          python -m pytest -q -ra -p no:cacheprovider test_geometry_engine3d.py test_geometry_engine3d_curved.py \
+            --junitxml="$RUNNER_TEMP/g3d-out/geometry3d.xml"
           python - "$RUNNER_TEMP/g3d-out/geometry3d.xml" <<'PY'
           import sys, xml.etree.ElementTree as ET
           suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
@@ -514,7 +517,9 @@ jobs:
           assert counts == {"skipped": 0, "failures": 0, "errors": 0}, counts
           g1 = [c for c in suite.iter("testcase") if c.get("name", "").startswith("test_g1_g2_g3_later_wins_boxes")]
           assert len(g1) == 200, len(g1)
-          print(suite.get("tests"), "tests,", len(g1), "G1 sets")
+          g89 = [c.get("name") for c in suite.iter("testcase") if c.get("name", "").startswith(("test_g8_", "test_g9_"))]
+          assert sorted(g89) == ["test_g8_cylinder_volume_converges", "test_g9_sphere_volume_converges"], g89
+          print(suite.get("tests"), "tests,", len(g1), "G1 sets, G8 and G9")
           PY
       # P4 and P5 (slice 4a): the empty and slab-loaded cavity convergence studies, from a copy
       # outside the checkout for the same reason; their measurements are JUnit properties.

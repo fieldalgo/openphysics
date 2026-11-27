@@ -1,4 +1,4 @@
-# meshloom을 거치는 3D 상자와 판 층(5단계, 실험 단계)
+# meshloom을 거치는 3D 상자, 판 층, 원통, 구(5단계, 실험 단계)
 
 [English](../../../../../packages/simcase/geometry_engine3d.md) | **한국어**
 
@@ -7,8 +7,8 @@
 **상태: 실험 단계.** meshloom 자체가 수용되기 전까지입니다([meshloom](../meshloom/overview.md)).
 `simcase.geometry_engine3d`는 [형상 문서 계약](geometry_document.md) 5단계의 슬라이스 1입니다. 계약의
 [5단계 컴파일 조건](geometry_document.md#5단계-컴파일-조건2026-11-27-보완)에 따라 `3d` 구성 요소의 `box`
-피처와 판 층으로 3D 영역 구성을 만들고 `meshloom.generate3d`로 메시합니다. 아직 이를 읽는 물리 러너는
-없습니다.
+피처와 판 층으로 3D 영역 구성을 만들고 `meshloom.generate3d`로 메시합니다. 슬라이스 3은 meshloom builder
+모양의 원통과 구를 더합니다([아래](#builder-모양의-원통과-구슬라이스-3)).
 
 ## 사용
 
@@ -78,6 +78,32 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
   `{"region": {"feature": id}}`, `{"region": {"material": m}}`. 아무것도 고르지 않는 이름 있는 선택은
   `optional`이 아니면 거부합니다.
 
+## builder 모양의 원통과 구(슬라이스 3)
+
+피처가 pm 값에서 `meshloom.builder`의 공개 구성 하나와 정확히 맞는 `3d` 구성 요소는 그 builder가
+`mesh.element_size`로 메시합니다. builder의 입력을 그대로(`max_points` = `mesh.element_count_limit`)
+`meshloom.generate3d`에 넘기므로 메시는 비트까지 builder의 메시이며, 태그는 그 뒤에 문서의 출처 이름으로
+바꿉니다.
+
+| 문서 | builder | 출처 |
+|---|---|---|
+| `zmin`·`zmax`가 도메인의 것이고 x–y에서 도메인 안에 엄격히 있는 `cylinder` 하나, 재료가 있는 배경(판) | `via_in_slab`(C4) | `<id>.side`, `<id>.bottom`과 `<id>.top`(`domain.z0`, `domain.z1`과 함께), `domain.x0` … `domain.z1` |
+| 도메인 안에 엄격히 있는 `sphere` 하나, 재료가 있는 배경 | `sphere_in_box`(C5) | `<id>.surface`, `domain.x0` … `domain.z1` |
+| `sphere` 하나, 배경 `material: null`(도메인은 경계만 줌) | `sphere`(C1) | `<id>.surface` |
+| 가장 바깥 것부터 적은 동심 구(나중 피처가 이겨 껍질이 됨), 배경 `material: null`, 가장 안쪽은 `material: null`(구멍) 가능 | `nested_spheres`(C11) | 각 구의 `<id>.surface` |
+
+도메인 면 위의 외부 면은 그 면의 태그(`x0`–`z1`), 나머지는 `void`입니다. 경계면은 상자처럼 영역 쌍으로
+키를 둡니다. 곡면은 builder가 표본화하며(고리와 측지 표본화는 meshloom에 있음), 표본화한 곡면마다 그 피처에서
+`I-SURFACE-SAMPLED`(정보)로 알립니다. 출처 이름, 종류, pm 단위의 정확한 매개변수, m 단위의 h,
+`meshloom.__version__`과 `kernel_version()`을 붙인 builder, builder 점에서 읽은 표본화(고리당 점 수 m과 고리 z
+높이, 시상 한계 r(1 − cos(π/m)), 또는 측지 빈도 n), 곡면 위 메시 노드가 정확한 매개변수에서 벗어난 V5 측정값을
+담습니다. `result.complex`는 `None`입니다. 표본화한 곡면의 정확한 구성은 아직 만들지 않으며, `evaluate3d`와
+`display_complex3d`는 그런 구성 요소를 이름을 밝혀 거부합니다(`geometry.components.<name>`에서
+`E-3D-COMBINATION`).
+
+크기는 하나만 받습니다. 표본화한 곡면이 있으면 피처나 배경의 `element_size`, `mesh.controls` 크기,
+`selections`, `boundary_tags`를 뒤 슬라이스까지 이름을 밝혀 거부합니다.
+
 ## meshloom에 넘기기
 
 - **좌표(규칙 H1).** pm 값 k마다 `float(Fraction(k, 10**12))` 미터가 되며 한 번만 반올림합니다. 그래서
@@ -103,8 +129,14 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 
 코드 `E-3D-COMBINATION`, 피처의 `features[i]`에서, 계약의 메시지 줄기로(메시지는 영어로 나옵니다):
 
-- `extrude`, `cylinder`, `sphere`: `<type> '<name>' is not taken yet in a 3d component; boxes and slab
-  layers are`(원통과 구는 슬라이스 3이 받음)
+- `extrude`, 그리고 builder 모양이 아닌 `cylinder`나 `sphere`: `<type> '<name>' is not taken yet in a 3d
+  component; boxes and slab layers are, and cylinders and spheres in meshloom's builder shapes only (one cylinder
+  through the whole slab, one sphere, concentric spheres)`
+- 도메인 옆면을 가로지르거나 닿는 원통, 도메인 면에 닿거나 가로지르는 구, 서로 닿거나 가로지르는 두 구는 계약의
+  고정 줄기로(`cylinder '<a>' crosses the side domain.<s> between z = <z0> and <z1> <unit>; …`, `cylinder '<a>'
+  touches domain.<s> at one line; …`, `sphere '<a>' touches or crosses domain.<s>; …`, `spheres '<a>' and '<b>'
+  touch or cross; …`). 나머지 줄기(면에 일부만 놓인 뚜껑, 가로지르는 두 원통, 프리즘을 품는 구)는 builder
+  모양에 없으므로 그런 문서는 단계 메시지를 받습니다.
 - 다른 피처와 함께 쓴 발자국 `layers`: `layers '<name>' has footprint layers; with other features a 3d
   component takes slab layers only, until a later slice`
 - 같은 double로 반올림되는 두 값: `<a>.<part> and <b>.<part> round to the same coordinate <x> m`
@@ -180,12 +212,28 @@ P4와 P5 측정값(코어 하나, 메시와 풀이 초):
 돕니다. 풀 리퀘스트는 h = 0.24 m에서 E4와 E5의 smoke 시험을 돌리며, 각 사례가 메시되고 풀리는지만
 확인합니다.
 
+슬라이스 3의 사전 등록 검사(결정 2026-11-27-openphysics-geometry-stage5-adopted)이며
+`tests/simcase/test_geometry_engine3d_curved.py`가 실행합니다. C1, C4, C5, C11은
+[3D 검증 계획](../meshine/validation3d.md)의 사례를 문서로 쓴 것입니다(m 단위).
+
+| ID | 사례 | 지표 | 기준 | 측정(Linux, 2026-11-27) |
+|---|---|---|---|---|
+| G7 | h 0.2, 0.1의 C4, 0.24, 0.12의 C5, 0.2, 0.1의 C11을 `generate3d(**builder.<fn>(...))`와 비교 | 노드, 연결, 영역; 바꾼 태그별 면 | 비트까지 같음 | 같음(사면체 4,134–26,445개) |
+| G8 | h 0.2, 0.1, 0.05의 C4([−1,1]² × [0,1]을 지나는 r = 0.3) | e_V = \|V_via − πr²L\| / πr²L; 고리 현 s = 2πr/m에 대한 최소제곱 기울기 | 기울기 ≥ 1.8; e_V(가장 고운) ≤ 5e-3 | 기울기 1.99; e_V 1.9e-2, 8.6e-3, 3.1e-3(m = 16, 24, 40) |
+| G9 | h 0.2, 0.1, 0.05의 C1(단위 공) | e = \|ΣV − 4π/3\| / (4π/3)(V6); h에 대한 기울기 | 기울기 ≥ 1.8; e(0.05) ≤ 1.5e-3 | 기울기 1.87; e 1.5e-2, 4.6e-3, 1.1e-3 |
+| G10 | G7의 메시 | 곡면 위 모든 노드의 V5 δ, 문서의 pm 정확한 매개변수와 비교 | ≤ 1e-15 | 최대 1.9e-16 |
+| G2, G3 | G7의 메시 | 출처 면이 부분 위에 있음(곡면은 대각선의 1e-12 안); 외부 면마다 태그 하나; V1, V2 | 0; 모두 성립 | 0; 모두 성립 |
+| G6 | builder 모양이 만날 수 있는 줄기마다, 단계로 미룬 구성마다 문서 하나 | 코드, 경로, 이름 | 100% | 100% |
+| S1 | 슬라이스 1의 풀 리퀘스트 G1 시드 25개와 E1 | main a5c61f8과 비교한 구성·메시 SHA-256 | 같음 | 같음 |
+
+G8과 G9는 main push와 수동 dispatch에서만 돕니다(`geometry3d-full`).
+
 ## 한계
 
 - 실험 단계: meshloom은 아직 수용되지 않았고, 메시 품질은 meshloom의 것입니다.
-- 상자와 판 층만 받습니다. 발자국 층은 혼자이면 압출 경로를 쓰고, 다른 피처와 함께이면 뒤 슬라이스까지
-  거부합니다.
-  원통과 구는 슬라이스 3에서 옵니다.
+- 상자와 판 층을 받습니다. 발자국 층은 혼자이면 압출 경로를 쓰고, 다른 피처와 함께이면 뒤 슬라이스까지
+  거부합니다. 원통과 구는 builder 모양 넷에서만, 크기 하나로 받습니다. "나중 피처가 이김" 배열 안의 일반
+  원통과 구는 meshloom의 조합 가능한 표본기를 기다립니다.
 - 영역마다 크기 하나입니다. 등급 크기나 표면 크기는 아직 없습니다.
 - 허용 오차보다는 크지만 대각선의 약 1e-7보다 얇은 조각은 meshloom이 돌아오지 않게 할 수 있습니다. 면을
   862 pm(대각선 14.4 mm의 6e-8) 어긋나게 둔 상자 둘을 h = 0.8 mm로 메시하면 600 s 안에 끝나지 않았고, 어긋남이

@@ -1,4 +1,4 @@
-# 3D boxes and slab layers through meshloom (stage 5, experimental)
+# 3D boxes, slab layers, cylinders and spheres through meshloom (stage 5, experimental)
 
 **English** | [한국어](../../locales/ko/pages/packages/simcase/geometry_engine3d.md)
 
@@ -9,7 +9,8 @@
 of the [geometry document contract](geometry_document.md): it builds the 3D region
 complex of the `box` features and slab layers of a `3d` component, under the contract's
 [stage 5 compile conditions](geometry_document.md#stage-5-compile-conditions-amended-2026-11-27),
-and meshes it with `meshloom.generate3d`. No physics runner reads it yet.
+and meshes it with `meshloom.generate3d`. Slice 3 adds cylinders and spheres in meshloom's
+builder shapes ([below](#cylinders-and-spheres-in-builder-shapes-slice-3)).
 
 ## Use
 
@@ -90,6 +91,35 @@ component, and an omitted name with no or several `3d` components are refused by
   `{"region": name}`, `{"region": {"feature": id}}` and `{"region": {"material": m}}`.
   A named selection that selects nothing is refused unless it is `optional`.
 
+## Cylinders and spheres in builder shapes (slice 3)
+
+A `3d` component whose features exactly match one of `meshloom.builder`'s public
+configurations, on its pm values, is meshed by that builder at `mesh.element_size`. The
+builder's input goes to `meshloom.generate3d` unchanged (with `max_points` =
+`mesh.element_count_limit`), so the mesh is the builder's mesh, bit for bit; its tags are
+renamed to the document's provenance names afterwards.
+
+| Document | Builder | Provenance |
+|---|---|---|
+| one `cylinder` with `zmin`, `zmax` the domain's, strictly inside it in x–y; background with a material (the slab) | `via_in_slab` (C4) | `<id>.side`, `<id>.bottom` and `<id>.top` (with `domain.z0` and `domain.z1`), `domain.x0` … `domain.z1` |
+| one `sphere` strictly inside the domain; background with a material | `sphere_in_box` (C5) | `<id>.surface`, `domain.x0` … `domain.z1` |
+| one `sphere`; background `material: null` (the domain only bounds it) | `sphere` (C1) | `<id>.surface` |
+| concentric spheres listed outermost first (later wins gives the shells); background `material: null`; the innermost may be `material: null` (a hole) | `nested_spheres` (C11) | `<id>.surface` of each |
+
+Exterior faces on a domain face take its tag (`x0`–`z1`), the others `void`. Interfaces are
+keyed by region pair, as for boxes. The builders sample the curved surfaces (ring and geodesic
+sampling live in meshloom), and each sampled surface is reported as `I-SURFACE-SAMPLED` (info)
+at its feature: the provenance name, the kind, the exact parameters in pm, h in m, the builder
+with `meshloom.__version__` and `kernel_version()`, the sampling read from the builder's points
+(points per ring m and the ring z levels with the sagitta bound r(1 − cos(π/m)), or the
+geodesic frequency n), and the measured V5 deviation of the mesh nodes on the surface from the
+exact parameters. `result.complex` is `None`: the exact complex of a sampled surface is not
+built yet, and `evaluate3d` and `display_complex3d` refuse such a component by name
+(`E-3D-COMBINATION` at `geometry.components.<name>`).
+
+One size only: a feature or background `element_size`, `mesh.controls` sizes, `selections`
+and `boundary_tags` are refused by name with a sampled surface, until a later slice.
+
 ## The meshloom hand-off
 
 - **Coordinates (rule H1).** Each pm value k becomes `float(Fraction(k, 10**12))` metres,
@@ -122,8 +152,16 @@ The mesh carries meshloom's guarantees on the doubles galerkin receives: exact
 
 Code `E-3D-COMBINATION` at the feature's `features[i]`, with the contract's message stems:
 
-- `extrude`, `cylinder` and `sphere`: `<type> '<name>' is not taken yet in a 3d component;
-  boxes and slab layers are` (slice 3 takes cylinders and spheres);
+- `extrude`, and a `cylinder` or `sphere` in no builder shape: `<type> '<name>' is not taken
+  yet in a 3d component; boxes and slab layers are, and cylinders and spheres in meshloom's
+  builder shapes only (one cylinder through the whole slab, one sphere, concentric spheres)`;
+- a cylinder crossing or touching a domain side, a sphere touching or crossing a domain face,
+  and two spheres touching or crossing, with the contract's fixed stems (`cylinder '<a>'
+  crosses the side domain.<s> between z = <z0> and <z1> <unit>; …`, `cylinder '<a>' touches
+  domain.<s> at one line; …`, `sphere '<a>' touches or crosses domain.<s>; …`, `spheres '<a>'
+  and '<b>' touch or cross; …`). The other stems (a cap partly on a face, two cylinders
+  crossing, a sphere containing a prism) have no builder shape: such documents get the
+  staging message;
 - footprint `layers` with other features: `layers '<name>' has footprint layers; with other
   features a 3d component takes slab layers only, until a later slice`;
 - two values that round to one double: `<a>.<part> and <b>.<part> round to the same
@@ -204,11 +242,29 @@ pushes and manual dispatch ([what CI runs](../../development.md#what-ci-runs)). 
 in that job only. Pull requests run a smoke test of E4 and E5 at h = 0.24 m, which checks only
 that each case meshes and solves.
 
+Slice 3, pre-registered (decision 2026-11-27-openphysics-geometry-stage5-adopted), run by
+`tests/simcase/test_geometry_engine3d_curved.py`; C1, C4, C5 and C11 are the
+[3D validation plan](../meshine/validation3d.md)'s cases written as documents (in m):
+
+| ID | Case | Metric | Threshold | Measured (Linux, 2026-11-27) |
+|---|---|---|---|---|
+| G7 | C4 at h 0.2, 0.1; C5 at 0.24, 0.12; C11 at 0.2, 0.1, against `generate3d(**builder.<fn>(...))` | nodes, connectivity, regions; faces per renamed tag | bitwise identical | identical (4,134–26,445 tetrahedra) |
+| G8 | C4 (r = 0.3 through [−1,1]² × [0,1]) at h 0.2, 0.1, 0.05 | e_V = \|V_via − πr²L\| / πr²L; least-squares slope against the ring chord s = 2πr/m | slope ≥ 1.8; e_V(finest) ≤ 5e-3 | slope 1.99; e_V 1.9e-2, 8.6e-3, 3.1e-3 (m = 16, 24, 40) |
+| G9 | C1 (unit ball) at h 0.2, 0.1, 0.05 | e = \|ΣV − 4π/3\| / (4π/3) (V6); slope against h | slope ≥ 1.8; e(0.05) ≤ 1.5e-3 | slope 1.87; e 1.5e-2, 4.6e-3, 1.1e-3 |
+| G10 | G7's meshes | V5's δ on every node of a curved surface, against the document's exact parameters in pm | ≤ 1e-15 | at most 1.9e-16 |
+| G2, G3 | G7's meshes | provenance faces on their parts (curved within 1e-12 of the diagonal); one tag per exterior face; V1, V2 | 0; all hold | 0; all hold |
+| G6 | one document per stem that builder shapes can meet, and per staged configuration | code, path, names | 100% | 100% |
+| S1 | slice 1's 25 pull-request G1 seeds and E1 | complex and mesh SHA-256 against main a5c61f8 | identical | identical |
+
+G8 and G9 run on main pushes and manual dispatch only (`geometry3d-full`).
+
 ## Limits
 
 - Experimental: meshloom is not yet accepted, and the mesh's quality is meshloom's.
 - Boxes and slab layers only. Footprint layers alone take the extrude route; with other
-  features they are refused until a later slice. Cylinders and spheres come with slice 3.
+  features they are refused until a later slice. Cylinders and spheres only in the four
+  builder shapes, with one element size; general cylinders and spheres in a later-wins
+  arrangement wait for meshloom's composable samplers.
 - One size per region; no graded sizes or sizes on surfaces yet.
 - Pieces thinner than about 1e-7 of the diagonal, though above the tolerance, can make meshloom
   not return: two boxes with a face offset by 862 pm (6e-8 of a 14.4 mm diagonal) at h = 0.8 mm
