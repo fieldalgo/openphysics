@@ -187,7 +187,7 @@ W14는 2026-11-27에 Linux의 headless Chromium 158(Xeon 2.1 GHz, CPU 4개, GPU 
 순서에는 바뀌지 않음, meshloom이 끝나지 않는 작업(얇은 띠 문서)이 추정의 두 배를 훨씬
 넘어서도 메시 중이고 취소 2초 안에 끝남, 작업 중에 끝나는 서버가 자식도 디렉터리도
 남기지 않음, 메시 응답(모든 면이 자기 평면에서 메시되고 면과 이름이 표시 응답과 같음)을
-확인합니다. platform-install 워크플로가 이 시험을 Linux, macOS, Windows에서 돌립니다.
+확인합니다. platform-install 워크플로가 이 가운데 프로세스 수준 시험(`tests/simcase/test_studio_mesh3d_process.py`, HTTP 클라이언트 없음)을 Linux, macOS, Windows에서 돌립니다.
 
 그 밖의 시험: 단면 윤곽이 평면 위에 있고 면마다 정확한 잘린 길이를 가짐(카드의 평면
 네 개, 하나는 via 구멍의 모서리를 따름), 거부 메시지가 엔진의 문구 그대로임, 자원

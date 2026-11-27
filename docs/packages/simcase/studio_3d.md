@@ -204,7 +204,7 @@ block and not with other blocks or key order, that a job in meshloom's non-retur
 thin-strip document) is still meshing long past twice its estimate and ends within 2 s of
 Cancel, that a server that exits mid-job leaves no child and no directory, and the mesh
 answer (every face meshed on its own plane, faces and names as the display answer's). The
-platform-install workflow runs these tests on Linux, macOS and Windows.
+platform-install workflow runs the process-level ones (`tests/simcase/test_studio_mesh3d_process.py`, without an HTTP client) on Linux, macOS and Windows.
 
 Also tested: section outlines lie on their plane and have the exact cut length of
 each face (four planes of the card, one along an edge of the via's hole);

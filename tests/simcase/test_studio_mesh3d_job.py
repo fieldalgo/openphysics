@@ -12,13 +12,13 @@ Pre-registered checks (fixed before implementation; never loosened):
   has exited 2 s after Cancel; no result is kept; the server's RSS is within 50 MB of before.
 
 Also tested, without numeric thresholds: the 429 path, that a cancelled job keeps nothing, that
-the reuse key changes with the geometry or mesh block, that a job in meshloom's non-return (two
-boxes with a background strip of 6e-8 of the diagonal between them) is cancellable, and the
-surface answer of a finished job.
+the reuse key changes with the geometry or mesh block, and the surface answer of a finished job.
+The process-level behaviour (Cancel's termination, meshloom's non-return, temporary directories,
+a server that exits) is in test_studio_mesh3d_process.py, which needs no HTTP client and also runs
+on macOS and Windows in platform-install.
 """
 import base64
 import json
-import math
 import os
 import socket
 import subprocess
@@ -60,17 +60,6 @@ def with_mesh(doc, **mesh):
 def card(size=None, **mesh):
     doc = F.card()
     return with_mesh(doc, **({"element_size": size} if size else {}), **mesh)
-
-
-def thin_strip():
-    """Two boxes with a background strip 6e-8 of the domain diagonal wide between them: meshloom
-    does not return on it (a known meshloom defect)."""
-    gap = 6e-8 * math.sqrt(10 ** 2 + 10 ** 2 + 2.5 ** 2)
-    x = float(f"{5 + gap:.12g}")
-    return F.doc([{"name": "a", "type": "box", "xmin": 0, "xmax": 5, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 2.5,
-                   "material": "m1"},
-                  {"name": "b", "type": "box", "xmin": x, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 2.5,
-                   "material": "m2"}], background="bg", size="2 mm")
 
 
 def wait(client, job, until, limit=WAIT):
@@ -198,23 +187,6 @@ def test_one_job_at_a_time_and_cancel_keeps_nothing(client):
 
 
 @needs_kernel
-def test_a_job_in_meshloom_s_non_return_is_cancellable(client):
-    """The thin-strip reproducer: still meshing long past twice its estimate, then cancelled."""
-    doc = thin_strip()
-    reply = client.post("/api/model3d/mesh", json={"doc": doc}).json()
-    job = reply["job"]
-    assert reply["estimate"]["seconds"] < 1
-    status = wait(client, job, lambda s: s["step"] == "meshing" and s["elapsed_s"] > 8, limit=60)
-    assert status["status"] == "running" and status["longer_than_estimate"] is True
-    process = model3d_api.jobs.jobs[job].process
-    t0 = time.monotonic()
-    cancel = client.post(f"/api/model3d/jobs/{job}/cancel").json()
-    assert cancel["cancelled"] and cancel["exited"] and time.monotonic() - t0 < 2.0
-    assert not process.is_alive()
-    assert model3d_api.jobs.kept == {}
-
-
-@needs_kernel
 def test_a_finished_job_answers_the_surface_and_is_reused(client):
     doc = card("1 um")
     reply = client.post("/api/model3d/mesh", json={"doc": doc}).json()
@@ -261,84 +233,11 @@ def test_a_finished_job_answers_the_surface_and_is_reused(client):
     client.post(f"/api/model3d/jobs/{changed['job']}/cancel")
 
 
-EXITING = """
-import json, sys, time
-from pathlib import Path
-from simcase.studio import mesh3d_jobs
-import model3d_fixtures as F
-if __name__ == "__main__":
-    doc = F.card()
-    doc["mesh"]["element_size"] = "0.3 um"
-    jobs = mesh3d_jobs.Mesh3DJobs()
-    reply = jobs.start(doc, None)
-    while jobs.status(reply["job"])["step"] != "meshing":
-        time.sleep(0.05)
-    print(json.dumps({"pid": jobs.jobs[reply["job"]].pid}), flush=True)
-    sys.exit(0)                                 # leave with the job running
-"""
-
-
-@needs_kernel
-def test_a_server_that_exits_leaves_no_child_and_no_directory(tmp_path):
-    script = tmp_path / "exiting.py"
-    script.write_text(EXITING, encoding="utf-8")
-    scratch = tmp_path / "tmp"
-    scratch.mkdir()
-    env = {**os.environ, "TMPDIR": str(scratch), "TEMP": str(scratch), "TMP": str(scratch),
-           "PYTHONPATH": os.pathsep.join([str(Path(F.__file__).parent), *sys.path])}
-    done = subprocess.run([sys.executable, str(script)], env=env, capture_output=True, text=True, timeout=WAIT,
-                          encoding="utf-8")
-    assert done.returncode == 0, done.stderr
-    pid = json.loads(done.stdout.strip().splitlines()[-1])["pid"]
-    assert [p.name for p in scratch.iterdir() if p.name.startswith("openphysics-mesh3d-")] == []
-    t0 = time.monotonic()
-    while _process_exists(pid) and time.monotonic() - t0 < 5:
-        time.sleep(0.05)
-    assert not _process_exists(pid)
-
-
-def _process_exists(pid: int) -> bool:
-    if sys.platform == "win32":
-        import ctypes
-        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)     # PROCESS_QUERY_LIMITED_INFORMATION
-        if not handle:
-            return False
-        code = ctypes.c_ulong()
-        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
-        ctypes.windll.kernel32.CloseHandle(handle)
-        return code.value == 259                                         # STILL_ACTIVE
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    if sys.platform.startswith("linux"):
-        try:
-            return Path(f"/proc/{pid}/stat").read_text(encoding="ascii").rsplit(")", 1)[1].split()[0] != "Z"
-        except FileNotFoundError:
-            return False
-    return True
-
-
 def test_job_ids_are_server_made(client):
     for job in ("nope", "m3d-0123456789ab", "m3d-../../etc", "M3D-0123456789AB"):
         for reply in (client.get(f"/api/model3d/jobs/{job}"), client.get(f"/api/model3d/jobs/{job}/result"),
                       client.post(f"/api/model3d/jobs/{job}/cancel")):
             assert reply.status_code == 404
-
-
-def test_quality_measure_is_one_for_the_regular_tetrahedron():
-    nodes = np.array([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1], [0, 0, 0.01]], dtype=float)
-    q = mesh3d_jobs._quality(nodes, np.array([[0, 1, 2, 3], [0, 1, 2, 4]]))
-    assert q[0] == pytest.approx(1.0, abs=1e-12) and 0 < q[1] < 1
-
-
-def test_the_child_uses_the_spawn_context_and_temporary_directories():
-    jobs = mesh3d_jobs.Mesh3DJobs()
-    assert jobs.ctx.get_start_method() == "spawn"
-    source = Path(mesh3d_jobs.__file__).read_text(encoding="utf-8")
-    assert "get_context(\"spawn\")" in source and "tempfile.mkdtemp(" in source
 
 
 # ----------------------------------------------------------------------------- W8

@@ -525,7 +525,7 @@ jobs:
     # Check W8 of the Studio 3D mesh job (docs/packages/simcase/studio_3d.md): a real Studio server
     # meshes the card at an estimate of about 69 s and is cancelled 3 s after the job starts; the
     # child process must have exited 2 s after Cancel, nothing is kept and the server's RSS stays
-    # within 50 MB. The source test parts skip it (OPENPHYSICS_STUDIO_W8 unset); this job runs it
+    # within 50 MB. Without OPENPHYSICS_STUDIO_W8=1 the test is not collected; this job runs it
     # on main pushes and manual dispatch only, so pull requests allocate no runner for it, and is
     # in the tests gate there. It installs the abi3 wheel meshloom-v26-wheel builds.
     needs: meshloom-v26-wheel
