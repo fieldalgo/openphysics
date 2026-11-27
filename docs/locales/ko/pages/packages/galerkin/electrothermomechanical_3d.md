@@ -2,6 +2,8 @@
 
 [English](../../../../../packages/galerkin/electrothermomechanical_3d.md) | **한국어**
 
+시간에 따른 가열과 냉각은 [3D 히터 펄스 예제](transient_heater_3d.md)에서 다룹니다.
+
 저장소 루트에서 `python examples/galerkin/electrothermomechanical_3d.py`로
 가열 도체 예제를 실행합니다.
 예제의 `solve_electrothermal_bar(nx)`로 앞의 전기·열 계산을 실행할 수 있습니다.
