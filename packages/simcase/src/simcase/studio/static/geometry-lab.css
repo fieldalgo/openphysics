@@ -53,4 +53,20 @@ footer a{color:var(--accent)}
 #face-names li{cursor:default}
 #faces{max-height:320px;overflow:auto}
 li input[type=checkbox]{margin:0 0 0 auto;align-self:center}
+#mesh3d{border-top:1px solid var(--line);margin-top:6px;padding-top:4px}
+#mesh3d .mesh-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#mesh-steps{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0;padding:0;list-style:none;font-size:12px}
+#mesh-steps li{display:list-item;padding:0;cursor:default;color:var(--muted)}
+#mesh-steps li.done{color:var(--ink)}
+#mesh-steps li.current{color:var(--accent);font-weight:600}
+#mesh-steps li+li::before{content:"→ ";color:var(--muted);font-weight:400}
+#mesh-progress{margin:4px 0;min-height:1.45em}
+#mesh-progress.longer{color:var(--warn)}
+#canvas-mesh{display:block;width:100%;aspect-ratio:10/7;height:auto;background:#fbfcfd;border:1px solid var(--line);border-radius:4px;touch-action:none}
+#canvas-mesh:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#canvas-mesh.stale{opacity:.35}
+@media (min-width:1300px){#canvas-mesh{width:720px;height:504px;aspect-ratio:auto}}
+#mesh-stats{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:6px 0;font-size:12px}
+#mesh-stats dt{color:var(--muted)}
+#mesh-stats dd{margin:0;font-variant-numeric:tabular-nums}
 @media (max-width:900px){main{grid-template-columns:1fr}}

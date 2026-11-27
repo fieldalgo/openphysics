@@ -11,7 +11,7 @@
  <label>Component <select id="component" disabled></select></label>
  <span id="status" role="status">Open or create a version 1 geometry document.</span>
 </div>
-<p class="note">Experimental: works on version 1 geometry documents through the exact 2D engine, and shows 3d components of boxes and slab layers in a read-only 3D view. The document stays in this page; nothing is stored on the server. It runs no physics.</p>
+<p class="note">Experimental: works on version 1 geometry documents through the exact 2D engine, and shows 3d components of boxes and slab layers in a read-only 3D view, which can be meshed (experimental). The document stays in this page; nothing is stored on the server. It runs no physics.</p>
 <section id="refusal" role="alert" hidden></section>
 <main>
  <aside id="parameters"><h2>Parameters</h2><p class="muted" id="no-parameters">No parameters.</p><div id="parameter-rows"></div></aside>
@@ -25,6 +25,14 @@
    <canvas id="canvas3d" tabindex="0" aria-label="3D view. Arrow keys rotate, Shift with arrow keys pans, plus and minus zoom, F fits, 1 to 6 choose the axis views, 0 the isometric view." aria-describedby="keys3d"></canvas>
    <p id="keys3d" class="muted">Drag to rotate, Shift-drag to pan, wheel to zoom, click to pick a face. Keys on the view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views, 0 isometric.</p>
    <section id="names" aria-live="polite"><h2>Names</h2><p id="names-title" class="muted">Pick a face in the view or in the faces list.</p><p id="names-detail" class="muted"></p><ul id="face-names"></ul></section>
+   <section id="mesh3d" aria-labelledby="mesh-heading"><h2 id="mesh-heading">Mesh</h2>
+    <div class="mesh-actions"><button id="mesh-start" disabled aria-describedby="mesh-estimate">Mesh</button><button id="mesh-cancel" hidden>Cancel meshing</button><span id="mesh-estimate" class="muted">Show a 3d component first.</span></div>
+    <ol id="mesh-steps" hidden aria-label="Meshing steps"></ol>
+    <p id="mesh-progress" role="status" aria-live="polite"></p>
+    <p id="mesh-note" class="muted" hidden></p>
+    <canvas id="canvas-mesh" tabindex="0" hidden aria-label="Mesh view: the mesh's exterior and interface triangles coloured by region, with mesh edges. Same keys as the 3D view; a pick shows the face's names." aria-describedby="keys3d"></canvas>
+    <dl id="mesh-stats" hidden></dl>
+   </section>
   </div>
   <div id="unit" class="muted"></div></section>
  <aside id="lists">

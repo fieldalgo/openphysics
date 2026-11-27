@@ -543,6 +543,60 @@ jobs:
           path: ${{ runner.temp }}/g3d-out/
           if-no-files-found: warn
 
+  studio-mesh3d-w8:
+    # Check W8 of the Studio 3D mesh job (docs/packages/simcase/studio_3d.md): a real Studio server
+    # meshes the card at an estimate of about 69 s and is cancelled 3 s after the job starts; the
+    # child process must have exited 2 s after Cancel, nothing is kept and the server's RSS stays
+    # within 50 MB. The source test parts skip it (OPENPHYSICS_STUDIO_W8 unset); this job runs it
+    # on main pushes and manual dispatch only, so pull requests allocate no runner for it, and is
+    # in the tests gate there. It installs the abi3 wheel meshloom-v26-wheel builds.
+    needs: meshloom-v26-wheel
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12.14"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: meshloom-v26-wheel
+          path: dist
+      - name: Install the pinned environment, the meshloom wheel and the other packages
+        run: |
+          python -m pip install -r tools/requirements-py312-linux.txt
+          python -m pip install --no-deps dist/meshloom-*.whl
+          python -m pip install --no-deps --no-build-isolation \
+            packages/galerkin packages/galerkin-refsol packages/meshine \
+            packages/gmshio packages/physmat packages/simcase packages/sipi
+          python -m pip check
+      # The test runs from a copy outside the checkout: the root conftest.py puts each
+      # package's src/ first on sys.path, which would import meshloom without its compiled
+      # kernel and skip the test.
+      - name: Run W8, and check that it ran
+        env:
+          OPENPHYSICS_STUDIO_W8: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/w8" "$RUNNER_TEMP/w8-out"
+          cp tests/simcase/test_studio_mesh3d_job.py tests/simcase/model3d_fixtures.py "$RUNNER_TEMP/w8/"
+          cd "$RUNNER_TEMP/w8"
+          python -c "import meshloom, simcase, sys; assert meshloom.kernel_available(), meshloom.__file__; print(sys.version, meshloom.__file__, simcase.__file__)"
+          python -m pytest -q -ra -s -p no:cacheprovider test_studio_mesh3d_job.py -k w8 --junitxml="$RUNNER_TEMP/w8-out/w8.xml" | tee "$RUNNER_TEMP/w8-out/w8.log"
+          python - "$RUNNER_TEMP/w8-out/w8.xml" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
+          counts = {k: int(suite.get(k)) for k in ("tests", "skipped", "failures", "errors")}
+          assert counts == {"tests": 1, "skipped": 0, "failures": 0, "errors": 0}, counts
+          PY
+          grep '^W8 ' "$RUNNER_TEMP/w8-out/w8.log"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: studio-mesh3d-w8
+          path: ${{ runner.temp }}/w8-out/
+          if-no-files-found: warn
+
   installed-platforms:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     uses: ./.github/workflows/platform-install.yml
@@ -550,7 +604,7 @@ jobs:
   tests:
     name: tests
     needs: [linux-py312, linux-py312-tests, installed-tests, blas-kernels, installed-platforms,
-            meshloom-v26-wheel, meshloom-v26, meshloom-v26-compare, geometry3d-full]
+            meshloom-v26-wheel, meshloom-v26, meshloom-v26-compare, geometry3d-full, studio-mesh3d-w8]
     if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -571,6 +625,9 @@ jobs:
           GEOMETRY3D_RESULT: ${{ needs.geometry3d-full.result }}
           # the stage 5 G1 check in full runs on main pushes and manual dispatch, not on pull requests
           GEOMETRY3D_EXPECTED: ${{ github.event_name == 'pull_request' && 'skipped' || 'success' }}
+          STUDIO_W8_RESULT: ${{ needs.studio-mesh3d-w8.result }}
+          # the Studio 3D mesh job's W8 runs on main pushes and manual dispatch, not on pull requests
+          STUDIO_W8_EXPECTED: ${{ github.event_name == 'pull_request' && 'skipped' || 'success' }}
         run: |
           test "$VALIDATION_RESULT" = success
           test "$SOURCE_TESTS_RESULT" = success
@@ -579,6 +636,7 @@ jobs:
           test "$PLATFORM_RESULT" = success
           test "$V26_RESULTS" = "$V26_EXPECTED"
           test "$GEOMETRY3D_RESULT" = "$GEOMETRY3D_EXPECTED"
+          test "$STUDIO_W8_RESULT" = "$STUDIO_W8_EXPECTED"
 
   panel-studies:
     # The corner-field panel convergence studies (tests/_support/panel_studies.py): panels
