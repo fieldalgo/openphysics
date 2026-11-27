@@ -11,7 +11,7 @@
 `quality="guaranteed"`(`GUARANTEED_RATIO` = 2, V7이 채점하는 한도)를 고른 뒤 메시를 개선합니다(sliver
 제거, smoothing, flip). `meshloom.builder`는 곡면 위에서 샘플링한 곡면 primitive(구, 원통 via)를 더합니다.
 지금까지 잰 품질 게이트는 V10의 15쌍 전부를 포함해 통과합니다. 다만 곡면 위 세분화가 아직 없고,
-기준선보다 느립니다(한계 참고).
+기준선보다 느립니다(한계 참고). 닫힌 삼각형 표면(STL 같은 입력)은 **experimental**입니다(한계 참고).
 
 ```python
 import numpy as np
@@ -66,7 +66,9 @@ mesh["region_names"]           # ['via', 'slab']
 - **평면 facet.** 상자 면과 via의 끝 원판은 평소처럼 세분화합니다.
 
 닫힌 삼각형 표면(STL 같은 입력: 점, 삼각형, 삼각형마다 태그)은
-`builder.triangle_surface(points, triangles, tags=..., region_points=...)`로 줍니다.
+`builder.triangle_surface(points, triangles, tags=..., region_points=...)`로 줍니다. **Experimental:** 3D 계획의 import 게이트
+(V20, Thingi10K 모집단 C14)를 M4에서 충족하지 못했습니다. 그래서 실제 파일에서는 메시 생성이 실패하거나 계획의 시간 한도를 넘을 수
+있습니다. 버전 1은 다면체 입력과 builder의 primitive를 지원하며, 닫힌 표면 import는 M8에서 다시 게이트하고 V20은 계속 보고합니다.
 - **합치는 것.** 두 삼각형이 다음을 모두 만족하면 다각형 facet 하나로 합칩니다.
   - 다른 삼각형이 쓰지 않는 변을 공유합니다.
   - 태그가 같습니다.
@@ -291,7 +293,8 @@ meshloom은 Apache-2.0입니다. 확장 모듈에는 PyO3와 그 작은 의존�
   수 있었습니다. 둘 다 고쳤습니다. 제약 Delaunay로 채울 수 없는 공동(지금까지 테스트에는 없음)은
   오류이며 아직 점을 더해 고치지 않습니다. gift-wrapping 대체 경로는 공동 크기의 제곱에 비례하는 시간이
   걸리고, 테스트에서는 Delaunay 경로가 모든 공동 쪽을 채웠습니다(사면체 25,979개 공동을 0.26초).
-- 닫힌 삼각형 표면을 삼각형마다 facet 하나로 주면(STL 같은 입력) 삼각형 사이의 작은 각까지 포함해 메시가
+- **닫힌 삼각형 표면(STL 같은 입력)은 experimental입니다.** import 게이트(C14의 V20)를 M4에서 충족하지 못했고, M8에서 다시 돌립니다.
+  닫힌 삼각형 표면을 삼각형마다 facet 하나로 주면(STL 같은 입력) 삼각형 사이의 작은 각까지 포함해 메시가
   됩니다. 다만 품질은 보장하지 않고, 느릴 수 있습니다. 이때는 삼각형 변이 모두 선분이 됩니다.
   - 어떤 삼각형도 품질 기준을 만족할 수 없을 만큼 작은 입력각 안에서는, 세분화가 가는 요소를 나누지 않고
     둡니다. 그 각은 subfacet에서 19.5°, 사면체에서 20.9°입니다(기본 기준 1.4일 때).
