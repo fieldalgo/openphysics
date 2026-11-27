@@ -197,12 +197,16 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
         if missing.is_empty() {
             break;
         }
-        // one split of each missing piece: the split points are chosen on the mesh of the
-        // round's start, then inserted in BRIO order (around a vertex with many segments
-        // the points of one sphere, inserted in angular order, would each meet the long
-        // tetrahedra around it: a cavity as large as the fan); a piece that an earlier
-        // insertion of the round made an edge is left alone
-        let mut plans: Vec<(usize, f64, Rule, bool)> = Vec::with_capacity(missing.len());
+        // one split of each missing piece, the pieces taken in BRIO order of their
+        // middles (around a vertex with many segments the points of one sphere, inserted
+        // in angular order, would each meet the long tetrahedra around it: a cavity as
+        // large as the fan); each split point is chosen on the mesh as it is then (a
+        // reference point from the round's start is stale: on thin needles that cost a
+        // third more points), and a piece that an earlier insertion of the round made an
+        // edge is left alone. A plan with a NaN parameter is such a piece, found by the
+        // parameter of its middle
+        let mut plans: Vec<(usize, f64, Rule)> = Vec::with_capacity(missing.len());
+        let mut mids: Vec<f64> = Vec::new();
         // a hub (an input vertex with more than HUB segments, a fan's centre) at which a
         // piece is missing is protected first, Shewchuk-style: every segment at it gets a
         // point at one distance rc from it (rc = min of 2/3 of the distance to its
@@ -259,7 +263,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                     let tr = d / len;
                     let w = tr * 2f64.powi(-30);
                     let t = if sj[0] == c { pick_t(tr - w, tr, exact) } else { pick_t(1.0 - tr, 1.0 - tr + w, exact) };
-                    plans.push((j as usize, t, Rule::Centre(c), true));
+                    plans.push((j as usize, t, Rule::Centre(c)));
                 }
             }
         }
@@ -268,33 +272,45 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
             if hubs_now.contains(&p.u) || hubs_now.contains(&p.v) {
                 continue; // after the hub's protection, next round
             }
+            plans.push((k, f64::NAN, Rule::Midpoint));
+            mids.push(p.t0 + (p.t1 - p.t0) / 2.0);
+        }
+        let at: Vec<P3> = plans.iter().enumerate().map(|(o, &(k, t, _))| {
+            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
+            let t = if t.is_nan() { mids[o - (plans.len() - mids.len())] } else { t };
+            std::array::from_fn(|c| a[c] + t * (b[c] - a[c]))
+        }).collect();
+        let fixed = plans.len() - mids.len();
+        for o in delaunay::brio_order(&at) {
+            let o = o as usize;
+            let (k, t, rule) = plans[o];
             let s = segments[k];
-            let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)], &hub_radius);
+            let (t, rule, i) = if t.is_nan() {
+                let i = pieces[k].partition_point(|q| q.t1 <= mids[o - fixed]);
+                let p = pieces[k][i];
+                if edge(&mut mesh, p.u, p.v) {
+                    continue;
+                }
+                let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)], &hub_radius);
+                if !(t > p.t0 && t < p.t1) {
+                    return Err(Error::Internal(format!(
+                        "segment {}: a piece is too short to split (do segments cross?)", p.seg)));
+                }
+                (t, rule, i)
+            } else {
+                // the piece of segment k that holds t (pieces are in order of t)
+                let i = pieces[k].partition_point(|q| q.t1 <= t);
+                (t, rule, i)
+            };
+            let p = pieces[k][i];
             if !(t > p.t0 && t < p.t1) {
-                return Err(Error::Internal(format!(
-                    "segment {}: a piece is too short to split (do segments cross?)", p.seg)));
+                continue;
             }
             let depth = (-(t - p.t0).min(p.t1 - t).log2()).ceil() as u32;
             if depth > max_depth {
                 return Err(Error::Internal(format!(
                     "segment {} needs more than {max_depth} halvings near t = {}", p.seg, p.t0)));
             }
-            plans.push((k, t, rule, false));
-        }
-        let at: Vec<P3> = plans.iter().map(|&(k, t, _, _)| {
-            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
-            std::array::from_fn(|c| a[c] + t * (b[c] - a[c]))
-        }).collect();
-        for o in delaunay::brio_order(&at) {
-            let (k, t, rule, force) = plans[o as usize];
-            // the piece of segment k that holds t (pieces are in order of t)
-            let i = pieces[k].partition_point(|q| q.t1 <= t);
-            let p = pieces[k][i];
-            if !force && edge(&mut mesh, p.u, p.v) || !(t > p.t0 && t < p.t1) {
-                continue;
-            }
-            let s = segments[k];
-            let depth = (-(t - p.t0).min(p.t1 - t).log2()).ceil() as u32;
             let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], t), &mut stats)?;
             seg_of_s.push(k as u32);
             // a removed edge has both ends among the new point's neighbours: the
