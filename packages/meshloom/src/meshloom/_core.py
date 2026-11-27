@@ -394,7 +394,11 @@ def mesh_plc(points, facets, segments=None, domain: str = "regions", max_depth: 
     tets, regions = i64(out[1], -1, 4), i64(out[2], -1)
     bfacet, bfaces = i64(out[3], -1), i64(out[4], -1, 3)
     ipair, ifaces = i64(out[5], -1, 2), i64(out[6], -1, 3)
-    boundary = {int(k): bfaces[bfacet == k] for k in np.unique(bfacet)}
+    # the faces of each facet in their order (a stable sort by facet, then split; a mask
+    # per facet would cost the number of facets times the number of faces)
+    order = np.argsort(bfacet, kind="stable")
+    keys, starts = np.unique(bfacet[order], return_index=True)
+    boundary = {int(k): bfaces[part] for k, part in zip(keys, np.split(order, starts[1:]))}
     interfaces = {}
     for (a, b), face in zip(ipair.tolist(), ifaces):
         interfaces.setdefault((a, b), []).append(face)
