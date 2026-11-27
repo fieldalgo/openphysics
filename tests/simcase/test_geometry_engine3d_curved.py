@@ -26,11 +26,16 @@ Pre-registered checks (adopted, decision 2026-11-27-openphysics-geometry-stage5-
 - G6: one document per contract stem that can occur in builder shapes (a cylinder crossing or
   touching a side, a sphere touching or crossing a face, two spheres touching or crossing) and the
   staging refusal of a configuration no builder takes; code, path and names.
-- S1: slice 1's 25 pull-request seeds and E1 give the SHA-256 recorded on main a5c61f8.
+- S1: slice 1's 25 pull-request seeds and E1 give the complex digest and the hand-off digest (what
+  simcase passes to meshloom: points as pm and as the doubles handed over, facets, tags, region
+  points, sizes and max_points) recorded from main f64e6a1's code before this slice. Re-registered
+  after the result (decision 2026-11-27-openphysics-geometry-stage5-s1-handoff-digest): the first
+  record held mesh digests, which depend on the meshloom kernel and came from a stale local build.
 """
 
 import hashlib
 import json
+import struct
 import math
 import os
 from fractions import Fraction
@@ -46,7 +51,7 @@ if not meshloom.kernel_available():
 import test_geometry_engine3d as s1  # noqa: E402
 from meshloom import builder  # noqa: E402
 from simcase.geometry_document import GeometryError  # noqa: E402
-from simcase.geometry_engine3d import _build, build_mesh3d  # noqa: E402
+from simcase.geometry_engine3d import build_mesh3d  # noqa: E402
 
 FULL = os.environ.get("OPENPHYSICS_GEOMETRY3D_FULL") == "1"
 DIGESTS = Path(__file__).with_name("geometry3d_slice1_digests.json")
@@ -362,16 +367,34 @@ def complex_digest(cx) -> str:
     return h.hexdigest()
 
 
+def handoff_digest(ho) -> str:
+    """SHA-256 of what simcase passes to meshloom (``_prepare``'s hand-off): every point as pm and as the
+    metre doubles of rule H1, the facets, their tags, the region points, the sizes and max_points."""
+    from simcase.geometry_engine3d import _metres
+    h = hashlib.sha256()
+    for p in ho.points:
+        h.update(repr(tuple(p)).encode())
+        h.update(struct.pack("<3d", *(_metres(c) for c in p)))
+    h.update(repr(ho.facets).encode())
+    h.update(repr([f"f{i}" for i in range(len(ho.facets))]).encode())
+    h.update(repr(ho.region_points).encode())
+    h.update(repr(sorted(ho.h.items()) if isinstance(ho.h, dict) else ho.h).encode())
+    h.update(repr(ho.max_points).encode())
+    return h.hexdigest()
+
+
 @pytest.mark.parametrize("seed", list(range(0, 200, 8)))
-def test_s1_slice1_complexes_and_meshes_are_unchanged(seed):
+def test_s1_slice1_complexes_and_hand_offs_are_unchanged(seed):
+    from simcase.geometry_engine3d import _prepare
     recorded = json.loads(DIGESTS.read_text(encoding="utf-8"))
-    result = build_mesh3d(s1.g1_doc(seed)[0])
-    assert {"complex": complex_digest(result.complex), "mesh": s1.digest(result)} == recorded[str(seed)]
+    cx, _, ho, _ = _prepare(s1.g1_doc(seed)[0])
+    assert {"complex": complex_digest(cx), "handoff": handoff_digest(ho)} == recorded[str(seed)]
 
 
 def test_s1_e1_is_unchanged():
+    from simcase.geometry_engine3d import _prepare
     recorded = json.loads(DIGESTS.read_text(encoding="utf-8"))
-    assert s1.digest(_build(s1.e1(), through_meshloom=True)) == recorded["e1"]
+    assert handoff_digest(_prepare(s1.e1(), through_meshloom=True)[2]) == recorded["e1"]["handoff"]
 
 
 def test_the_exact_complex_of_a_sampled_surface_is_refused_by_name():
