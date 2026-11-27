@@ -265,8 +265,8 @@ impl<G: Geom> Mesh<G> {
         false
     }
 
-    /// The vertices joined to a by an edge (no ghost), in walk order: the same walk
-    /// over the tetrahedra around a as [`Mesh::has_edge`].
+    /// The vertices joined to a by an edge (no ghost), sorted: the same walk over the
+    /// tetrahedra around a as [`Mesh::has_edge`].
     pub(crate) fn neighbours(&mut self, a: u32) -> Vec<u32> {
         debug_assert!(self.track, "neighbours needs a mesh built with track");
         let mut out = Vec::new();
@@ -282,7 +282,7 @@ impl<G: Geom> Mesh<G> {
         while let Some(t) = self.stack.pop() {
             let v = self.verts(t);
             for &w in &v {
-                if w != a && w != GHOST && !out.contains(&w) {
+                if w != a && w != GHOST {
                     out.push(w);
                 }
             }
@@ -297,6 +297,8 @@ impl<G: Geom> Mesh<G> {
                 }
             }
         }
+        out.sort_unstable();
+        out.dedup();
         out
     }
 
