@@ -104,6 +104,12 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 크기는 하나만 받습니다. 표본화한 곡면이 있으면 피처나 배경의 `element_size`, `mesh.controls` 크기,
 `selections`, `boundary_tags`를 뒤 슬라이스까지 이름을 밝혀 거부합니다.
 
+허용 오차 아래 거부도 여기에 적용되며, 넘기기 전, 닿음과 가로지름 줄기 뒤에 돕니다. 가장 작은 정확한 틈(C4는
+비아 곡면에서 도메인 옆면마다, C5는 구에서 도메인 면마다, C11은 이웃한 반지름의 차)이 대각선의
+`MESHER_RELATIVE_TOLERANCE`(3e-8)보다 작으면 `geometry.components.<name>`에서 `E-CONTRACT`와 파서의 문장으로,
+나중 피처 이름을 밝혀 거부합니다. C1과 C11의 도메인은 빈 공간의 경계만 주므로(그곳에서 builder는 상자를 메시하지
+않음) 구와 도메인 사이 거리는 검사하지 않습니다.
+
 ## meshloom에 넘기기
 
 - **좌표(규칙 H1).** pm 값 k마다 `float(Fraction(k, 10**12))` 미터가 되며 한 번만 반올림합니다. 그래서
