@@ -172,8 +172,8 @@ pub(crate) fn locate_seeds(points: &[P3], b: &Boundary, comp: &[u32], outside: &
     let n = points.len() as u32;
     let mut ext = points.to_vec();
     ext.extend(seeds.iter().map(|s| s.p));
-    let m = Mixed { input: &ext, s: &b.plc.rec.s };
-    let orig = Mixed { input: points, s: &b.plc.rec.s };
+    let m = Mixed::new(&ext, &b.plc.rec.s);
+    let orig = Mixed::new(points, &b.plc.rec.s);
     let mut cnt = MixedCounters::default();
     let mut out = Vec::with_capacity(seeds.len());
     for (j, sd) in seeds.iter().enumerate() {
@@ -284,7 +284,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
         }
         if let Some(c) = (0..ncomp as usize).find(|&c| !outside[c] && label_of[c].is_none()) {
             let t = comp.iter().position(|&x| x == c as u32).unwrap();
-            let m = Mixed { input: points, s: &b.plc.rec.s };
+            let m = Mixed::new(points, &b.plc.rec.s);
             let q = tets[t].map(|g| m.rounded(m.from_id(g)));
             let w = [0, 1, 2].map(|k| (q[0][k] + q[1][k] + q[2][k] + q[3][k]) / 4.0);
             return Err(format!("seed: a region has no seed (one of its points: {w:?})"));
@@ -377,7 +377,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
         k
     };
     // 3. rounding and renumbering
-    let m = Mixed { input: points, s: &b.plc.rec.s };
+    let m = Mixed::new(points, &b.plc.rec.s);
     let mut new_id: HashMap<u32, u32> = HashMap::new();
     let mut nodes: Vec<P3> = Vec::new();
     let mut source: Vec<u32> = Vec::new();

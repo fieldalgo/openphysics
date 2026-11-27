@@ -350,7 +350,7 @@ See [third-party software](../../third-party.md).
   - V28 on C2, C3 and C5 at two sizes each, from micrometres to 1e6 m: V1–V5 hold,
     and the volume fractions and tetrahedron counts are within the gates.
   - V14's graded 1M-tetrahedron cube (benchmark): V8's graded size times 0.130 gives
-    1,005,634 tetrahedra at 0.77 GiB peak RSS, **within** ≤ 1 GiB, in a median of 175 s
+    1,005,634 tetrahedra at 0.77 GiB peak RSS, **within** ≤ 1 GiB, in a median of 135 s
     (5 fresh processes, one thread), which **fails** ≤ 60 s (2026-11-27; 255 s and
     2.12 GiB on 2026-11-26, before the shape memo was removed).
   - V6: sphere volume slope 1.87, e(0.05) = 1.15e-3.

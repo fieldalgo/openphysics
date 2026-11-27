@@ -256,7 +256,7 @@ pub fn recover_checked(plc: &crate::plc::Plc, checked: crate::plc::Checked, max_
     let chain_of: HashMap<(u32, u32), &Vec<u32>> = segs.iter().zip(&rec.chains)
         .map(|(s, c)| ((s[0].min(s[1]), s[0].max(s[1])), c)).collect();
     let plane = crate::mixed::MixedPlane {
-        m: crate::mixed::Mixed { input: &plc.points, s: &rec.s },
+        m: crate::mixed::Mixed::new(&plc.points, &rec.s),
         n: std::cell::Cell::new(MixedCounters::default()),
     };
     let chain = |e: &(u32, u32)| -> Result<&Vec<u32>, String> {
@@ -321,7 +321,7 @@ fn is_acute(points: &[P3], segments: &[[u32; 2]], inc: &[u32], v: usize) -> bool
 fn exact_point(a: &P3, b: &P3, t: f64) -> bool {
     let input = [*a, *b];
     let s = [SPoint::seg(0, 1, t)];
-    crate::mixed::Mixed { input: &input, s: &s }.is_exact(Pt::S(0))
+    crate::mixed::Mixed::new(&input, &s).is_exact(Pt::S(0))
 }
 
 fn insert_s(mesh: &mut Mesh<MixedPoints>, sp: SPoint, stats: &mut RecoveryStats) -> Result<u32, Error> {
@@ -386,7 +386,10 @@ mod tests {
     /// b through its own S points with increasing t.
     fn check(points: &[P3], segments: &[[u32; 2]]) -> Recovered {
         let r = recover(points, segments, 60).unwrap();
-        let mut g = MixedPoints { input: points.to_vec(), s: r.s.clone(), n: MixedCounters::default() };
+        let mut g = MixedPoints::new(points.to_vec());
+        for sp in &r.s {
+            g.push(*sp);
+        }
         verify_with(&mut g, points.len() + r.s.len(), &r.tets).unwrap();
         let edges: HashSet<(u32, u32)> = r.tets.iter()
             .flat_map(|v| (0..4).flat_map(move |i| (i + 1..4).map(move |j| (v[i].min(v[j]), v[i].max(v[j])))))
