@@ -406,6 +406,10 @@ class _Builder:
         V = _plan_vertices(rc)
         self.V = V
         self.rectilinear = all(V[k.a][0] == V[k.b][0] or V[k.a][1] == V[k.b][1] for k in rc.curves)
+        # the ends of sloped curves: an axis-aligned face is not merged across one, and a horizontal
+        # loop keeps one, so a sloped quad's vertical edge meets other faces in their edges only
+        self.keep = frozenset(V[v] for k in rc.curves if V[k.a][0] != V[k.b][0] and V[k.a][1] != V[k.b][1]
+                              for v in (k.a, k.b))
         ncell = len(rc.cells)
         bg = comp.background.get("material", _MISSING)
 
@@ -521,7 +525,7 @@ class _Builder:
                 key[c.index] = (below, above, frozenset(prov))
             for group in _groups(rc, key):
                 k0 = key[group[0]]
-                loops2 = _merged_loops(rc, self.V, set(group))
+                loops2 = _merged_loops(rc, self.V, set(group), self.keep)
                 cells_minus = self._cells_of(group, s - 1)
                 cells_plus = self._cells_of(group, s)
                 ext = k0[0] is None or k0[0][2] or k0[1] is None or k0[1][2]
@@ -570,7 +574,8 @@ class _Builder:
             pieces.sort()
             merged = []
             for lo, hi, minus, plus in pieces:
-                if merged and merged[-1][1] == lo:
+                at = (lo, coord) if axis == 1 else (coord, lo)
+                if merged and merged[-1][1] == lo and at not in self.keep:
                     merged[-1][1] = hi
                     merged[-1][2].add(minus)
                     merged[-1][3].add(plus)
@@ -642,7 +647,7 @@ def _direction(p, q):
     return _ex(4 + t)
 
 
-def _merged_loops(rc, V, group: set) -> list[list]:
+def _merged_loops(rc, V, group: set, keep=frozenset()) -> list[list]:
     """The faces of a group of fine cells: ``[[outer, hole, ...], ...]`` of 2D pm points.
 
     One face with its holes when its boundary is simple; when the boundary meets itself at a
@@ -674,7 +679,7 @@ def _merged_loops(rc, V, group: set) -> list[list]:
                 a, b = b, nxt
                 used.add((a, b))
             loops.append([V[v] for v in loop])
-    loops = [_simplify(lp) for lp in loops]
+    loops = [_simplify(lp, keep) for lp in loops]
     seen, pinch = set(), False
     for lp in loops:
         for p in lp:
@@ -690,17 +695,18 @@ def _merged_loops(rc, V, group: set) -> list[list]:
     return [[outers[0], *holes]]
 
 
-def _simplify(loop: list) -> list:
+def _simplify(loop: list, keep=frozenset()) -> list:
     """Drop the vertices of a closed loop where it goes straight on along an axis. A vertex on a sloped
     run is kept: the sloped sides are split at every 2D vertex, and a point cannot be put back into a
-    sloped edge after rounding."""
+    sloped edge after rounding. So is a vertex in ``keep`` (an end of a sloped curve), where a sloped
+    quad's vertical edge meets the loop."""
     n = len(loop)
-    keep = []
+    out = []
     for i in range(n):
         d0, d1 = _direction(loop[i - 1], loop[i]), _direction(loop[i], loop[(i + 1) % n])
-        if d0 != d1 or not isinstance(d0, int):
-            keep.append(loop[i])
-    return keep
+        if d0 != d1 or not isinstance(d0, int) or loop[i] in keep:
+            out.append(loop[i])
+    return out
 
 
 def _axis_aligned(loop: list) -> bool:
