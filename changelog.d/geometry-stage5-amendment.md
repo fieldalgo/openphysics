@@ -1,0 +1,9 @@
+# Changed
+
+## English
+
+- `simcase`: **the geometry document contract's stage 5 amendment** (approved 2026-11-27; documentation only). The 3D compile conditions replace the proposal: every `box`, `extrude`, `cylinder` and slab layer is a vertical prism, cut at every distinct z level, with each slab a 2D later-wins arrangement resolved by the stage 2 engine; what is allowed and refused for boxes, cylinders, spheres, footprint layers, `circle_segments` and rounding collapses, with the new code `E-3D-COMBINATION` (valid but outside the stage 5 combinations) and fixed message stems; anything else is refused by name, and a gmshio route is not planned. A `3d` component holding one `layers` feature keeps the `meshine.extrude` route; every other `3d` component goes to meshloom (experimental until meshloom's acceptance); `em.cavity3d` keeps its route. New default tags row for 3D through meshloom (`x0`–`z1` on the domain faces, `void` elsewhere); rule H1 for the hand-off (metres, each pm value rounded once); an extruded `rect` or `trapezoid` profile's `bottom` and `top` become `y0` and `y1`. [Stage 5 compile conditions](docs/packages/simcase/geometry_document.md#stage-5-compile-conditions-amended-2026-11-27).
+
+## 한국어
+
+- `simcase`: **형상 문서 계약의 5단계 보완**(2026-11-27 승인, 문서만). 3D 컴파일 조건이 제안을 대체합니다. 모든 `box`, `extrude`, `cylinder`와 판 층은 수직 프리즘이고, 서로 다른 모든 z 높이에서 자르며, 각 판 구간은 2단계 엔진이 푸는 2D "나중 피처가 이김" 배열입니다. 상자·원통·구·발자국 층·`circle_segments`·반올림 겹침에 대해 받는 것과 거부하는 것을 정하고, 새 코드 `E-3D-COMBINATION`(유효하지만 5단계 조합 밖)과 고정 메시지 줄기를 둡니다. 그 밖의 것은 이름을 밝혀 거부하며 gmshio 경로는 계획하지 않습니다. `layers` 피처 하나를 가진 `3d` 구성 요소는 `meshine.extrude` 경로를 유지하고, 그 밖의 `3d` 구성 요소는 meshloom으로 갑니다(meshloom 수용 전까지 실험 단계). `em.cavity3d`는 경로를 유지합니다. meshloom을 거치는 3D의 기본 태그 행(도메인 면에 `x0`–`z1`, 그 밖에 `void`), 넘기기 규칙 H1(미터, pm 값마다 한 번 반올림), 압출한 `rect`·`trapezoid` 프로파일의 `bottom`·`top`이 `y0`·`y1`이 되는 규칙을 더합니다. [5단계 컴파일 조건](packages/simcase/geometry_document.md#5단계-컴파일-조건2026-11-27-보완).
