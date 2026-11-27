@@ -315,6 +315,8 @@ main.comparing>.divider-inspector{left:calc(var(--inspector-width,320px) - 3px)}
 .compare-selection .compare-pick{white-space:nowrap}
 .compare-options{flex-wrap:wrap;padding:10px 0;gap:12px}
 .compare-options label{flex:0 1 160px}
+/* round 38 (D4, C2): the first-view lines under the Matched modes toolbar, above the plots */
+.compare-first-line{margin:0 0 10px;overflow-wrap:anywhere}
 /* the matched-modes picker shows the whole pair when closed: its own row, as wide as the pane */
 .canvas>.toolbar.compare-options label.compare-mode-label{flex:1 1 100%;max-width:100%;flex-direction:column;align-items:stretch;gap:4px}.canvas>.toolbar.compare-options label.compare-mode-label select{width:100%;max-width:100%}
 /* a number keeps its unit ("0.1234 %") and its sign on one line */

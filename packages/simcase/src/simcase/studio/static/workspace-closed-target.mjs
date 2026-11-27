@@ -37,6 +37,9 @@ export const SHORTCUT_MODE_COUNT=4;
 export const shortTarget=t=>String(Number(t));
 /** "Set search near 2.46 · 4 modes": the edge note's shortcut (round 22, V5: "Set", as it runs nothing). */
 export const shortcutText=t=>`Set search near ${shortTarget(t)} · ${SHORTCUT_MODE_COUNT} modes`;
+// Round 38 (D4): the same shortcut offered on Compare for one run, naming the run and what the button
+// does there: it makes that run's inputs current, then sets the shortcut (it runs nothing)
+export const runShortcutText=(n,t)=>`Use Run ${n}'s inputs with search near ${shortTarget(t)} · ${SHORTCUT_MODE_COUNT} modes`;
 /** The end of the shortcut's message (round 22, V5): it sets the inputs; Run study computes. */
 export const SHORTCUT_RUN_TEXT='Press Run study to compute.';
 /** "Found 3 of 4 modes near n_eff 2.46, above n = 1.45": the run line of every closed targeted run. */

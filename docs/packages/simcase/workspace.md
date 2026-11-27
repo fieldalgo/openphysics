@@ -2842,6 +2842,17 @@ overtakes the TM-like one). Matching is on for two closed runs (with an open run
   run's inputs (the *Use this run's inputs* step); Modes to return is not part of Undo. There is no
   button for a run with a core mode, an open run, or when Compare matched the modes. The matching,
   Compare's other text, the values, the files, the run records and the dialog are unchanged.
+- **Core search above the plots (round 38, D4).** At 1440 × 900 the plots fill Compare's first
+  view, so the round-37 button sat out of sight. Under the same conditions (no matched modes, a
+  closed run whose mode 1 is an edge mode and which has no core mode) one line now sits directly
+  under the Matched modes toolbar, above the plots, one per such run: *A · Run 2 has no core mode:
+  its modes are mostly in Substrate, which touches the window edge.* The round-37 button moved onto
+  that line (there is no second button). Its label names the run and what it does: *Use Run 2's
+  inputs with search near 2.46 · 4 modes*; its action is unchanged (the run's inputs, the shortcut,
+  the Model page, nothing run), and so is the Messages line. The description keeps its reason and
+  its *Open Run 2 in Results* link. Opening Compare scrolls the pane toward the middle of the plots
+  as before, but never past this line, so the line, its button and the plots' headings stay in the
+  first view. The matching, the mode numbers, the values, the files and the dialog are unchanged.
 - **Older files.** Matching uses only the stored samples, so it works on every optical run of
   version 6 and 7 session files, and nothing is added to the files.
 - **Limitations.** η is computed from piecewise-constant centroid samples, so it carries a
