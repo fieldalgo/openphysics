@@ -43,6 +43,8 @@ import {SIDES,SIDE_TYPES,DEFAULT_THERMAL,validateThermal,thermalBlock,heatDocume
 import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
+import {createModel3dView} from './workspace-model3d-view.mjs';
+import {CARD3D} from './workspace-model3d.mjs';
 import {ENVELOPE,matchesAgainText} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
@@ -194,7 +196,36 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(t
  // the model's current file name (File › Save downloads under it again), which the header names
  currentFileName:()=>currentFileNow()?.name||null,currentFileHow:()=>currentFileNow()?.how||null,
  // the browser copy, in the indicator's words: kept:N when recovery left out the maps of N runs
- recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),null,libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));}});
+ recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),null,libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));library3d(host);}});
+// The 3D model (slice B of the Studio 3D view; workspace-model3d-view.mjs): its own page, tree and
+// Undo beside the workspace and multiphysics models, which stay as they are.
+const m3View=createModel3dView({$,ui,notice:text=>notice(text),render:()=>render(),request:(url,body)=>studioRequest('POST',url,body),
+ onHistory:()=>{updateHistory();refreshPersistence();},projectLine:()=>projectLine(),
+ applications:host=>{renderApplications(host,resumeOffer(),null,libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));library3d(host);}});
+// The Library's 3D group: its own cards, after the application cards (not an application card).
+function library3d(host){
+ const cards=host.querySelector('.cards');if(!cards||host.querySelector('.library-3d'))return;
+ const section=document.createElement('section');section.className='library-3d';
+ const heading=document.createElement('h3');heading.textContent='3D models (experimental)';
+ const group=document.createElement('div');group.className='cards-3d';
+ const button=document.createElement('button');button.type='button';button.dataset.model3dCard=CARD3D.id;
+ const title=document.createElement('strong');title.textContent=CARD3D.title;
+ const status=document.createElement('span');status.className='application-status available';status.textContent=CARD3D.status;
+ const description=document.createElement('p');description.textContent=CARD3D.description;
+ const note=document.createElement('span');note.className='card-scope';note.textContent=CARD3D.note;
+ const action=document.createElement('span');action.className='card-action';action.textContent=m3View.inProject()?'Return to the 3D model':'Open model';
+ button.append(title,status,description,note,action);group.append(button);section.append(heading,group);cards.after(section);
+ button.onclick=()=>choose3d();
+}
+// The 3D card: the model in the project as it was left, else the card's document. The other models stay.
+async function choose3d(){
+ if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
+ if(openingModel){notice('Wait until the model file has been opened.');return;}
+ if(m3View.inProject()){if(!leaveMultiphysics())return;m3View.show();topOfPage();return;}
+ let doc;try{doc=await studioRequest('GET',CARD3D.asset);}catch(e){notice('The 3D model could not be loaded: '+e.message);return;}
+ if(!leaveMultiphysics())return;fileScope++;projectId('model3d');m3View.open(doc,{asTitle:CARD3D.title});topOfPage();
+ notice(`${CARD3D.title} added to this project; the other models stay as they were. Nothing was computed.`);
+}
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
 // Reset): refused while its run is going; false when refused.
 function leaveMultiphysics(){
@@ -254,12 +285,13 @@ function projectModels(){
  const list=[];
  if(workspaceInProject())list.push({id:projectId('workspace'),kind:'workspace',title:workspaceTitle(),card:workspaceCard()});
  if(multiView.inProject())list.push({id:projectId('multiphysics'),kind:'multiphysics',title:multiView.projectTitle(),card:multiView.card()});
+ if(m3View.inProject())list.push({id:projectId('model3d'),kind:'model3d',title:m3View.projectTitle(),card:m3View.card()});
  return list;
 }
 // What "changed" counts: the project name and every model's inputs, study settings, runs, names,
 // pins and comparison (multiphysics: its document, runs and without-heater results); not the view
 // or the selected run.
-const projectContent=()=>JSON.stringify([workspaceInProject()?{input:workspaceInputs(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),comparison:compareIds}:null,multiView.inProject()?multiView.contentStamp():null]);
+const projectContent=()=>JSON.stringify([workspaceInProject()?{input:workspaceInputs(),runs:runs.map(r=>[r.job,r.completedAt,r.label||'',r.pinned===true]),comparison:compareIds}:null,multiView.inProject()?multiView.contentStamp():null,m3View.inProject()?m3View.contentStamp():null]);
 const projectStamp=(name=project.name,content=projectContent())=>JSON.stringify([name,content]);
 // The models whose runs no file holds (the leave question names them)
 function unsavedModels(){
@@ -373,6 +405,7 @@ function renameProject(value){
 // Switching models inside a project asks nothing (P3): a card whose model is in the project shows
 // it as it was left; the other cards add their model.
 function chooseTemplate(id){
+ if(m3View.active())m3View.leave();
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  if(openingModel){notice('Wait until the model file has been opened.');return;}
  if(id==='heated-waveguide'&&multiView.inProject()){if(multiView.active()){ui.page=multiView.returnPage();render();}else multiView.show();topOfPage();return;}
@@ -486,7 +519,7 @@ function rememberReturn(){if(ui.page==='Applications')return;if(multiView.active
 function render(){groupCarry.seen(state.groupIndex);rememberReturn();if(ui.page!=='Compare')compareOpen=false;const key=ui.page+'/'+ui.selection,inspectorScroll=key===panelKey?$('inspector').scrollTop:0,before=document.activeElement;panelKey=key;renderPanels();$('inspector').scrollTop=inspectorScroll;
  // only a field whose focus was restored onto a new element is brought into view; a background redraw does not move a panel the user scrolled
  const focused=document.activeElement;if(focused&&focused!==before&&$('inspector').contains(focused)&&focused!==$('inspector'))focused.scrollIntoView({block:'nearest'});}
-function renderPanels(){if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?projectLine():'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));markPageTabs(document.querySelector('.page-tabs'),ui.page);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');drawModelTree();
+function renderPanels(){if(m3View.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;m3View.renderPage();refreshInputIssues();return;}if(multiView.active()){disposeConnectionGraph();disposeConnectionGraph=()=>{};profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();disposeWidthEditor();disposeWidthEditor=()=>{};if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();$('run-optical').hidden=true;$('run-heat').hidden=true;$('run-joule').hidden=true;$('input-problems').hidden=true;multiView.renderPage();return;}document.querySelector('main').dataset.page=ui.page;$('view-title').textContent=({Model:'Graphics',Connections:'Physics connections',Results:'Results',Compare:'Comparison',Applications:'Model library'})[ui.page];$('view-detail').textContent=ui.page==='Model'?'Interactive model view':ui.page==='Connections'?(isJoule()?'Solved together':isHeat()||isOptical()?'Single physics':'One-way setup'):ui.page==='Applications'?projectLine():'';document.querySelectorAll('[data-command-node]').forEach(b=>b.disabled=ui.page==='Applications');disposeConnectionGraph();disposeConnectionGraph=()=>{};if(!isJoule())$('solver-log').hidden=true;document.querySelector('main').classList.toggle('connecting',ui.page==='Connections'&&!isOptical()&&!isHeat());const focused=document.activeElement,focusId=focused?.id;const focusData=['port','joule-node','select','toggle','node','body','pick-mode','pick-body','pick-shape','shape','handle','pick-edge','run'].map(key=>[key,focused?.getAttribute('data-'+key)]).find(([,value])=>value!==null&&value!==undefined);profileResize?.disconnect();heatResize?.disconnect();jouleView.disconnect();profileRedraw=()=>{};disposeWidthEditor();disposeWidthEditor=()=>{};if(isHeat()){if(!HEAT_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isJoule()){if(!JOULE_NODES.includes(ui.selection))ui.selection='Geometry';ui.view='Section';pick.mode='Bodies';pick.boundary=null;}if(isOptical()){if(ui.page==='Model'&&['Electric currents','Heat transfer','Solid mechanics','Couplings'].includes(ui.selection))ui.selection='Geometry';ui.view='Section';if(ui.body==='Heater')ui.body='Core';if(pick.boundary&&!pick.boundary.startsWith('optical-'))pick.boundary=null;}else if(pick.boundary?.startsWith('optical-'))pick.boundary=null;document.querySelector('[data-view=Perspective]').disabled=isOptical()||isHeat();if(typeof fieldResize!=='undefined'&&fieldResize)fieldResize.disconnect();document.querySelectorAll('[data-command-node]').forEach(b=>b.onclick=()=>select(b.dataset.commandNode));markPageTabs(document.querySelector('.page-tabs'),ui.page);document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===ui.view));$('breadcrumb').textContent=ui.page+' / '+ui.selection;document.querySelectorAll('[data-view]').forEach(b=>b.hidden=ui.page!=='Model');drawModelTree();
 let inspector='<span class="muted">SELECTION</span><h2>'+ui.selection+'</h2>';
 if(ui.selection==='Geometry'&&isOptical())inspector+=shapeInspector();
 else if(ui.selection==='Geometry')inspector+=`<label for="width">Core width <output>${state.width} nm</output><input id="width" aria-label="Core width slider [nm]" type="range" min="300" max="900" step="any" value="${state.width}"></label><label>Core width [nm]<input id="width-number" type="number" min="300" max="900" step="any" value="${state.width}"></label>`+pair('Bodies','Core / oxide / heater')+pair('Representation','Concept preview');
@@ -500,7 +533,7 @@ else inspector+=pair('Status','Not executed')+'<p>Settings and validation will b
 if(isHeat())inspector=heatInspector();else if(isJoule())inspector=jouleView.inspector();else inspector+='<p class="muted">Editing this design does not run a simulation.</p>';$('inspector').innerHTML=inspector;if(ui.selection==='Geometry'&&isOptical())bindShapePanel();if(isHeat())bindHeatPanel();if(isJoule())jouleView.bindInspector();
 if(ui.page==='Connections'&&isOptical()){$('canvas').innerHTML='<h2>Optical-only model</h2><p>This model has one optical interface and no coupled physics. Choose the heated-waveguide template to configure a multiphysics preview; coupled computation remains unavailable.</p><button id=choose-multiphysics>Choose another application</button>';$('choose-multiphysics').onclick=()=>{ui.page='Applications';render();};}
 else if(ui.page==='Connections')$('canvas').innerHTML=renderConnectionOverview();
-else if(ui.page==='Applications')renderApplications($('canvas'),resumeOffer(),null,libraryOptions());
+else if(ui.page==='Applications'){renderApplications($('canvas'),resumeOffer(),null,libraryOptions());library3d($('canvas'));}
 else if(ui.page==='Results')$('canvas').innerHTML='<h2>Results workspace</h2><p>Temperature · displacement · optical fields</p><div class="empty">No computed results<br>Run adapters are not connected.</div><p>Planned: common coordinates, time playback, probes and explicit deformation magnification.</p>';
 else $('canvas').innerHTML='<h2>'+ui.selection+'</h2>'+geom();
 $('sequence').innerHTML=applicationChosen()?active().map((n,i)=>`<span><b>${i+1}</b>${n}</span>`).join('')+'<span>Preflight pending</span>':'<span class="sequence-empty">Study steps appear once you choose an application.</span>';
@@ -534,9 +567,10 @@ function refreshInputIssues(){
   const el=$(field.id);if(!el)continue;const issue=numericDrafts.get(key);el.setAttribute('aria-invalid',String(!!issue));
   const hint=$(field.id+'-hint');if(hint)hint.textContent=issue?issue.message:`Allowed: ${field.min}–${field.max}${field.unit?' '+field.unit:''}.`;
  }
- for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||(multiView.active()&&id==='save-draft');
+ for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||m3View.drafts()>0||((multiView.active()||m3View.active())&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;refreshRunOptions();
- if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
+ if(m3View.active())$('status').textContent=m3View.blockText()||'3D geometry · Mesh and Run come in a later step';
+ else if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
  else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
  // the Study panel's next-run line follows every accepted edit (a numeric edit does not redraw the panel)
@@ -758,6 +792,8 @@ let saveIndicator=null,recoveryState=null,latestOffer=null;
 // The inputs a model card gave, until the first edit: the indicator says the model is new, not that edits are unsaved.
 let newModelInputs=null;
 function refreshPersistence(){
+  // the 3D model: its document is saved in the project file; it is not in browser recovery yet
+  if(m3View.active()){const saved=project.file&&project.file.scope===project.scope&&project.stamp===projectStamp();const text=saved?'3D model saved in the project file':'3D model · not saved to a file';if($('autosave-status').textContent!==text)$('autosave-status').textContent=text;refreshProjectLine();return;}
   const clean=!edits.dirty;
   // Results not in a session file outrank a clean input snapshot: saving inputs only
   // must not read as saved while completed runs would be lost.
@@ -942,8 +978,8 @@ function checkpointRecovery(){
 try{recoverable=readRecovery(localStorage);showRecovery();}catch(error){$('recovery-status').textContent='Recovery could not be read: '+error.message+' Current inputs kept.';}
 $('recover-inputs').onclick=()=>{try{rejectInvalidInput();if(recoverable)requestLoad(recoverable.input,{saved:false,label:'Recent valid inputs'});}catch(error){notice(error.message);}};
 
-function updateHistory(){ $('undo-edit').disabled=multiView.active()?!multiView.canUndo():!edits.canUndo;$('redo-edit').disabled=multiView.active()?!multiView.canRedo():!edits.canRedo; }
-function trackEdit(group=null){if(multiView.active())return;const before=edits.signature;edits.record(inputsFile(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();offerDue=true;}updateHistory();refreshPersistence();}
+function updateHistory(){ $('undo-edit').disabled=m3View.active()?!m3View.canUndo():multiView.active()?!multiView.canUndo():!edits.canUndo;$('redo-edit').disabled=m3View.active()?!m3View.canRedo():multiView.active()?!multiView.canRedo():!edits.canRedo; }
+function trackEdit(group=null){if(multiView.active()||m3View.active())return;const before=edits.signature;edits.record(inputsFile(),group);if(edits.signature!==before){checkpointRecovery();inputsChangedSinceResult();offerDue=true;}updateHistory();refreshPersistence();}
 // Round 18 (X1): an edit, Undo or Redo that leaves the current inputs and study settings equal to a
 // run's (its signature: geometry, materials, wavelength, mesh, Modes to find, group index, boundary
 // and search targets) says so after the edit's own message, in the heated model's words, with Show
@@ -1000,8 +1036,8 @@ function restoreEdit(doc,label){
  Object.assign(state,doc.model);setStudy(doc);Object.assign(setup,doc.setup);pick.boundary=null;
  checkpointRecovery();render();updateHistory();refreshPersistence();if(label!==null)notice(label+' · input changes only; no solver executed.');
 }
-$('undo-edit').onclick=()=>{if(multiView.active())multiView.undo();else{restoreEdit(edits.undo(),'Undo');offerMatchingRun();}};
-$('redo-edit').onclick=()=>{if(multiView.active())multiView.redo();else{restoreEdit(edits.redo(),'Redo');offerMatchingRun();}};
+$('undo-edit').onclick=()=>{if(m3View.active())m3View.undo();else if(multiView.active())multiView.undo();else{restoreEdit(edits.undo(),'Undo');offerMatchingRun();}};
+$('redo-edit').onclick=()=>{if(m3View.active())m3View.redo();else if(multiView.active())multiView.redo();else{restoreEdit(edits.redo(),'Redo');offerMatchingRun();}};
 document.addEventListener('input',event=>trackEdit(event.target));
 document.addEventListener('change',()=>{trackEdit();edits.endGroup();if(offerDue)setTimeout(offerMatchingRun,0);});
 document.addEventListener('click',()=>{trackEdit();edits.endGroup();if(offerDue)setTimeout(offerMatchingRun,0);});
@@ -1016,7 +1052,7 @@ document.addEventListener('keydown',event=>{
   if(document.activeElement?.matches('input,textarea,select'))document.activeElement.blur();
  const item=$(fileKey==='o'?'menu-open':event.shiftKey?'menu-save-as':'menu-save');if(!item.disabled)item.click();else notice('Fix or discard the invalid inputs first.');return;}
  if(event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
- const canUndo=multiView.active()?multiView.canUndo():edits.canUndo,canRedo=multiView.active()?multiView.canRedo():edits.canRedo;
+ const canUndo=m3View.active()?m3View.canUndo():multiView.active()?multiView.canUndo():edits.canUndo,canRedo=m3View.active()?m3View.canRedo():multiView.active()?multiView.canRedo():edits.canRedo;
  if(event.key.toLowerCase()==='z'){event.preventDefault();if(event.shiftKey){if(canRedo)$('redo-edit').click();}else if(canUndo)$('undo-edit').click();}
  else if(event.key.toLowerCase()==='y'){event.preventDefault();if(canRedo)$('redo-edit').click();}
 });
@@ -2163,6 +2199,7 @@ async function saveMultiphysicsSession({saveAs=false,keepSelected=false}={}){
 // Save writes the file Save As chose; without one it asks, as Save As does. Resolves when done.
 function saveSessionFile({saveAs=false,keepSelected=false}={}){
  if(savingFile){notice('A save is already in progress.');return Promise.resolve();}
+ if(m3View.active()){try{if(m3View.drafts())throw new Error(m3View.blockText());deliverSession(m3View.sessionText(),'via-in-a-layer-stack-3d.json',{saveAs});}catch(e){notice('Session not saved: '+e.message);}return Promise.resolve();}
  if(multiView.active())return saveMultiphysicsSession({saveAs,keepSelected}).catch(e=>notice('Session not saved: '+e.message));
  try{rejectInvalidInput();return saveOpticalSession({saveAs,keepSelected}).catch(e=>notice('Session not saved: '+e.message));}catch(e){notice('Session not saved: '+e.message);return Promise.resolve();}
 }
@@ -2194,13 +2231,16 @@ function saveProject({saveAs,keep}){
    let recoveryNow=null;if(runs.length){try{recoveryNow=captureSession(inputs,runs,solverRun?.job||null,compareIds,currentView())();}catch{}}
    parts.push({model:m,text:out.text,recovery:recoveryNow,words:modelParts(m.card==='optical'||runs.length?{runs:runs.length,comparison:runs.length>1}:{inputsOnly:true}),notKept:out.notKept,
     mark:(name,savedAt,written,projectName)=>{newModelInputs=null;if(at.shown&&!mpFlags&&JSON.stringify(inputsFile())===at.inputs)edits.markSaved();savedNotebookState=at.notebook;savedRunsState=at.runs;lastSavedFile={name,savedAt,stamp:at.stamp,recovered:false,written,projectName};loadedSession=null;}});
+  }else if(m.kind==='model3d'){
+   if(m3View.drafts())throw new Error(`${m.title}: ${m3View.blockText()}`);
+   parts.push({model:m,text:m3View.sessionText(),recovery:null,words:modelParts({inputsOnly:true}),notKept:[],mark:()=>{}});
   }else{
    const out=multiView.projectEntry({keepSelected:keep.has(m.id)});
    if(!out.ok){if(out.refusal)throw new Error(`${m.title}: ${out.refusal}`);askProjectOverflow(m,out.question,true,{saveAs,keep});return Promise.resolve();}
    parts.push({model:m,text:out.text,recovery:multiView.recoveryTextNow(),words:modelParts({runs:out.runs,baseline:out.baselines>0}),notKept:out.notKept,mark:out.mark});
   }
  }
- const entries=parts.map(p=>projectEntry({...p.model,text:p.text})),content=projectContent(),active=(multiView.active()?models.find(m=>m.kind==='multiphysics'):models[0]).id;
+ const entries=parts.map(p=>projectEntry({...p.model,text:p.text})),content=projectContent(),active=(m3View.active()?models.find(m=>m.kind==='model3d'):multiView.active()?models.find(m=>m.kind==='multiphysics'):models[0]).id;
  const fileText=name=>{const out=writeProject({name,savedAt:new Date().toISOString(),studio:connection.version||'unknown',active,entries});if(!out.ok)throw new Error(out.refusal);return out.text;};
  // the size before anything is asked (the name changes it by a few bytes at most)
  const first=writeProject({name:project.name||'Untitled project',savedAt:new Date().toISOString(),studio:connection.version||'unknown',active,entries});
@@ -2309,12 +2349,12 @@ async function openProjectFile(file){
  }catch(e){notice('Project not opened: '+e.message+' The current project is unchanged.');}
 }
 async function applyOpenedProject(read,fileName){
- const ws=read.models.find(m=>m.kind==='workspace'),mp=read.models.find(m=>m.kind==='multiphysics');
+ const ws=read.models.find(m=>m.kind==='workspace'),mp=read.models.find(m=>m.kind==='multiphysics'),solid=read.models.find(m=>m.kind==='model3d');
  if(solverBusy||multiView.busy()){notice('A calculation started; the project was not opened.');return;}
  openingModel=true;
  try{
   if(!leaveMultiphysics())return;
-  multiView.discard();
+  multiView.discard();m3View.close();
   resetProject({name:read.name,nameFrom:nameSource(read.name,fileName),ids:Object.fromEntries(read.models.map(m=>[m.kind,m.id]))});
   if(ws)completeLoad({input:ws.session.input,saved:true,session:ws.session,source:'file',label:fileName,page:null,opener:$('open-session'),context:loadContext()});
   else clearWorkspace();
@@ -2323,9 +2363,10 @@ async function applyOpenedProject(read,fileName){
    await multiView.openSession(mp.session,{label:fileName,source:'file',card:mp.card});
    if(read.active!==mp.id){leaveMultiphysics();ui.page=page;render();}
   }
+  if(solid){m3View.openSession(solid.session,{asTitle:solid.title});if(read.active!==solid.id){m3View.leave();ui.page='Model';render();}}
   project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});if(project.file)project.file.models=modelList();project.stamp=projectStamp();
   refreshPersistence();
-  const words=read.models.map(m=>({title:m.title,parts:m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
+  const words=read.models.map(m=>({title:m.title,parts:m.kind==='model3d'?modelParts({inputsOnly:true}):m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
   notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);if(ws)appendCurrentInputs(mp?ws.title:'');
  }finally{openingModel=false;}
 }
@@ -2359,6 +2400,7 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
   return;}
  const session=loaded.value.session;
  if(session.application==='multiphysics'){requestMultiphysicsSession(session,{label:file.name,source:'file',opener:$('open-session')});return;}
+ if(session.application==='model3d'){guardLeave(file.name,false,()=>{if(!leaveMultiphysics())return;projectId('model3d');m3View.openSession(session,{asTitle:CARD3D.title});notice(`Opened ${file.name}: the 3D model, checked again by the server; nothing was run.`);});return;}
  requestLoad(session.input,{session,label:file.name,fileName:file.name,opener:$('open-session'),newProject:true});
 }catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 

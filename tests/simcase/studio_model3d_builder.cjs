@@ -1,0 +1,152 @@
+// Copyright 2026 Yongha Kim (FieldAlgo)
+// SPDX-License-Identifier: Apache-2.0
+// The 3D builder's pure helpers (workspace-model3d.mjs): tree rows, field edits and drafts,
+// feature operations, parameters in use, the undo history and the refusal words.
+const test=require('node:test');const assert=require('node:assert/strict');
+const fs=require('node:fs');const path=require('node:path');
+const STATIC='../../packages/simcase/src/simcase/studio/static/';
+const STATIC_DIR=path.join(__dirname,'..','..','packages','simcase','src','simcase','studio','static');
+let M;
+test.before(async()=>{M=await import(STATIC+'workspace-model3d.mjs');});
+const card=()=>JSON.parse(fs.readFileSync(path.join(STATIC_DIR,'model3d-layer-stack-3d.json'),'utf8'));
+const comp=doc=>doc.geometry.components.stack3d;
+
+test('the card is its own Library group, with the square-via note',()=>{
+ assert.equal(M.CARD3D.id,'layer-stack-3d');assert.equal(M.CARD3D.kind,'model3d');
+ assert.equal(M.CARD3D.title,'Via in a layer stack (3D heat)');
+ assert.equal(M.CARD3D.note,'Square via (a round via needs cylinders, coming with the next geometry step)');
+ assert.equal(M.CARD3D.asset,'/model3d-assets/model3d-layer-stack-3d.json');
+ assert.deepEqual(M.FEATURE_TYPES.filter(t=>t.available).map(t=>t.label),['Box','Layers']);
+ // design 5.2, the coordinator's exact reasons
+ assert.deepEqual(M.FEATURE_TYPES.filter(t=>!t.available).map(t=>[t.label,t.reason]),[['Extrude','Extrude comes with a later geometry step'],
+  ['Cylinder','Cylinders come with the next geometry step'],['Sphere','Spheres come with the next geometry step']]);
+ assert.throws(()=>M.addFeature(card(),'cylinder'),{message:'Cylinders come with the next geometry step'});
+});
+
+test('the tree (design 5.2): Component 1 with Parameters, Geometry 1 (Domain, numbered features, Form result) and Materials',()=>{
+ const check={features:[{text:'covered in part by 2 (via)'},{text:''}],regions:[1,2,3,4],display:{faces:new Array(23).fill({})}};
+ const rows=M.treeRows(card(),check);
+ assert.deepEqual(rows.map(r=>[r.label,r.level,r.note]),[['Component 1 · 3D · µm',1,''],['Parameters',2,''],['Geometry 1',2,''],
+  ['Domain',3,'200 × 200 × 610 µm'],['1 Layers stack',3,'sub · oxide · top (covered in part by 2 (via))'],['2 Box via',3,'20 × 20 × 10 µm'],
+  ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · SiO2 · Cu']]);
+ let doc=M.addParameter(M.addParameter(card(),'t_ox','10 um'),'via_w','20 um');
+ const free=JSON.parse(JSON.stringify(doc));delete free.geometry.components.stack3d.domain.zmin;delete free.geometry.components.stack3d.domain.zmax;
+ const r2=M.treeRows(free,null);
+ assert.equal(r2.find(r=>r.key==='parameters').note,'t_ox = 10 um · via_w = 20 um');
+ assert.equal(r2.find(r=>r.key==='domain').note,'200 × 200 µm, z from the features');
+ assert.equal(r2.find(r=>r.key==='form').note,'');
+ const refused=M.treeRows(card(),null,{feature_index:1});
+ assert.deepEqual(refused.filter(r=>r.problem).map(r=>r.key),['feature:1']);
+ assert.equal(refused.find(r=>r.key==='form').note,'refused');
+ assert.deepEqual(M.treeRows(card(),null,{feature_index:null}).filter(r=>r.problem).map(r=>r.key),['form']);
+});
+
+test('field edits: numbers, quantities, names and expressions; a bad one is a draft problem',()=>{
+ // a field holding a parameter name shows it with its written value; a number its SI value
+ const named=M.setField(M.addParameter(card(),'t_ox','10 um'),'features[0].layers[1].thickness','t_ox');
+ assert.equal(M.fieldNote(named,'features[0].layers[1].thickness'),'= t_ox (10 µm)');
+ assert.equal(M.fieldNote(card(),'features[1].xmin'),'= 0.00009 m');
+ assert.equal(M.fieldNote(M.setField(card(),'features[1].xmin','100 - w / 2'),'features[1].xmin'),'');
+ const f=M.fieldsOf(card(),'feature:1').find(x=>x.key==='features[1].xmin');
+ let r=M.editField(card(),f,'95');assert.equal(comp(r.doc).features[1].xmin,95);assert.ok(Math.abs(r.si-9.5e-5)<1e-18);assert.equal(M.siText(r.si),'= 0.000095 m');
+ r=M.editField(card(),f,'0.1 mm');assert.equal(comp(r.doc).features[1].xmin,'0.1 mm');assert.ok(Math.abs(r.si-1e-4)<1e-18);
+ r=M.editField(card(),f,'100 - w / 2');assert.equal(comp(r.doc).features[1].xmin,'100 - w / 2');assert.equal(r.si,null);
+ assert.equal(M.editField(card(),f,'').problem,'Enter a length: a number, a quantity such as 12 um, a parameter name or an expression.');
+ assert.equal(M.editField(card(),f,'3 ft').problem,'ft is not a length unit (m, mm, um, nm).');
+ assert.equal(M.editField(card(),f,'2;rm').problem,'2;rm is not a number, a quantity, a parameter name or an expression.');
+ const t=M.fieldsOf(card(),'feature:0').find(x=>x.key==='features[0].layers[1].thickness');
+ assert.deepEqual(t.rule,{positive:true});assert.equal(M.editField(card(),t,'0').problem,'Stack oxide thickness must be greater than 0 µm.');
+ assert.equal(M.editField(card(),t,'-1 um').problem,'Stack oxide thickness must be greater than 0 µm.');
+ const mat=M.fieldsOf(card(),'feature:1').find(x=>x.kind==='material');
+ assert.equal(comp(M.editField(card(),mat,'Si').doc).features[1].material,'Si');
+ assert.equal(comp(M.editField(card(),mat,'').doc).features[1].material,null);
+ assert.equal(M.editField(card(),mat,'Gold').problem,'Gold is not a material of this model (Si, SiO2, Cu).');
+ assert.equal(M.siText(9.5e-5),'= 0.000095 m');assert.equal(M.siText(null),'');
+ assert.deepEqual(M.fieldsOf(card(),'domain').map(x=>x.label),['xmin','xmax','ymin','ymax','zmin','zmax']);
+});
+
+test('ranges (design 5.2): the 2D range sentence; Studio guards, not contract rules',()=>{
+ const f=key=>M.fieldsOf(card(),key.startsWith('domain')?'domain':'feature:'+/features\[(\d+)\]/.exec(key)[1]).find(x=>x.key===key);
+ const p=(key,raw,doc=card())=>M.editField(doc,f(key),raw).problem;
+ // a box: min < max on each axis, inside the domain where the domain is fixed
+ assert.equal(p('features[1].xmax','80'),'Via x max must be between 90–200 µm.');
+ assert.equal(p('features[1].xmax','210'),'Via x max must be between 90–200 µm.');
+ assert.equal(p('features[1].xmax','0.25 mm'),'Via x max must be between 90–200 µm.');
+ assert.equal(p('features[1].zmin','-5'),'Via z min must be between 0–510 µm.');
+ assert.equal(p('features[1].xmax','150'),undefined);
+ assert.equal(p('features[1].xmax','w'),undefined,'a name or an expression is the server\'s to check');
+ const free=JSON.parse(JSON.stringify(card()));free.geometry.components.stack3d.domain.xmax='2 * w';
+ assert.equal(M.editField(free,f('features[1].xmax'),'500').problem,undefined,'no fixed domain bound: only min < max');
+ assert.equal(M.editField(free,f('features[1].xmax'),'50').problem,'Via x max must be greater than 90 µm.');
+ // the domain: min < max
+ assert.equal(p('domain.xmin','200'),'Domain x min must be less than 200 µm.');
+ assert.equal(p('domain.zmax','-1'),'Domain z max must be greater than 0 µm.');
+ // names: unique in the component; layer names unique in the feature
+ assert.equal(p('features[1].name','stack'),'stack is already the name of another feature.');
+ assert.equal(p('features[1].name','2via'),'A name starts with a letter or _ and holds letters, digits and _.');
+ const lay=M.fieldsOf(card(),'feature:0').find(x=>x.key==='features[0].layers[2].name');
+ assert.equal(M.editField(card(),lay,'sub').problem,'sub is already the name of another layer of stack.');
+ // element_size (optional): domain diagonal/400 to diagonal/4 (672.3 µm here)
+ const es=M.fieldsOf(card(),'feature:1').find(x=>x.key==='features[1].element_size');
+ assert.equal(es.optional,true);
+ assert.equal(M.editField(card(),es,'1').problem,'Via element size must be between 1.68–168 µm.');
+ assert.equal(M.editField(card(),es,'200').problem,'Via element size must be between 1.68–168 µm.');
+ assert.equal(M.getField(M.editField(card(),es,'20').doc,'features[1].element_size'),20);
+ assert.equal('element_size' in M.editField(M.editField(card(),es,'20').doc,es,'').doc.geometry.components.stack3d.features[1],false,'empty clears it');
+ // layers: 1 to 32 rows
+ let many=card();for(let k=0;k<29;k++)many=M.addLayer(many,0);
+ assert.equal(M.getField(many,'features[0].layers').length,32);
+ assert.throws(()=>M.addLayer(many,0),{message:'A layers feature holds 1 to 32 layers.'});
+ let one=card();one=M.removeLayer(M.removeLayer(one,0,2),0,1);
+ assert.throws(()=>M.removeLayer(one,0,0),{message:'A layers feature holds 1 to 32 layers.'});
+ assert.deepEqual(M.getField(M.addLayer(card(),0),'features[0].layers').map(l=>l.name),['sub','oxide','top','layer']);
+});
+
+test('feature operations: move, duplicate, delete, add',()=>{
+ const moved=M.moveFeature(card(),1,-1);assert.deepEqual(comp(moved).features.map(f=>f.name),['via','stack']);
+ assert.throws(()=>M.moveFeature(card(),0,-1),{message:'The first feature cannot move up.'});
+ assert.throws(()=>M.moveFeature(card(),1,1),{message:'The last feature cannot move down.'});
+ const dup=M.duplicateFeature(card(),1);assert.deepEqual(comp(dup).features.map(f=>f.name),['stack','via','via_2']);
+ assert.deepEqual(comp(M.duplicateFeature(dup,1)).features.map(f=>f.name),['stack','via','via_3','via_2']);
+ assert.deepEqual(comp(M.deleteFeature(card(),0)).features.map(f=>f.name),['via']);
+ const box=comp(M.addFeature(card(),'box')).features[2];
+ assert.deepEqual([box.name,box.type,box.xmin,box.xmax,box.zmin,box.zmax,box.material],['box','box',50,150,152.5,457.5,'Si']);
+ const lay=comp(M.addFeature(card(),'layers')).features[2];
+ assert.deepEqual([lay.name,lay.type,lay.z0,lay.layers.length],['layers','layers',152.5,1]);
+ assert.deepEqual(comp(card()).features.map(f=>f.name),['stack','via'],'the card itself is unchanged');
+});
+
+test('parameters: a used parameter cannot be deleted, and the refusal names its users in feature order',()=>{
+ let doc=M.addParameter(card(),'w','20 um');
+ assert.deepEqual(doc.geometry.parameters,{w:{value:'20 um'}});
+ assert.throws(()=>M.addParameter(doc,'w','1'),{message:'A parameter w already exists.'});
+ assert.throws(()=>M.addParameter(doc,'2w','1'),{message:/^A parameter name starts with a letter/});
+ doc=M.setParameter(doc,'w','25 um');assert.equal(doc.geometry.parameters.w.value,'25 um');
+ assert.equal(M.setParameter(doc,'w','3').geometry.parameters.w.value,3);
+ assert.throws(()=>M.deleteParameter(doc,'w',['features[0].layers[1].thickness']),{message:'w is used by stack.oxide thickness.'});
+ // several: comma-separated in feature order (the server lists them sorted as text)
+ assert.throws(()=>M.deleteParameter(doc,'w',['domain.xmax','features[0].layers[1].thickness','features[1].xmax','features[1].xmin']),
+  {message:'w is used by domain xmax, stack.oxide thickness, via xmin, via xmax.'});
+ assert.equal(M.deleteParameter(doc,'w',[]).geometry.parameters,undefined);
+});
+
+test('undo: one history of documents; an equal document records nothing',()=>{
+ const h=new M.Model3dHistory(card());assert.equal(h.canUndo,false);
+ const a=M.moveFeature(card(),1,-1);assert.equal(h.record(a),true);assert.equal(h.record(a),false);
+ const b=M.deleteFeature(a,0);h.record(b);
+ assert.deepEqual(h.undo(),a);assert.deepEqual(h.undo(),card());assert.equal(h.canUndo,false);
+ assert.deepEqual(h.redo(),a);h.record(M.duplicateFeature(a,0));assert.equal(h.canRedo,false,'a new edit drops the redo branch');
+ const small=new M.Model3dHistory(card(),3);for(const n of [1,2,3,4])small.record(M.addParameter(card(),'p'+n,1));
+ assert.equal(small.items.length,3);
+});
+
+test('refusals: the engine words as written, the code and path under Details; the block reasons',()=>{
+ const r={ok:false,refused:"sphere 'ball' is not taken yet in a 3d component; boxes and slab layers are",code:'E-3D-COMBINATION',
+  path:'geometry.components.c.features[2]',feature_index:2};
+ assert.deepEqual(M.refusalMessage(r),{text:r.refused,details:'E-3D-COMBINATION at geometry.components.c.features[2]',feature:2});
+ assert.equal(M.blockReason({drafts:2}),'Correct the highlighted fields or restore their last valid values first.');
+ assert.equal(M.blockReason({refused:r}),'Fix 1 problem in Messages to mesh');
+ assert.equal(M.blockReason(),'Meshing and heat come in a later step of the 3D model.');
+ assert.equal(M.fieldWords(card(),'parameters.h'),'parameter h');
+ assert.equal(M.deletedText(card(),1),'via deleted; Undo restores it.');
+});
