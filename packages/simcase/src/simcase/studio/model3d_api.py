@@ -18,6 +18,7 @@ the engine's own words (``E-3D-COMBINATION`` names the feature).
 from __future__ import annotations
 
 import base64
+import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -37,7 +38,7 @@ NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 # The view's own files; a request only selects one of these fixed paths by name.
 ASSETS = {name: (STATIC / name, mime) for name, mime in (
     ("model3d-view.mjs", "text/javascript"), ("model3d-model.mjs", "text/javascript"),
-    ("model3d-via-stack.json", "application/json"))}
+    ("model3d-via-stack.json", "application/json"), ("model3d-layer-stack-3d.json", "application/json"))}
 
 
 def install(app) -> None:
@@ -150,8 +151,21 @@ def _material(material):
 
 def display_view(doc: dict, component: str | None = None) -> dict:
     """The display answer of one ``3d`` component; raises ``GeometryError`` on a refusal."""
-    model, comp, cx = complex_of(doc, component)
+    return _display(*complex_of(doc, component))
+
+
+def _alone(cx) -> dict:
+    """Per face, its provenance names that select that face and no other (sorted)."""
+    faces_of: dict = {}
+    for f in cx.faces:
+        for n in f.provenance:
+            faces_of.setdefault(n, []).append(f.index)
+    return {f.index: [n for n in sorted(f.provenance) if faces_of[n] == [f.index]] for f in cx.faces}
+
+
+def _display(model, comp, cx) -> dict:
     unit = float(comp.pm_per_unit)
+    alone = _alone(cx)
     origin2, to_m = _frame(cx)
     positions, indices, owner, faces = [], [], [], []
     for face_index, vertices, triangles in tessellate(cx):
@@ -163,7 +177,8 @@ def display_view(doc: dict, component: str | None = None) -> dict:
         owner += [face_index] * len(triangles)
         regions = [sorted({cx.cells[c].region for c in side}) for side in face.sides]
         faces.append({"id": face_index, "axis": AXES[face.axis], "at": float(Fraction(face.coord) / comp.pm_per_unit),
-                      "names": sorted(face.provenance), "minus": regions[0], "plus": regions[1],
+                      "names": sorted(face.provenance), "alone": alone[face_index],
+                      "minus": regions[0], "plus": regions[1],
                       "exterior": face.exterior, "tag": face.tag,
                       "area": float(Fraction(face.area) / comp.pm_per_unit ** 2),
                       "first_triangle": first, "triangle_count": len(triangles)})
@@ -203,6 +218,140 @@ def display_view(doc: dict, component: str | None = None) -> dict:
         "edge_faces": _b64(np.array(edge_faces, dtype=np.uint32), "u4"),
         "summary": _summary(cx, comp, regions, faces),
     }
+
+
+# ----------------------------------------------------------------------------- the builder's check
+
+_FEATURE = re.compile(r"features\[(\d+)\]")
+
+
+def _boxes(comp, feature) -> list:
+    """The exact pm boxes (x0, x1, y0, y1, z0, z1) a box or a layers feature of slab layers fills."""
+    d = feature.data
+    if feature.type == "box":
+        return [tuple(d[k] for k in ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"))]
+    dom = comp.domain
+    out, z = [], d["z0"]
+    for lay in d["layers"]:
+        out.append((dom["xmin"], dom["xmax"], dom["ymin"], dom["ymax"], z, z + lay["thickness"]))
+        z += lay["thickness"]
+    return out
+
+
+def _overlap(a, b) -> int:
+    """The exact volume (pm^3) two boxes share; 0 when they only touch."""
+    v = 1
+    for i in range(3):
+        lo, hi = max(a[2 * i], b[2 * i]), min(a[2 * i + 1], b[2 * i + 1])
+        if hi <= lo:
+            return 0
+        v *= hi - lo
+    return v
+
+
+def _coverage(comp, cx) -> list:
+    """Per feature: its volume inside the domain, the volume its own cells keep (from the complex),
+    and the later features that take part of it (their box overlaps it and they keep volume)."""
+    dom = comp.domain
+    domain = tuple(dom[k] for k in ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"))
+    boxes = [_boxes(comp, f) for f in comp.features]
+    owned = [0] * len(boxes)
+    for c in cx.cells:
+        if c.feature_index >= 0:
+            owned[c.feature_index] += c.volume
+    unit3 = comp.pm_per_unit ** 3
+    out = []
+    for i, f in enumerate(comp.features):
+        volume = sum(_overlap(b, domain) for b in boxes[i])
+        by = [j for j in range(i + 1, len(boxes)) if owned[j] > 0
+              and any(_overlap(a, b) > 0 for a in boxes[i] for b in boxes[j])]
+        refs = ", ".join(f"{j + 1} ({comp.features[j].id})" for j in by)
+        if volume == 0:
+            coverage, text = "outside", "outside the domain; adds no region"
+        elif owned[i] == 0:
+            coverage, text = "none", f"covered by {refs}; adds no region"
+        elif owned[i] < volume:
+            coverage, text = "partial", f"covered in part by {refs}"
+        else:
+            coverage, text = "full", ""
+        out.append({"index": i, "id": f.id, "type": f.type, "volume": float(Fraction(volume) / unit3),
+                    "owned": float(Fraction(owned[i]) / unit3), "coverage": coverage, "covered_by": by,
+                    "text": text})
+    return out
+
+
+def _parameters(doc: dict, model, comp_name: str) -> list:
+    """Parameters with their SI value and the fields of the component that use them (by name)."""
+    raw = (doc.get("geometry") or {}).get("parameters") or {}
+    comp = ((doc.get("geometry") or {}).get("components") or {}).get(comp_name) or {}
+    fields = []
+
+    def walk(value, path):
+        if isinstance(value, dict):
+            for k, v in value.items():
+                walk(v, f"{path}.{k}" if path else k)
+        elif isinstance(value, list):
+            for i, v in enumerate(value):
+                walk(v, f"{path}[{i}]")
+        elif isinstance(value, str):
+            fields.append((path, value))
+    walk({k: comp.get(k) for k in ("domain", "features") if k in comp}, "")
+    for name, entry in raw.items():
+        if isinstance(entry, dict):
+            walk(entry.get("value"), f"parameters.{name}")
+    out = []
+    for name, (value, kind) in model.parameters.items():
+        token = re.compile(rf"(?<![\w.]){re.escape(name)}(?![\w])")
+        entry = raw.get(name) if isinstance(raw.get(name), dict) else {}
+        out.append({"name": name, "kind": kind,
+                    "value": float(Fraction(value) / 10 ** 12) if kind == "length" else float(value),
+                    "unit": "m" if kind == "length" else "1", "written": entry.get("value"),
+                    "used_by": sorted(p for p, text in fields if p != f"parameters.{name}" and token.search(text))})
+    return out
+
+
+def check_view(doc: dict, component: str | None = None) -> dict:
+    """The builder's check of one ``3d`` component: features with their coverage, parameters,
+    selections and the display answer; raises ``GeometryError`` on a refusal."""
+    model, comp, cx = complex_of(doc, component)
+    display = _display(model, comp, cx)
+    # Seam for the mesh estimate: when the public ``simcase.estimate_mesh3d`` lands, call it here so
+    # every check also raises the pre-mesh refusals and answers with its estimate line.
+    return {"ok": True, "component": cx.component, "unit": str(comp.length_unit),
+            "features": _coverage(comp, cx), "regions": display["regions"],
+            "parameters": _parameters(doc, model, cx.component),
+            "selections": display["selections"], "display": display}
+
+
+def _refusal(exc: GeometryError) -> dict:
+    """A refusal with the engine's words, its code and path, and the feature it names (or None)."""
+    path = getattr(exc, "path", None)
+    found = _FEATURE.search(path or "") or _FEATURE.search(str(exc))
+    return {"ok": False, "refused": str(exc), "code": getattr(exc, "code", None), "path": path,
+            "feature_index": int(found.group(1)) if found else None}
+
+
+def new_selection(doc: dict, component: str | None, face: int, name: str) -> dict:
+    """A copy of ``doc`` with ``selections[name] = {"boundary": <the first of the face's names that
+    selects it alone>}`` ("Use for -> New selection"); ``GeometryError`` when no name does, or the
+    name is taken."""
+    import copy
+    model, comp, cx = complex_of(doc, component)
+    if not isinstance(face, int) or isinstance(face, bool) or not 0 <= face < len(cx.faces):
+        raise GeometryError(f"component {cx.component!r} has no face {face!r}")
+    names = _alone(cx)[face]
+    if not names:
+        raise GeometryError(f"no single name selects face {face} alone: its names "
+                            f"{', '.join(sorted(cx.faces[face].provenance))} each select more faces")
+    raw = doc["geometry"]["components"][cx.component]
+    if name in (raw.get("selections") or {}):
+        raise GeometryError(f"selection {name!r} already exists")
+    if any(f.id == name for f in comp.features):
+        raise GeometryError(f"{name!r} is a feature id; choose another selection name")
+    out = copy.deepcopy(doc)
+    out["geometry"]["components"][cx.component].setdefault("selections", {})[name] = {"boundary": names[0]}
+    complex_of(out, cx.component)               # the new document must still form
+    return out
 
 
 def _summary(cx, comp, regions, faces) -> str:
@@ -281,6 +430,13 @@ def _reply(fn, *args) -> dict:
         return {"ok": False, "refused": str(exc)}
 
 
+def _reply_coded(fn, *args) -> dict:
+    try:
+        return fn(*args)
+    except GeometryError as exc:
+        return _refusal(exc)
+
+
 async def _read(request: Request, optional=("component",)):
     tree, found = read_envelope(await request.body(), optional=optional)
     component = tree.get("component")
@@ -327,6 +483,36 @@ async def model3d_section(request: Request):
     if found:
         return exact_json(_found(found))
     return exact_json(await run_in_threadpool(_reply, section_view, tree["doc"], tree.get("component"), axis, at))
+
+
+@router.post("/api/model3d/check")
+async def model3d_check(request: Request):
+    try:
+        tree, found = await _read(request)
+    except RequestRefused as exc:
+        return exc.reply()
+    if found:
+        return exact_json(_found(found))
+    return exact_json(await run_in_threadpool(_reply_coded, check_view, tree["doc"], tree.get("component")))
+
+
+@router.post("/api/model3d/selection")
+async def model3d_selection(request: Request):
+    try:
+        tree, found = await _read(request, optional=("component", "face", "name"))
+        face, name = tree.get("face"), tree.get("name")
+        if isinstance(face, bool) or not isinstance(face, int):
+            raise RequestRefused("face: the picked face is a face id (an integer)")
+        if not isinstance(name, str) or not name:
+            raise RequestRefused("name: the new selection's name is a non-empty string")
+    except RequestRefused as exc:
+        return exc.reply()
+    if found:
+        return exact_json(_found(found))
+
+    def made(doc, component, face, name):
+        return {"ok": True, "doc": new_selection(doc, component, face, name)}
+    return exact_json(await run_in_threadpool(_reply_coded, made, tree["doc"], tree.get("component"), face, name))
 
 
 @router.get("/model3d-assets/{filename}")

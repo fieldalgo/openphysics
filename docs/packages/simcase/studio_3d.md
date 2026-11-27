@@ -27,6 +27,9 @@ three slab layers (substrate 0–2, oxide 2–3 and top silicon 3–4, one `laye
 feature `stack`) and a copper box `via` with x and y in [4, 6] through the oxide
 (z in [2, 3]).
 
+The same view is the Model page of the workspace's 3D model, which edits a document
+and makes selections from picked faces: see [3D models](workspace.md#3d-models-experimental).
+
 | Action | Pointer | Keyboard (focus on the view) |
 |---|---|---|
 | Rotate | drag | arrow keys (15° per press) |
@@ -79,7 +82,28 @@ Mesh edges are not drawn: the view shows the exact geometry, not the mesh.
   It answers the segments where the plane meets the closed faces (`segments`,
   float32, two end points each, same frame; `segment_faces`), the faces cut and
   the regions met. A plane outside the domain is refused by name.
-- The answer is deterministic (W15): nothing unordered reaches it.
+- The answer is deterministic (W15): nothing unordered reaches it. Each face also
+  lists under `alone` the names that select that face and no other.
+- `POST /api/model3d/check` is the 3D builder's check (same envelope). It answers
+  `{"ok": true, ...}` with:
+  - `features`: per feature its `index`, `id`, `type`, its `volume` inside the
+    domain and the volume its own cells keep (`owned`), both in the component's
+    length unit cubed, and its `coverage`. The coverage is `full`, `partial`
+    ("covered in part by N (id)"), `none` ("covered by N (id); adds no region") or `outside`
+    ("outside the domain; adds no region"). N lists the later features (numbered
+    from 1) whose box overlaps it and that keep volume themselves. All of this is
+    computed exactly from the complex, in pm.
+  - `parameters`: SI value, unit, the written value, and `used_by`, the fields of
+    the component that name the parameter.
+  - `regions`, `selections`, and the display answer under `display`.
+- A refusal is `{"ok": false, "refused": <the engine's message as written>,
+  "code", "path", "feature_index"}`. The index is the `features[i]` the path names,
+  or null, and the builder marks that feature.
+- `POST /api/model3d/selection` takes the envelope plus `"face"` (a face id) and
+  `"name"`, and answers the document with `selections[name] = {"boundary":
+  <name>}`, where `<name>` is the first of the face's sorted names that selects it
+  alone ("Use for → New selection"). A face that no single name selects, a name
+  already taken and a feature id are refused by name.
 
 The page loads three.js 0.186.1 from Studio itself
 ([browser-served files](../../third-party.md#browser-served-files)) and the view's
