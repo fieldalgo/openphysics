@@ -380,3 +380,15 @@ def test_the_exact_complex_of_a_sampled_surface_is_refused_by_name():
     assert err.value.code == "E-3D-COMBINATION" and err.value.path == "geometry.components.c"
     assert str(err.value) == ("component 'c' holds sampled surfaces (meshloom builder.via_in_slab): the exact 3D complex "
                               "of a sampled surface is not built yet; simcase.build_mesh3d meshes the component")
+
+
+def test_prepare_gives_the_estimate_and_the_limit_refusal_before_meshing():
+    from simcase.geometry_engine3d import _prepare
+    cx, comp, ho, info = _prepare(c4(0.2, ref=False)[0])
+    assert cx is None and comp.name == "c" and info.code == "I-MESH-ESTIMATE"
+    assert ho.shape == "via_in_slab" and ho.estimate > 0
+    d = c4(0.1, ref=False)[0]
+    d["mesh"]["element_count_limit"] = 100
+    with pytest.raises(GeometryError) as err:
+        _prepare(d)
+    assert err.value.code == "E-MESH-ESTIMATE" and err.value.path == "mesh.element_count_limit"

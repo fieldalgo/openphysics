@@ -156,16 +156,21 @@ def _m(k) -> float:
     return _metres(k)
 
 
-def build(data: dict, comp: Component, opts: dict):
-    """Mesh a builder-shaped component: a ``geometry_engine3d.Mesh3DResult`` (``complex`` is None; the
-    exact complex of sampled surfaces is not built yet)."""
-    import numpy as np
-    import meshloom
+class Handoff:
+    """A builder-shaped component's hand-off: the builder's ``generate3d`` arguments and how to rename
+    its result (``geometry_engine3d._prepare`` returns it in place of the complex's hand-off)."""
+
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+def prepare(data: dict, comp: Component, opts: dict):
+    """Everything before meshloom for a builder-shaped component: recognition, refusals, the builder's
+    input, ``I-MESH-ESTIMATE`` and the element-count limit. Returns ``(Handoff, diagnostic)``."""
     from meshloom import builder
-    from galerkin.mesh3d import Mesh3D
     from physmat.units import Diagnostic
 
-    from .geometry_engine3d import TETRAHEDRA_PER_VOLUME, Mesh3DError, Mesh3DResult
+    from .geometry_engine3d import TETRAHEDRA_PER_VOLUME
 
     shape, curved = recognise(comp)
     _sizes_refused(comp, opts)
@@ -237,8 +242,24 @@ def build(data: dict, comp: Component, opts: dict):
         raise GeometryError(f"component {comp.name!r}: about {estimate:.0f} tetrahedra from the element sizes "
                             f"(T = 6.3 sum(V/h^3)); the limit is {opts['element_count_limit']} "
                             "(mesh.element_count_limit)", path="mesh.element_count_limit", code="E-MESH-ESTIMATE")
+    ho = Handoff(shape=shape, curved=curved, kwargs=kwargs, h=h, max_points=opts["element_count_limit"],
+                 exterior=exterior, interior=interior, surfaces=surfaces, estimate=estimate)
+    return ho, info
+
+
+def mesh(comp: Component, ho: Handoff, info):
+    """Mesh a prepared builder-shaped component: a ``geometry_engine3d.Mesh3DResult`` (``complex`` is
+    None: the exact complex of sampled surfaces is not built yet)."""
+    import numpy as np
+    import meshloom
+    from galerkin.mesh3d import Mesh3D
+
+    from .geometry_engine3d import Mesh3DError, Mesh3DResult
+
+    shape, curved, kwargs, h, surfaces = ho.shape, ho.curved, ho.kwargs, ho.h, ho.surfaces
+    exterior, interior, estimate = ho.exterior, ho.interior, ho.estimate
     try:
-        raw = meshloom.generate3d(h=h, max_points=opts["element_count_limit"], **kwargs)
+        raw = meshloom.generate3d(h=h, max_points=ho.max_points, **kwargs)
     except (meshloom.KernelUnavailable, ValueError) as exc:
         prov = sorted({p for _, p, _ in surfaces.values()})
         raise Mesh3DError(f"component {comp.name!r}: meshloom {type(exc).__name__}: {exc}; the sampled surfaces are "
@@ -271,7 +292,7 @@ def build(data: dict, comp: Component, opts: dict):
     tagged = {t: np.concatenate(v) for t, v in sorted(tagged.items())}
     mesh = Mesh3D(nodes, tets, regions=regions, region_names=names, tagged_faces=tagged, interfaces=interfaces)
     mesh.provenance_faces = provenance
-    result = Mesh3DResult(mesh, None, provenance, {}, {}, [], [], estimate, kwargs, raw)
+    result = Mesh3DResult(mesh, None, provenance, {}, {}, [], [], estimate, ho, raw)
     result.diagnostics.append(info)
     for i in curved:
         result.diagnostics.append(_sampled(comp, i, surfaces[i], shape, kwargs, provenance, nodes, h))
