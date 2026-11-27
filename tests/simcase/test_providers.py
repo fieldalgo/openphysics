@@ -129,8 +129,11 @@ def test_builtin_ports_are_registry_quantities_with_their_si_unit():
             assert "result" in q.places, (name, port)
             if port["direction"] == "input":
                 inputs.append((name, port["name"], port["location"], port["combine"]))
-    # the one built-in input port (multiphysics documents, D2): em.modes2d's coupled temperature
-    assert inputs == [("em.modes2d", "temperature", "element", "single")]
+    assert set(inputs) == {
+        ("em.modes2d", "temperature", "element", "single"),
+        ("mechanics", "temperature", "node", "single"),
+        ("thermal.steady2d", "heat_source_density", "element", "single"),
+    }
 
 
 @pytest.mark.parametrize("name", ["thermal_slab", "thermal_regions", "thermal_boundary", "transient_thermal_uniform",

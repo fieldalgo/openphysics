@@ -109,6 +109,8 @@ class CouplingHook:
     ports: tuple = ()
     #: the output ports ``solve`` produces; None for every output port of the kind
     outputs: frozenset | None = None
+    #: concrete types of a multi-type kind that support this hook
+    types: frozenset | None = None
 
 
 def ports_of(kind) -> dict[str, dict]:
@@ -200,7 +202,8 @@ def resolve_envelope(tree: dict, result) -> Any:
             checks.add("E-CONTRACT", path, "a physics name is an identifier (letters, digits and _): a coupling "
                                            "and a study refer to the physics by this name")
         kind = kind_of_type(entry["type"])
-        if getattr(kind, "coupling", None) is None:
+        hook = getattr(kind, "coupling", None)
+        if hook is None or (hook.types is not None and entry["type"] not in hook.types):
             checks.add("E-CONTRACT", path + ["type"], f'"{entry["type"]}" is not coupled in this release; run it '
                                                       'as its own "0.3" document')
     if result.diagnostics.errors:
@@ -219,10 +222,12 @@ def resolve_envelope(tree: dict, result) -> Any:
     _check_blocks(tree, checks)
     if result.diagnostics.errors:
         return result
+    incoming = _coupled_inputs(tree)
     views = {}
     for name, entry in physics.items():
         view = _view_tree(tree, name, kind_of_type(entry["type"]))
-        views[name] = resolve.resolve_tree(view, from_python=False)
+        views[name] = resolve.resolve_tree(view, from_python=False,
+                                           coupled_inputs=incoming.get(name, frozenset()))
         _merge_diagnostics(result.diagnostics, views[name].diagnostics)
     result.views = views
     if result.diagnostics.errors:
@@ -326,15 +331,13 @@ def _view_tree(tree: dict, name: str, kind) -> dict:
     for k in ("name", "display_units", "geometry", "mesh"):
         if k in tree:
             view[k] = copy.deepcopy(tree[k])
-    reads = set()
-    for t, props in (table_for(kind).policy().get("reads") or {}).items():
-        reads |= set(props)
-    others = set()
     from .registry import kind_of_type
+    reads = set((table_for(kind).policy().get("reads") or {}).get(tree["physics"][name]["type"], []))
+    others = set()
     for entry in tree["physics"].values():
-        other = kind_of_type(entry.get("type"))
-        for t, props in (table_for(other).policy().get("reads") or {}).items():
-            others |= set(props)
+        physics_type = entry["type"]
+        other = kind_of_type(physics_type)
+        others.update((table_for(other).policy().get("reads") or {}).get(physics_type, []))
     if isinstance(tree.get("materials"), dict):
         materials = {}
         for mname, record in tree["materials"].items():
@@ -710,13 +713,18 @@ def _check_order(tree, edges, checks: _Checks) -> None:
                        suggestions=(Suggestion(proposal, None, None, "1"),))
 
 
-def _check_hooks(tree, views, checks: _Checks, materials: dict) -> None:
-    """Each kind's own checks of its entry under its coupled inputs (the thermo-optic model)."""
-    from .registry import kind_of_type
+def _coupled_inputs(tree):
     coupled = {}
     for c in (tree.get("couplings") or {}).values():
         pname, _, port = c["to"].partition(".")
         coupled.setdefault(pname, set()).add(port)
+    return {name: frozenset(ports) for name, ports in coupled.items()}
+
+
+def _check_hooks(tree, views, checks: _Checks, materials: dict) -> None:
+    """Each kind's own checks of its entry under its coupled inputs."""
+    from .registry import kind_of_type
+    coupled = _coupled_inputs(tree)
     for name, r in views.items():
         hook = kind_of_type(tree["physics"][name]["type"]).coupling
         if hook.check is not None:
@@ -724,7 +732,7 @@ def _check_hooks(tree, views, checks: _Checks, materials: dict) -> None:
                 checks.diagnostics.append(d)
     read = set()
     for name, ports in coupled.items():
-        if "temperature" in ports:
+        if "temperature" in ports and tree["physics"].get(name, {}).get("type") == "em.modes2d":
             view = views[name].document()
             if view is not None:
                 read |= set(region_material_refs(view))

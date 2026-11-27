@@ -11,7 +11,7 @@ region kinds that share these helpers; the format 0.2 region readers are gone (u
 See docs/packages/simcase/thermal_regions2d.md.
 """
 import copy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import math
 import time
 
@@ -562,7 +562,10 @@ def region_summary_03(doc, label, lines, versions):
             props = ', '.join(f'{k} {_authored(doc, f"materials.{mname}.{k}")}' for k in spec if k != 'source')
         out.append(f'  material {mname}: {props}')
     source = p.get('heat_source_density')
-    if source is None:
+    coupled_source = doc._resolution is not None and 'heat_source_density' in doc._resolution.coupled_inputs
+    if coupled_source:
+        out.append('  heat_source_density: coupled element Joule power density')
+    elif source is None:
         out.append('  no heat_source_density')
     elif isinstance(source, dict):
         out.append('  heat_source_density ' + str({r: _authored(doc, f'{where}.heat_source_density.{r}')
@@ -1012,7 +1015,29 @@ for _name in ('generated_heat_rate_per_depth', 'reaction_heat_rate_per_depth', '
     setattr(AxisymmetricRegionThermalRunResult, _name, _planar_name(_name))
 
 
-def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
+@dataclass
+class CoupledRegion:
+    """A solved stage's region mesh inputs, prepared before same_mesh transfer."""
+    view: Document
+    handoff: RegionHandOff
+    mesh: object
+    region_materials: dict
+    triangulation: object
+    mesh_time: float
+
+    @property
+    def triangle_regions(self):
+        return np.asarray(self.mesh.region_names, dtype=object)[np.asarray(self.mesh.regions)]
+
+
+def prepare_coupled_region(view):
+    start = time.perf_counter()
+    handoff = handoff_03(view)
+    mesh, materials, tri = build_region_mesh(handoff)
+    return CoupledRegion(view, handoff, mesh, materials, tri, time.perf_counter() - start)
+
+
+def run_region_thermal(doc, verbose=True, *, mesh_limits=None, prepared=None, element_source=None):
     from galerkin.thermal import solve_steady_heat
     from .thermal import log_lines_03
     doc.validate()
@@ -1020,13 +1045,20 @@ def run_region_thermal(doc, verbose=True, *, mesh_limits=None):
     doc.validate()
     name, _ = doc.sole_physics()
     t0 = time.perf_counter()
-    h = handoff_03(doc)
-    mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    if prepared is None:
+        h = handoff_03(doc)
+        mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    else:
+        h, mesh, region_materials, tri = (prepared.handoff, prepared.mesh, prepared.region_materials,
+                                         prepared.triangulation)
     # the mesher's findings reach the caller's document as coded diagnostics
     for target in (given, doc):
         mesh_diagnostics_03(target, component_03(doc)[0], h.notes)
     kwargs = region_inputs(doc, mesh, region_materials, views.region_heat_03(doc), NAMES_03)
-    t_mesh = time.perf_counter()-t0
+    if element_source is not None:
+        from galerkin.heat_source import ElementHeatSource
+        kwargs['heat_source'] = ElementHeatSource(mesh, element_source)
+    t_mesh = time.perf_counter()-t0 + (prepared.mesh_time if prepared is not None else 0.0)
     calculation_json = doc.canonical_json(separators=(',', ':'))
     axisymmetric = is_axisymmetric(h)
     t0 = time.perf_counter()

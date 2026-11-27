@@ -80,11 +80,10 @@ property no physics reads stays, so its value is checked and reported unused
 (`I-UNUSED-PROPERTY`). Diagnostics keep their document paths, and a diagnostic two views give
 for a shared block is reported once.
 
-Physics names are identifiers (letters, digits and `_`). In this release a multiphysics
-document takes the kinds with a coupling hook, `thermal.steady2d` and `em.modes2d`; another
-type is `E-CONTRACT` at `physics.<name>.type` ("is not coupled in this release"). The
-compound kinds (`joule.temperature2d`, `mechanics.thermoelastic2d`) stay single-physics
-documents with their own loops.
+Physics names are identifiers (letters, digits and `_`). The coupled types are
+`electric.steady2d`, `thermal.steady2d`, `mechanics.thermoelastic2d` and `em.modes2d`.
+Other types give `E-CONTRACT` at `physics.<name>.type`. The dedicated `joule.steady2d`
+and `joule.temperature2d` workflows use single-physics documents.
 
 ## Couplings
 
@@ -131,6 +130,46 @@ Today `thermal.steady2d` and `em.modes2d` build the identical mesh from the same
 and `mesh` block, except that `mesh.grading` (the radial grading of `em.modes2d`) is not read
 by the heat kind; a `same_mesh` coupling between them refuses `mesh.grading`, and
 `mesh.controls`, which both read, grades the mesh instead.
+
+## DC conduction → Joule heating → thermal expansion
+
+[The Joule-heated strip](../../../examples/simcase/multiphysics_joule_thermoelastic_strip.json)
+uses one planar 2D component with named material regions and temperature-independent
+conductivities. Its two connections run in this order:
+
+| From | To | Field |
+|---|---|---|
+| `dc.joule_power_density` (`electric.steady2d`) | `heat.heat_source_density` (`thermal.steady2d`) | Joule power density in W/m³, constant on each triangle |
+| `heat.temperature` (`thermal.steady2d`) | `structure.temperature` (`mechanics.thermoelastic2d`) | Absolute temperature in K, one value per node |
+
+Both inputs take a single `same_mesh` connection. The heat solver integrates the original
+element values directly as its volumetric load. Give the heat boundary conditions on the heat
+entry and omit its authored `heat_source_density` when using this connection. The mechanics
+entry takes the nodal temperature and its own `stress_free_temperature`, mechanical
+constraints and material expansion coefficients. It freezes the received field for the static
+solve and saves it with displacement and stress. With this connection, put thermal boundary
+conditions and sources on the heat entry. The standalone thermoelastic document still solves its own heat stage.
+
+```sh
+simcase validate examples/simcase/multiphysics_joule_thermoelastic_strip.json
+simcase run examples/simcase/multiphysics_joule_thermoelastic_strip.json -o joule-strip
+```
+
+The analytical reference uses strip length L, electrical bias V, conductivity σ and
+thermal conductivity k. Power density is q = σ(V/L)² and the temperature rise is
+ΔT(x) = q x(L − x)/(2k). The restrained plane-strain solution has
+u_y = σ_xx = σ_xy = 0, du_x/dx = α(1 + ν)ΔT/(1 − ν) and
+σ_yy = σ_zz = −EαΔT/(1 − ν).
+At element sizes 0.1, 0.05 and 0.025 mm the maximum nodal temperature errors were
+0.00503, 0.00146 and 0.000316 K, and maximum displacement errors were
+1.54e-10, 4.17e-11 and 1.01e-11 m. Maximum in-plane centroid stress errors were
+23.1, 11.4 and 6.31 kPa. The electrical power, assembled source and boundary heat
+loss each gave 20 W/m (4 mW at the example depth). A separate two-material case checks
+the per-element source, nodal heat load, temperature, displacement and stress against
+the existing dedicated Joule and prescribed-temperature mechanics solvers.
+[Validation tests](../../../tests/simcase/test_multiphysics_joule_thermoelastic.py).
+A separate scikit-fem 12.0.2 assembly on the 0.1 mm mesh gave maximum differences of
+5.7e-14 K in temperature, 7.3e-23 m in displacement and 4.8e-9 Pa in in-plane stress.
 
 ## Heat → n(T) → optical modes
 

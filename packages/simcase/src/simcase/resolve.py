@@ -84,6 +84,7 @@ class Resolution:
         self.extent: list[str] = []
         self.estimates: dict[str, float] = {}
         self._document = None
+        self.coupled_inputs = frozenset()
 
     @property
     def ok(self) -> bool:
@@ -110,9 +111,10 @@ def resolve_text(raw) -> Resolution:
     return _resolve(tree, result)
 
 
-def resolve_tree(obj, *, from_python: bool = True) -> Resolution:
+def resolve_tree(obj, *, from_python: bool = True, coupled_inputs=frozenset()) -> Resolution:
     """Resolve a Python object (``Document.from_dict``): floats are read through their ``repr``."""
     result = Resolution()
+    result.coupled_inputs = coupled_inputs
     tree, found = reader.read_with_diagnostics(obj) if from_python else (obj, [])
     if found:
         result.diagnostics.extend(found)

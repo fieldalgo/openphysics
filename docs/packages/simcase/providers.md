@@ -137,17 +137,13 @@ declares. Every shipped example document was checked against it.
 | `em.cavity3d` | `em.cavity3d` | `electromagnetics` | `resonant_frequency` (Hz, scalar per mode) |
 | `em.modes2d` | `em.modes2d` | `electromagnetics` | `effective_index` (1, scalar per mode) |
 
-One built-in kind has an input port, read only in a
-[multiphysics document](multiphysics_document.md):
+Built-in input ports are read in a [multiphysics document](multiphysics_document.md).
 
-| Kind | Input port (quantity, unit, location, `combine`) | What the kind does with it |
+| Type | Input port (quantity, unit, location, `combine`) | Use |
 |---|---|---|
-| `em.modes2d` | `temperature` (temperature, K, element, `single`) | takes the mean of a node temperature over each triangle and sets n = n₀(λ) + (dn/dT)(T − T_ref) |
-
-An input port is not saved under its name as an output is; a coupled `em.modes2d` result
-saves the temperature it used and the index it gave as `temperature` and
-`refractive_index` in its `fields.npz`. The Joule temperature workflow and the thermoelastic
-workflow still couple inside one kind; they do not read another kind's output.
+| `thermal.steady2d` | `heat_source_density` (joule_power_density, W/m^3, element, `single`) | integrates element Joule power from `electric.steady2d` as a volumetric heat load |
+| `mechanics.thermoelastic2d` | `temperature` (temperature, K, node, `single`) | freezes the nodal temperature for thermal expansion and saves that temperature |
+| `em.modes2d` | `temperature` (temperature, K, element, `single`) | averages the nodal temperature over each triangle and sets n = n₀(λ) + (dn/dT)(T − T_ref) |
 
 ## Writing a provider
 
