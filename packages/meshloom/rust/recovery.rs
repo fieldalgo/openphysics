@@ -189,13 +189,14 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
         if missing.is_empty() {
             break;
         }
-        // one split of each, from the back of each segment's list so indices stay valid;
-        // a piece that an earlier split of this round made an edge is left alone
-        for &(k, i) in missing.iter().rev() {
+        // one split of each missing piece: the split points are chosen on the mesh of the
+        // round's start, then inserted in BRIO order (around a vertex with many segments
+        // the points of one sphere, inserted in angular order, would each meet the long
+        // tetrahedra around it: a cavity as large as the fan); a piece that an earlier
+        // insertion of the round made an edge is left alone
+        let mut plans: Vec<(usize, f64, Rule)> = Vec::with_capacity(missing.len());
+        for &(k, i) in &missing {
             let p = pieces[k][i];
-            if edge(&mut mesh, p.u, p.v) {
-                continue;
-            }
             let s = segments[k];
             let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)]);
             if !(t > p.t0 && t < p.t1) {
@@ -207,6 +208,22 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                 return Err(Error::Internal(format!(
                     "segment {} needs more than {max_depth} halvings near t = {}", p.seg, p.t0)));
             }
+            plans.push((k, t, rule));
+        }
+        let at: Vec<P3> = plans.iter().map(|&(k, t, _)| {
+            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
+            std::array::from_fn(|c| a[c] + t * (b[c] - a[c]))
+        }).collect();
+        for o in delaunay::brio_order(&at) {
+            let (k, t, rule) = plans[o as usize];
+            // the piece of segment k that holds t (pieces are in order of t)
+            let i = pieces[k].partition_point(|q| q.t1 <= t);
+            let p = pieces[k][i];
+            if edge(&mut mesh, p.u, p.v) {
+                continue;
+            }
+            let s = segments[k];
+            let depth = (-(t - p.t0).min(p.t1 - t).log2()).ceil() as u32;
             let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], t), &mut stats)?;
             seg_of_s.push(k as u32);
             // a removed edge has both ends among the new point's neighbours: the
