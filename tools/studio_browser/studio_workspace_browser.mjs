@@ -3495,6 +3495,63 @@ try {
     assert.match(g3.after.plan, /^Closed window · near n_eff 2\.46 · 4 modes(?: · last such run \d+:\d\d)?$/);
     assert.ok(g3.after.message.includes('No need to run: Run 3 already has these results.'), g3.after.message);
     assert.equal(g3.after.nearest, true); assert.equal(g3.after.modes, '4');
+    // round 36 (C1): the T18 open run (Run 4, Modes to find back to 2) against the shortcut's closed run
+    // (Run 3, its core mode at mode 3) and against the closed run as set (Run 2, no core mode). Compare
+    // marks a mode that its run's notes call the core mode "(core)", in the picker and the table, and
+    // says "Core modes: …" above the table when the first modes are not matched but the core modes are
+    await rTree('Optical modes', '!!' + openRadio);
+    await r.click('input[name="outer-boundary"][value="open"]'); await r.until(openRadio + '.checked', 'C1 Open boundary');
+    before = await runItems(); await pressRun(); await waitRun(before);
+    const c1Results = {item: await rText('.run-item[aria-pressed=true]'), core: await r.eval("[...document.querySelectorAll('#modes-table td[data-core-note]')].map(n=>[n.dataset.coreNote,n.textContent])")};
+    const c1Read = () => r.eval(`(()=>{const t=document.getElementById('compare-neff'),box=t.closest('.compare-table-scroll'),s=document.getElementById('compare-mode'),c=document.createElement('canvas').getContext('2d');c.font=getComputedStyle(s).font;
+      return {picker:[...s.options].map(o=>o.textContent),selected:s.selectedOptions[0].textContent,need:Math.max(...[...s.options].map(o=>Math.ceil(c.measureText(o.textContent).width)+32)),width:s.clientWidth,
+       short:[...t.tBodies[0].rows].map(x=>x.cells[0].textContent),labels:[...t.tBodies[0].rows].map(x=>x.cells[0].getAttribute('aria-label')),matched:[...t.tBodies[0].rows].map(x=>x.dataset.match||null),
+       overlap:[...t.querySelectorAll('[data-overlap]')].map(x=>Number(x.dataset.overlap)),best:[...t.querySelectorAll('tr[data-no-match]')].map(x=>x.cells[3].textContent),
+       core:document.getElementById('compare-core-line')?.textContent??null,coreBefore:!!document.getElementById('compare-core-line')&&!!(document.getElementById('compare-core-line').compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING),
+       shown:document.getElementById('compare-description').textContent,slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),page:document.documentElement.scrollWidth-document.documentElement.clientWidth}})()`);
+    const c1Pick = async (a, b, tag) => {
+      await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'C1 Compare ' + tag);
+      for (const [id, n] of [['#compare-a', a], ['#compare-b', b]]) {
+        const job = await r.eval(`[...document.querySelectorAll('${id} option')].find(o=>o.textContent.startsWith('Run ${n} · ')).value`);
+        await r.choose(id, job); await sleep(400);
+      }
+      await r.until("!!document.getElementById('compare-neff')", 'C1 Compare table ' + tag);
+      const out = {at1440: await c1Read()}; await rSize(390, 844, true); out.at390 = await c1Read(); await rSize(1440, 900); return out;
+    };
+    const c1 = {results: c1Results, shortcut: await c1Pick(3, 4, 'Run 3 ↔ Run 4'), asSet: await c1Pick(2, 4, 'Run 2 ↔ Run 4')};
+    stage('R36 C1 Compare names the core mode', c1);
+    assert.ok(/^Run 4 · open \(PML 1 µm\) · /.test(c1.results.item), c1.results.item);
+    assert.deepEqual(c1.results.core.map(n => n[0]), ['1'], JSON.stringify(c1.results.core)); assert.ok(c1.results.core[0][1].startsWith('Mode 1 is the core mode: '), c1.results.core[0][1]);
+    {
+      const v = c1.shortcut.at1440;
+      // the pair the agents saw, now named: the matching and the default pick unchanged
+      assert.deepEqual(v.matched.filter(Boolean), ['2:0'], JSON.stringify(v.matched)); assert.ok(v.overlap.length === 1 && v.overlap[0] >= 0.8, JSON.stringify(v.overlap));
+      const overlap = v.overlap[0].toFixed(2);
+      assert.deepEqual(v.picker, [`A mode 3 (core) ↔ B mode 1 (core) · overlap ${overlap} · TE-like`]); assert.equal(v.selected, v.picker[0]);
+      // both sides core modes: one mark after the pair (coordinator's choice (e)); the accessible name keeps both
+      assert.deepEqual(v.short, ['1 ↔ —', '2 ↔ —', '3 ↔ 1 (core)', '4 ↔ —', '— ↔ 2'], JSON.stringify(v.short));
+      assert.equal(v.labels[2], 'A mode 3 (core) ↔ B mode 1 (core)');
+      assert.ok(v.labels[0].startsWith('A mode 1: no match in B'), v.labels[0]);
+      assert.ok(v.best.length === 4 && v.best.every(t => t.startsWith('best ') && t.endsWith(' not matched)')), JSON.stringify(v.best));
+      assert.equal(v.core, `Core modes: A mode 3 ↔ B mode 1 · overlap ${overlap}`); assert.equal(v.coreBefore, true);
+      // Compare's other text is unchanged
+      assert.ok(v.shown.includes(` Shown: A mode 3 ↔ B mode 1, overlap ${overlap}, Δn_eff (B − A) `), v.shown);
+      assert.ok(v.need <= v.width, `C1 picker needs ${v.need} px, has ${v.width} px at 1440`);
+      assert.ok(v.slack >= 24, `C1 Compare: ${v.slack} px to spare at 1440 (O2, 24 px)`);
+      for (const at of [c1.shortcut.at1440, c1.shortcut.at390, c1.asSet.at1440, c1.asSet.at390]) assert.ok(at.page <= 0, 'C1 page overflow ' + at.page);
+      assert.deepEqual([c1.shortcut.at390.picker, c1.shortcut.at390.short, c1.shortcut.at390.core], [v.picker, v.short, v.core]);
+    }
+    {
+      // Run 2 (closed, run as set) has no core mode: no mark on A, and no line
+      const v = c1.asSet.at1440;
+      assert.ok(v.short.every(t => !t.startsWith('1 (core)') && !t.startsWith('2 (core)')), JSON.stringify(v.short));
+      // one side a core mode: that side is marked
+      assert.deepEqual(v.short, ['1 ↔ —', '2 ↔ —', '— ↔ 1 (core)', '— ↔ 2'], JSON.stringify(v.short));
+      assert.equal(v.labels[2], 'B mode 1 (core): no match in A (best overlap ' + v.labels[2].split('(best overlap ')[1], v.labels[2]);
+      assert.ok(v.slack >= 24, `C1 Compare as set: ${v.slack} px to spare at 1440 (O2, 24 px)`);
+      assert.ok(v.picker.every(t => !t.includes('A mode 1 (core)') && !t.includes('A mode 2 (core)')), JSON.stringify(v.picker));
+      assert.equal(v.core, null);
+    }
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }
 

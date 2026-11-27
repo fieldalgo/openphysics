@@ -2814,6 +2814,22 @@ overtakes the TM-like one). Matching is on for two closed runs (with an open run
   and the line profile show the chosen pair. With no match the picker is disabled and the plots
   show mode 1 of each run, marked *not matched*. The choice is not saved: session files are
   written exactly as before.
+- **Core mode (round 36, C1).** A mode that its run's notes call the core mode (the Results note
+  *Mode 3 is the core mode: …* of a closed run with Search near n_eff, or *Mode 1 is the core mode:
+  … in the window (PML excluded) …* of an open run; the same rule, no other) carries *(core)* in
+  Compare: in the picker (*A mode 3 (core) ↔ B mode 1 (core) · overlap 0.99 · TE-like*, the T18
+  shortcut's closed run against the open run) and in the table's row header. A row whose two sides are
+  both core modes carries one mark after the pair, *3 ↔ 1 (core)*, so the frozen Modes column stays
+  narrow (one line, 24 px to spare at 1440 × 900); its accessible name and title keep both marks
+  (*A mode 3 (core) ↔ B mode 1 (core)*). A row with one core side marks that side: *3 (core) ↔ —*,
+  *— ↔ 1 (core)* or *3 (core) ↔ 1*. When
+  the two runs' first modes are not matched with each other but their core modes are, one line
+  above the table reads *Core modes: A mode 3 ↔ B mode 1 · overlap 0.99*; there is no such line
+  when the first modes are matched, when a run has no core mode or when the core modes are not
+  matched. A run with no core-mode note gets no mark: a closed run as set (highest n_eff) or the
+  core-only Design A/B runs, where no shape touches the window edge. The matching, the mode
+  numbers and their order, the pair the picker shows first, the other words, the values, the
+  files and the run records are unchanged.
 - **Older files.** Matching uses only the stored samples, so it works on every optical run of
   version 6 and 7 session files, and nothing is added to the files.
 - **Limitations.** η is computed from piecewise-constant centroid samples, so it carries a

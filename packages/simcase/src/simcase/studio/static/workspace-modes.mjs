@@ -443,6 +443,10 @@ export function openRegionPlacement(run){
   return {edge,core};
  });
 }
+// Round 36 (C1): Compare marks the core mode of each run with "(core)". It is the mode that Results
+// gives a core-mode note (coreNoteText or openCoreNoteText), by the same rule: no other rule.
+/** The modes (0-based) a run's notes name as its core mode: a Set, empty for a run without one. */
+export const coreModes=run=>new Set([...coreNotes(run),...openRegionNotes(run).filter(n=>n.kind==='core')].map(n=>n.mode));
 const sideWords=list=>{const s=EDGE_ORDER.filter(e=>list.includes(e));return s.length<3?s.join(' and '):s.slice(0,-1).join(', ')+' and '+s.at(-1);};
 /** "Mode 3 is the core mode: 64 % of |E|² in the window (PML excluded) is in Core, which does not touch the window edge." */
 export function openCoreNoteText(mode,p){
