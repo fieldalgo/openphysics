@@ -289,11 +289,13 @@ Each value gets at most one error, from the first rule that applies:
 
 `gauge_pressure` between 90 and 110 kPa also warns `W-GAUGE-ATMOSPHERIC`. `q()`
 raises `UnitError` for an error and issues each warning as a `UnitWarning`;
-`convert()` returns them. The registry lists all 66 diagnostic codes of the
+`convert()` returns them. The registry lists all 70 diagnostic codes of the
 convention with a one-line English and Korean title (`DIAGNOSTIC_CODES`): the 58
-of the design and 8 for the document reader (`E-FORMAT`, `E-JSON`,
+of the design, 8 for the document reader (`E-FORMAT`, `E-JSON`,
 `E-VALUE-FORM`, `E-MATERIAL-UNKNOWN`, `E-CONTRACT`, `W-SHAPE-DROPPED`,
-`W-PIECE-DROPPED`, `I-MESH-CONTROL-RAISED`). This module raises 16 of them
+`W-PIECE-DROPPED`, `I-MESH-CONTROL-RAISED`), `E-LOOP-DIVERGED` of multiphysics
+loops, and `E-3D-COMBINATION`, `I-MESH-ESTIMATE` and `I-SURFACE-SAMPLED` of the 3D
+route through meshloom. This module raises 16 of them
 (`E-VALUE-FORM` and `E-GAIN` from `convert_array` and `convert_complex`), and
 messages are English.
 

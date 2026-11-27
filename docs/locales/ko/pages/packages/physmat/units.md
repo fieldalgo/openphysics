@@ -259,9 +259,10 @@ error E-UNIT-NOT-ACCEPTED at physics.solid.conditions.bore.gauge_pressure
 
 90–110 kPa의 `gauge_pressure`는 `W-GAUGE-ATMOSPHERIC`도 냅니다. `q()`는 오류면 `UnitError`를
 일으키고 경고는 각각 `UnitWarning`으로 냅니다. `convert()`는 둘 다 돌려줍니다. 등록부는 규칙의
-진단 코드 66개 모두를 영어·한국어 한 줄 제목과 함께 담습니다(`DIAGNOSTIC_CODES`). 설계의 58개와
+진단 코드 70개 모두를 영어·한국어 한 줄 제목과 함께 담습니다(`DIAGNOSTIC_CODES`). 설계의 58개,
 문서 리더를 위한 8개(`E-FORMAT`, `E-JSON`, `E-VALUE-FORM`, `E-MATERIAL-UNKNOWN`, `E-CONTRACT`,
-`W-SHAPE-DROPPED`, `W-PIECE-DROPPED`, `I-MESH-CONTROL-RAISED`)입니다. 이 모듈은 그중 16개를
+`W-SHAPE-DROPPED`, `W-PIECE-DROPPED`, `I-MESH-CONTROL-RAISED`), 다중 물리 루프의 `E-LOOP-DIVERGED`,
+meshloom을 거치는 3D 경로의 `E-3D-COMBINATION`, `I-MESH-ESTIMATE`, `I-SURFACE-SAMPLED`입니다. 이 모듈은 그중 16개를
 냅니다(`E-VALUE-FORM`과 `E-GAIN`은 `convert_array`와 `convert_complex`에서).
 
 **fix**는 닫힌 목록에서만 나옵니다: 복합 단위 안의 `degC`를 `K`로, 빠진 공백
