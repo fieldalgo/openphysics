@@ -3522,6 +3522,7 @@ try {
       assert.ok(v.headings.length === 2 && v.headings.every(Boolean), `${tag}: the plots' headings ${JSON.stringify(v)}`);
       assert.deepEqual(v.page, [0, 0], tag + ': page scrolled');
     };
+    const C2_LINE = 'Mode 1 of A · Run 3 is a Substrate mode and matches no mode of B; the core modes are A mode 3 ↔ B mode 1.';
     const D4_LINE = (n, side = 'A') => `${side} · Run ${n} has no core mode: its modes are mostly in Substrate, which touches the window edge. Use Run ${n}'s inputs with search near 2.46 · 4 modes`;
     const c1Pick = async (a, b, tag) => {
       await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'C1 Compare ' + tag);
@@ -3580,6 +3581,15 @@ try {
       assert.deepEqual(c1.asSet.switched.lines[0].buttons.map(b => [b.id, b.text]), [['compare-core-search-a', "Use Run 2's inputs with search near 2.46 · 4 modes"]]);
       // the shortcut's closed run has a core mode, and its modes are matched: no D4 line
       assert.ok(c1.shortcut.at1440.lines.every(([id]) => !id.startsWith('compare-core-search-line-')), JSON.stringify(c1.shortcut.at1440.lines));
+    }
+    // round 38 (C2): the core pair shown (A mode 3 ↔ B mode 1) and Run 3's mode 1 a Substrate mode with
+    // no match: one line in the same place says so; the table's Core modes line is unchanged
+    {
+      const v = c1.shortcut.at1440;
+      assert.deepEqual(v.lines, [['compare-first-mode-a', C2_LINE]]); assert.equal(v.linesBeforePlots, true);
+      assert.deepEqual(c1.shortcut.at390.lines, v.lines);
+      checkFirstView(c1.shortcut.switched, [C2_LINE], 'C2 switched to Compare, Run 3 ↔ Run 4');
+      assert.ok(c1.asSet.at1440.lines.every(([id]) => !id.startsWith('compare-first-mode-')), JSON.stringify(c1.asSet.at1440.lines));
     }
     // round 37 (D3): beside the note on the closed run as set (A · Run 2: its modes are mostly in
     // Substrate, …; the core mode was not found), its shortcut "Set search near 2.46 · 4 modes"; none
@@ -3670,7 +3680,8 @@ try {
       await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R38 Results after'); r38.itemsAfter = (await runItems()).length;
       stage('R38 D4 C2 Compare first view after Compare the two newest', r38);
       assert.equal(r38.core.offer, 'Run 4 is newer than this pair · Compare the two newest: Run 3 and Run 4');
-      checkFirstView(r38.core.view, [], 'Compare the two newest: Run 3 and Run 4');
+      checkFirstView(r38.core.view, [C2_LINE], 'C2 Compare the two newest: Run 3 and Run 4');
+      assert.ok((r38.core.at1440.core ?? '').startsWith('Core modes: A mode 3 ↔ B mode 1 · overlap '), r38.core.at1440.core);
       assert.equal(r38.asSet.offer, 'Run 5 is newer than this pair · Compare the two newest: Run 4 and Run 5');
       checkFirstView(r38.asSet.view, [D4_LINE(5, 'B')], 'D4 Compare the two newest: Run 4 and Run 5');
       assert.deepEqual(r38.asSet.view.lines[0].buttons.map(b => [b.id, b.text]), [['compare-core-search-b', "Use Run 5's inputs with search near 2.46 · 4 modes"]]);

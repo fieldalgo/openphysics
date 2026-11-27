@@ -2853,6 +2853,14 @@ overtakes the TM-like one). Matching is on for two closed runs (with an open run
   its *Open Run 2 in Results* link. Opening Compare scrolls the pane toward the middle of the plots
   as before, but never past this line, so the line, its button and the plots' headings stay in the
   first view. The matching, the mode numbers, the values, the files and the dialog are unchanged.
+- **First modes (round 38, C2).** When the pair shown is a core pair (both sides core modes, as
+  marked *(core)*) and a run's mode 1 is not a core mode, is mostly in a shape that touches the
+  window edge (its Results edge note) and is in no matched pair, one line in the same place, under
+  the Matched modes toolbar and above the plots, says so: *Mode 1 of A · Run 3 is a Substrate mode
+  and matches no mode of B; the core modes are A mode 3 ↔ B mode 1.* (the T18 shortcut's closed run
+  against the open run). A degenerate unit is named as in the table (*modes 3–4 (pair)*). There is
+  no such line when mode 1 is matched, is a core mode or is not an edge-shape mode, or when the pair
+  shown is not a core pair. The table's *Core modes* line (round 36) is unchanged.
 - **Older files.** Matching uses only the stored samples, so it works on every optical run of
   version 6 and 7 session files, and nothing is added to the files.
 - **Limitations.** η is computed from piecewise-constant centroid samples, so it carries a

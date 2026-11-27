@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {coreModes,degenerateGroups,physicalBounds,physicalWindow,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
+import {coreModes,firstModeEdgeShape,degenerateGroups,physicalBounds,physicalWindow,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
 import {isOpenRun,openLoss,LOSS_FLOOR,FLOOR_TEXT,FLOOR_HELP} from './workspace-open-run.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
@@ -305,4 +305,22 @@ export function coreMatchText(match,runs={}){
  const cores=compareCores(runs);if(!cores.a.size||!cores.b.size)return '';
  const pairs=accepted.filter(p=>coreMark(cores.a,p.unitA)&&coreMark(cores.b,p.unitB));
  return pairs.length?'Core modes: '+pairs.map(p=>`A ${unitName(p.unitA)} ↔ B ${unitName(p.unitB)} · overlap ${formatOverlap(p.eta)}`).join('; '):'';
+}
+// Round 38 (C2): Compare's first view showed "A mode 3 (core) ↔ B mode 1 (core)" and the plots, with
+// nothing near the top saying what A's mode 1 is. When the chosen pair is a core pair (both units core
+// modes, coreModes) and a run's mode 1 is not a core mode, is an edge-shape mode (firstModeEdgeShape)
+// and is in no accepted pair, one line under the Matched modes toolbar says so, run by run.
+/** [{side, text}]: "Mode 1 of A · Run 3 is a Substrate mode and matches no mode of B; the core modes are
+ * A mode 3 ↔ B mode 1." chosen: the shown {a, b} or null; titles: {a, b}, each run's number and name. */
+export function firstModeLines(match,runs={},chosen=null,titles={}){
+ if(!chosen||!match||match.error||match.disabled)return [];
+ const accepted=match.pairs?.filter(p=>p.accepted)??[],cores=compareCores(runs);
+ const pair=accepted.find(p=>p.unitA.includes(chosen.a)&&p.unitB.includes(chosen.b));
+ if(!pair||!coreMark(cores.a,pair.unitA)||!coreMark(cores.b,pair.unitB))return [];
+ const core=accepted.filter(p=>coreMark(cores.a,p.unitA)&&coreMark(cores.b,p.unitB)).map(p=>`A ${unitName(p.unitA)} ↔ B ${unitName(p.unitB)}`).join(' and ');
+ return [['A','B','unitA','a'],['B','A','unitB','b']].flatMap(([side,other,key,k])=>{
+  const run=runs[k];if(!run||cores[k].has(0)||accepted.some(p=>p[key].includes(0)))return [];
+  const shape=firstModeEdgeShape(run);if(!shape)return [];
+  return [{side,text:`Mode 1 of ${side} · ${titles[k]??''} is a ${shape} mode and matches no mode of ${other}; the core modes are ${core}.`}];
+ });
 }
