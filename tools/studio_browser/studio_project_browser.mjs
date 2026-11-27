@@ -347,7 +347,7 @@ try {
     await openFile(path);
     await page.until("/^Opened project Heater study \\(heater-study\\.json\\)/.test(document.getElementById('file-status').textContent)", 'project opened ' + tag, 60000);
     const opened = {message: await status(), title: await title(), footer: await footer()};
-    assert.equal(opened.message, 'Opened project Heater study (heater-study.json): Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). Results were read from the file, not recomputed; nothing was run. Current inputs are Run 2\'s.');
+    assert.equal(opened.message, 'Opened project Heater study (heater-study.json): Optical waveguide (2 runs, the comparison) and Heated silicon waveguide (1 run, the without-heater result). Results were read from the file, not recomputed; nothing was run. Optical waveguide: current inputs are Run 2\'s.');
     assert.equal(opened.title, 'Heater study · heater-study.json · opened');
     // round 18 (X8): the heated model is shown, with the other model in the project: its status bar speaks about it in the project
     assert.equal(opened.footer, 'Heated silicon waveguide · in project heater-study.json · opened');
@@ -553,7 +553,7 @@ try {
     await openFile(join(downloads, abName)); await sleep(500); if (await page.eval("document.getElementById('leave-confirm').open")) await page.eval("document.getElementById('leave-go').click()");
     await page.until("/^Opened project Heater study \\(design-ab\\.json\\)/.test(document.getElementById('file-status').textContent)", 'R16 reopen', 60000);
     // round 33 (M1): the open names the run whose inputs are current (650 × 300 nm, Modes to find 4: Run 3)
-    assert.ok((await status()).endsWith(" nothing was run. Current inputs are Run 3's."), await status());
+    assert.ok((await status()).endsWith(" nothing was run. Optical waveguide: current inputs are Run 3's."), await status());
     await page.press('tab', 'Library'); await page.press('button', 'Optical waveguide', 'start'); await page.press('tab', 'Compare'); await page.until("!!document.getElementById('compare-a')", 'R16 Compare reopened');
     const reopened = await pair(); stage('R16 S3 reopened', {pair: reopened});
     assert.ok(reopened[0].startsWith('Run 1 · Design A · ') && reopened[1].startsWith('Run 2 · Design B · '), JSON.stringify(reopened));
@@ -788,7 +788,7 @@ try {
     await page.press('tab', 'Library'); await page.until("!!document.querySelector('[data-template=optical] .card-action')", 'R20 Library after');
     const after = await page.eval("({actions:Object.fromEntries([...document.querySelectorAll('.cards [data-template]')].map(b=>[b.dataset.template,b.querySelector('.card-action').textContent])),offers:[...document.querySelectorAll('.resume-actions button,.card-resume button,.card-kept')].map(b=>b.textContent),names:[...document.querySelectorAll('.cards [data-template]')].map(b=>b.querySelector('.card-action').textContent)})");
     stage('R20 Z2 restored', {restored, after});
-    assert.equal(restored.message, "Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. Current inputs are Run 2's.");
+    assert.equal(restored.message, "Restored Optical waveguide (2 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. Optical waveguide: current inputs are Run 2's.");
     assert.match(restored.title, /^Heater study · r20-both\.json · saved \d{1,2}:\d\d(?: [AP]M)?$/);
     assert.equal(restored.page, 'Results'); assert.equal(restored.optical, 2);
     // Z3: both return cards, each naming its model; no restore offer is left
@@ -958,7 +958,7 @@ try {
     k5.after = await numbersNow('K5 after');
     stage('K5 numbers after Restore newest', k5);
     assert.equal(k5.offer.pair, 'true', JSON.stringify(k5.offer));
-    assert.equal(k5.message, "Restored Optical waveguide (20 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. Current inputs are Run 5's.");
+    assert.equal(k5.message, "Restored Optical waveguide (20 runs) and Heated silicon waveguide (1 run) from this browser, not recomputed. Optical waveguide: current inputs are Run 5's.");
     assert.equal(k5.title, 'both-models · recovered from this browser · changed since both-models.json, not saved · kept for recovery in this browser');
     assert.deepEqual(k5.after, k5.before); assert.deepEqual(k5.heated.map(t => t.replace(/ · (?:from file|recovered)$/, '')), k4.heated.map(t => t.replace(/ · (?:from file|recovered)$/, ''))); assert.match(k5.heated[0], /^Run 1 /);
     assert.deepEqual(k5.before.items.map(t => t.replace('Pinned · ', '').split(' · ')[0]), ['Run 22', 'Run 21', 'Run 20', 'Run 19', 'Run 18', 'Run 17', 'Run 16', 'Run 15', 'Run 14', 'Run 13', 'Run 12', 'Run 11', 'Run 10', 'Run 9', 'Run 8', 'Run 7', 'Run 6', 'Run 5', 'Run 4', 'Run 3']);

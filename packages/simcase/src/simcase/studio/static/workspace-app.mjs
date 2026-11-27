@@ -748,8 +748,9 @@ const signature = () => studySignature(current(), state.modeCount, state.groupIn
 // the inputs that become current are those the file or record kept. While the multiphysics model is
 // shown, state holds its all-physics placeholder: the optical model's own physics are used then.
 const opticalInputsNow=()=>mpFlags&&workspacePhysics?snapshot({...state,...workspacePhysics},setup):current();
-const currentInputsNow=()=>{const input=opticalInputsNow();return currentInputsText(runs,studySignature(input,state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()),geometryWords(input.model));};
-function appendCurrentInputs(){const text=currentInputsNow();if(text)$('file-status').append(' '+text);}
+// model: the optical model's title in a line that names more than one model (round 34, M2), else ''.
+const currentInputsNow=(model='')=>{const input=opticalInputsNow();return currentInputsText(runs,studySignature(input,state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()),geometryWords(input.model),model);};
+function appendCurrentInputs(model=''){const text=currentInputsNow(model);if(text)$('file-status').append(' '+text);}
 const inputSignature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(inputsFile());
 // The title and the footer show one save indicator (persistenceTitle), so they never disagree.
@@ -1188,12 +1189,14 @@ function restorePair(index,opener){
  const own=options=>index<0?recoverLatest(opener,options):recoverEarlier(index,opener,options);
  if(!other||other.inTab||!other.record){own();return;}
  const card=first.recovered.session.application==='multiphysics'?'heated-waveguide':'optical',firstFile=first.recovered.savedFile,record=other.record;
+ // the optical model's title as pairLine names it (round 34, M2)
+ const opticalTitle=card==='heated-waveguide'?other.model:entry.model||'Optical waveguide';
  const then=async()=>{
   await renderEarlierSessions();
   const again=recoveryList().find(e=>e.recovered.session.application===record.application&&e.recovered.savedAt===record.savedAt&&entryFile(e)===record.file);
   if(!again){notice(`${other.model} was not restored: its browser record is no longer stored.`);return;}
   const done=()=>{chooseTemplate(card);notice(`Restored ${pairLine(entry,{model:other.model,runs:record.runs})} from this browser, not recomputed.`);};
-  const options={then:()=>{done();appendCurrentInputs();},failed:message=>notice(`${other.model} was not restored: ${message}`),projectMatched:firstFile?.current===true&&firstFile.name===record.file};
+  const options={then:()=>{done();appendCurrentInputs(opticalTitle);},failed:message=>notice(`${other.model} was not restored: ${message}`),projectMatched:firstFile?.current===true&&firstFile.name===record.file};
   if(again.kind==='latest')recoverLatest(opener,options);else recoverEarlier(again.index,opener,options);
  };
  own({then});
@@ -2299,7 +2302,7 @@ async function applyOpenedProject(read,fileName){
   project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});if(project.file)project.file.models=modelList();project.stamp=projectStamp();
   refreshPersistence();
   const words=read.models.map(m=>({title:m.title,parts:m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
-  notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);if(ws)appendCurrentInputs();
+  notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);if(ws)appendCurrentInputs(mp?ws.title:'');
  }finally{openingModel=false;}
 }
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
