@@ -747,8 +747,14 @@ impl MixedPoints {
         MixedPoints { input, s: Vec::new(), n: MixedCounters::default(), siv: Vec::new() }
     }
 
+    /// Checked in release builds too (every predicate goes through here): a `siv` out of
+    /// step with `s` gives wrong signs, not an error.
+    fn check(&self) {
+        assert_eq!(self.siv.len(), self.s.len(), "S points changed without push, set_s or pop_s");
+    }
+
     pub fn view(&self) -> Mixed<'_> {
-        debug_assert_eq!(self.siv.len(), self.s.len());
+        self.check();
         Mixed { input: &self.input, s: &self.s, iv: &self.siv }
     }
 
@@ -778,11 +784,13 @@ impl crate::delaunay::Geom for MixedPoints {
     }
 
     fn orient3d(&mut self, v: [u32; 4]) -> i8 {
+        self.check();
         let m = Mixed { input: &self.input, s: &self.s, iv: &self.siv };
         m.orient3d(v.map(|i| m.from_id(i)), &mut self.n)
     }
 
     fn insphere_sos(&mut self, v: [u32; 5]) -> i8 {
+        self.check();
         let m = Mixed { input: &self.input, s: &self.s, iv: &self.siv };
         m.insphere_sos(v.map(|i| m.from_id(i)), &mut self.n)
     }
