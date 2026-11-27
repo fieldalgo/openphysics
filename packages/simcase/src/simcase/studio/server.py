@@ -119,16 +119,19 @@ def workspace_asset(filename: str):
 # "browser_served"). Only these names are served; three.module.js imports ./three.core.js, so both sit
 # under one path and need no import map. The page's script-src stays 'self'.
 THREE = "three-0.186.1"
-_VENDOR_THREE = {"three.module.js": "text/javascript", "three.core.js": "text/javascript",
-                 "LICENSE": "text/plain; charset=utf-8"}
+# The paths are fixed here; a request only selects one of them by name.
+_VENDOR_THREE = {name: (STATIC / "vendor" / THREE / name, mime) for name, mime in (
+    ("three.module.js", "text/javascript"), ("three.core.js", "text/javascript"),
+    ("LICENSE", "text/plain; charset=utf-8"))}
 
 
 @app.get(f"/vendor/{THREE}/{{filename}}")
 def vendor_three(filename: str):
-    mime = _VENDOR_THREE.get(filename)
-    if mime is None:
+    entry = _VENDOR_THREE.get(filename)
+    if entry is None:
         raise HTTPException(404, "Unknown vendored file")
-    return FileResponse(STATIC / "vendor" / THREE / filename, media_type=mime,
+    path, mime = entry
+    return FileResponse(path, media_type=mime,
                         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
