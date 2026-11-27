@@ -410,3 +410,71 @@ def test_inventory_entries_are_valid_and_documented():
         text = doc.read_text(encoding="utf-8")
         for name in INVENTORY["distributions"]:
             assert f"`{name}`" in text, (doc.name, name)
+
+
+# ---- browser-served files (static assets Studio sends to a browser) ----------------
+
+def served(tmp_path, files=None, spdx="MIT", **extra):
+    directory = tmp_path / "vendor" / "lib-1.0"
+    directory.mkdir(parents=True)
+    files = {"lib.js": b"export const x = 1;\n", "LICENSE": b"MIT License\n"} if files is None else files
+    for name, data in files.items():
+        (directory / name).write_bytes(data)
+    import hashlib
+    record = {name: {"from": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+              for name, data in files.items()}
+    entry = {"version": "1.0", "spdx": spdx, "source": "https://registry.example/lib-1.0.tgz",
+             "directory": "vendor/lib-1.0", "files": record, "modified": False, **extra}
+    return directory, {"lib": entry}
+
+
+def test_browser_served_files_matching_their_record_pass(tmp_path):
+    _, entries = served(tmp_path)
+    assert check_licenses.browser_served_errors(entries, INVENTORY["policy"], root=tmp_path) == []
+
+
+def test_the_repository_browser_served_record_passes():
+    assert INVENTORY["browser_served"], "three.js is recorded"
+    assert check_licenses.browser_served_errors(INVENTORY["browser_served"], INVENTORY["policy"]) == []
+
+
+def test_a_changed_byte_in_a_browser_served_file_fails(tmp_path):
+    directory, entries = served(tmp_path)
+    (directory / "lib.js").write_bytes(b"export const x = 2;\n")
+    errors = check_licenses.browser_served_errors(entries, INVENTORY["policy"], root=tmp_path)
+    assert any("lib.js" in e and "SHA-256" in e for e in errors)
+
+
+def test_an_unrecorded_or_missing_browser_served_file_fails(tmp_path):
+    directory, entries = served(tmp_path)
+    (directory / "extra.js").write_bytes(b"")
+    (directory / "LICENSE").unlink()
+    errors = check_licenses.browser_served_errors(entries, INVENTORY["policy"], root=tmp_path)
+    assert any("extra.js" in e for e in errors) and any("LICENSE" in e for e in errors)
+
+
+@pytest.mark.parametrize("extra", [{"spdx": "GPL-3.0-only"}, {"spdx": "LGPL-2.1-only"},
+                                   {"spdx": "MPL-2.0", "modified": True}, {"modified": True}])
+def test_browser_served_files_must_be_permissive_and_unmodified(tmp_path, extra):
+    _, entries = served(tmp_path, **extra)
+    assert check_licenses.browser_served_errors(entries, INVENTORY["policy"], root=tmp_path)
+
+
+def test_unmodified_mpl_alone_may_be_browser_served(tmp_path):
+    _, entries = served(tmp_path, spdx="MPL-2.0")
+    assert check_licenses.browser_served_errors(entries, INVENTORY["policy"], root=tmp_path) == []
+
+
+def test_a_browser_served_entry_needs_its_license_file(tmp_path):
+    _, entries = served(tmp_path, files={"lib.js": b"x"})
+    errors = check_licenses.browser_served_errors(entries, INVENTORY["policy"], root=tmp_path)
+    assert any("license text" in e for e in errors)
+
+
+def test_the_docs_must_list_browser_served_entries(tmp_path, monkeypatch):
+    doc = tmp_path / "third-party.md"
+    doc.write_text("no rows\n", encoding="utf-8")
+    monkeypatch.setattr(check_licenses, "DOCS", (doc,))
+    monkeypatch.setattr(check_licenses, "ROOT", tmp_path)
+    errors, _ = check_licenses.check([str(tmp_path / "site")], INVENTORY, check_docs=True)
+    assert any("does not list" in e and "three" in e for e in errors)

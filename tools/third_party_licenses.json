@@ -105,6 +105,26 @@
       }
     }
   },
+  "browser_served": {
+    "three": {
+      "version": "0.186.1", "spdx": "MIT",
+      "source": "https://registry.npmjs.org/three/-/three-0.186.1.tgz",
+      "source_integrity": "sha512-blFeqb49wRCSGUGj7gtpfnSGHy2lwDk94RhUmS1c/hTby70kvChbWpkJ4Pm1390LqzzvTmzgXKHPEafJwCb8jA==",
+      "url": "https://github.com/mrdoob/three.js",
+      "directory": "packages/simcase/src/simcase/studio/static/vendor/three-0.186.1",
+      "files": {
+        "three.core.js": {"from": "build/three.core.js", "bytes": 1458113,
+                          "sha256": "9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6"},
+        "three.module.js": {"from": "build/three.module.js", "bytes": 662772,
+                            "sha256": "9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea"},
+        "LICENSE": {"from": "LICENSE", "bytes": 1081,
+                    "sha256": "8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc"}
+      },
+      "modified": false,
+      "served_by": "simcase Studio at /vendor/three-0.186.1/<file>; shipped in the simcase wheel and sdist",
+      "review": "First third-party code Studio sends to a browser, vendored unmodified with no CDN and no import map (project owner, 2026-11-27)."
+    }
+  },
   "distributions": {
     "annotated-doc": {"spdx": "MIT", "url": "https://github.com/fastapi/annotated-doc"},
     "annotated-types": {"spdx": "MIT", "url": "https://github.com/annotated-types/annotated-types"},

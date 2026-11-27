@@ -1,1 +1,3 @@
 * text=auto eol=lf
+# Vendored third-party files are stored and checked out byte for byte (docs/third-party.md).
+packages/simcase/src/simcase/studio/static/vendor/** -text

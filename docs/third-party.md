@@ -23,6 +23,7 @@ of each validation environment (see [Automated check](#automated-check)).
 | external process | Separately installed program run as a separate process; only its output files are read. Its Python module, if it has one, is never imported by package code. |
 | bundled | Native library, statically linked code, font or runtime file that a third-party wheel's publisher ships inside that wheel. |
 | data | Numbers or records reproduced in or fetched by the repository. |
+| browser-served | Third-party file copied unmodified into a first-party package, shipped in its wheel and sdist and sent by Studio to the browser. See [browser-served files](#browser-served-files). |
 
 ## License policy
 
@@ -36,9 +37,10 @@ levels.
    are original Apache-2.0 work apart from the third-party data recorded under
    [data and published numbers](#data-and-published-numbers) (CC0-1.0
    refractive-index tables embedded in physmat, published benchmark numbers in
-   galerkin-refsol), which keeps its own terms. No third-party source code is
-   copied into the repository, and the distributions declare their
-   dependencies without including them. Only `meshloom` contains compiled code:
+   galerkin-refsol), which keeps its own terms, and the unmodified three.js files
+   listed under [browser-served files](#browser-served-files), which keep their
+   MIT license. No other third-party source code is copied into the repository,
+   and the distributions declare their dependencies without including them. Only `meshloom` contains compiled code:
    its wheels hold one Rust extension module that statically links PyO3, its
    small dependencies and the Rust standard library, all under permissive
    licenses, with no third-party C or C++ code. Their license texts ship in
@@ -94,7 +96,10 @@ levels.
    separate-process tool such as Gmsh may bundle GPL libraries.
 
 Running software on a server is not distribution, but JavaScript, CSS, fonts and
-WebAssembly sent to a browser are. OpenPhysics distributes no third-party
+WebAssembly sent to a browser are. The only third-party files Studio sends to a
+browser are the unmodified, permissively licensed files listed under
+[browser-served files](#browser-served-files), with their license text, from
+Studio's own server (no CDN). OpenPhysics distributes no third-party
 binaries. Before anything that contains third-party binaries is distributed
 (container or virtual-machine images, installers, frozen applications,
 wheelhouses or wheel mirrors, browser-based Python sites, customer deliveries),
@@ -260,6 +265,40 @@ a platform, wheel tag or Python version, when a dependency is added, when a
 package gains compiled code, or before OpenPhysics code would load a bundled
 library directly.
 
+## Browser-served files
+
+Third-party files that a first-party package ships and Studio sends to a browser.
+They are copied byte for byte from the published package, never edited or merged
+with OpenPhysics code, and kept in their own versioned folder with the upstream
+license text. Studio serves only the recorded names, at
+`/vendor/<name>-<version>/<file>`, from its own origin with `Cache-Control:
+no-store` and `X-Content-Type-Options: nosniff`; the page policy stays
+`script-src 'self'`, with no CDN and no import map. Git stores the folder
+without line-ending conversion (`.gitattributes`), so the hashes hold on every
+OS.
+
+| Name | Version | License | Files (in `simcase/studio/static/vendor/three-0.186.1/`) and SHA-256 | Source | Status |
+|---|---|---|---|---|---|
+| `three` (three.js) | 0.186.1 | MIT | `three.module.js` (662,772 bytes) `9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea`; `three.core.js` (1,458,113 bytes) `9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6`; `LICENSE` (1,081 bytes) `8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc` | npm registry tarball <https://registry.npmjs.org/three/-/three-0.186.1.tgz> (`build/three.module.js`, `build/three.core.js`, `LICENSE`); project <https://github.com/mrdoob/three.js> | unmodified |
+
+`three.module.js` imports only `./three.core.js`. Add-ons such as
+`OrbitControls` import the bare specifier `three`, which would need an import
+map, so they are not vendored; Studio writes its own controls. The MIT notice is
+in the repository [NOTICE](../NOTICE) and the
+[simcase NOTICE](../packages/simcase/NOTICE), which ships in the wheel.
+`tools/check_licenses.py` checks the folder against the `browser_served`
+record of the inventory, and `tests/simcase/test_studio_vendor_three.py`
+checks the bytes Studio serves (check W16).
+`tools/studio_browser/studio_vendor_three_browser.mjs` (local; needs Playwright,
+not in CI) loads `three.module.js` in a Studio page, renders one box and checks
+the received hashes and that the page made no request to another origin.
+
+To vendor another file: take it from the published package, record its source,
+size and SHA-256 under `browser_served`, add it to the package data of its
+distribution, an explicit Studio route, a row here and in the Korean page, and
+its notice in both NOTICE files. Only permissive licenses, or MPL-2.0 alone in
+its own file, are accepted, and the files stay unmodified.
+
 ## External programs
 
 | Program | License | How it is used |
@@ -331,6 +370,9 @@ The check reads installed metadata and each distribution's RECORD file list with
 - a `bundled_files` record of a distribution that is not an external process
   leaves only GPL terms without a runtime exception listed in the policy (such
   a library would load into the OpenPhysics process);
+- a `browser_served` entry is not permissive (or MPL-2.0 alone), is not recorded
+  as unmodified, has no license file, or its folder does not hold exactly the
+  recorded files with the recorded sizes and SHA-256 values;
 - this page or its Korean translation does not list every inventory entry.
 
 CI runs it on the pinned Linux environment, on the fresh environments holding the

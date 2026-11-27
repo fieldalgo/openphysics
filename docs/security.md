@@ -56,7 +56,9 @@ server. The server refuses them before any route runs:
   (`style-src 'unsafe-inline'`). The classic editor writes document text
   (names, materials, parameters) as text, so a crafted model file cannot inject
   markup. The interactive API pages `/docs` and `/redoc`, which load Swagger UI
-  from a CDN, are switched off.
+  from a CDN, are switched off. The one third-party script, three.js, comes
+  from the server itself too: unmodified files with recorded SHA-256 values
+  ([browser-served files](third-party.md#browser-served-files)).
 
 These checks do not depend on the FastAPI version or on the browser's Local
 Network Access rules. They do not make Studio safe on a shared or untrusted

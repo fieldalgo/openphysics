@@ -57,4 +57,5 @@ include = ["simcase*"]
 [tool.setuptools.package-data]
 # simcase.slots: the generated slot table of format 0.3 documents
 simcase = ["slot_table.json"]
-"simcase.studio" = ["static/*"]
+# static/vendor: unmodified browser-served third-party files (docs/third-party.md)
+"simcase.studio" = ["static/*", "static/vendor/three-0.186.1/*"]
