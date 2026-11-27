@@ -172,6 +172,13 @@ def _thermoelasticity3d():
     )
 
 
+def _thermoelasticity_history_3d():
+    from galerkin.transient_thermoelasticity3d import solve_thermoelasticity_history_3d
+    _, kwargs = _thermoelasticity3d()
+    kwargs.update(time=[0.0], temperature=kwargs["temperature"][None, :])
+    return solve_thermoelasticity_history_3d, kwargs
+
+
 def _steady_thermoelasticity():
     from galerkin.thermal_mechanical import solve_steady_thermoelasticity
     mesh = _square()
@@ -352,6 +359,7 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.thermoelasticity:freeze_temperature": _freeze,
                 "galerkin.thermoelasticity:solve_thermoelasticity": _thermoelasticity,
                 "galerkin.thermoelasticity3d:solve_thermoelasticity_3d": _thermoelasticity3d,
+                "galerkin.transient_thermoelasticity3d:solve_thermoelasticity_history_3d": _thermoelasticity_history_3d,
                 "galerkin.thermal_mechanical:solve_steady_thermoelasticity": _steady_thermoelasticity,
                 "galerkin.transient_thermal_mechanical:solve_transient_thermoelasticity": _transient_thermoelasticity,
                 "galerkin.transient_thermal_mechanical:TransientThermoelasticError": _transient_thermoelastic_error,
