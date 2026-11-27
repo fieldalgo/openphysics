@@ -902,9 +902,8 @@ impl State<'_> {
         for _pass in 0..4 {
             let mut done = 0u32;
             // 2-3 across interior faces
-            let mut faces: Vec<[u32; 3]> = self.cx.faces.iter()
-                .filter(|(k, o)| o[0] != NONE && o[1] != NONE && !self.sub.contains_key(*k))
-                .map(|(k, _)| *k).collect();
+            let mut faces: Vec<[u32; 3]> = self.cx.interior_faces().into_iter()
+                .filter(|k| !self.sub.contains_key(k)).collect();
             faces.sort_unstable();
             for k in faces {
                 if self.clean_faces.contains(&k) {
@@ -953,7 +952,7 @@ impl State<'_> {
     /// flipped. A refusal depends only on the two tetrahedra on k, so flip_passes skips k
     /// until a tetrahedron on it is replaced.
     fn try_23(&mut self, k: [u32; 3]) -> bool {
-        let Some(o) = self.cx.faces.get(&k).copied() else { return false };
+        let Some(o) = self.cx.face_tets(&k) else { return false };
         if o[0] == NONE || o[1] == NONE || self.sub.contains_key(&k) {
             return false;
         }
@@ -1254,7 +1253,7 @@ impl State<'_> {
             if self.sub.contains_key(&k) {
                 continue;
             }
-            let Some(o) = self.cx.faces.get(&k).copied() else { continue };
+            let Some(o) = self.cx.face_tets(&k) else { continue };
             if o[0] == NONE || o[1] == NONE {
                 continue;
             }
@@ -1410,7 +1409,7 @@ impl State<'_> {
 
     /// Boundary size: a subfacet whose circumradius exceeds FAC_C alpha h of its regions.
     fn subfacet_too_large(&self, f: [u32; 3]) -> bool {
-        let Some(o) = self.cx.faces.get(&f) else { return false };
+        let Some(o) = self.cx.face_tets(&f) else { return false };
         let h = self.local_h(o.iter().copied());
         if !(h > 0.0) {
             return false;
@@ -1455,7 +1454,7 @@ impl State<'_> {
         if !(self.opt.ratio > 0.0) || f.iter().any(|&v| (v as usize) < self.small_apex.len() && self.small_apex[v as usize]) {
             return false;
         }
-        let Some(o) = self.cx.faces.get(&f) else { return false };
+        let Some(o) = self.cx.face_tets(&f) else { return false };
         if !(self.local_h(o.iter().copied()) > 0.0) {
             return false;
         }
@@ -1613,7 +1612,7 @@ impl State<'_> {
 
     /// A vertex in the equatorial ball of subfacet f, among the apexes of its tetrahedra.
     fn encroacher(&mut self, f: [u32; 3]) -> Option<u32> {
-        let o = self.cx.faces.get(&f).copied()?;
+        let o = self.cx.face_tets(&f)?;
         let m = self.g.view();
         o.iter().filter(|&&t| t != NONE && self.inside[t as usize]).map(|&t| {
             *self.cx.tets[t as usize].iter().find(|x| !f.contains(x)).unwrap()
@@ -1768,7 +1767,7 @@ impl State<'_> {
         // cavity whether or not the search below reaches them
         let mut all: Vec<u32> = seeds.to_vec();
         for k in plane {
-            if let Some(o) = self.cx.faces.get(k) {
+            if let Some(o) = self.cx.face_tets(k) {
                 all.extend(o.iter().copied().filter(|&t| t != NONE && self.inside[t as usize]));
             }
         }
@@ -1898,7 +1897,7 @@ impl State<'_> {
         // would leave its old face open on that side of the facet
         let mut seedset: std::collections::HashSet<u32> = seeds.iter().copied().collect();
         for k in plane {
-            if let Some(o) = self.cx.faces.get(k) {
+            if let Some(o) = self.cx.face_tets(k) {
                 seedset.extend(o.iter().copied().filter(|&t| t != NONE && self.inside[t as usize] && inc.contains_key(&t)));
             }
         }
@@ -2111,7 +2110,7 @@ impl State<'_> {
             });
             // every tetrahedron on a subfacet the 2D cavity replaces must be in the cavity,
             // or its old face would be left open (the cavity shrank on one side of the facet)
-            let one_sided = plane.iter().any(|k| self.cx.faces.get(k).is_some_and(|o| o.iter().any(|&t| t != NONE && self.inside[t as usize] && !set.contains(&t))));
+            let one_sided = plane.iter().any(|k| self.cx.face_tets(k).is_some_and(|o| o.iter().any(|&t| t != NONE && self.inside[t as usize] && !set.contains(&t))));
             if swallowed_face || swallowed_edge || one_sided {
                 return Ok(false);
             }
@@ -2192,7 +2191,7 @@ impl State<'_> {
                 continue;
             }
             let nk = key([x, y, p]);
-            if !self.cx.faces.contains_key(&nk) {
+            if !self.cx.has_face(&nk) {
                 return Err(format!("refinement: the split subfacet {nk:?} is not a face"));
             }
             self.sub.insert(nk, fl);
@@ -2416,7 +2415,7 @@ impl State<'_> {
             self.stats.exempt_faces += 1;
             return Ok(());
         }
-        let seeds: Vec<u32> = plane.iter().flat_map(|k| self.cx.faces[k]).filter(|&t| t != NONE).collect();
+        let seeds: Vec<u32> = plane.iter().flat_map(|k| self.cx.face_tets(k).unwrap()).filter(|&t| t != NONE).collect();
         let cav = self.cavity(p, &seeds, &plane);
         let (_, es) = self.encroached_by(p, &cav);
         if let Some(&e) = es.first() {
