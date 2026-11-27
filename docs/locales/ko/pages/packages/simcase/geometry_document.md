@@ -11,7 +11,8 @@
 [`simcase.geometry_velocity`](geometry_engine.md#설계-속도-4단계)가 구현합니다. 5단계 보완(2026-11-27)이
 `3d` 구성 요소의 3D 컴파일 조건, meshloom 넘기기, 메시 생성기 경로를 정합니다
 ([5단계 컴파일 조건](#5단계-컴파일-조건2026-11-27-보완) 참고). meshloom을 거치는 3D 경로는 meshloom 자체가
-수용되기 전까지 실험 단계입니다. 저장소 사실은 `main` `015a6d8`에서, 5단계 보완의 사실은 `b4177fa`에서
+수용되기 전까지 실험 단계입니다. [`simcase.geometry_engine3d`](geometry_engine3d.md)가 그 경로로 상자와 판 층을
+받습니다(슬라이스 1). 저장소 사실은 `main` `015a6d8`에서, 5단계 보완의 사실은 `b4177fa`에서
 확인했습니다.
 
 이 문서의 구성은 다음과 같습니다.
@@ -661,7 +662,7 @@ part       := [A-Za-z0-9_-]+
 | [영역 기계](mechanics2d.md#재료-영역과-이름-있는-경계)(`mechanics.elasticity2d`, `mechanics.thermoelastic2d`) | 2단계 엔진을 거친 `2d` 구성 요소. E·ν·α·k는 `materials`에서, 변위·traction·압력은 영역 열과 같은 경계 이름으로(2026-11-08) | `axisymmetric`; 빈 공간 배경; 변위·traction·압력의 경계면 선택(galerkin은 외부 절점만 고정) |
 | FEM 2.5D(`meshine.extrude`) | `layers`, z 방향 `extrude` | 기울거나 휜 옆면. 압출기는 수직 프리즘만 만듦(`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | 격자면 규칙을 지키는 `box` | 다른 3D 피처 |
-| FEM 3D(meshloom, 5단계, 실험 단계) | 단독 `layers` 피처(압출 경로)와 `em.cavity3d` 문서를 뺀 모든 `3d` 구성 요소: [5단계 조합](#5단계-컴파일-조건2026-11-27-보완) | 그 밖의 모든 것, 이름을 밝혀 거부(`E-3D-COMBINATION`); gmshio 경로는 계획하지 않음 |
+| FEM 3D(meshloom, 5단계, 실험 단계) | 단독 `layers` 피처(압출 경로)와 `em.cavity3d` 문서를 뺀 모든 `3d` 구성 요소: [5단계 조합](#5단계-컴파일-조건2026-11-27-보완); [`simcase.geometry_engine3d`](geometry_engine3d.md)가 상자와 판 층을 받음(슬라이스 1) | 그 밖의 모든 것, 이름을 밝혀 거부(`E-3D-COMBINATION`); gmshio 경로는 계획하지 않음 |
 | sipi | 어댑터를 거친 `2d` 구성 요소. 어댑터는 sipi의 겹침 거부를 유지(`packages/sipi/src/sipi/crosssection.py:216-239`) | — |
 | Wavebit RCWA·FDTD | 3단계 보완이 정의 | — |
 
@@ -885,3 +886,5 @@ sipi에서 옮기는 방식:
   소비자, "정의하지만 소비자가 없는 것"과 "여기서 정하지 않는 것" 목록, 상태 문장, 소비자 표를 고치고 낡은
   인용을 바로잡음(`validation3d.md:44`는 이제 `:45`, `cavity.py:104-145`는 공동 상자에 대해 `:124-209`, 3D
   도메인에 대해 `:144-157`). 나머지 동결 본문은 그대로.
+- 2026-11-27: 상태 문장과 소비자 표에 meshloom으로 상자와 판 층을 받는 `simcase.geometry_engine3d`를 적음(5단계
+  슬라이스 1, 동결 절 아님).

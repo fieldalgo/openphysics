@@ -223,11 +223,12 @@ not run it. It has five parts, run in parallel:
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
 | `meshloom-v26-wheel`, `meshloom-v26`, `meshloom-v26-compare` | Ubuntu 24.04, four jobs; main pushes and manual dispatch only | meshloom's V26 in full: C1–C9 at h = 0.1, C3 included, with one abi3 wheel on Python 3.12 and 3.15, and the two Pythons' digests compared |
+| `geometry3d-full` | Ubuntu 24.04; main pushes and manual dispatch only | The stage 5 geometry check G1 in full: `tests/simcase/test_geometry_engine3d.py` with `OPENPHYSICS_GEOMETRY3D_FULL=1` (all 200 seeded box sets; pull requests run 25 in the source parts), against the abi3 wheel of `meshloom-v26-wheel` ([3D boxes and slab layers](packages/simcase/geometry_engine3d.md#validation)) |
 
 The single required check is **`tests`**. It passes only when all five parts
 succeed (all sixteen jobs of each split part among them); a failed, cancelled or skipped part fails it. On main
-pushes and manual dispatch it also needs the three meshloom V26 jobs to succeed; on pull requests they do not run,
-and it needs them skipped. Every change, including documentation, needs it.
+pushes and manual dispatch it also needs the three meshloom V26 jobs and `geometry3d-full` to succeed; on pull
+requests they do not run, and it needs them skipped. Every change, including documentation, needs it.
 
 **meshloom V26 jobs.** The source test parts run V26 (validation3d.md) on every pull request without C3 at
 h = 0.1 and on one Python. C3 at h = 0.1 has about 1.27 million tetrahedra (513 s and 2.1 GiB per run on one

@@ -205,6 +205,8 @@
   "E-BASIS": {"severity": "error", "en": "A total or per-depth value does not match the component's basis.", "ko": "합 또는 깊이당 값이 구성 요소의 기준과 맞지 않음."},
   "E-CONTAINMENT": {"severity": "error", "en": "A feature lies outside its domain.", "ko": "형상 요소가 영역 밖에 있음."},
   "E-MESH-ESTIMATE": {"severity": "error", "en": "The estimated element count exceeds the limit.", "ko": "추정 요소 수가 한도를 넘음."},
+  "E-3D-COMBINATION": {"severity": "error", "en": "Valid, but outside the stage 5 combinations of a 3d component.", "ko": "유효하지만 3d 구성 요소의 5단계 조합 밖에 있음."},
+  "I-MESH-ESTIMATE": {"severity": "info", "en": "The estimated tetrahedron count and meshing time of a 3d component.", "ko": "3d 구성 요소의 추정 사면체 수와 메시 시간."},
   "E-SCALE-MISMATCH": {"severity": "error", "en": "A mesh file's extent disagrees with expected_extent.", "ko": "메시 파일 크기가 expected_extent와 맞지 않음."},
   "E-EXPRESSION-KIND": {"severity": "error", "en": "An expression of the wrong kind in a slot.", "ko": "자리와 맞지 않는 종류의 식."},
   "E-SELECTION-UNKNOWN": {"severity": "error", "en": "Unknown selection name.", "ko": "알 수 없는 선택 이름."},

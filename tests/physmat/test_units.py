@@ -898,12 +898,13 @@ def test_each_path_gets_exactly_one_error():
 def test_diagnostic_codes_are_the_closed_list_with_en_and_ko_text():
     codes = units.DIAGNOSTIC_CODES
     # 58 codes of the design, plus the 8 of the document reader (R-1): E-FORMAT, E-JSON, E-VALUE-FORM,
-    # E-MATERIAL-UNKNOWN, E-CONTRACT, W-SHAPE-DROPPED, W-PIECE-DROPPED, I-MESH-CONTROL-RAISED, and
-    # E-LOOP-DIVERGED of multiphysics loops (D2).
-    assert len(codes) == 67
-    assert sum(1 for c in codes.values() if c["severity"] == "error") == 38
+    # E-MATERIAL-UNKNOWN, E-CONTRACT, W-SHAPE-DROPPED, W-PIECE-DROPPED, I-MESH-CONTROL-RAISED,
+    # E-LOOP-DIVERGED of multiphysics loops (D2), and E-3D-COMBINATION and I-MESH-ESTIMATE of the
+    # 3D route through meshloom (geometry stage 5).
+    assert len(codes) == 69
+    assert sum(1 for c in codes.values() if c["severity"] == "error") == 39
     assert sum(1 for c in codes.values() if c["severity"] == "warning") == 18
-    assert sum(1 for c in codes.values() if c["severity"] == "info") == 11
+    assert sum(1 for c in codes.values() if c["severity"] == "info") == 12
     for code, c in codes.items():
         assert code.startswith({"error": "E-", "warning": "W-", "info": "I-"}[c["severity"]])
         assert c["en"] and c["ko"]
