@@ -25,8 +25,9 @@ server's reply bit for bit, browser recovery, the 16 MiB limit and the refusals 
 Since P3 a fourth (tools/studio_browser/studio_project_browser.mjs) saves both models of a tab in one
 project file and opens it after a server restart in a new browser profile: the same values, no
 run started, the refusals of damaged files and the save dialog stubbed at its boundary.
-Since 2026-11-27 it runs the Studio 3D mesh job's tests (tests/simcase/test_studio_mesh3d_job.py)
-on every platform: the spawn child, Cancel's termination and the temporary directory's removal.
+Since 2026-11-27 it runs the Studio 3D mesh job's process tests (tests/simcase/test_studio_mesh3d_process.py,
+no HTTP client: the Studio pins have no httpx) on every platform: the spawn child, Cancel's termination
+and the temporary directory's removal.
 """
 import argparse
 from email.parser import BytesParser
@@ -227,8 +228,9 @@ def main():
             ROOT / "tests/simcase/test_steady_boundary_platform.py":
                 tests / "test_steady_boundary_platform.py",
             # the Studio 3D mesh job: a spawn child that Cancel terminates, and its temporary
-            # directory removed, on every platform (W8 itself runs on Linux in validate.yml)
-            ROOT / "tests/simcase/test_studio_mesh3d_job.py": tests / "test_studio_mesh3d_job.py",
+            # directory removed, on every platform (W8 itself runs on Linux in validate.yml);
+            # driven without HTTP, since the Studio pins have no httpx for TestClient
+            ROOT / "tests/simcase/test_studio_mesh3d_process.py": tests / "test_studio_mesh3d_process.py",
             ROOT / "tests/simcase/model3d_fixtures.py": tests / "model3d_fixtures.py"}
         for source, destination in copies.items():
             shutil.copy2(source, destination)
@@ -274,7 +276,7 @@ def main():
             tests / "test_meshloom_refine.py",
             tests / "test_meshloom_generate3d.py",
             tests / "test_export_regions.py",
-            tests / "test_studio_mesh3d_job.py",
+            tests / "test_studio_mesh3d_process.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)
         # Installed save/I-O robustness: every transient and steady-boundary platform
