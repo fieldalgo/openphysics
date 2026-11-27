@@ -248,10 +248,32 @@ def test_section_refuses_a_plane_outside_the_domain(client):
     assert reply.status_code == 400
 
 
+# ---- the view's files and the lab page -------------------------------------------------------
 
-def test_the_card_is_served_by_name_only(client):
-    reply = client.get("/model3d-assets/model3d-via-stack.json")
-    assert reply.status_code == 200 and reply.json() == F.card()
-    assert reply.headers["cache-control"] == "no-store" and reply.headers["x-content-type-options"] == "nosniff"
-    for name in ("../server.py", "model3d-api.py", "three.module.js"):
+def test_view_assets_are_served_by_name_only(client):
+    import re
+    static = F.STATIC
+    for name, mime in (("model3d-view.mjs", "text/javascript"), ("model3d-model.mjs", "text/javascript"),
+                       ("model3d-via-stack.json", "application/json")):
+        reply = client.get("/model3d-assets/" + name)
+        assert reply.status_code == 200 and reply.content == (static / name).read_bytes()
+        assert reply.headers["content-type"].startswith(mime)
+        assert reply.headers["cache-control"] == "no-store" and reply.headers["x-content-type-options"] == "nosniff"
+    for name in ("geometry-lab-app.mjs", "../server.py", "model3d-api.py", "three.module.js"):
         assert client.get("/model3d-assets/" + name).status_code == 404
+    imports = {}
+    for name in ("model3d-view.mjs", "model3d-model.mjs", "geometry-lab-app.mjs"):
+        text = (static / name).read_text(encoding="utf-8")
+        assert "http" not in text.replace("http://www.w3.org/2000/svg", "") and "import(" not in text and "eval(" not in text
+        imports[name] = set(re.findall(r"""from\s*['"]([^'"]+)['"]""", text))
+    assert imports["model3d-view.mjs"] == {"/vendor/three-0.186.1/three.module.js", "/model3d-assets/model3d-model.mjs"}
+    assert imports["model3d-model.mjs"] == set()
+    assert {"/model3d-assets/model3d-view.mjs", "/model3d-assets/model3d-model.mjs"} <= imports["geometry-lab-app.mjs"]
+
+
+def test_lab_page_offers_the_card_and_the_view(client):
+    page = client.get("/geometry-lab").text
+    assert '<option value="model3d_via_stack">' in page and 'id="canvas3d" tabindex="0"' in page
+    assert 'id="faces"' in page and 'id="names"' in page
+    starter = client.get("/model3d-assets/model3d-via-stack.json").json()
+    assert starter == F.card() and starter["geometry"]["components"]["stack3d"]["length_unit"] == "um"
