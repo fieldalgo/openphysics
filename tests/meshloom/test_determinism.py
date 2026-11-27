@@ -9,9 +9,10 @@ Rows of docs/packages/meshine/validation3d.md, with the inputs fixed before meas
 - V26: C1-C9 at h = 0.1. The SHA-256 of the canonical arrays (nodes, tetrahedra,
   regions, node_source, boundary faces by tag, interfaces by region pair) is the same over
   3 fresh processes and 2 runs in this process. C3 at h = 0.1 (about 1.3 million
-  tetrahedra, minutes per run) runs only with ``MESHLOOM_V26_FULL=1``; its record and the
-  comparison across Python versions (the same wheel on 3.12 and 3.15, through
-  ``python test_determinism.py v26 CASE ...``) are kept with the plan 5 measurements.
+  tetrahedra, minutes per run) runs only with ``MESHLOOM_V26_FULL=1``.
+  ``MESHLOOM_V26_DIGESTS=path`` writes the digests by case as JSON, so that runs on two
+  Pythons with the same wheel can be compared: the CI job ``meshloom-v26`` does both on
+  main pushes and manual dispatch (Python 3.12 and 3.15).
 - V27: C1 at h = 0.2, 0.1, 0.05 and C3 at h = 0.8, 0.4, with the input points, the size
   and the region points scaled by 2^-20 and 2^10 (exact): connectivity, regions, node
   sources and faces are identical, and the nodes are the unscaled nodes times the factor,
@@ -25,6 +26,7 @@ Rows of docs/packages/meshine/validation3d.md, with the inputs fixed before meas
 """
 
 import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -73,6 +75,9 @@ def test_v26_c1_c9_are_deterministic():
         fresh.append(out.split())
     assert all(len(d) == len(V26_CI) for d in fresh + inproc)
     assert all(d == inproc[0] for d in fresh + inproc), fresh + inproc
+    if os.environ.get("MESHLOOM_V26_DIGESTS"):
+        Path(os.environ["MESHLOOM_V26_DIGESTS"]).write_text(
+            json.dumps(dict(zip(V26_CI, inproc[0])), indent=1) + "\n", encoding="utf-8")
 
 
 def scaled(kw, s):

@@ -338,8 +338,9 @@ See [third-party software](../../third-party.md).
     (the gate is 90%).
   - V26 on C1–C9 at h = 0.1 (2026-11-26): the same SHA-256 per case over 3 fresh
     processes and 2 runs in one process, on Python 3.12.13 and 3.15.0b4 with the same
-    wheel. CI runs it without C3, whose mesh has about 1.27 million tetrahedra (513 s
-    and 2.1 GiB on one core).
+    wheel. Pull requests run it without C3, whose mesh has about 1.27 million
+    tetrahedra (513 s and 2.1 GiB on one core); main pushes run it in full on both
+    Pythons ([meshloom V26 jobs](../../development.md#what-ci-runs)).
   - V27 on C1 at three sizes and C3 at two: scaled by 2⁻²⁰ and 2¹⁰, the mesh is the
     same and its nodes are the scaled nodes, bit for bit.
   - V28 on C2, C3 and C5 at two sizes each, from micrometres to 1e6 m: V1–V5 hold,

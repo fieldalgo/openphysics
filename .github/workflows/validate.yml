@@ -348,13 +348,128 @@ jobs:
             tests/refsol/test_fiber_group_index.py \
             tests/refsol/test_fiber_fields.py
 
+  meshloom-v26-wheel:
+    # V26 of the 3D plan in full (docs/packages/meshine/validation3d.md): C1-C9 at h = 0.1,
+    # the same SHA-256 per case over 3 fresh processes and 2 runs in one process, on Python
+    # 3.12 and 3.15 with the same wheel. The source test parts run it on every pull request
+    # without C3 at h = 0.1 (about 1.27 million tetrahedra; 513 s and 2.1 GiB per run on one
+    # core, so its five runs do not fit a part) and on one Python. These three jobs add C3 and
+    # the second Python on main pushes and manual dispatch only, so pull requests allocate no
+    # runner for them, and are in the tests gate there. This one builds the abi3 wheel both
+    # Pythons install.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12.14"
+      # meshloom's compiled kernel: the toolchain pinned in packages/meshloom/rust-toolchain.toml.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install 1.97.0 --profile minimal --component rust-src --no-self-update
+      - name: Build meshloom's abi3 wheel with the pinned maturin
+        run: |
+          python -m pip install -c tools/requirements-py312-linux.txt maturin
+          python -m pip wheel --no-deps --no-build-isolation -w dist packages/meshloom
+          ls dist
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: meshloom-v26-wheel
+          path: dist/meshloom-*.whl
+          if-no-files-found: error
+
+  meshloom-v26:
+    name: meshloom-v26 (Python ${{ matrix.python }})
+    needs: meshloom-v26-wheel
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    # The fresh processes run at the same time as the two runs in the test's own process, so
+    # the job takes about two C1-C9 runs: 2 x 10 min on one core here (2026-11-26), and up to
+    # about twice that on a slower runner. Four C3 meshes at once take about 8.5 GiB of the
+    # runner's 16. The limit only stops hung jobs.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12.14", "3.15"]
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: meshloom-v26-wheel
+          path: dist
+      - name: Install the wheel, numpy and pytest
+        run: |
+          python -m pip install --only-binary=:all: -c tools/requirements-py312-linux.txt numpy pytest
+          python -m pip install --no-deps dist/meshloom-*.whl
+      # The tests run from a copy outside the checkout: the root conftest.py puts each
+      # package's src/ first on sys.path, which would import meshloom without its compiled
+      # kernel and skip the test.
+      - name: Run V26 with C3, and check that it ran
+        env:
+          MESHLOOM_V26_FULL: "1"
+          MESHLOOM_V26_DIGESTS: ${{ runner.temp }}/v26-out/digests-${{ matrix.python }}.json
+        run: |
+          mkdir -p "$RUNNER_TEMP/v26" "$RUNNER_TEMP/v26-out"
+          cp tests/meshloom/*.py "$RUNNER_TEMP/v26/"
+          cd "$RUNNER_TEMP/v26"
+          python -c "import meshloom, sys; assert meshloom.kernel_available(), meshloom.__file__; print(sys.version, meshloom.__file__)"
+          python -m pytest -q -ra -p no:cacheprovider test_determinism.py -k v26 --junitxml="$RUNNER_TEMP/v26-out/v26-${{ matrix.python }}.xml"
+          python - "$RUNNER_TEMP/v26-out/v26-${{ matrix.python }}.xml" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
+          counts = {k: int(suite.get(k)) for k in ("tests", "skipped", "failures", "errors")}
+          assert counts == {"tests": 1, "skipped": 0, "failures": 0, "errors": 0}, counts
+          PY
+          cat "$MESHLOOM_V26_DIGESTS"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: meshloom-v26-${{ matrix.python }}
+          path: ${{ runner.temp }}/v26-out/
+          if-no-files-found: warn
+
+  meshloom-v26-compare:
+    # V26 across Pythons: the digests by case on 3.12 and 3.15 must be the same.
+    needs: meshloom-v26
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: meshloom-v26-3*
+          path: v26
+          merge-multiple: true
+      - name: Compare the digests of Python 3.12 and 3.15
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          files = sorted(Path("v26").glob("digests-*.json"))
+          digests = {f.name: json.loads(f.read_text(encoding="utf-8")) for f in files}
+          assert len(digests) == 2, sorted(digests)
+          (a, da), (b, db) = digests.items()
+          assert sorted(da) == ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9"], sorted(da)
+          assert da == db, {c: (da[c], db.get(c)) for c in da if da[c] != db.get(c)}
+          print(json.dumps(da, indent=1))
+          PY
+
   installed-platforms:
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     uses: ./.github/workflows/platform-install.yml
 
   tests:
     name: tests
-    needs: [linux-py312, linux-py312-tests, installed-tests, blas-kernels, installed-platforms]
+    needs: [linux-py312, linux-py312-tests, installed-tests, blas-kernels, installed-platforms,
+            meshloom-v26-wheel, meshloom-v26, meshloom-v26-compare]
     if: ${{ always() && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -366,12 +481,19 @@ jobs:
           INSTALLED_RESULT: ${{ needs.installed-tests.result }}
           KERNEL_RESULT: ${{ needs.blas-kernels.result }}
           PLATFORM_RESULT: ${{ needs.installed-platforms.result }}
+          V26_RESULTS: >-
+            ${{ needs.meshloom-v26-wheel.result }} ${{ needs.meshloom-v26.result }}
+            ${{ needs.meshloom-v26-compare.result }}
+          # meshloom's full V26 runs on main pushes and manual dispatch, not on pull requests
+          V26_EXPECTED: >-
+            ${{ github.event_name == 'pull_request' && 'skipped skipped skipped' || 'success success success' }}
         run: |
           test "$VALIDATION_RESULT" = success
           test "$SOURCE_TESTS_RESULT" = success
           test "$INSTALLED_RESULT" = success
           test "$KERNEL_RESULT" = success
           test "$PLATFORM_RESULT" = success
+          test "$V26_RESULTS" = "$V26_EXPECTED"
 
   panel-studies:
     # The corner-field panel convergence studies (tests/_support/panel_studies.py): panels

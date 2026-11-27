@@ -199,9 +199,18 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 | `installed-tests` | Ubuntu 24.04, job 열여섯 개 | sdist에서 빌드한 wheel 아홉 개를 모든 extra와 함께 checkout 밖에 설치하고 `tests/`의 Python 시험 전체를 시간이 고르게 나뉜 열여섯 부분으로 동시에 실행 |
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
+| `meshloom-v26-wheel`, `meshloom-v26`, `meshloom-v26-compare` | Ubuntu 24.04, job 네 개; main push와 수동 dispatch에서만 | meshloom V26 전체: C3를 포함한 C1–C9를 h = 0.1로, abi3 wheel 하나를 Python 3.12와 3.15에서 돌리고 두 Python의 다이제스트를 비교 |
 
 필수 검사는 **`tests`** 하나입니다. 다섯 부분이(나뉜 부분의 job 열여섯 개씩 모두 포함) 모두 성공해야 통과하며, 하나라도
-실패·취소·건너뜀이면 실패합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
+실패·취소·건너뜀이면 실패합니다. main push와 수동 dispatch에서는 meshloom V26 job 세 개도 성공해야 합니다. pull request에서는
+이 job들이 돌지 않으므로 건너뜀이어야 합니다. 문서만 바꾼 변경도 이 검사가 필요합니다.
+
+**meshloom V26 job.** 소스 시험 부분은 모든 pull request에서 V26(validation3d.md)을 C3 h = 0.1 없이 Python 하나로 돌립니다.
+C3의 h = 0.1은 사면체가 약 127만 개라(코어 하나로 한 번에 513 s, 2.1 GiB) 시험의 다섯 번 실행이 한 부분에 들어가지 않습니다.
+`meshloom-v26-wheel`은 고정한 maturin으로 abi3 wheel을 빌드합니다. `meshloom-v26`은 그 wheel을 Python 3.12와 3.15에 설치합니다.
+그리고 checkout 밖으로 복사한 `tests/meshloom`에서 `MESHLOOM_V26_FULL=1`로 시험을 돌립니다(루트 `conftest.py`가 커널 없는
+meshloom 소스를 import해 시험을 건너뛰게 하기 때문입니다). 이어서 JUnit 보고서로 시험이 실제로 돌고 통과했는지 확인합니다.
+`meshloom-v26-compare`는 두 Python에서 사례마다 SHA-256이 같기를 요구합니다. pull request는 이 job들에 러너를 쓰지 않습니다.
 
 **Linux job.** 라이선스 검사 뒤 `tools/check_release_version.py`가 배포판 아홉 개의 버전이
 하나인지 확인하고([배포](#배포pypi) 참고) `tools/changelog.py --check`가 [변경 기록 조각](#변경-기록-조각)을 확인한 뒤, Markdown 링크 검사가 돕니다. 저장소에서 추적하는 Markdown 파일의 모든 상대

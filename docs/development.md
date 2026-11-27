@@ -222,10 +222,20 @@ not run it. It has five parts, run in parallel:
 | `installed-tests` | Ubuntu 24.04, sixteen jobs | Every Python test in `tests/` against all nine wheels, built from sdists and installed with all their extras outside the checkout, in eight time-balanced parts run at the same time |
 | `blas-kernels` | Ubuntu 24.04, two jobs | Numerically sensitive tracking, eigenspace, material-cavity (complex dense and sparse eigensolves), fiber-reference and length-unit independence tests under two forced OpenBLAS kernels |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | Eight packages built from sdists into wheels and tested in a fresh environment outside the checkout |
+| `meshloom-v26-wheel`, `meshloom-v26`, `meshloom-v26-compare` | Ubuntu 24.04, four jobs; main pushes and manual dispatch only | meshloom's V26 in full: C1–C9 at h = 0.1, C3 included, with one abi3 wheel on Python 3.12 and 3.15, and the two Pythons' digests compared |
 
 The single required check is **`tests`**. It passes only when all five parts
-succeed (all sixteen jobs of each split part among them); a failed, cancelled or skipped part fails it. Every change, including
-documentation, needs it.
+succeed (all sixteen jobs of each split part among them); a failed, cancelled or skipped part fails it. On main
+pushes and manual dispatch it also needs the three meshloom V26 jobs to succeed; on pull requests they do not run,
+and it needs them skipped. Every change, including documentation, needs it.
+
+**meshloom V26 jobs.** The source test parts run V26 (validation3d.md) on every pull request without C3 at
+h = 0.1 and on one Python. C3 at h = 0.1 has about 1.27 million tetrahedra (513 s and 2.1 GiB per run on one
+core), so the test's five runs do not fit a part. `meshloom-v26-wheel` builds the abi3 wheel with the pinned
+maturin; `meshloom-v26` installs it on Python 3.12 and on 3.15 and runs the test with `MESHLOOM_V26_FULL=1` from a
+copy of `tests/meshloom` outside the checkout (the root `conftest.py` would import meshloom's source without its
+kernel and skip the test), then checks in the JUnit report that the test ran and passed; `meshloom-v26-compare`
+requires the same SHA-256 per case on both Pythons. Pull requests allocate no runner for these jobs.
 
 **Linux job.** After the license check, `tools/check_release_version.py` checks that
 the nine distributions share one version (see [Publishing](#publishing)) and
