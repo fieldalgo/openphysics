@@ -73,6 +73,9 @@ struct State<'a> {
     g: MixedPoints,
     cx: Complex,
     xyz: Vec<P3>,
+    /// per tetrahedron id, values of q_of, shape(..).0 and min_dihedral already computed
+    /// (NaN: not yet); a vertex move clears the entries of its star (see `moved`)
+    memo: TetMemo,
     /// insertion radius per vertex: an input vertex's shortest incident edge at the start,
     /// an inserted point's distance to its nearest neighbour when inserted (small-angle rule)
     rins: Vec<f64>,
@@ -231,6 +234,68 @@ fn shape_q(x: &[P3; 4]) -> f64 {
                                            + dot(&c, &c) * cross(&a, &b)[k]);
     let r = dot(&num, &num).sqrt() / (2.0 * v6);
     if r > 0.0 { 3.0 * (v6 / 2.0 / s) / r } else { 0.0 }
+}
+
+/// Values computed from a live tetrahedron's vertex coordinates, kept by tetrahedron id.
+/// A tetrahedron's vertices never change (a change makes a new id), so an entry stays
+/// right until one of its vertices moves, and every move clears the entries of the moved
+/// vertex's star first. The value returned is the one the function computes.
+#[derive(Default)]
+struct TetMemo {
+    q: Vec<f64>,
+    dihedral_sorted: Vec<f64>,
+    dihedral: Vec<f64>,
+}
+
+impl TetMemo {
+    fn get(v: &[f64], t: u32) -> Option<f64> {
+        v.get(t as usize).copied().filter(|x| !x.is_nan())
+    }
+
+    fn put(v: &mut Vec<f64>, t: u32, x: f64) -> f64 {
+        let i = t as usize;
+        if i >= v.len() {
+            v.resize(i + 1, f64::NAN);
+        }
+        v[i] = x;
+        x
+    }
+
+    fn clear(&mut self, ts: &[u32]) {
+        for v in [&mut self.q, &mut self.dihedral_sorted, &mut self.dihedral] {
+            for &t in ts {
+                if let Some(x) = v.get_mut(t as usize) {
+                    *x = f64::NAN;
+                }
+            }
+        }
+    }
+}
+
+/// The edges of the tetrahedra that `keep` accepts, sorted and without repeats, built
+/// vertex by vertex from the stars (each vertex's higher neighbours sorted), so that no
+/// list of all edges is sorted: the same list as sorting and deduplicating them all.
+fn edges_of(cx: &Complex, mut keep: impl FnMut(u32) -> bool) -> Vec<(u32, u32)> {
+    let n = cx.star.len();
+    let mut ok = vec![0u8; cx.tets.len()]; // 0 unknown, 1 kept, 2 not
+    let mut out = Vec::new();
+    let mut nb: Vec<u32> = Vec::new();
+    for a in 0..n as u32 {
+        nb.clear();
+        for &t in &cx.star[a as usize] {
+            let s = &mut ok[t as usize];
+            if *s == 0 {
+                *s = if keep(t) { 1 } else { 2 };
+            }
+            if *s == 1 {
+                nb.extend(cx.tets[t as usize].iter().copied().filter(|&b| b > a));
+            }
+        }
+        nb.sort_unstable();
+        nb.dedup();
+        out.extend(nb.iter().map(|&b| (a, b)));
+    }
+    out
 }
 
 impl State<'_> {
@@ -607,6 +672,7 @@ impl State<'_> {
     /// Moves facet point v to (about) p, keeping it exactly in its plane: p as
     /// a + s (b - a) + r (c - a) on v's own three input points, least squares in doubles.
     fn set_facet_point(&mut self, v: u32, sp: SPoint) {
+        self.memo.clear(&self.cx.star[v as usize]);
         let n = self.g.input.len();
         self.g.set_s(v as usize - n, sp);
         let m = self.g.view();
@@ -763,6 +829,7 @@ impl State<'_> {
     }
 
     fn set_volume_point(&mut self, v: u32, p: P3) {
+        self.memo.clear(&self.cx.star[v as usize]);
         let n = self.g.input.len();
         self.g.set_s(v as usize - n, SPoint::vol(p));
         self.xyz[v as usize] = p;
@@ -790,6 +857,29 @@ impl State<'_> {
             c = c.max((dot(&n1, &n2) / d).clamp(-1.0, 1.0));
         }
         (smallest_angle(c), shape_q(&x))
+    }
+
+    /// q_of(tets[t]), shape(tets[t]).0 and min_dihedral(t) of live tetrahedron t, kept in
+    /// `memo` (the same values, computed once until a vertex of t moves).
+    fn q_of_tet(&mut self, t: u32) -> f64 {
+        match TetMemo::get(&self.memo.q, t) {
+            Some(x) => x,
+            None => { let x = self.q_of(self.cx.tets[t as usize]); TetMemo::put(&mut self.memo.q, t, x) }
+        }
+    }
+
+    fn dihedral_sorted_tet(&mut self, t: u32) -> f64 {
+        match TetMemo::get(&self.memo.dihedral_sorted, t) {
+            Some(x) => x,
+            None => { let x = self.shape(self.cx.tets[t as usize]).0; TetMemo::put(&mut self.memo.dihedral_sorted, t, x) }
+        }
+    }
+
+    fn min_dihedral_tet(&mut self, t: u32) -> f64 {
+        match TetMemo::get(&self.memo.dihedral, t) {
+            Some(x) => x,
+            None => { let x = self.min_dihedral(t); TetMemo::put(&mut self.memo.dihedral, t, x) }
+        }
     }
 
     /// shape(v).1 alone, bit for bit: the same degeneracy test without the six arc cosines.
@@ -917,20 +1007,8 @@ impl State<'_> {
                 }
             }
             // 3-2 removing an edge with three tetrahedra
-            let mut edges: Vec<(u32, u32)> = Vec::new();
-            for t in 0..self.cx.tets.len() as u32 {
-                if !self.cx.alive[t as usize] || !self.inside[t as usize] {
-                    continue;
-                }
-                let v = self.cx.tets[t as usize];
-                for a in 0..4 {
-                    for b in a + 1..4 {
-                        edges.push(ekey(v[a], v[b]));
-                    }
-                }
-            }
-            edges.sort_unstable();
-            edges.dedup();
+            let inside = &self.inside;
+            let edges = edges_of(&self.cx, |t| inside[t as usize]);
             for (a, b) in edges {
                 if self.clean_e32.contains(&(a, b)) {
                     continue;
@@ -1049,24 +1127,15 @@ impl State<'_> {
     /// programming for the best worst q, when that raises the ring's worst (dihedral, q) and
     /// keeps V7. Every new tetrahedron has exact orient3d of the ring's sign.
     fn edge_removal(&mut self) -> u32 {
-        let mut edges: Vec<(u32, u32)> = Vec::new();
+        // the edges of the tetrahedra inside that are not good: q first, the dihedral angle
+        // decides only when q > 0.9
+        let mut bad = vec![false; self.cx.tets.len()];
         for t in 0..self.cx.tets.len() as u32 {
-            if !self.cx.alive[t as usize] || !self.inside[t as usize] {
-                continue;
-            }
-            // q first: the dihedral angle decides only when q > 0.9
-            if self.q_of(self.cx.tets[t as usize]) > 0.9 && self.shape(self.cx.tets[t as usize]).0 >= DIHEDRAL_MIN {
-                continue;
-            }
-            let v = self.cx.tets[t as usize];
-            for a in 0..4 {
-                for b in a + 1..4 {
-                    edges.push(ekey(v[a], v[b]));
-                }
+            if self.cx.alive[t as usize] && self.inside[t as usize] {
+                bad[t as usize] = !(self.q_of_tet(t) > 0.9 && self.dihedral_sorted_tet(t) >= DIHEDRAL_MIN);
             }
         }
-        edges.sort_unstable();
-        edges.dedup();
+        let edges = edges_of(&self.cx, |t| bad[t as usize]);
         let mut done = 0;
         for (a, b) in edges {
             if self.clean_er.contains(&(a, b)) {
@@ -1158,6 +1227,11 @@ impl State<'_> {
             for i in 0..n - len {
                 let j = i + len;
                 for k in i + 1..j {
+                    // v below is at most min(best[i][k], best[k][j]); when that cannot raise
+                    // best[i][j], neither can v, so triangle (i, k, j) needs no q
+                    if !(best[i][k].0.min(best[k][j].0) > best[i][j].0) {
+                        continue;
+                    }
                     let q = *tri_q[(i * n + k) * n + j].get_or_insert_with(|| {
                         let tr = [poly[i], poly[k], poly[j]];
                         if self.g.orient3d([tr[0], tr[1], tr[2], a]) != sa || self.g.orient3d([tr[0], tr[1], tr[2], b]) != -sa {
@@ -2823,7 +2897,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         (0..plc.points.len()).map(|v| all[v] > 0 && all[v] == tri[v]).collect()
     };
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, clean_faces: std::collections::HashSet::with_hasher(FastKey), clean_e32: std::collections::HashSet::with_hasher(FastKey), clean_er: std::collections::HashSet::with_hasher(FastKey), track_clean: false, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, memo: TetMemo::default(), rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, clean_faces: std::collections::HashSet::with_hasher(FastKey), clean_e32: std::collections::HashSet::with_hasher(FastKey), clean_er: std::collections::HashSet::with_hasher(FastKey), track_clean: false, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         size,
         _p: std::marker::PhantomData,
