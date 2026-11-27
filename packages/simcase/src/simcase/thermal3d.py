@@ -111,12 +111,13 @@ class _Plan:
     """What validation found: the route, the region -> material table, the boundary names and, on the
     meshloom route, the 3D complex."""
 
-    def __init__(self, route, regions, tags, complex_=None, stack=None):
+    def __init__(self, route, regions, tags, complex_=None, stack=None, handoff=None):
         self.route = route
         self.regions = regions              # region name -> material name (non-void regions)
         self.tags = tags                    # default and boundary_tags tags present on the exterior
         self.complex = complex_
         self.stack = stack
+        self.handoff = handoff              # builder route: geometry_builders3d.Handoff
 
 
 def _plan(doc) -> _Plan:
@@ -140,6 +141,16 @@ def _plan(doc) -> _Plan:
             _refuse(str(exc), where)
         regions = dict(stack.materials)
         return _Plan("extrude", regions, set(EXTRUDE_TAGS), stack=stack)
+    from . import geometry_builders3d as builders
+    if builders.has_curved(comp):
+        from .geometry_engine3d import _prepare
+        try:
+            _cx, _comp, ho, _info = _prepare(doc.data, comp.name)
+        except GeometryError as exc:
+            raise DocumentError(str(exc), path=exc.path, code=exc.code) from None
+        tags = {next((p.split(".", 1)[1] for p in parts if p.startswith("domain.")), "void")
+                for parts in ho.exterior.values()}
+        return _Plan("builder", builder_regions(comp), tags, handoff=ho)
     from .geometry_engine3d import _evaluate
     try:
         cx = _evaluate(comp, through_meshloom=False)
@@ -151,6 +162,44 @@ def _plan(doc) -> _Plan:
             regions.setdefault(c.region, c.material)
     tags = {f.tag for f in cx.faces if f.exterior}
     return _Plan("meshloom", regions, tags, complex_=cx)
+
+
+def builder_regions(comp) -> dict:
+    """Region -> material of a builder-shaped component (the background's when it has a material, and
+    each cylinder's or sphere's that has one), in the builders' region names."""
+    out = {}
+    bg = comp.background.get("material")
+    if bg is not None:
+        out["background"] = bg
+    for f in comp.features:
+        if f.material is not None:
+            out[f.region] = f.material
+    return out
+
+
+def _builder_parts(plan):
+    """(exterior part names, interior part names) of the builder route."""
+    ho = plan.handoff
+    exterior = {p for parts in ho.exterior.values() for p in parts}
+    return exterior, set(ho.interior.values())
+
+
+def _builder_names(plan, comp, key, where):
+    """The part names a ``prescribed_temperature`` key names on the builder route: a tag, a part, or a
+    feature id (all its parts); an interior part is refused."""
+    exterior, interior = _builder_parts(plan)
+    if key in plan.tags or key in exterior:
+        return {key}
+    if key in interior:
+        _refuse(f"Fixed temperature needs an outer face; {key} is inside", where)
+    if any(f.id == key for f in comp.features):
+        mine = {p for p in exterior | interior if p.split(".", 1)[0] == key}
+        inside = sorted(mine & interior)
+        if inside:
+            _refuse(f"Fixed temperature needs an outer face; {key} is inside", where)
+        return mine
+    _refuse(f"{where}: {key!r} is not a tag, a part or a feature id of this component; expected one of "
+            f"{sorted(plan.tags | exterior)}", where, "E-SELECTION-UNKNOWN")
 
 
 def _boundary_faces(plan, comp, key, where):
@@ -204,6 +253,8 @@ def validate_thermal3d(doc) -> None:
             if key not in EXTRUDE_TAGS:
                 _refuse(f"{where}: no tag of that name on the extrude route; expected one of {list(EXTRUDE_TAGS)}",
                         where, "E-SELECTION-UNKNOWN")
+        elif plan.route == "builder":
+            _builder_names(plan, comp, key, where)
         else:
             _boundary_faces(plan, comp, key, where)
     source = p.get("heat_source_density")
@@ -253,9 +304,10 @@ def build(doc):
     """``(galerkin.Mesh3D, route, Mesh3DResult or None)`` of a validated document."""
     if is_extrude_route(doc.component):
         return extrude_mesh(doc), "extrude", None
+    from . import geometry_builders3d as builders
     from .geometry_engine3d import build_mesh3d
     built = build_mesh3d(doc.data)
-    return built.mesh, "meshloom", built
+    return built.mesh, ("builder" if builders.has_curved(doc.component) else "meshloom"), built
 
 
 def prescribed_nodes(doc, mesh, built):
@@ -283,6 +335,14 @@ def prescribed_nodes(doc, mesh, built):
 
 
 def _selection_nodes(doc, built, key):
+    if built.complex is None:                  # builder route: tags and part names (validated)
+        mesh = built.mesh
+        if key in mesh.tagged_faces:
+            return np.asarray(mesh.tagged_faces[key]).ravel()
+        if key in built.provenance_faces:
+            return np.asarray(built.provenance_faces[key]).ravel()
+        faces = [v for p, v in built.provenance_faces.items() if p.split(".", 1)[0] == key]
+        return np.concatenate(faces).ravel() if faces else np.zeros(0, dtype=int)
     from .geometry_engine3d import _resolve_boundary
     cx = built.complex
     chosen = _resolve_boundary(cx, doc.component, key, f"prescribed_temperature.{key}", ())
@@ -311,6 +371,10 @@ def _region_materials(doc, mesh):
         from .geometry_document import layer_stack
         mats = layer_stack(doc.geometry_model, comp.name).materials
         return {r: mats[r] for r in mesh.region_names}
+    from . import geometry_builders3d as builders
+    if builders.has_curved(comp):
+        table = builder_regions(comp)
+        return {r: table[r] for r in mesh.region_names}
     from .geometry_engine3d import _evaluate
     cx = _evaluate(comp, through_meshloom=False)
     table = {}
@@ -333,7 +397,7 @@ def run_thermal3d(doc, verbose=True):
     except GeometryError as exc:
         raise DocumentError(str(exc), path=exc.path, code=exc.code) from exc
     if built is not None:
-        doc.diagnostics.extend(built.diagnostics)          # I-MESH-ESTIMATE of the meshloom route
+        doc.diagnostics.extend(built.diagnostics)          # I-MESH-ESTIMATE (and I-SURFACE-SAMPLED)
     kwargs, by_key = solver_inputs(doc, mesh, built)
     t_mesh = time.perf_counter() - t0
     t0 = time.perf_counter()

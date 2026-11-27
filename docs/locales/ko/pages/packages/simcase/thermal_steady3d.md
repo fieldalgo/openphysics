@@ -45,6 +45,7 @@ result.save("out/")                               # summary.json, fields.npz, mo
 |---|---|---|
 | 판 층으로 된 `layers` 피처 하나 | `meshine.extrude`: 도메인 사각형을 요소 크기로 meshine이 메시하고, 그 두께 이하의 하위 층으로 층 높이를 따라 압출 | `z0`, `z1`, 발자국 옆면 `left`, `right`, `bottom`, `top` |
 | 슬라이스 1이 받는 [상자와 판 층](geometry_engine3d.md)의 그 밖의 조합 | meshloom을 거치는 `simcase.build_mesh3d`(**실험 단계**) | 도메인 면에 `x0`–`z1`, 그 밖에 `void`, 또는 `boundary_tags` |
+| [meshloom builder 모양](geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3) 하나의 원통이나 구 | "builder": builder를 거치는 `simcase.build_mesh3d`(**실험 단계**) | 도메인 면에 `x0`–`z1`, 그 밖에 `void`; 부분 `<id>.side`, `<id>.bottom`, `<id>.top`, `<id>.surface` |
 
 결과의 `route`(요약의 `mesh_route`)가 어느 경로였는지 알려 줍니다. 발자국 층이 있는 단독 `layers` 피처는 아직
 받지 않습니다. 압출 경로의 면은 태그만 가지므로 그 경로에서는 `selections`와 `boundary_tags`를 거부합니다.
@@ -53,7 +54,7 @@ result.save("out/")                               # summary.json, fields.npz, mo
 
 | 키 | 뜻 |
 |---|---|
-| `physics.<name>.prescribed_temperature` | `{경계 이름: 온도}`. meshloom 경로에서는 [선택자 규칙](geometry_document.md#선택자-규칙동결)으로 이름을 풉니다. 태그, 이름 있는 경계 선택, 출처 이름(`domain.z0`, `via.x1`, `stack.c.top`), 피처 id입니다. 압출 경로에서는 위의 태그 가운데 하나입니다. 하나 이상 필요합니다. |
+| `physics.<name>.prescribed_temperature` | `{경계 이름: 온도}`. meshloom 경로에서는 [선택자 규칙](geometry_document.md#선택자-규칙동결)으로 이름을 풉니다. 태그, 이름 있는 경계 선택, 출처 이름(`domain.z0`, `via.x1`, `stack.c.top`), 피처 id입니다. 압출 경로에서는 위의 태그 가운데 하나입니다. builder 경로에서는 태그, 외부 부분(`via.bottom`, `sa.surface`, `domain.z0`), 피처 id(그 부분 모두)입니다. 하나 이상 필요합니다. |
 | `physics.<name>.heat_source_density` | 값 하나, 또는 메시되는 영역에 대한 `{영역: 값}`. 없으면 열원 없음 |
 | `materials.<m>.thermal_conductivity` | 재료가 `m`인 모든 영역의 열전도율 |
 | `mesh.element_size` | 필수. meshloom 경로에서는 [build_mesh3d](geometry_engine3d.md#사용)처럼 `mesh.element_count_limit`과 `mesh.controls` `element_size`도 받음 |
@@ -105,10 +106,23 @@ Linux(2026-11-27)에서 `tests/simcase/test_thermal_steady3d.py`로 측정했습
 | 비트 일치, 압출 경로 | E1을 `meshine.extrude` + `solve_steady_heat_3d` 직접 호출과 비교 | 노드, 사면체, 온도, 반력 열 비율의 SHA-256이 같음 | 같음 |
 | 비트 일치, meshloom 경로 | 코어 층에 구리 상자를 넣은 E1을 `build_mesh3d` + `solve_steady_heat_3d`와 비교 | SHA-256이 같음 | 같음 |
 
+builder 경로(5단계 슬라이스 4b, `tests/simcase/test_thermal_steady3d_builders.py`). 물리는 `build_mesh3d` +
+`solve_steady_heat_3d`를 직접 불러 판정하며, 이 종류는 그 값과 같아야 합니다.
+
+| 검사 | 사례 | 기준 | 측정(Linux, 2026-11-27) |
+|---|---|---|---|
+| P2(main) | E2: m 단위 C4, k = 1 W/(m K)인 판 [−1,1]² × [0,1], k = 100 W/(m K)인 r = 0.3 비아, `z0`에서 T = 300 K, `z1`에서 301 K; Q = ΔT/L (k_v πr² + k_s(A − πr²)) = 31.99 W; h 0.2, 0.1, 0.05 | e_Q(0.05) ≤ 1e-2; 고리 현 s = 2πr/m(`I-SURFACE-SAMPLED`의 m)에 대한 기울기 ≥ 1.5 | e_Q 1.68e-2, 7.51e-3, 2.71e-3(m = 16, 24, 40); 기울기 1.99 |
+| P3(main) | E3: r = 0.5 구멍, (0.5, 0.75)에서 k = 1, (0.75, 1)에서 k = 4인 C11, 안쪽 T = 301 K, 바깥 300 K; Q = 16π/3 W; h 0.2, 0.1, 0.05 | e_Q(0.05) ≤ 5e-3; h에 대한 기울기 ≥ 1.6 | e_Q 3.25e-2, 1.05e-2, 2.07e-3; 기울기 1.99 |
+| P3(a) | E3: 같은 메시에서 Q_h와 V24의 C_h = uᵀKu(Σ k_T \|∇u_T\|² V_T, u = T − 300 K) | 상대 1e-9 이하(PR은 0.2, 0.1, main은 셋 모두) | 3.8e-14, 5.0e-15 |
+| 이 종류 | `thermal.steady3d`를 거친 E2, E3를 직접 경로와 비교 | Q_h와 노드 T가 상대 1e-12 안 | 같음(0) |
+| 거부 | `via.side`(E2)나 `sb.surface`(E3)에 거는 고정 온도 | `Fixed temperature needs an outer face; <name> is inside`(`E-CONTRACT`) | 그대로 |
+
 ## 한계
 
 - 지정 온도와 체적 열원만 있는 정상 열전도입니다. 열유속, 대류, 과도, 결합은 아직 없습니다. Studio는 이 종류를
   열지 않습니다.
 - meshloom 경로는 meshloom 수용 전까지 실험 단계이며 상자와 판 층을 받습니다([3D 상자와 판 층](geometry_engine3d.md)).
+  builder 경로는 meshloom builder 모양 넷을 크기 하나로 받습니다. 결과의 `mesh_route`는 `"builder"`이고, 진단에
+  `I-MESH-ESTIMATE`와 표본화한 곡면마다 `I-SURFACE-SAMPLED` 하나가 담깁니다.
   압출 경로는 판 층으로 된 단독 스택을 받습니다.
 - `simcase export`는 이 배치를 지원하지 않는 배치로 거부합니다.
