@@ -186,6 +186,95 @@ impl<'a> Mixed<'a> {
         }
     }
 
+    /// The point's coordinates with an error bound (the float filter in front of the
+    /// interval filter): built from a, b, t (and c, u) like [`Mixed::interval`].
+    fn approx(&self, p: Pt) -> [Ef; 3] {
+        match p {
+            Pt::In(i) => self.input[i as usize].map(Ef::point),
+            Pt::S(k) => {
+                let sp = self.s[k as usize];
+                if sp.kind() == Kind::Volume {
+                    return sp.p.map(Ef::point);
+                }
+                let (a, b) = (&self.input[sp.a as usize], &self.input[sp.b as usize]);
+                let t = Ef::point(sp.t);
+                let mut x: [Ef; 3] = std::array::from_fn(|c| {
+                    let (ac, bc) = (Ef::point(a[c]), Ef::point(b[c]));
+                    ac.add(&t.mul(&bc.sub(&ac)))
+                });
+                if sp.kind() == Kind::Facet {
+                    let (cc, u) = (&self.input[sp.c as usize], Ef::point(sp.u));
+                    for k in 0..3 {
+                        x[k] = x[k].add(&u.mul(&Ef::point(cc[k]).sub(&Ef::point(a[k]))));
+                    }
+                }
+                x
+            }
+        }
+    }
+
+    /// The exact sign of a predicate that is affine in each point (orient3d, and
+    /// orient2d in a projection: determinants of the homogeneous rows (p, 1)), from its
+    /// values on input points only, when those decide it. A segment point is
+    /// (1 - t) a + t b with 0 < t < 1, so the predicate is a sum with positive weights
+    /// of the predicate on the choices of one end per segment point; it is 0 when every
+    /// term is 0 and has the common sign of the nonzero terms when they agree. None
+    /// otherwise, and for facet points (whose weight 1 - t - u is not checked here).
+    fn multilinear<const N: usize>(&self, p: &[Pt; N], f: impl Fn(&[&P3; N], &mut Counters) -> i8,
+                                   c: &mut Counters) -> Option<i8> {
+        let mut ends = [[&self.input[0]; 2]; N];
+        let mut ids = [[0u32; 2]; N];
+        let mut len = [1usize; N];
+        for (k, q) in p.iter().enumerate() {
+            match *q {
+                Pt::In(i) => {
+                    ends[k][0] = &self.input[i as usize];
+                    ids[k][0] = i;
+                }
+                Pt::S(j) => {
+                    let sp = &self.s[j as usize];
+                    match sp.kind() {
+                        Kind::Volume => {
+                            ends[k][0] = &sp.p;
+                            ids[k][0] = u32::MAX - j; // distinct from input indices
+                        }
+                        Kind::Segment => {
+                            ends[k] = [&self.input[sp.a as usize], &self.input[sp.b as usize]];
+                            ids[k] = [sp.a, sp.b];
+                            len[k] = 2;
+                        }
+                        Kind::Facet => return None,
+                    }
+                }
+            }
+        }
+        let (mut pos, mut neg) = (false, false);
+        let total: usize = len.iter().product();
+        'choice: for m in 0..total {
+            let mut q = [&self.input[0]; N];
+            let mut chosen = [0u32; N];
+            let mut r = m;
+            for k in 0..N {
+                let e = r % len[k];
+                r /= len[k];
+                q[k] = ends[k][e];
+                chosen[k] = ids[k][e];
+                if chosen[..k].contains(&chosen[k]) {
+                    continue 'choice; // a repeated point: the determinant is 0
+                }
+            }
+            match f(&q, c) {
+                0 => {}
+                s if s > 0 => pos = true,
+                _ => neg = true,
+            }
+            if pos && neg {
+                return None;
+            }
+        }
+        Some(if pos { 1 } else if neg { -1 } else { 0 })
+    }
+
     fn exact(&self, p: Pt) -> [Dy; 3] {
         match p {
             Pt::In(i) => self.input[i as usize].map(Dy::from_f64),
@@ -270,6 +359,12 @@ impl<'a> Mixed<'a> {
             return pr::orient3d(q[0], q[1], q[2], q[3], &mut n.input);
         }
         n.interval += 1;
+        if let Some(s) = orient(&p.map(|q| self.approx(q))).sign() {
+            return s;
+        }
+        if let Some(s) = self.multilinear(&p, |q: &[&P3; 4], c: &mut Counters| pr::orient3d(q[0], q[1], q[2], q[3], c), &mut n.input) {
+            return s;
+        }
         let iv = p.map(|q| self.interval(q));
         if let Some(s) = orient(&iv).sign() {
             return s;
@@ -286,6 +381,9 @@ impl<'a> Mixed<'a> {
             return pr::insphere(q[0], q[1], q[2], q[3], q[4], &mut n.input);
         }
         n.interval += 1;
+        if let Some(s) = insph(&p.map(|q| self.approx(q))).sign() {
+            return -s;
+        }
         let iv = p.map(|q| self.interval(q));
         if let Some(s) = insph(&iv).sign() {
             return -s;
@@ -323,6 +421,12 @@ impl<'a> Mixed<'a> {
             return pr::orient2d_proj(axis, q[0], q[1], q[2]);
         }
         n.interval += 1;
+        if let Some(s) = orient2(axis, &p.map(|q| self.approx(q))).sign() {
+            return s;
+        }
+        if let Some(s) = self.multilinear(&p, |q: &[&P3; 3], _: &mut Counters| pr::orient2d_proj(axis, q[0], q[1], q[2]), &mut n.input) {
+            return s;
+        }
         if let Some(s) = orient2(axis, &p.map(|q| self.interval(q))).sign() {
             return s;
         }
@@ -337,6 +441,9 @@ impl<'a> Mixed<'a> {
             return pr::incircle_plane(axis, q[0], q[1], q[2], q[3]);
         }
         n.interval += 1;
+        if let Some(s) = incircle(axis, &p.map(|q| self.approx(q))).sign() {
+            return s;
+        }
         if let Some(s) = incircle(axis, &p.map(|q| self.interval(q))).sign() {
             return s;
         }
@@ -457,6 +564,59 @@ fn incircle<T: Num>(axis: usize, p: &[[T; 3]; 4]) -> T {
         [q[i].sub(&p[3][i]), q[j].sub(&p[3][j]), w]
     };
     det3(&row(&p[0]), &row(&p[1]), &row(&p[2]))
+}
+
+// ------------------------------------------------------------ the float filter
+
+/// A double with an absolute error bound (midpoint-radius arithmetic under round to
+/// nearest): the exact value lies in [v - e, v + e]. Each operation adds its own
+/// rounding error (at most u |v|, plus the smallest normal double for underflow) and
+/// the propagated errors, and the bound is computed with a margin that covers the
+/// rounding of its own evaluation (all its terms are nonnegative). An infinite or NaN
+/// part only makes the filter fail.
+#[derive(Clone, Copy, Debug)]
+struct Ef {
+    v: f64,
+    e: f64,
+}
+
+const UNIT: f64 = f64::EPSILON / 2.0;
+
+impl Ef {
+    fn point(x: f64) -> Ef {
+        Ef { v: x, e: 0.0 }
+    }
+
+    /// The sign when the bound excludes zero.
+    fn sign(&self) -> Option<i8> {
+        if !(self.v.is_finite() && self.e.is_finite()) {
+            None
+        } else if self.v > self.e {
+            Some(1)
+        } else if self.v < -self.e {
+            Some(-1)
+        } else {
+            None
+        }
+    }
+}
+
+impl Num for Ef {
+    fn add(&self, o: &Ef) -> Ef {
+        let v = self.v + o.v;
+        Ef { v, e: (self.e + o.e + UNIT * v.abs()) * (1.0 + 8.0 * UNIT) }
+    }
+
+    fn sub(&self, o: &Ef) -> Ef {
+        let v = self.v - o.v;
+        Ef { v, e: (self.e + o.e + UNIT * v.abs()) * (1.0 + 8.0 * UNIT) }
+    }
+
+    fn mul(&self, o: &Ef) -> Ef {
+        let v = self.v * o.v;
+        let e = self.v.abs() * o.e + o.v.abs() * self.e + self.e * o.e + UNIT * v.abs() + f64::MIN_POSITIVE;
+        Ef { v, e: e * (1.0 + 16.0 * UNIT) }
+    }
 }
 
 // ------------------------------------------------------------ intervals
@@ -690,6 +850,77 @@ mod tests {
     fn lcg(s: &mut u64) -> f64 {
         *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         (*s >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    /// The filters and the multilinear decision agree with the exact signs, on points
+    /// of a coarse grid (many coplanar, collinear and cospherical choices) and S points
+    /// on segments between them, with dyadic and with arbitrary t.
+    #[test]
+    fn filtered_signs_equal_exact_signs_on_degenerate_points() {
+        let mut seed = 7u64;
+        let mut input = Vec::new();
+        for _ in 0..40 {
+            let g = |s: &mut u64| (lcg(s) * 4.0).floor() * 0.25 + 1.0;
+            input.push([g(&mut seed), g(&mut seed), g(&mut seed)]);
+        }
+        input.sort_by(|a, b| crate::predicates::lex_cmp(a, b));
+        input.dedup_by(|a, b| a == b);
+        let n = input.len() as u32;
+        let mut s = Vec::new();
+        for k in 0..60 {
+            let a = (lcg(&mut seed) * n as f64) as u32;
+            let mut b = (lcg(&mut seed) * n as f64) as u32;
+            if a == b {
+                b = (a + 1) % n;
+            }
+            let t = if k % 2 == 0 { dyadic(&mut seed) } else { 0.05 + 0.9 * lcg(&mut seed) };
+            s.push(SPoint::seg(a, b, t));
+        }
+        s.push(SPoint::vol([1.125, 1.25, 1.5]));
+        let m = Mixed { input: &input, s: &s };
+        let total = n + s.len() as u32;
+        let mut pick = |seed: &mut u64| m.from_id((lcg(seed) * total as f64) as u32);
+        let (mut zeros, mut nc) = (0, MixedCounters::default());
+        for _ in 0..4000 {
+            let p4 = [pick(&mut seed), pick(&mut seed), pick(&mut seed), pick(&mut seed)];
+            let want = orient(&p4.map(|q| m.exact(q))).exact_sign();
+            assert_eq!(m.orient3d(p4, &mut nc), want, "orient3d {p4:?}");
+            zeros += (want == 0) as u32;
+            let p5 = [p4[0], p4[1], p4[2], p4[3], pick(&mut seed)];
+            let want = -insph(&p5.map(|q| m.exact(q))).exact_sign();
+            assert_eq!(m.insphere(p5, &mut nc), want, "insphere {p5:?}");
+            for axis in 0..3 {
+                let p3 = [p4[0], p4[1], p4[2]];
+                let want = orient2(axis, &p3.map(|q| m.exact(q))).exact_sign();
+                assert_eq!(m.orient2d_proj(axis, p3, &mut nc), want, "orient2d {p3:?}");
+                let want = incircle(axis, &p4.map(|q| m.exact(q))).exact_sign();
+                assert_eq!(m.incircle_plane(axis, p4, &mut nc), want, "incircle {p4:?}");
+            }
+        }
+        assert!(zeros > 100, "too few degenerate cases: {zeros}");
+    }
+
+    /// The float filter's bound holds: the exact value lies within it.
+    #[test]
+    fn float_filter_bounds_hold() {
+        let mut seed = 11u64;
+        for _ in 0..2000 {
+            let mut x = [[Ef::point(0.0); 3]; 4];
+            let mut d = [[Dy::from_f64(0.0), Dy::from_f64(0.0), Dy::from_f64(0.0)],
+                         [Dy::from_f64(0.0), Dy::from_f64(0.0), Dy::from_f64(0.0)],
+                         [Dy::from_f64(0.0), Dy::from_f64(0.0), Dy::from_f64(0.0)],
+                         [Dy::from_f64(0.0), Dy::from_f64(0.0), Dy::from_f64(0.0)]];
+            for i in 0..4 {
+                for c in 0..3 {
+                    let (a, b, t) = (lcg(&mut seed) * 1e3 - 500.0, lcg(&mut seed) * 1e3 - 500.0, lcg(&mut seed));
+                    x[i][c] = Ef::point(a).add(&Ef::point(t).mul(&Ef::point(b).sub(&Ef::point(a))));
+                    d[i][c] = Dy::from_f64(a).add(&Dy::from_f64(t).mul(&Dy::from_f64(b).sub(&Dy::from_f64(a))));
+                }
+            }
+            let (f, e) = (orient(&x), orient(&d));
+            // f.v - f.e <= exact <= f.v + f.e
+            assert!(Dy::from_f64(f.v - f.e).sub(&e).exact_sign() <= 0 && Dy::from_f64(f.v + f.e).sub(&e).exact_sign() >= 0);
+        }
     }
 
     /// A dyadic parameter k / 2^m in (0, 1).
