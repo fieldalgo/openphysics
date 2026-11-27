@@ -382,6 +382,10 @@ export const noMatchEdgeText=(side,title,shape)=>`${side} · ${title}: its modes
  * is an edge mode and which has no core mode: the edge warning's and the slab question's target
  * estimate for the run's geometry (defaultTarget); null for any other run. */
 export const noMatchCoreSearch=run=>!isOpenRun(run)&&firstModeEdgeShape(run)&&!coreNotes(run).length?defaultTarget(run.input?.model?.shapes??[]):null;
+/** Round 38 (D4): the line under Compare's Matched modes toolbar, above the plots, for a run that
+ * noMatchCoreSearch offers the closed search: "A · Run 6 has no core mode: its modes are mostly in
+ * Substrate, which touches the window edge." (the edge wording of noMatchEdgeText). */
+export const noCoreModeText=(side,title,shape)=>`${side} · ${title} has no core mode: its modes are mostly in ${shape}, which touches the window edge.`;
 /** "Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge." */
 export function coreNoteText(mode,p){
  return `Mode ${mode+1} is the core mode: ${Math.round(p.share*100)} % of |E|² is in ${p.shape}, which does not touch the window edge.`;

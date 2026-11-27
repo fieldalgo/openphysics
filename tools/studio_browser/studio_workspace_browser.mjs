@@ -3508,7 +3508,21 @@ try {
        short:[...t.tBodies[0].rows].map(x=>x.cells[0].textContent),labels:[...t.tBodies[0].rows].map(x=>x.cells[0].getAttribute('aria-label')),matched:[...t.tBodies[0].rows].map(x=>x.dataset.match||null),
        overlap:[...t.querySelectorAll('[data-overlap]')].map(x=>Number(x.dataset.overlap)),best:[...t.querySelectorAll('tr[data-no-match]')].map(x=>x.cells[3].textContent),
        core:document.getElementById('compare-core-line')?.textContent??null,coreBefore:!!document.getElementById('compare-core-line')&&!!(document.getElementById('compare-core-line').compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING),
-       shown:document.getElementById('compare-description').textContent,search:[...document.querySelectorAll('#compare-description button')].map(x=>[x.id,x.textContent]),slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),page:document.documentElement.scrollWidth-document.documentElement.clientWidth}})()`);
+       shown:document.getElementById('compare-description').textContent,search:[...document.querySelectorAll('#canvas button[id^=compare-core-search-]')].map(x=>[x.id,x.textContent]),descriptionButtons:[...document.querySelectorAll('#compare-description button')].map(x=>[x.id,x.textContent]),
+       lines:[...document.querySelectorAll('.compare-first-line')].map(x=>[x.id,x.textContent]),linesBeforePlots:[...document.querySelectorAll('.compare-first-line')].every(x=>x.previousElementSibling?.matches('.compare-options,.compare-first-line')&&!!(x.compareDocumentPosition(document.querySelector('.compare-grid'))&Node.DOCUMENT_POSITION_FOLLOWING)),slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),page:document.documentElement.scrollWidth-document.documentElement.clientWidth}})()`);
+    // round 38 (D4, C2): the first view at 1440 × 900: each line under the Matched modes toolbar, and
+    // its button, wholly inside the visible Compare pane and the viewport; the plots' headings in view
+    const firstView = () => r.eval(`(()=>{const pane=document.getElementById('canvas').getBoundingClientRect(),inside=b=>b.top>=Math.max(0,pane.top)-0.5&&b.bottom<=Math.min(innerHeight,pane.bottom)+0.5&&b.left>=Math.max(0,pane.left)-0.5&&b.right<=Math.min(innerWidth,pane.right)+0.5;
+      return {lines:[...document.querySelectorAll('.compare-first-line')].map(x=>({id:x.id,text:x.textContent,inside:inside(x.getBoundingClientRect()),buttons:[...x.querySelectorAll('button')].map(b=>({id:b.id,text:b.textContent,inside:inside(b.getBoundingClientRect())}))})),
+       headings:[...document.querySelectorAll('.compare-grid h3')].map(h=>inside(h.getBoundingClientRect())),scroll:document.getElementById('canvas').scrollTop,page:[scrollX,scrollY],size:[innerWidth,innerHeight]}})()`);
+    const checkFirstView = (v, lines, tag) => {
+      assert.deepEqual(v.size, [1440, 900], tag);
+      assert.deepEqual(v.lines.map(x => x.text), lines, tag + ': ' + JSON.stringify(v.lines));
+      for (const x of v.lines) { assert.ok(x.inside, `${tag}: ${x.id} outside the first view ${JSON.stringify(v)}`); for (const b of x.buttons) assert.ok(b.inside, `${tag}: ${b.id} outside the first view ${JSON.stringify(v)}`); }
+      assert.ok(v.headings.length === 2 && v.headings.every(Boolean), `${tag}: the plots' headings ${JSON.stringify(v)}`);
+      assert.deepEqual(v.page, [0, 0], tag + ': page scrolled');
+    };
+    const D4_LINE = (n, side = 'A') => `${side} · Run ${n} has no core mode: its modes are mostly in Substrate, which touches the window edge. Use Run ${n}'s inputs with search near 2.46 · 4 modes`;
     const c1Pick = async (a, b, tag) => {
       await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'C1 Compare ' + tag);
       for (const [id, n] of [['#compare-a', a], ['#compare-b', b]]) {
@@ -3516,7 +3530,11 @@ try {
         await r.choose(id, job); await sleep(400);
       }
       await r.until("!!document.getElementById('compare-neff')", 'C1 Compare table ' + tag);
-      const out = {at1440: await c1Read()}; await rSize(390, 844, true); out.at390 = await c1Read(); await rSize(1440, 900); return out;
+      const out = {at1440: await c1Read()}; await rSize(390, 844, true); out.at390 = await c1Read(); await rSize(1440, 900);
+      // round 38: right after switching to the Compare tab (frameComparePlots runs then)
+      await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'C1 Results ' + tag);
+      await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-neff')&&!!document.querySelector('.compare-grid canvas')", 'C1 Compare again ' + tag); await sleep(600);
+      out.switched = await firstView(); await r.screenshot(`r38-switched-run-${a}-run-${b}`); return out;
     };
     const c1 = {results: c1Results, shortcut: await c1Pick(3, 4, 'Run 3 ↔ Run 4'), asSet: await c1Pick(2, 4, 'Run 2 ↔ Run 4')};
     stage('R36 C1 Compare names the core mode', c1);
@@ -3552,6 +3570,17 @@ try {
       assert.ok(v.picker.every(t => !t.includes('A mode 1 (core)') && !t.includes('A mode 2 (core)')), JSON.stringify(v.picker));
       assert.equal(v.core, null);
     }
+    // round 38 (D4): the closed run as set against the open run: one line under the Matched modes
+    // toolbar, above the plots, with the D3 button; in the first view right after switching to Compare
+    {
+      const v = c1.asSet.at1440;
+      assert.deepEqual(v.lines, [['compare-core-search-line-a', D4_LINE(2)]]); assert.equal(v.linesBeforePlots, true);
+      assert.deepEqual(c1.asSet.at390.lines, v.lines); assert.deepEqual(v.descriptionButtons, []);
+      checkFirstView(c1.asSet.switched, [D4_LINE(2)], 'D4 switched to Compare, Run 2 ↔ Run 4');
+      assert.deepEqual(c1.asSet.switched.lines[0].buttons.map(b => [b.id, b.text]), [['compare-core-search-a', "Use Run 2's inputs with search near 2.46 · 4 modes"]]);
+      // the shortcut's closed run has a core mode, and its modes are matched: no D4 line
+      assert.ok(c1.shortcut.at1440.lines.every(([id]) => !id.startsWith('compare-core-search-line-')), JSON.stringify(c1.shortcut.at1440.lines));
+    }
     // round 37 (D3): beside the note on the closed run as set (A · Run 2: its modes are mostly in
     // Substrate, …; the core mode was not found), its shortcut "Set search near 2.46 · 4 modes"; none
     // on the open run, none when the modes are matched (Run 3 ↔ Run 4). Pressing it makes Run 2's
@@ -3577,8 +3606,10 @@ try {
       await r.click('#undo-edit'); await sleep(600); d3.undo1 = await d3Read();
       await r.click('#undo-edit'); await sleep(600); d3.undo2 = await d3Read();
       stage('R37 D3 Compare offers the closed core search', d3);
-      assert.ok(d3.note.includes('A · Run 2: its modes are mostly in Substrate, which touches the window edge; the core mode was not found. Open Run 2 in Results. Set search near 2.46 · 4 modes'), d3.note);
-      assert.deepEqual(d3.asSet, [['compare-core-search-a', 'Set search near 2.46 · 4 modes']]); assert.deepEqual(d3.asSet390, d3.asSet);
+      // round 38 (D4): the button moved from the description onto the line above the plots, its label naming the run
+      assert.ok(d3.note.includes('A · Run 2: its modes are mostly in Substrate, which touches the window edge; the core mode was not found. Open Run 2 in Results.'), d3.note);
+      assert.ok(!d3.note.includes('search near'), d3.note);
+      assert.deepEqual(d3.asSet, [['compare-core-search-a', "Use Run 2's inputs with search near 2.46 · 4 modes"]]); assert.deepEqual(d3.asSet390, d3.asSet);
       assert.deepEqual(d3.shortcut, []);
       assert.equal(d3.page, 'Model');
       assert.deepEqual(d3.after, d3.before, 'D3: nothing run'); assert.equal(d3.after.length, 4);
@@ -3589,6 +3620,64 @@ try {
       assert.deepEqual([d3.undo1.closed, d3.undo1.nearest, d3.undo1.modes], [true, true, '2']);
       // the second Undo: Run 4's inputs again (open boundary, Modes to find 2)
       assert.deepEqual([d3.undo2.closed, d3.undo2.modes], [false, '2']);
+    }
+    // round 38 (D4, C2): the first view right after pressing "Compare the two newest". Run 1 and Run 2
+    // are named and picked on Compare, then the page is reloaded and resumed: a named pair is kept, not
+    // picked by hand (pairChosen), so Compare offers the two newest runs (round 24, B4)
+    {
+      const r38 = {};
+      const showRun = async n => {
+        await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R38 Results ' + n);
+        await r.onElement(`function(selector){[...this.querySelectorAll(selector)].find(b=>b.textContent.replace(/^Pinned · /,'').startsWith('Run ${n} · ')).click();return true}`, '.run-item'); await sleep(400);
+      };
+      const nameRuns = async names => { for (const [n, name] of names) {
+        await showRun(n);
+        await r.onElement('function(selector){const e=this.querySelector(selector);e.focus();e.select();return true}', '#run-name-input'); await r.call('Input.insertText', {text: name});
+        for (const type of ['keyDown', 'keyUp']) await r.call('Input.dispatchKeyEvent', {type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: type === 'keyDown' ? '\r' : undefined});
+        await r.until(`[...document.querySelectorAll('.run-item')].some(b=>b.textContent.includes(${JSON.stringify(name)}))`, 'R38 named Run ' + n);
+      } };
+      await nameRuns([[1, 'Strip A'], [2, 'Strip B']]);
+      await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'R38 Compare');
+      const jobs = [];
+      for (const [id, n] of [['#compare-a', 1], ['#compare-b', 2]]) {
+        const job = await r.eval(`[...document.querySelectorAll('${id} option')].find(o=>o.textContent.startsWith('Run ${n} · ')).value`); jobs.push(job);
+        await r.choose(id, job); await sleep(400);
+      }
+      // the browser record holds the names and the pair before the reload
+      await r.until(`import('/workspace-assets/workspace-notebook-recovery.mjs').then(async m=>{const x=await m.indexedNotebookStore().load();const d=JSON.parse(x.session);return JSON.stringify(d.comparison)===${JSON.stringify(JSON.stringify(jobs))}&&d.runs[0].label==='Strip A'&&d.runs[1].label==='Strip B';})`, 'R38 record', 30000);
+      await r.call('Page.reload'); await r.until("!!document.querySelector('#resume-newest')", 'R38 resume offer', 30000);
+      await r.click('#resume-newest'); await r.until("!!document.querySelector('.run-item')||!!document.getElementById('compare-a')", 'R38 resumed', 30000);
+      const newest = async tag => {
+        await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-newer-button')", 'R38 offer ' + tag);
+        const offer = await rText('#compare-newer');
+        await r.click('#compare-newer-button'); await r.until("!document.getElementById('compare-newer')&&!!document.getElementById('compare-neff')&&!!document.querySelector('.compare-grid canvas')", 'R38 newest ' + tag); await sleep(600);
+        const out = {offer, view: await firstView(), at1440: await c1Read()}; await r.screenshot('r38-newest-' + tag.replaceAll(' ', '-').toLowerCase()); await rSize(390, 844, true); out.at390 = await c1Read(); await rSize(1440, 900); return out;
+      };
+      r38.core = await newest('Run 3 and Run 4');
+      // the pair the offer showed (Run 3 ↔ Run 4) named, so it is kept when Run 5 comes (round 25, A3)
+      await nameRuns([[3, 'Strip C'], [4, 'Open D']]);
+      // Run 5: Run 1's inputs (the closed window, Highest n_eff, 2 modes), run as set
+      await showRun(1); await r.click('#restore-run-input'); await sleep(500);
+      const before = await runItems(); await pressRun();
+      await r.until("document.getElementById('slab-question').open||document.getElementById('run-optical').textContent!=='Run study'", 'R38 Run 5 started');
+      if (await open()) await r.click('#slab-question-run');
+      await waitRun(before);
+      r38.asSet = await newest('Run 4 and Run 5');
+      // the button on the line runs nothing
+      r38.items = (await runItems()).length;
+      await r.click('#compare-core-search-b');
+      await r.until("document.getElementById('page-tab-Model').getAttribute('aria-selected')==='true'", 'R38 Model', 30000); await sleep(1500);
+      await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'R38 Results after'); r38.itemsAfter = (await runItems()).length;
+      stage('R38 D4 C2 Compare first view after Compare the two newest', r38);
+      assert.equal(r38.core.offer, 'Run 4 is newer than this pair · Compare the two newest: Run 3 and Run 4');
+      checkFirstView(r38.core.view, [], 'Compare the two newest: Run 3 and Run 4');
+      assert.equal(r38.asSet.offer, 'Run 5 is newer than this pair · Compare the two newest: Run 4 and Run 5');
+      checkFirstView(r38.asSet.view, [D4_LINE(5, 'B')], 'D4 Compare the two newest: Run 4 and Run 5');
+      assert.deepEqual(r38.asSet.view.lines[0].buttons.map(b => [b.id, b.text]), [['compare-core-search-b', "Use Run 5's inputs with search near 2.46 · 4 modes"]]);
+      assert.deepEqual(r38.asSet.at1440.descriptionButtons, []); assert.equal(r38.asSet.at1440.linesBeforePlots, true);
+      assert.ok(r38.asSet.at1440.shown.includes('B · Run 5: its modes are mostly in Substrate, which touches the window edge; the core mode was not found. Open Run 5 in Results.'), r38.asSet.at1440.shown);
+      for (const v of [r38.core, r38.asSet]) { assert.ok(v.at1440.slack >= 24, `R38: ${v.at1440.slack} px to spare at 1440 (O2, 24 px)`); assert.ok(v.at390.page <= 0, 'R38 page overflow at 390: ' + v.at390.page); assert.ok(v.at1440.page <= 0, 'R38 page overflow at 1440'); }
+      assert.equal(r38.items, 5); assert.equal(r38.itemsAfter, r38.items, 'R38: the line\'s button runs nothing');
     }
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }

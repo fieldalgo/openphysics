@@ -64,9 +64,10 @@ test('D3: Compare puts the button beside the note; it reuses Use this run\'s inp
  // the note and its link (round 22, V3), unchanged
  assert.ok(app.includes("if(!chosen&&!match.disabled&&!match.error)[['A',a],['B',b]].forEach(([side,run],i)=>{if(i&&a.job===b.job)return;const shape=firstModeEdgeShape(run);if(!shape)return;"));
  assert.ok(app.includes("reason.textContent=noMatchEdgeText(side,runNumberTitle(run),shape);"));
- // the button: the shortcut's words for the run's geometry, after the note's link
+ // the button: the shortcut's target for the run's geometry; round 38 (D4) moved it onto a line above
+ // the plots, its label naming the run (studio_round38.cjs)
  assert.ok(app.includes("const near=noMatchCoreSearch(run);"));
- assert.ok(app.includes("search.id='compare-core-search-'+side.toLowerCase();search.textContent=shortcutText(near);search.onclick=()=>useRunClosedSearch(run,near);"));
+ assert.ok(app.includes("search.id='compare-core-search-'+side.toLowerCase();search.textContent=runShortcutText(runNumber(run),near);search.onclick=()=>useRunClosedSearch(run,near);"));
  // pressing it: Use this run's inputs, then the shortcut, on the Model page; nothing runs
  assert.ok(app.includes("function useRunClosedSearch(run,t){if(!useRunInputs(run))return;ui.page='Model';render();useClosedSearch(t);}"));
  const body=app.slice(app.indexOf('function useRunClosedSearch('),app.indexOf('\n',app.indexOf('function useRunClosedSearch(')));

@@ -22,7 +22,7 @@ import {installLayout,installStatusPanels} from './workspace-layout.mjs';
 import {MAX_BYTES,DRAFT_KEY,validateProject,parseProject,snapshot,withStudy,withoutStudy,projectStudy,projectBoundary,STUDY_PROJECT_VERSION,OPEN_PROJECT_VERSION} from './workspace-project.mjs';
 import {checkResultRecord,checkDocuments,checkLabel,openChoice,targetText,effectiveTarget,isOpenRun,runChoice,signaturePml,parseTarget,pairCheck,checkVerdict,openLoss,openIndexText,openTableTitle,builderBoundary,openEdges,sectionWords,CLOSED_POINTER,OPEN_POLARIZATION_HELP,OPEN_AREA_HELP,CHECK_HEADER,CHECK_HELP,CHECK_STRENGTH,DEPENDS_HELP,OPEN_LOSS_HELP,COMPARE_LOSS_NOTE,COMPARE_LOSS_NOTE_BA} from './workspace-open-run.mjs';
 import {hasOpenEdge,lowerTarget,defaultTarget} from './workspace-open-boundary.mjs';
-import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget,slabQuestionText,slabQuestionButtons,slabQuestionKey,slabQuestionMemory,shortcutModesMemory} from './workspace-closed-target.mjs';
+import {CLOSED_TARGET_QUERY,checkClosedTarget,shortcutText,runShortcutText,SHORTCUT_MODE_COUNT,closedFoundText,leftOutText,CLOSED_SEARCH_HELP,CLOSED_SEARCH_LEGEND,HIGHEST_LABEL,SHORTCUT_RUN_TEXT,NEAREST_LABEL,NEAR_FIELD_LABEL,closedSearchNotice,shortTarget,slabQuestionText,slabQuestionButtons,slabQuestionKey,slabQuestionMemory,shortcutModesMemory} from './workspace-closed-target.mjs';
 import {boundaryFieldHtml,studyOpenHtml,edgePanel,foundLine,candidatesDisclosure} from './workspace-open-view.mjs';
 import {WorkspaceStore} from './workspace-store.mjs';
 import {fieldScalars,nmTicks,formatNm} from './workspace-field.mjs';
@@ -32,7 +32,7 @@ import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
 import {chooseFieldsAtArrival,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {placeChannelNotes} from './workspace-mode-channel.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText,noMatchCoreSearch} from './workspace-modes.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText,noMatchCoreSearch,noCoreModeText} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes,compareCores,coreMark,coreMatchText,CORE_MARK} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
@@ -2031,8 +2031,10 @@ let compareChoice=null;
 var compareOpen=false;
 function frameComparePlots(grid){
  const pane=$('canvas'),box=pane.getBoundingClientRect(),plot=grid.querySelector('canvas')?.getBoundingClientRect();if(!plot)return;
- // the middle of the plot 24 px above the pane's bottom edge, never scrolling the plots' headings out of view
- const need=plot.top+plot.height/2-(box.bottom-24),room=grid.getBoundingClientRect().top-box.top;
+ // the middle of the plot 24 px above the pane's bottom edge, never scrolling the plots' headings out of view,
+ // nor (round 38) the first-view lines above the plots (.compare-first-line)
+ const first=pane.querySelector('.compare-first-line')??grid;
+ const need=plot.top+plot.height/2-(box.bottom-24),room=first.getBoundingClientRect().top-box.top;
  if(need>0)pane.scrollTop+=Math.min(need,Math.max(0,room));
 }
 function renderComparison(){
@@ -2072,6 +2074,7 @@ function renderComparison(){
  const shownText=chosen?`Shown: A mode ${chosen.a+1} ↔ B mode ${chosen.b+1}, overlap ${formatOverlap(pairOf.eta)}, Δn_eff (B − A) ${formatDelta(pairOf.delta)}${pairOf.unitA.length>1?' (difference of the pair means)':''}.`:match.disabled?`${match.disabled}; the plots show mode 1 of each run, not matched.`:match.error?`Modes not matched (${match.error}); the plots show mode 1 of each run.`:'No mode of A matches a mode of B; the plots show mode 1 of each run, not matched.';
  const description=document.createElement('p');description.id='compare-description';const sameShapes=JSON.stringify(a.input.model.shapes)===JSON.stringify(b.input.model.shapes);description.textContent=`Geometry: ${designSummary(a.input.model)} → ${designSummary(b.input.model)}${sameShapes?' (same shapes)':' (shapes differ)'}. Wavelength: ${a.input.model.wavelength} → ${b.input.model.wavelength} nm. Core mesh: ${a.input.model.coreMesh} → ${b.input.model.coreMesh} nm. ${shownText} ${a.job===b.job?'Same run on both sides. ':''}`;
  const grid=document.createElement('div');grid.className='compare-grid';[a,b].forEach((run,i)=>{const article=document.createElement('article');const h=document.createElement('h3');h.textContent=fieldHeading(i?'B':'A',run,runNumber(run));const which=document.createElement('p');which.className='compare-field-mode';which.id=i?'compare-shown-b':'compare-shown-a';which.textContent=`Mode ${shown[i]+1} · ${unitPolarization(run,[shown[i]])}${chosen?'':' · not matched'}`;const canvas=document.createElement('canvas');canvas.id=i?'compare-field-b':'compare-field-a';canvas.style.cssText='width:100%;height:var(--optical-plot-height,340px);display:block';canvas.setAttribute('role','img');article.append(h,which,canvas);probeOutput(article,i?'compare-probe-b':'compare-probe-a');grid.append(article);});
+ const firstLines=[];
  // round 22 (V3): no matched mode, and a run's mode 1 is an edge mode: the empty-match line says why,
  // with a link that opens that run in Results
  if(!chosen&&!match.disabled&&!match.error)[['A',a],['B',b]].forEach(([side,run],i)=>{if(i&&a.job===b.job)return;const shape=firstModeEdgeShape(run);if(!shape)return;
@@ -2079,10 +2082,13 @@ function renderComparison(){
   link.onclick=e=>{e.preventDefault();if(!runs.includes(run))return;solverRun=run;ui.page='Results';render();notice(`${runNumberTitle(run)} shown under Results; the inputs are unchanged.`);};
   const reason=document.createElement('span');reason.className='compare-edge-reason';reason.id='compare-edge-reason-'+side.toLowerCase();reason.textContent=noMatchEdgeText(side,runNumberTitle(run),shape);
   description.append(description.textContent.endsWith(' ')?'':' ',reason,' ',link,'.');
-  // round 37 (D3): a closed run with no core mode: its shortcut beside the note (sets the inputs, runs nothing)
-  const near=noMatchCoreSearch(run);if(near!=null){const search=document.createElement('button');search.type='button';search.className='message-action';search.id='compare-core-search-'+side.toLowerCase();search.textContent=shortcutText(near);search.onclick=()=>useRunClosedSearch(run,near);description.append(' ',search);}});
- // the plots first, right under the pickers (as Results shows its plot), then what they show
- host.append(grid,description);
+  // round 37 (D3), round 38 (D4): a closed run with no core mode: one line under the Matched modes
+  // toolbar, above the plots, says so, with the run's shortcut (sets that run's inputs, runs nothing)
+  const near=noMatchCoreSearch(run);if(near!=null){const line=document.createElement('p');line.className='compare-first-line';line.id='compare-core-search-line-'+side.toLowerCase();line.append(noCoreModeText(side,runNumberTitle(run),shape),' ');
+   const search=document.createElement('button');search.type='button';search.className='message-action';search.id='compare-core-search-'+side.toLowerCase();search.textContent=runShortcutText(runNumber(run),near);search.onclick=()=>useRunClosedSearch(run,near);line.append(search);firstLines.push(line);}});
+ // the plots first, right under the pickers (as Results shows its plot), then what they show; the
+ // first-view lines (round 38) between the toolbar and the plots
+ host.append(...firstLines,grid,description);
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each mode is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their mode vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend,compareTable(a,b,match));
  const redraw=()=>{if(!grid.isConnected)return;drawField($('compare-field-a'),a,null,$('compare-probe-a'),redraw,shown[0]);drawField($('compare-field-b'),b,null,$('compare-probe-b'),redraw,shown[1]);};addProbeControls(host,redraw);
  $('compare-mode').onchange=()=>{const c=choices[+$('compare-mode').value];if(c){compareChoice={a:c.a,b:c.b};render();}};
