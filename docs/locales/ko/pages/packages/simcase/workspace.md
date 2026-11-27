@@ -420,7 +420,13 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
    ([Save As가 저장하는 곳](#file-메뉴와-파일-종류)). Studio는 다운로드를 브라우저에 넘길 뿐 실제로
    보관됐는지 알 수 없으므로(다운로드는 취소될 수 있음) Messages에 *Session file … sent to your
    browser's Downloads*가 나오고, 저장 대화상자로 쓰기를 마치면 *Saved to …*가 나옵니다. 현재 입력의 실행이
-   없으면 알림이 그렇다고 말합니다: *Current inputs (650 × 300 nm) have no run yet.* 저장 표시는
+   없으면 알림이 그렇다고 말합니다: *Current inputs (650 × 300 nm) have no run yet.*
+   프로젝트나 세션 파일을 열거나 이 브라우저에서 복원하면 파일이나 기록이 담은 입력이 현재 입력이 되며, 그것은
+   흔히 첫 실행이 아니라 마지막으로 저장된 실행의 입력입니다. 33차(M1)부터 그런 열기나 복원의 Messages 줄(프로젝트에서는
+   광학 모델 부분)은 그 입력을 밝히는 문장 하나로 끝납니다: 실행의 입력과 같으면 *Current inputs are Run 2 · Design B's.*
+   (그런 실행 중 가장 새것으로, *has the results of the current inputs*와 같은 비교; 이름 없는 실행이면 *Current inputs are
+   Run 3's.*), 아니면 *Current inputs (650 × 300 nm) have no run yet.*입니다. 모델에 실행이 없으면 아무것도 붙지 않습니다.
+   가열 모델의 메시지는 바뀌지 않습니다. 저장 표시는
    헤더에 하나만 있고 하단(footer)은 같은 문구를 그대로 보여 줍니다. 현재 파일 이름과 상태가 나오며,
    다음 편집이나 실행 전까지 *design-a.json · downloaded 03:42*(저장 대화상자로 쓴 뒤에는
    *design-a.json · saved 03:42*), 그 뒤에는 *design-a.json · changed since downloaded*(저장 대화상자로 쓴
