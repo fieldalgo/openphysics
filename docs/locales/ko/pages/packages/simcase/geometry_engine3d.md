@@ -1,14 +1,14 @@
-# meshloom을 거치는 3D 상자와 판 층(5단계, 실험 단계)
+# meshloom을 거치는 3D 상자, 판 층, 압출(5단계, 실험 단계)
 
 [English](../../../../../packages/simcase/geometry_engine3d.md) | **한국어**
 
 [문서 홈](../../index.md)
 
 **상태: 실험 단계.** meshloom 자체가 수용되기 전까지입니다([meshloom](../meshloom/overview.md)).
-`simcase.geometry_engine3d`는 [형상 문서 계약](geometry_document.md) 5단계의 슬라이스 1입니다. 계약의
-[5단계 컴파일 조건](geometry_document.md#5단계-컴파일-조건2026-11-27-보완)에 따라 `3d` 구성 요소의 `box`
-피처와 판 층으로 3D 영역 구성을 만들고 `meshloom.generate3d`로 메시합니다. 아직 이를 읽는 물리 러너는
-없습니다.
+`simcase.geometry_engine3d`는 [형상 문서 계약](geometry_document.md) 5단계의 슬라이스 1이며 슬라이스 2를
+더했습니다. 계약의 [5단계 컴파일 조건](geometry_document.md#5단계-컴파일-조건2026-11-27-보완)에 따라 `3d`
+구성 요소의 `box` 피처, 판 층, `extrude` 피처(사각형·사다리꼴·다각형 프로파일)로 3D 영역 구성을 만들고
+`meshloom.generate3d`로 메시합니다. [`thermal.steady3d`](thermal_steady3d.md)가 이를 읽습니다.
 
 ## 사용
 
@@ -41,7 +41,7 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 
 `simcase.geometry_engine3d.evaluate3d(model, component=None)`은 `simcase.geometry_document.parse`로 읽은
 모델의 영역 구성만 돌려줍니다. 압출 경로로 메시되는, `layers` 피처 하나만 가진 구성 요소는 거부합니다. 표시용(Studio)
-`simcase.display_complex3d(model, component=None)`은 그런 구성 요소를 포함해 슬라이스 1이 받는 모든
+`simcase.display_complex3d(model, component=None)`은 그런 구성 요소를 포함해 meshloom 경로가 받는 모든
 `3d` 구성 요소의 정확한 영역 구성, 곧 meshloom 경로가 만들 구성을 돌려줍니다. 아무것도 메시하지 않으며
 `build_mesh3d`가 하거나 거부하는 것을 바꾸지 않습니다. `model`은 `simcase.parse_geometry`가 돌려주는 것이고,
 `3d` 구성 요소가 정확히 하나이면 `component`를 생략할 수 있습니다(옆의 2d 발자국은 괜찮음). 모르는 이름, `2d`나
@@ -50,9 +50,10 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 
 ## 만드는 것
 
-- **프리즘.** 모든 `box`와 모든 판 층(`material`이 있고 `footprint`가 없는 층)은 수직 프리즘입니다. 판
-  층은 정확한 z 높이 사이에서 도메인 x–y 범위를 덮으며, 셀 이름은 압출 경로처럼 `region`, 없으면 재료
-  이름입니다.
+- **프리즘.** 모든 `box`, 모든 판 층(`material`이 있고 `footprint`가 없는 층), 사각형·사다리꼴·다각형
+  프로파일의 모든 `extrude`는 수직 프리즘입니다. 판 층은 정확한 z 높이 사이에서 도메인 x–y 범위를 덮으며,
+  셀 이름은 압출 경로처럼 `region`, 없으면 재료 이름입니다. 압출의 프로파일은 그대로 2D 엔진에 들어가므로
+  유도된 점(사다리꼴 꼭짓점, 기울어진 변의 교점)은 정확한 유리수로 남습니다.
 - **나중 피처가 이김.** 모든 프리즘의 발자국을 경계를 모두 남긴 채 [2단계 엔진](geometry_engine.md)에
   한 번 넣습니다. 그래서 잘게 나뉜 2D 셀마다 그 셀을 품는 프리즘의 정확한 집합이 붙습니다. 구성 요소를
   서로 다른 모든 z 높이에서 자르면, 판 구간 안에서 셀의 영역은 그 셀을 품는 마지막 활성 프리즘의 것이고,
@@ -62,10 +63,15 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 - **면.** 수평면은 위아래 영역이 다르거나 한쪽이 도메인 밖인 곳에, 수직면은 2D 곡선 양쪽의 영역이 다른
   곳에 있습니다. 빈 공간 셀 둘 사이, 빈 공간 셀과 바깥 사이의 면은 메시하지 않고 목록에도 없습니다.
   양쪽과 출처가 같은 면은 평면 안에서, 그리고 판 구간을 건너 합칩니다. 경계가 꼭짓점에서 자기와 만나는
-  수평면은 사각형으로 나눠, meshloom이 받는 모든 루프가 단순하게 합니다.
+  수평면은 사각형(축 정렬 경계)이나 2D 셀로, 꼭짓점에서 꼬인 2D 셀은 삼각형으로 나눠, meshloom이 받는 모든
+  루프가 단순하게 합니다. 기울어진 옆면은 2D 곡선 하나와 판 구간 연속마다 수직 사각형 하나입니다. 모든 2D
+  꼭짓점에서 나누고 수평면도 기울어진 변 위의 꼭짓점을 모두 지니므로, 반올림한 뒤 기울어진 변 안에 점을
+  넣을 일이 없습니다.
 - **출처.** 면은 그 면을 품는 표면의 모든 부분을 가집니다. 그 피처가 이웃 셀을 가졌는지와 상관없습니다.
   `<box>.x0` … `<box>.z1`, `domain.x0` … `domain.z1`, 판 층은 `<id>.<layer>.bottom`,
-  `<id>.<layer>.top`, 옆면 `<id>.<layer>.domain.x0` … `<id>.<layer>.domain.y1`입니다. 이는 계약의
+  `<id>.<layer>.top`, 옆면 `<id>.<layer>.domain.x0` … `<id>.<layer>.domain.y1`, 압출은 뚜껑
+  `<id>.bottom`, `<id>.top`과 옆면의 프로파일 부분 이름(계약 A4: 사각형과 사다리꼴은 `left`, `right`,
+  `y0`, `y1`, 다각형은 `e1` … `eN` 또는 `edges` 이름)입니다. 판 층 옆면 이름은 계약의
   `<id>.<layer>.domain.<side>`에 3D 도메인 면 이름을 쓴 것으로, 2D 이름은 층 뚜껑(`<id>.<layer>.bottom`,
   `.top`)과 겹치기 때문입니다. `meshine.extrude`는 출처를 내지 않으므로 두 경로가 이 이름을 다르게 쓸 수
   없습니다. 수직면은 그 판
@@ -81,16 +87,21 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 ## meshloom에 넘기기
 
 - **좌표(규칙 H1).** pm 값 k마다 `float(Fraction(k, 10**12))` 미터가 되며 한 번만 반올림합니다. 그래서
-  축에 정렬된 평면의 점들은 double 하나를 공유하고 평면은 정확하게 남습니다. 한 축의 서로 다른 두 값이
-  같은 double로 반올림되면 둘 다 밝혀 거부합니다.
-- **패싯.** 면 하나가 평면 패싯 하나이며, 바깥 루프가 먼저입니다. 패싯의 변 위에 놓인 구성의 모든 점을
-  그 변에 넣으므로, 두 패싯은 온전한 변이나 점에서만 만나고 직선을 따라 일부만 겹치지 않습니다. 패싯마다
+  축에 정렬된 평면의 점들은 double 하나를 공유하고 평면은 정확하게 남습니다. 유도된 유리수 점도 한 번만
+  반올림합니다. 기울어진 사각형의 점들은 수직선 둘 위에 있으므로 double에서도 평면으로 남습니다. 한 축의
+  서로 다른 두 값이 같은 double로 반올림되면 둘 다 밝혀 거부합니다. 압출이 있으면 유도된 것을 포함한 모든
+  2D 꼭짓점을 세며, 그 점을 지나는 가장 작은 부분 이름으로 부릅니다.
+- **패싯.** 면 하나가 평면 패싯 하나이며, 바깥 루프가 먼저입니다. 패싯의 축 정렬 변 위에 놓인 구성의 모든
+  점을 그 변에 넣으므로, 두 패싯은 온전한 변이나 점에서만 만나고 직선을 따라 일부만 겹치지 않습니다.
+  기울어진 변 안에는 만드는 방식상 점이 없습니다. 패싯마다
   고유 태그(`f<i>`)가 있고, 결과는 그것을 태그와 출처로 되돌립니다.
-- **영역.** 유계 성분마다 정확한 내부 점 하나를 영역 이름과 함께 줍니다. 닫힌 빈 공간은 `None`이며
+- **영역.** 유계 성분마다 정확한 내부 점 하나(기울어진 곡선이 있으면 2D 셀의 중간 높이 선에서 가장 넓은
+  구간의 가운데, 반올림한 뒤 안쪽인지 확인)를 영역 이름과 함께 줍니다. 닫힌 빈 공간은 `None`이며
   메시하지 않습니다. 도메인 경계에 닿는 빈 공간은 메시 바깥입니다.
 - **크기.** `h`는 크기 하나이거나 영역마다 하나입니다.
 - **메시 면.** 외부 면은 패싯 태그에서 옵니다. 내부 면은 meshloom의 `interfaces`에서 오며, 축 정렬 평면의
   정확한 일치로, 한 평면에 패싯이 여럿이면 면 중심을 각 패싯 다각형에 정확히 판정해 패싯에 배정합니다.
+  기울어진 패싯 위의 면은 반올림한 밑변이 면 중심에 가장 가까운 사각형에 배정합니다(밑변 길이의 1e-9 안).
   `mesh.interfaces`의 키는 정렬된 영역 이름 쌍이며, 첫째에서 둘째로 감깁니다.
 - **오류.** meshloom 오류(`InvalidPLC`, `RecoveryError`, `RoundingError`, `RegionError`, `RefineError`,
   `MeshError`)는 오류가 가리키는 패싯의 출처 이름과 피처를 붙여 `simcase.geometry_engine3d.Mesh3DError`로
@@ -103,8 +114,10 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 
 코드 `E-3D-COMBINATION`, 피처의 `features[i]`에서, 계약의 메시지 줄기로(메시지는 영어로 나옵니다):
 
-- `extrude`, `cylinder`, `sphere`: `<type> '<name>' is not taken yet in a 3d component; boxes and slab
-  layers are`(원통과 구는 슬라이스 3이 받음)
+- `cylinder`, `sphere`: `<type> '<name>' is not taken yet in a 3d component; boxes, slab layers and rect,
+  trapezoid and polygon extrudes are`(원통과 구는 슬라이스 3이 받음)
+- 원 프로파일의 `extrude`: `extrude '<name>' is not taken yet in a 3d component (an extruded circle is a
+  cylinder); boxes, slab layers and rect, trapezoid and polygon extrudes are`
 - 다른 피처와 함께 쓴 발자국 `layers`: `layers '<name>' has footprint layers; with other features a 3d
   component takes slab layers only, until a later slice`
 - 같은 double로 반올림되는 두 값: `<a>.<part> and <b>.<part> round to the same coordinate <x> m`
@@ -149,10 +162,12 @@ P1 측정값:
 ## 한계
 
 - 실험 단계: meshloom은 아직 수용되지 않았고, 메시 품질은 meshloom의 것입니다.
-- 상자와 판 층만 받습니다. 발자국 층은 혼자이면 압출 경로를 쓰고, 다른 피처와 함께이면 뒤 슬라이스까지
-  거부합니다.
-  원통과 구는 슬라이스 3에서 옵니다.
+- 상자, 판 층, 직선 변 프로파일의 압출만 받습니다. 발자국 층은 혼자이면 압출 경로를 쓰고, 다른 피처와
+  함께이면 뒤 슬라이스까지 거부합니다. 원통, 구, 원의 압출은 슬라이스 3에서 옵니다.
+- 한 프로파일의 꼭짓점이 다른 프로파일의 기울어진 변 위에 놓이면(T자 접합) 구성에서는 정확하지만 double에서는
+  아닙니다. meshloom이 그런 집합을 `RoundingError`로 거부할 수 있으며, 관련 패싯의 출처와 함께 다시
+  알립니다(아래 퍼즈 F).
 - 영역마다 크기 하나입니다. 등급 크기나 표면 크기는 아직 없습니다.
 - 면과 셀은 2D 셀과 판 구간마다 나열합니다. 구성은 메모리 안의 진단 구조이며 저장 형식이 아닙니다.
-- Python: 구성은 정확한 정수로 순수 Python에서 만듭니다. 상자가 많은 구성 요소는 서로 다른 평면 수에
-  따라 커지는 배열을 만듭니다.
+- Python: 구성은 정확한 유리수로 순수 Python에서 만듭니다. 프리즘이 많은 구성 요소는 서로 다른 평면과 변의
+  수에 따라 커지는 배열을 만듭니다.

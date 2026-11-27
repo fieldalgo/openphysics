@@ -46,7 +46,7 @@ The route follows the contract's [mesher route](geometry_document.md#stage-5-com
 | Component | Route | Exterior tags |
 |---|---|---|
 | one `layers` feature of slab layers | `meshine.extrude`: the domain rectangle meshed by meshine at the element size, extruded through the layer levels in sub-layers at most that thick | `z0`, `z1`, and the footprint's sides `left`, `right`, `bottom`, `top` |
-| anything else of the [boxes and slab layers](geometry_engine3d.md) slice 1 takes | `simcase.build_mesh3d` through meshloom (**experimental**) | `x0`–`z1` on the domain faces, `void` elsewhere, or `boundary_tags` |
+| anything else of the [boxes, slab layers and extrudes](geometry_engine3d.md) the meshloom route takes | `simcase.build_mesh3d` through meshloom (**experimental**) | `x0`–`z1` on the domain faces, `void` elsewhere, or `boundary_tags` |
 
 The result's `route` (and the summary's `mesh_route`) says which route ran. A lone `layers`
 feature with footprint layers is not taken yet. On the extrude route the faces carry their
@@ -115,7 +115,7 @@ Measured on Linux (2026-11-27), `tests/simcase/test_thermal_steady3d.py`:
 
 - Steady conduction with prescribed temperatures and volumetric sources only: no flux,
   convection, transient or coupling yet. Studio does not open the kind.
-- The meshloom route is experimental until meshloom's acceptance, and takes boxes and slab
-  layers ([3D boxes and slab layers](geometry_engine3d.md)); the extrude route takes a lone
-  stack of slab layers.
+- The meshloom route is experimental until meshloom's acceptance, and takes boxes, slab
+  layers and rect, trapezoid and polygon extrudes ([3D boxes, slab layers and
+  extrudes](geometry_engine3d.md)); the extrude route takes a lone stack of slab layers.
 - `simcase export` refuses the layout as unsupported.

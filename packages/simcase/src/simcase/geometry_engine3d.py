@@ -1,19 +1,23 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
 
-"""The 3D region complex of boxes and slab layers, and its meshloom hand-off (stage 5, slice 1).
+"""The 3D region complex of boxes, slab layers and extrudes, and its meshloom hand-off (stage 5,
+slices 1 and 2).
 
 This module implements the stage 5 compile conditions of the geometry document contract
-(``docs/packages/simcase/geometry_document.md``) for the features slice 1 takes: ``box`` and
+(``docs/packages/simcase/geometry_document.md``) for the features slices 1 and 2 take: ``box``,
 the slab layers of ``layers`` features (a layer with a material and no footprint, a box over
-the domain's x-y extent between its exact z levels). Every box and slab layer is a vertical
-prism. The footprints of all prisms go once through the stage 2 exact 2D engine
-(``simcase.geometry_engine``) with every boundary kept, so each fine 2D cell carries the exact
-set of prisms whose footprint contains it; cutting the component at every distinct z level,
-the region of a fine cell in a slab is that of the last prism active there (later wins), which
-is the slab's 2D later-wins arrangement. Horizontal faces lie where the regions above and below
-differ, vertical faces where the regions on the two sides of a fine curve differ; faces of equal
-sides and provenance are merged.
+the domain's x-y extent between its exact z levels) and ``extrude`` of a rect, trapezoid or
+polygon profile. Every one is a vertical prism. The footprints of all prisms go once through the
+stage 2 exact 2D engine (``simcase.geometry_engine``) with every boundary kept, so each fine 2D
+cell carries the exact set of prisms whose footprint contains it; cutting the component at every
+distinct z level, the region of a fine cell in a slab is that of the last prism active there
+(later wins), which is the slab's 2D later-wins arrangement. Horizontal faces lie where the
+regions above and below differ, vertical faces where the regions on the two sides of a fine
+curve differ; faces of equal sides and provenance are merged, except that a sloped side is one
+quad per fine curve (split at every 2D vertex, so no point has to be put into a sloped edge
+after rounding). Derived points (trapezoid corners, intersections of sloped edges) stay exact
+rationals until the hand-off.
 
 ``build_mesh3d`` hands the complex to ``meshloom.generate3d`` (rule H1: metres, each pm value
 rounded once) and returns the shared ``galerkin.Mesh3D`` with the contract's default tags
@@ -23,13 +27,14 @@ own acceptance. Everything else a ``3d`` component may hold is refused by name
 (``E-3D-COMBINATION``); a component holding one ``layers`` feature keeps the ``meshine.extrude``
 route (``geometry_document.layer_stack``).
 
-The complex is built with the standard library and exact integers only; NumPy is used for the
+The complex is built with the standard library and exact rationals only; NumPy is used for the
 mesh arrays after meshing.
 """
 
 from __future__ import annotations
 
 import bisect
+import math
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -50,9 +55,18 @@ TETRAHEDRA_PER_VOLUME = 6.3
 #: ``mesh.element_count_limit`` when the document gives none (the 2D estimate's default)
 DEFAULT_ELEMENT_COUNT_LIMIT = 600000
 CODE = "E-3D-COMBINATION"
+#: ``Face3D.axis`` of a vertical face that is not axis-aligned (a sloped extrude side)
+SLOPED = 3
 
 # rect parts of the 2D engine -> box parts (the engine names a rect's sides bottom, right, top, left)
 _RECT_PART = {"bottom": "y0", "right": "x1", "top": "y1", "left": "x0"}
+# the 2D engine's part names of an extrude's profile -> the extrude's side names (contract A4: a rect or
+# trapezoid's bottom and top become y0 and y1; a polygon keeps its edge names)
+_PROFILE_PARTS = {"rect": {"bottom": "y0", "right": "right", "top": "y1", "left": "left"},
+                  "trapezoid": {"bottom": "y0", "right": "right", "top": "y1", "left": "left"},
+                  "polygon": None}
+#: what a 3d component takes on the meshloom route (stage 5, slice 2)
+_TAKEN = "boxes, slab layers and rect, trapezoid and polygon extrudes are"
 
 
 class Mesh3DError(GeometryError):
@@ -77,14 +91,19 @@ class _Prism:
     feature_index: int
     feature_id: str
     prefix: str                     # provenance prefix: the box id, or "<id>.<layer>"
-    kind: str                       # "box" or "slab"
+    kind: str                       # "box", "slab" or "extrude"
     region: str
     material: object                # a name, or None for void
     mesh_size: int | None
-    bounds: tuple                   # (x0, x1, y0, y1, z0, z1) in pm, as written
+    bounds: tuple                   # (x0, x1, y0, y1, z0, z1) in pm, as written (an extrude: its profile's box)
+    profile: object = None          # an extrude's profile: (type, data without "type", part names edge by edge)
 
     def part(self, name: str) -> str:
         if self.kind == "box":
+            return f"{self.prefix}.{name}"
+        if self.kind == "extrude":
+            if name in ("z0", "z1"):
+                return f"{self.prefix}.{'bottom' if name == 'z0' else 'top'}"
             return f"{self.prefix}.{name}"
         if name in ("z0", "z1"):
             return f"{self.prefix}.{'bottom' if name == 'z0' else 'top'}"
@@ -120,10 +139,41 @@ def _prisms(comp: Component, *, lone_layers: bool) -> list[_Prism]:
                 out.append(_Prism(i, f.id, f"{f.id}.{lay['name']}", "slab", region, material, f.mesh_size,
                                   (dom["xmin"], dom["xmax"], dom["ymin"], dom["ymax"], z, z1)))
                 z = z1
+        elif f.type == "extrude":
+            prof = dict(f.data["profile"])
+            t = prof.pop("type")
+            if t not in _PROFILE_PARTS:
+                _refuse(f"extrude {f.name!r} is not taken yet in a 3d component (an extruded circle is a cylinder); "
+                        f"{_TAKEN}", path)
+            pts, parts = _profile_points(t, prof)
+            xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+            out.append(_Prism(i, f.id, f.id, "extrude", f.region, f.material, f.mesh_size,
+                              (min(xs), max(xs), min(ys), max(ys), f.data["zmin"], f.data["zmax"]),
+                              (t, prof, parts)))
         else:
-            _refuse(f"{f.type} {f.name!r} is not taken yet in a 3d component; boxes and slab layers are", path)
+            _refuse(f"{f.type} {f.name!r} is not taken yet in a 3d component; {_TAKEN}", path)
     _check_regions(comp, out)
     return out
+
+
+def _profile_points(t: str, d: dict):
+    """The corners (pm, exact) and part names, edge by edge, of a rect, trapezoid or polygon profile,
+    in the 2D engine's order (a rect or trapezoid: bottom, right, top, left; contract A4 names the
+    bottom and top y0 and y1)."""
+    if t == "rect":
+        x, y, w, h = d["x"], d["y"], d["w"], d["h"]
+        return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)], ["y0", "right", "y1", "left"]
+    if t == "trapezoid":
+        cx, y, w, h, wt = (Fraction(d[k]) for k in ("cx", "y", "w", "h", "w_top"))
+        pts = [(cx - w / 2, y), (cx + w / 2, y), (cx + wt / 2, y + h), (cx - wt / 2, y + h)]
+        return [(_ex(x), _ex(y)) for x, y in pts], ["y0", "right", "y1", "left"]
+    return [tuple(p) for p in d["points"]], list(d["edges"])
+
+
+def _ex(q):
+    """An exact rational as an int when it is one (so integer geometry keeps its integer form)."""
+    q = Fraction(q)
+    return int(q) if q.denominator == 1 else q
 
 
 def _check_regions(comp: Component, prisms: list[_Prism]) -> None:
@@ -178,18 +228,20 @@ class Cell3D:
 
 @dataclass
 class Face3D:
-    """A planar face of the complex: an axis-aligned polygon with its two sides."""
+    """A planar face of the complex: a polygon in an axis-aligned plane, or a vertical quad of a
+    sloped extrude side, with its two sides."""
 
     index: int
-    axis: int                       # 0, 1, 2: the face lies in the plane coordinate[axis] == coord
-    coord: int                      # pm
+    axis: int                       # 0, 1, 2: the face lies in the plane coordinate[axis] == coord; SLOPED: see plane
+    coord: object                   # pm (exact); None for a sloped face
     loops: list                     # [outer, hole, ...]; each a list of (x, y, z) pm points
     provenance: frozenset
     minus: frozenset                # cells on the side of smaller coordinate[axis] (empty: outside the domain)
     plus: frozenset
     exterior: bool                  # one side is outside the domain or void (a face of the mesh boundary)
     tag: str | None = None          # mesh tag of an exterior face
-    area: int = 0                   # pm^2, exact
+    area: object = 0                # pm^2, exact (a sloped face: the float of its exact area)
+    plane: tuple | None = None      # a sloped face: (nx, ny, d), its plane nx*x + ny*y == d (pm, exact)
 
     @property
     def sides(self):
@@ -207,6 +259,8 @@ class Complex3D:
     prisms: list = field(repr=False, default_factory=list)
     _plan: object = field(repr=False, default=None)        # the 2D complex of the footprints
     _component: object = field(repr=False, default=None)
+    _rectilinear: bool = field(repr=False, default=True)   # every fine curve is axis-aligned
+    _vertex_names: list = field(repr=False, default_factory=list)   # per 2D vertex, its curves' names
 
     def region_names(self) -> list[str]:
         """Regions in feature order, the background last (as in 2D)."""
@@ -304,9 +358,10 @@ class _Builder:
     def _plan(self):
         from .geometry_engine import evaluate_component
         x0, x1, y0, y1 = self.dom[:4]
-        feats = [Feature(f"p{k}", f"p{k}", f"p{k}", "rect", "m", None,
-                         {"x": p.bounds[0], "y": p.bounds[2], "w": p.bounds[1] - p.bounds[0],
-                          "h": p.bounds[3] - p.bounds[2]}) for k, p in enumerate(self.P)]
+        feats = [Feature(f"p{k}", f"p{k}", f"p{k}", p.profile[0], "m", None, p.profile[1]) if p.kind == "extrude"
+                 else Feature(f"p{k}", f"p{k}", f"p{k}", "rect", "m", None,
+                              {"x": p.bounds[0], "y": p.bounds[2], "w": p.bounds[1] - p.bounds[0],
+                               "h": p.bounds[3] - p.bounds[2]}) for k, p in enumerate(self.P)]
         plan = Component(self.comp.name, "2d", {"xmin": x0, "xmax": x1, "ymin": y0, "ymax": y1}, {"material": "m"},
                          feats, "imprint", {}, [], self.comp.length_unit, self.comp.pm_per_unit)
         return evaluate_component(plan)
@@ -316,13 +371,18 @@ class _Builder:
         out = set()
         for name in engine_provenance:
             fid, part = name.split(".", 1)
-            side = _RECT_PART[part]
             if fid == "domain":
-                out.add(f"domain.{side}")
+                out.add(f"domain.{_RECT_PART[part]}")
                 continue
             k = int(fid[1:])
             if slab is None or self.active(k, slab):
-                out.add(self.P[k].part(side))
+                p = self.P[k]
+                if p.kind == "extrude":
+                    table = _PROFILE_PARTS[p.profile[0]]
+                    side = part if table is None else table[part]
+                else:
+                    side = _RECT_PART[part]
+                out.add(p.part(side))
         return frozenset(out)
 
     def active(self, k: int, s: int) -> bool:
@@ -343,8 +403,9 @@ class _Builder:
         nslab = len(L) - 1
         rc = self._plan()
         self.rc = rc
-        V = [(int(x.a), int(y.a)) for x, y in rc.vertices]
+        V = _plan_vertices(rc)
         self.V = V
+        self.rectilinear = all(V[k.a][0] == V[k.b][0] or V[k.a][1] == V[k.b][1] for k in rc.curves)
         ncell = len(rc.cells)
         bg = comp.background.get("material", _MISSING)
 
@@ -390,7 +451,8 @@ class _Builder:
         self._horizontal(faces, side)
         self._vertical(faces, side)
         self.faces = faces
-        cx = Complex3D(comp.name, dict(comp.domain), list(L), cells, faces, {}, list(P), rc, comp)
+        cx = Complex3D(comp.name, dict(comp.domain), list(L), cells, faces, {}, list(P), rc, comp,
+                       self.rectilinear, self._vertex_names())
         _default_tags(cx)
         _apply_boundary_tags(cx, comp)
         cx.selections = _resolve_selections(cx, comp)
@@ -407,8 +469,17 @@ class _Builder:
                     a, b = (k.a, k.b) if fwd else (k.b, k.a)
                     (xa, ya), (xb, yb) = self.V[a], self.V[b]
                     twice += xa * yb - xb * ya
-            out.append(abs(twice) // 2)
+            out.append(_ex(Fraction(abs(twice), 2)))
         return out
+
+    def _vertex_names(self) -> list:
+        """The 3D provenance names of the fine curves at every 2D vertex (any slab)."""
+        out = [set() for _ in self.V]
+        for k in self.rc.curves:
+            names = self._names(k.provenance)
+            out[k.a] |= names
+            out[k.b] |= names
+        return [frozenset(n) for n in out]
 
     @staticmethod
     def _exists(sa, sb) -> bool:
@@ -471,11 +542,15 @@ class _Builder:
                 lo, hi = xa, xb
                 # going +x, the left side is +y
                 minus, plus = (right, left) if xa < xb else (left, right)
-            else:                                  # along y; normal x
+            elif xa == xb:                         # along y; normal x
                 axis, coord = 0, xa
                 lo, hi = ya, yb
                 # going +y, the left side is -x
                 minus, plus = (left, right) if ya < yb else (right, left)
+            else:                                  # sloped: one quad per fine curve (split at every 2D vertex)
+                axis, coord = SLOPED, k.index
+                lo, hi = 0, 1
+                minus, plus = right, left
             if lo > hi:
                 lo, hi = hi, lo
             s = 0
@@ -503,6 +578,18 @@ class _Builder:
                     merged.append([lo, hi, {minus}, {plus}])
             za, zb = L[s0], L[s1 + 1]
             ext = key[0] is None or key[0][2] or key[1] is None or key[1][2]
+            if axis == SLOPED:
+                k = rc.curves[coord]
+                (xa, ya), (xb, yb) = V[k.a], V[k.b]
+                loop = [(xa, ya, za), (xb, yb, za), (xb, yb, zb), (xa, ya, zb)]
+                (_, _, mins, plus), = merged
+                cm = frozenset(self.cell_at[(ci, s)] for ci in mins if ci is not None for s in range(s0, s1 + 1))
+                cp = frozenset(self.cell_at[(ci, s)] for ci in plus if ci is not None for s in range(s0, s1 + 1))
+                nx, ny = yb - ya, xa - xb
+                faces.append(Face3D(len(faces), SLOPED, None, [loop], key[2], cm, cp, ext,
+                                    area=math.hypot(float(xb - xa), float(yb - ya)) * float(zb - za),
+                                    plane=(nx, ny, nx * xa + ny * ya)))
+                continue
             for lo, hi, mins, plus in merged:
                 if axis == 1:
                     loop = [(lo, coord, za), (hi, coord, za), (hi, coord, zb), (lo, coord, zb)]
@@ -511,6 +598,17 @@ class _Builder:
                 cm = frozenset(self.cell_at[(ci, s)] for ci in mins if ci is not None for s in range(s0, s1 + 1))
                 cp = frozenset(self.cell_at[(ci, s)] for ci in plus if ci is not None for s in range(s0, s1 + 1))
                 faces.append(Face3D(len(faces), axis, coord, [loop], key[2], cm, cp, ext, area=(hi - lo) * (zb - za)))
+
+
+def _plan_vertices(rc) -> list:
+    """The 2D vertices (pm, exact rationals; ints where integer). The engine's vertices of lines are
+    rational: profiles of straight edges only."""
+    out = []
+    for x, y in rc.vertices:
+        if x.b or y.b:
+            raise GeometryError("internal: an irrational vertex in a 3d component's footprints")
+        out.append((_ex(x.a), _ex(y.a)))
+    return out
 
 
 def _groups(rc, key: dict) -> list[list[int]]:
@@ -533,20 +631,24 @@ def _groups(rc, key: dict) -> list[list[int]]:
     return list(out.values())
 
 
-_DIR = {(1, 0): 0, (0, 1): 1, (-1, 0): 2, (0, -1): 3}
-
-
-def _direction(p, q) -> int:
+def _direction(p, q):
+    """The exact pseudo-angle of p -> q in [0, 4): 0, 1, 2, 3 along +x, +y, -x, -y, monotone in the angle."""
     dx, dy = q[0] - p[0], q[1] - p[1]
-    return _DIR[((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))]
+    t = Fraction(dy) / (abs(dx) + abs(dy))
+    if dx >= 0 and dy >= 0:
+        return _ex(t)
+    if dx < 0:
+        return _ex(2 - t)
+    return _ex(4 + t)
 
 
 def _merged_loops(rc, V, group: set) -> list[list]:
     """The faces of a group of fine cells: ``[[outer, hole, ...], ...]`` of 2D pm points.
 
     One face with its holes when its boundary is simple; when the boundary meets itself at a
-    vertex (a pinch), the group is split into rectangles instead, so that every loop handed on
-    is simple."""
+    vertex (a pinch), the group is split into rectangles instead (axis-aligned boundaries), or into
+    its fine cells, a pinched fine cell into triangles (``_cell_faces``), so that every loop handed
+    on is simple."""
     out_edges: dict = {}
     for k in rc.curves:
         inl = k.left in group if k.left is not None else False
@@ -581,16 +683,130 @@ def _merged_loops(rc, V, group: set) -> list[list]:
             seen.add(p)
     outers = [lp for lp in loops if _signed_area2(lp) > 0]
     if pinch or len(outers) != 1:
-        return [[r] for r in _rectangles(loops)]
+        if all(_axis_aligned(lp) for lp in loops):
+            return [[r] for r in _rectangles(loops)]
+        return [face for ci in sorted(group) for face in _cell_faces(rc, V, ci)]
     holes = [lp for lp in loops if _signed_area2(lp) < 0]
     return [[outers[0], *holes]]
 
 
 def _simplify(loop: list) -> list:
-    """Drop the vertices of a closed axis-aligned loop where it goes straight on."""
+    """Drop the vertices of a closed loop where it goes straight on along an axis. A vertex on a sloped
+    run is kept: the sloped sides are split at every 2D vertex, and a point cannot be put back into a
+    sloped edge after rounding."""
     n = len(loop)
-    keep = [loop[i] for i in range(n) if _direction(loop[i - 1], loop[i]) != _direction(loop[i], loop[(i + 1) % n])]
+    keep = []
+    for i in range(n):
+        d0, d1 = _direction(loop[i - 1], loop[i]), _direction(loop[i], loop[(i + 1) % n])
+        if d0 != d1 or not isinstance(d0, int):
+            keep.append(loop[i])
     return keep
+
+
+def _axis_aligned(loop: list) -> bool:
+    n = len(loop)
+    return all(loop[i][0] == loop[(i + 1) % n][0] or loop[i][1] == loop[(i + 1) % n][1] for i in range(n))
+
+
+def _cell_loops(rc, V, ci: int) -> list:
+    """The loops of one fine cell, as lists of 2D pm points."""
+    out = []
+    for loop in rc.cells[ci].loops:
+        pts = []
+        for ki, fwd in loop:
+            k = rc.curves[ki]
+            pts.append(V[k.a] if fwd else V[k.b])
+        out.append(pts)
+    return out
+
+
+def _cell_faces(rc, V, ci: int) -> list:
+    """The faces of one fine cell: the cell with its holes, or its triangles when its loops meet
+    themselves or each other at a vertex."""
+    loops = _cell_loops(rc, V, ci)
+    pts = [p for lp in loops for p in lp]
+    if len(pts) == len(set(pts)):
+        return [loops]
+    outer, holes = loops[0], loops[1:]
+    return [[t] for t in _triangulate(outer, holes)]
+
+
+def _orient(a, b, c):
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+
+def _crosses(a, b, c, d) -> bool:
+    """Segments ab and cd share a point other than a common end point."""
+    if {a, b} & {c, d}:
+        shared = ({a, b} & {c, d}).pop()
+        p = a if b == shared else b
+        q = c if d == shared else d
+        # collinear and overlapping beyond the shared end point
+        return _orient(shared, p, q) == 0 and (p[0] - shared[0]) * (q[0] - shared[0]) + \
+            (p[1] - shared[1]) * (q[1] - shared[1]) > 0
+    o1, o2, o3, o4 = _orient(a, b, c), _orient(a, b, d), _orient(c, d, a), _orient(c, d, b)
+    if o1 * o2 < 0 and o3 * o4 < 0:
+        return True
+
+    def on(p, q, r):            # r on the closed segment pq (collinear)
+        return min(p[0], q[0]) <= r[0] <= max(p[0], q[0]) and min(p[1], q[1]) <= r[1] <= max(p[1], q[1])
+    return ((o1 == 0 and on(a, b, c)) or (o2 == 0 and on(a, b, d)) or (o3 == 0 and on(c, d, a))
+            or (o4 == 0 and on(c, d, b)))
+
+
+def _triangulate(outer: list, holes: list) -> list:
+    """Triangles (counter-clockwise, on the loops' own vertices) of a polygon with holes whose loops may
+    touch at vertices: holes are bridged into the outer loop, then ears are clipped (exact)."""
+    if _signed_area2(outer) < 0:
+        outer = outer[::-1]
+    holes = [h[::-1] if _signed_area2(h) > 0 else list(h) for h in holes]
+    loops_all = [outer] + holes
+    edges = [(lp[i], lp[(i + 1) % len(lp)]) for lp in loops_all for i in range(len(lp))]
+
+    def inside(p):
+        return _inside_loops(p[0], p[1], loops_all)
+
+    poly = list(outer)
+    for hole in sorted(holes, key=lambda h: -max(p[0] for p in h)):
+        best = None
+        for hi, m in enumerate(hole):
+            for pi, q in enumerate(poly):
+                if m == q:
+                    continue
+                if any(_crosses(m, q, a, b) for a, b in edges):
+                    continue
+                mid = ((m[0] + q[0]) / 2, (m[1] + q[1]) / 2)
+                if not inside(mid):
+                    continue
+                d2 = (m[0] - q[0]) ** 2 + (m[1] - q[1]) ** 2
+                if best is None or d2 < best[0]:
+                    best = (d2, hi, pi)
+        if best is None:
+            raise GeometryError("internal: no bridge from a hole to its outer loop")
+        _, hi, pi = best
+        ring = hole[hi:] + hole[:hi + 1]
+        poly = poly[:pi + 1] + ring + poly[pi:pi + 1] + poly[pi + 1:]
+        edges.append((hole[hi], poly[pi]))
+    tris = []
+    while len(poly) > 3:
+        n = len(poly)
+        for i in range(n):
+            a, b, c = poly[i - 1], poly[i], poly[(i + 1) % n]
+            if _orient(a, b, c) <= 0:
+                continue
+            corners = {a, b, c}
+            if any(p not in corners and _orient(a, b, p) >= 0 and _orient(b, c, p) >= 0 and _orient(c, a, p) >= 0
+                   for p in poly):
+                continue
+            tris.append([a, b, c])
+            del poly[i]
+            break
+        else:
+            raise GeometryError("internal: a pinched face of the complex has no ear to clip")
+    if _orient(*poly) <= 0:
+        raise GeometryError("internal: a pinched face of the complex leaves a degenerate triangle")
+    tris.append(list(poly))
+    return tris
 
 
 def _signed_area2(loop: list) -> int:
@@ -598,8 +814,10 @@ def _signed_area2(loop: list) -> int:
     return sum(loop[i][0] * loop[(i + 1) % n][1] - loop[(i + 1) % n][0] * loop[i][1] for i in range(n))
 
 
-def _loops_area(loops: list) -> int:
-    return abs(sum(_signed_area2(lp) for lp in loops)) // 2
+def _loops_area(loops: list):
+    """Exact area (pm^2) of an outer loop minus its holes, whatever their orientations."""
+    twice = abs(_signed_area2(loops[0])) - sum(abs(_signed_area2(lp)) for lp in loops[1:])
+    return _ex(Fraction(twice, 2))
 
 
 def _rectangles(loops: list) -> list[list]:
@@ -778,10 +996,24 @@ def _check_rounding(cx: Complex3D, comp: Component) -> None:
         lo, hi = dom[f"{axis}min"], dom[f"{axis}max"]
         named: dict = {lo: ("domain", f"domain.{axis}0", -1), hi: ("domain", f"domain.{axis}1", -1)}
         for p in cx.prisms:
+            if p.kind == "extrude" and a < 2:
+                continue                    # an extrude's x and y values are its profile's vertices (below)
             for j, part in ((2 * a, f"{axis}0"), (2 * a + 1, f"{axis}1")):
                 v = p.bounds[j]
                 if lo <= v <= hi and v not in named:
                     named[v] = (p.feature_id, p.part(part), p.feature_index)
+        if a < 2 and any(p.kind == "extrude" for p in cx.prisms):
+            # every 2D vertex, derived ones included (intersections of sloped edges): by the smallest
+            # name among the curves through a vertex with that coordinate
+            names: dict = {}
+            for v, ns in zip(_plan_vertices(cx._plan), cx._vertex_names):
+                if ns:
+                    names[v[a]] = min(names[v[a]], min(ns)) if v[a] in names else min(ns)
+            for v in sorted(names):
+                if v not in named:
+                    fid = names[v].split(".", 1)[0]
+                    i, _f = _feature_by_id(comp, fid)
+                    named[v] = (fid, names[v], -1 if i is None else i)
         values = sorted(named)
         for u, w in zip(values, values[1:]):
             if _metres(u) == _metres(w):
@@ -824,7 +1056,10 @@ def _handoff(cx: Complex3D, comp: Component, mesh_opts: dict) -> _Handoff:
             for i in range(n):
                 p, q = lp[i], lp[(i + 1) % n]
                 full.append(index[p])
-                a = next(b for b in range(3) if p[b] != q[b])
+                differ = [b for b in range(3) if p[b] != q[b]]
+                if len(differ) != 1:
+                    continue                  # a sloped edge: no point lies inside it (split at every 2D vertex)
+                a = differ[0]
                 key = (a,) + tuple(p[b] for b in range(3) if b != a)
                 line = lines[key]
                 lo, hi = sorted((p[a], q[a]))
@@ -886,17 +1121,51 @@ def _region_points(cx: Complex3D) -> list:
     comps: dict = {}
     for c in cells:
         comps.setdefault(find(c.index), []).append(c.index)
-    rects = _cell_rectangles(cx)
+    rects = _cell_rectangles(cx) if cx._rectilinear else None
+    V = _plan_vertices(rc)
     out = []
     for root in sorted(comps, key=lambda r: min(comps[r])):
         members = comps[root]
         first = cells[min(members)]
         if first.void and any(touches[i] for i in members):
             continue                               # open to the outside: not a bounded component
-        (xa, xb, ya, yb) = rects[first.fine]
-        point = (_inside(xa, xb), _inside(ya, yb), _inside(L[first.slab], L[first.slab + 1]))
+        if rects is not None:
+            (xa, xb, ya, yb) = rects[first.fine]
+            x, y = _inside(xa, xb), _inside(ya, yb)
+        else:
+            x, y = _cell_point(_cell_loops(rc, V, first.fine))
+        point = (x, y, _inside(L[first.slab], L[first.slab + 1]))
         out.append((point, None if first.void else first.region))
     return out
+
+
+def _cell_point(loops: list):
+    """A point (metre doubles) strictly inside a fine cell, also after rule H1 rounds its loops: the
+    middle of the widest interval of the horizontal line half-way between two vertex heights."""
+    ys = sorted({p[1] for lp in loops for p in lp})
+    best = None
+    for ya, yb in zip(ys, ys[1:]):
+        y = Fraction(ya + yb) / 2
+        xs = []
+        for lp in loops:
+            n = len(lp)
+            for i in range(n):
+                (x0, y0), (x1, y1) = lp[i], lp[(i + 1) % n]
+                if (y0 > y) != (y1 > y):
+                    xs.append(x0 + (y - y0) * Fraction(x1 - x0) / (y1 - y0))
+        xs.sort()
+        for xa, xb in zip(xs[::2], xs[1::2]):
+            score = min(xb - xa, yb - ya)
+            if score > 0 and (best is None or score > best[0]):
+                best = (score, (xa + xb) / 2, y)
+    if best is None:
+        raise GeometryError("internal: a fine cell of the complex has no interior")
+    x, y = _metres(best[1]), _metres(best[2])
+    rounded = [[(Fraction(_metres(p[0])), Fraction(_metres(p[1]))) for p in lp] for lp in loops]
+    if not _inside_loops(Fraction(x), Fraction(y), rounded):
+        raise GeometryError(f"no double lies inside the cell at ({x!r}, {y!r}) m; the geometry is below the "
+                            "resolution of doubles there")
+    return x, y
 
 
 def _inside(lo: int, hi: int) -> float:
@@ -923,7 +1192,7 @@ def _cell_rectangles(cx: Complex3D) -> list:
 
 
 def _grid_lines(cx: Complex3D):
-    V = [(int(x.a), int(y.a)) for x, y in cx._plan.vertices]
+    V = _plan_vertices(cx._plan)
     return sorted({v[0] for v in V}), sorted({v[1] for v in V})
 
 
@@ -1089,7 +1358,8 @@ def _mesh(cx: Complex3D, comp: Component, ho: _Handoff) -> Mesh3DResult:
     plane_facets: dict = {}
     for fi, face_index in enumerate(ho.face_of_facet):
         f = cx.faces[face_index]
-        plane_facets.setdefault((f.axis, _metres(f.coord)), []).append(fi)
+        key = (SLOPED, None) if f.axis == SLOPED else (f.axis, _metres(f.coord))
+        plane_facets.setdefault(key, []).append(fi)
     interior: dict = {fi: [] for fi in range(len(ho.facets))}
     for (ia, ib), faces in raw["interfaces"].items():
         faces = np.asarray(faces, dtype=np.int64).reshape(-1, 3)
@@ -1134,6 +1404,23 @@ def _facet_of(cx: Complex3D, ho: _Handoff, plane_facets: dict, xyz) -> int:
                 if _inside_loops(cen[u], cen[v], [[(Fraction(_metres(p[u])), Fraction(_metres(p[v]))) for p in lp]
                                                   for lp in loops]):
                     return fi
+    # a sloped facet: the vertical quad whose base segment (rounded) is nearest the face's centroid
+    cen = [sum(float(xyz[i][b]) for i in range(3)) / 3 for b in range(3)]
+    best = None
+    for fi in plane_facets.get((SLOPED, None), []):
+        (xa, ya, za), (xb, yb, _), (_, _, zb), _ = cx.faces[ho.face_of_facet[fi]].loops[0]
+        ax, ay, bx, by = _metres(xa), _metres(ya), _metres(xb), _metres(yb)
+        z0, z1 = sorted((_metres(za), _metres(zb)))
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        t = ((cen[0] - ax) * dx + (cen[1] - ay) * dy) / L2
+        if not (-1e-9 <= t <= 1 + 1e-9 and z0 <= cen[2] <= z1):
+            continue
+        dist = abs((cen[0] - ax) * dy - (cen[1] - ay) * dx) / math.sqrt(L2)
+        if best is None or dist < best[0]:
+            best = (dist, fi, math.sqrt(L2))
+    if best is not None and best[0] <= 1e-9 * best[2]:
+        return best[1]
     raise GeometryError("internal: an interface face of the mesh lies in no hand-off facet")
 
 
@@ -1174,6 +1461,8 @@ def _locate_tets(cx: Complex3D, mesh):
     """The complex cell of every tetrahedron, from its centroid: slab by the rounded levels, fine
     cell by the grid of rounded vertex coordinates."""
     import numpy as np
+    if not cx._rectilinear:
+        return _locate_tets_in_cells(cx, mesh)
     xs, ys = _grid_lines(cx)
     grid = _grid_cells(cx, xs, ys)
     cen = mesh.nodes[mesh.tets].mean(axis=1)
@@ -1185,12 +1474,38 @@ def _locate_tets(cx: Complex3D, mesh):
                     dtype=np.int64)
 
 
+def _locate_tets_in_cells(cx: Complex3D, mesh):
+    """``_locate_tets`` for footprints with sloped curves: the fine cell of each centroid by an
+    even-odd test against every fine cell's rounded loops."""
+    import numpy as np
+    rc = cx._plan
+    V = _plan_vertices(rc)
+    cen = mesh.nodes[mesh.tets].mean(axis=1)
+    fine = np.full(len(cen), -1, dtype=np.int64)
+    X, Y = cen[:, 0], cen[:, 1]
+    for c in rc.cells:
+        inside = np.zeros(len(cen), dtype=bool)
+        for lp in _cell_loops(rc, V, c.index):
+            pts = [(_metres(p[0]), _metres(p[1])) for p in lp]
+            for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]):
+                if y0 == y1:
+                    continue
+                crosses = (y0 > Y) != (y1 > Y)
+                inside ^= crosses & (X < x0 + (Y - y0) * (x1 - x0) / (y1 - y0))
+        fine[inside & (fine < 0)] = c.index
+    if (fine < 0).any():
+        raise GeometryError("internal: a tetrahedron's centroid lies in no fine cell")
+    zi = np.searchsorted([_metres(z) for z in cx.levels], cen[:, 2]) - 1
+    at = {(c.fine, c.slab): c.index for c in cx.cells}
+    return np.array([at[(f, s)] for f, s in zip(fine.tolist(), zi.tolist())], dtype=np.int64)
+
+
 def _grid_cells(cx: Complex3D, xs, ys) -> list:
     """The fine cell of every grid rectangle between consecutive vertex x and y values (None outside
     the domain). Walking up each column from below, a rectangle belongs to the cell below it unless
     a fine curve separates them; then it belongs to that curve's upper side."""
     rc = cx._plan
-    V = [(int(x.a), int(y.a)) for x, y in rc.vertices]
+    V = _plan_vertices(rc)
     cover: dict = {}
     for k in rc.curves:
         (xa, ya), (xb, yb) = V[k.a], V[k.b]

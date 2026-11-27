@@ -463,12 +463,14 @@ jobs:
           PY
 
   geometry3d-full:
-    # Stage 5 check G1 of the geometry document in full (docs/packages/simcase/geometry_engine3d.md):
-    # all 200 seeded box sets against the brute-force oracle, with the rest of
-    # tests/simcase/test_geometry_engine3d.py. The source test parts run the file on every pull
-    # request with 25 fixed seeds; this job runs all 200 (about 7 min on one core, 2026-11-27) on
-    # main pushes and manual dispatch only, so pull requests allocate no runner for it, and is in
-    # the tests gate there. It installs the abi3 wheel meshloom-v26-wheel builds.
+    # Stage 5 checks G1 and G1-P of the geometry document in full
+    # (docs/packages/simcase/geometry_engine3d.md): all 200 seeded box sets and all 200 seeded
+    # prism sets (boxes, slab layers, rect, trapezoid and polygon extrudes) against their oracles,
+    # with the rest of tests/simcase/test_geometry_engine3d.py and
+    # tests/simcase/test_geometry_engine3d_extrude.py. The source test parts run both files on every
+    # pull request with 25 fixed seeds each; this job runs all 200 of each on main pushes and manual
+    # dispatch only, so pull requests allocate no runner for it, and is in the tests gate there. It
+    # installs the abi3 wheel meshloom-v26-wheel builds.
     needs: meshloom-v26-wheel
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
@@ -496,15 +498,17 @@ jobs:
       # The test runs from a copy outside the checkout: the root conftest.py puts each
       # package's src/ first on sys.path, which would import meshloom without its compiled
       # kernel and skip the test.
-      - name: Run G1 on all 200 sets, and check that it ran
+      - name: Run G1 and G1-P on all 200 sets each, and check that they ran
         env:
           OPENPHYSICS_GEOMETRY3D_FULL: "1"
         run: |
           mkdir -p "$RUNNER_TEMP/g3d" "$RUNNER_TEMP/g3d-out"
-          cp tests/simcase/test_geometry_engine3d.py "$RUNNER_TEMP/g3d/"
+          cp tests/simcase/test_geometry_engine3d.py tests/simcase/test_geometry_engine3d_extrude.py \
+            tests/simcase/geometry3d_slice1_digests.json "$RUNNER_TEMP/g3d/"
           cd "$RUNNER_TEMP/g3d"
           python -c "import meshloom, simcase, sys; assert meshloom.kernel_available(), meshloom.__file__; print(sys.version, meshloom.__file__, simcase.__file__)"
-          python -m pytest -q -ra -p no:cacheprovider test_geometry_engine3d.py --junitxml="$RUNNER_TEMP/g3d-out/geometry3d.xml"
+          python -m pytest -q -ra -p no:cacheprovider test_geometry_engine3d.py test_geometry_engine3d_extrude.py \
+            --junitxml="$RUNNER_TEMP/g3d-out/geometry3d.xml"
           python - "$RUNNER_TEMP/g3d-out/geometry3d.xml" <<'PY'
           import sys, xml.etree.ElementTree as ET
           suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
@@ -512,7 +516,9 @@ jobs:
           assert counts == {"skipped": 0, "failures": 0, "errors": 0}, counts
           g1 = [c for c in suite.iter("testcase") if c.get("name", "").startswith("test_g1_g2_g3_later_wins_boxes")]
           assert len(g1) == 200, len(g1)
-          print(suite.get("tests"), "tests,", len(g1), "G1 sets")
+          g1p = [c for c in suite.iter("testcase") if c.get("name", "").startswith("test_g1p_g2_g3_later_wins_prisms")]
+          assert len(g1p) == 200, len(g1p)
+          print(suite.get("tests"), "tests,", len(g1), "G1 sets,", len(g1p), "G1-P sets")
           PY
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()

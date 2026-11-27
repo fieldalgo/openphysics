@@ -44,7 +44,7 @@ result.save("out/")                               # summary.json, fields.npz, mo
 | 구성 요소 | 경로 | 외부 태그 |
 |---|---|---|
 | 판 층으로 된 `layers` 피처 하나 | `meshine.extrude`: 도메인 사각형을 요소 크기로 meshine이 메시하고, 그 두께 이하의 하위 층으로 층 높이를 따라 압출 | `z0`, `z1`, 발자국 옆면 `left`, `right`, `bottom`, `top` |
-| 슬라이스 1이 받는 [상자와 판 층](geometry_engine3d.md)의 그 밖의 조합 | meshloom을 거치는 `simcase.build_mesh3d`(**실험 단계**) | 도메인 면에 `x0`–`z1`, 그 밖에 `void`, 또는 `boundary_tags` |
+| meshloom 경로가 받는 [상자, 판 층, 압출](geometry_engine3d.md)의 그 밖의 조합 | meshloom을 거치는 `simcase.build_mesh3d`(**실험 단계**) | 도메인 면에 `x0`–`z1`, 그 밖에 `void`, 또는 `boundary_tags` |
 
 결과의 `route`(요약의 `mesh_route`)가 어느 경로였는지 알려 줍니다. 발자국 층이 있는 단독 `layers` 피처는 아직
 받지 않습니다. 압출 경로의 면은 태그만 가지므로 그 경로에서는 `selections`와 `boundary_tags`를 거부합니다.
@@ -109,6 +109,6 @@ Linux(2026-11-27)에서 `tests/simcase/test_thermal_steady3d.py`로 측정했습
 
 - 지정 온도와 체적 열원만 있는 정상 열전도입니다. 열유속, 대류, 과도, 결합은 아직 없습니다. Studio는 이 종류를
   열지 않습니다.
-- meshloom 경로는 meshloom 수용 전까지 실험 단계이며 상자와 판 층을 받습니다([3D 상자와 판 층](geometry_engine3d.md)).
+- meshloom 경로는 meshloom 수용 전까지 실험 단계이며 상자, 판 층, 사각형·사다리꼴·다각형 압출을 받습니다([3D 상자, 판 층, 압출](geometry_engine3d.md)).
   압출 경로는 판 층으로 된 단독 스택을 받습니다.
 - `simcase export`는 이 배치를 지원하지 않는 배치로 거부합니다.

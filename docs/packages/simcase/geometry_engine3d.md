@@ -1,4 +1,4 @@
-# 3D boxes and slab layers through meshloom (stage 5, experimental)
+# 3D boxes, slab layers and extrudes through meshloom (stage 5, experimental)
 
 **English** | [한국어](../../locales/ko/pages/packages/simcase/geometry_engine3d.md)
 
@@ -6,10 +6,11 @@
 
 **Status: experimental** until meshloom's own acceptance
 ([meshloom](../meshloom/overview.md)). `simcase.geometry_engine3d` is slice 1 of stage 5
-of the [geometry document contract](geometry_document.md): it builds the 3D region
-complex of the `box` features and slab layers of a `3d` component, under the contract's
+of the [geometry document contract](geometry_document.md), with slice 2: it builds the 3D
+region complex of the `box` features, slab layers and `extrude` features (rect, trapezoid
+and polygon profiles) of a `3d` component, under the contract's
 [stage 5 compile conditions](geometry_document.md#stage-5-compile-conditions-amended-2026-11-27),
-and meshes it with `meshloom.generate3d`. No physics runner reads it yet.
+and meshes it with `meshloom.generate3d`. [`thermal.steady3d`](thermal_steady3d.md) reads it.
 
 ## Use
 
@@ -46,7 +47,7 @@ grading (`near`, `far`, `refinement_distance`) and `z_divisions` are refused by 
 for a model from `simcase.geometry_document.parse`. It refuses a component holding one
 `layers` feature, which is meshed on the extrude route. For display (Studio),
 `simcase.display_complex3d(model, component=None)` returns the exact complex of any `3d`
-component slice 1 takes, that one included: the complex the meshloom route would build. It
+component the meshloom route takes, that one included: the complex the meshloom route would build. It
 meshes nothing and changes nothing `build_mesh3d` does or refuses. `model` is what
 `simcase.parse_geometry` returns; `component` may be left out when the model has exactly one
 `3d` component (2d footprints beside it are allowed). An unknown name, a `2d` or axisymmetric
@@ -55,10 +56,12 @@ component, and an omitted name with no or several `3d` components are refused by
 
 ## What it builds
 
-- **Prisms.** Every `box` and every slab layer (a layer with a `material` and no
-  `footprint`) is a vertical prism. A slab layer covers the domain's x–y extent between
-  its exact z levels; its cells are named by its `region`, otherwise by its material, as
-  on the extrude route.
+- **Prisms.** Every `box`, every slab layer (a layer with a `material` and no
+  `footprint`) and every `extrude` of a rect, trapezoid or polygon profile is a vertical
+  prism. A slab layer covers the domain's x–y extent between its exact z levels; its cells
+  are named by its `region`, otherwise by its material, as on the extrude route. An
+  extrude's profile goes to the 2D engine as the profile itself, so its derived points (a
+  trapezoid's corners, the intersections of sloped edges) stay exact rationals.
 - **Later wins.** The footprints of all prisms go once through the
   [stage 2 engine](geometry_engine.md) with every boundary kept, so each fine 2D cell
   carries the exact set of prisms whose footprint contains it. Cutting the component at
@@ -71,11 +74,18 @@ component, and an omitted name with no or several `3d` components are refused by
   fine curve differ. Faces between two void cells, or between a void cell and the outside,
   are not meshed and not listed. Faces with equal sides and provenance are merged, in the
   plane and across slabs; a horizontal face whose boundary meets itself at a vertex is
-  split into rectangles, so that every loop meshloom receives is simple.
+  split into rectangles (axis-aligned boundaries) or into its fine cells, a pinched fine
+  cell into triangles, so that every loop meshloom receives is simple. A sloped side is
+  one vertical quad per fine curve and run of slabs: it is split at every 2D vertex, and the
+  horizontal faces keep every vertex along a sloped edge, so no point ever has to be put
+  into a sloped edge after rounding.
 - **Provenance.** A face carries every part whose surface contains it, whether or not
   that feature owns a neighbouring cell: `<box>.x0` … `<box>.z1`, `domain.x0` …
   `domain.z1`, and for a slab layer `<id>.<layer>.bottom`, `<id>.<layer>.top` and
-  `<id>.<layer>.domain.x0` … `<id>.<layer>.domain.y1` on its sides: the contract's
+  `<id>.<layer>.domain.x0` … `<id>.<layer>.domain.y1` on its sides, and for an extrude
+  `<id>.bottom` and `<id>.top` on its caps and the profile's part names on its sides
+  (contract A4: a rect or trapezoid gives `left`, `right`, `y0` and `y1`; a polygon `e1` … `eN`
+  or its `edges` names): the contract's
   `<id>.<layer>.domain.<side>` with the 3D domain face names, because the 2D names would
   clash with the layer caps (`<id>.<layer>.bottom` and `.top`). `meshine.extrude` emits no
   provenance, so the two routes cannot name these differently. A vertical face
@@ -94,20 +104,26 @@ component, and an omitted name with no or several `3d` components are refused by
 
 - **Coordinates (rule H1).** Each pm value k becomes `float(Fraction(k, 10**12))` metres,
   rounded once, so the points of an axis-aligned plane share one double and the plane
-  stays exact. Two distinct values of one axis that round to one double are refused,
-  naming both.
+  stays exact; a derived rational point is rounded once too. The points of a sloped quad lie
+  on two vertical lines, so the quad stays planar in doubles. Two distinct values of one axis
+  that round to one double are refused, naming both; with extrudes, every 2D vertex counts,
+  derived ones included, named by the smallest part name through it.
 - **Facets.** Each face is one planar facet, outer loop first. Every point of the
-  complex that lies on a facet's edge is put into that edge, so two facets meet in whole
-  edges or points and never overlap partly along a line. Each facet has its own tag
+  complex that lies on an axis-aligned edge of a facet is put into that edge, so two facets
+  meet in whole edges or points and never overlap partly along a line; a sloped edge has no
+  point inside it by construction. Each facet has its own tag
   (`f<i>`), which the result maps back to its tag and provenance.
-- **Regions.** One exact interior point per bounded component, named by its region; an
+- **Regions.** One exact interior point per bounded component (with sloped curves: the
+  middle of the widest interval of a fine cell's mid-height line, checked inside after
+  rounding), named by its region; an
   enclosed void gets `None` and is not meshed. A void that reaches the domain boundary is
   outside the mesh.
 - **Sizes.** `h` is one size, or one per region.
 - **Mesh faces.** Exterior faces come from the facet tags. Interior faces come from
   meshloom's `interfaces` and are assigned to their facet by exact equality of the
   axis-aligned plane and, when a plane holds several facets, an exact test of the face's
-  centroid against each facet's polygon. `mesh.interfaces` is keyed by the sorted pair of
+  centroid against each facet's polygon; a face on a sloped facet goes to the quad whose
+  rounded base segment is nearest its centroid (within 1e-9 of the segment's length). `mesh.interfaces` is keyed by the sorted pair of
   region names, wound from the first to the second.
 - **Errors.** meshloom's errors (`InvalidPLC`, `RecoveryError`, `RoundingError`,
   `RegionError`, `RefineError`, `MeshError`) are re-reported as
@@ -122,8 +138,11 @@ The mesh carries meshloom's guarantees on the doubles galerkin receives: exact
 
 Code `E-3D-COMBINATION` at the feature's `features[i]`, with the contract's message stems:
 
-- `extrude`, `cylinder` and `sphere`: `<type> '<name>' is not taken yet in a 3d component;
-  boxes and slab layers are` (slice 3 takes cylinders and spheres);
+- `cylinder` and `sphere`: `<type> '<name>' is not taken yet in a 3d component; boxes, slab
+  layers and rect, trapezoid and polygon extrudes are` (slice 3 takes cylinders and spheres);
+- an `extrude` of a circle profile: `extrude '<name>' is not taken yet in a 3d component (an
+  extruded circle is a cylinder); boxes, slab layers and rect, trapezoid and polygon extrudes
+  are`;
 - footprint `layers` with other features: `layers '<name>' has footprint layers; with other
   features a 3d component takes slab layers only, until a later slice`;
 - two values that round to one double: `<a>.<part> and <b>.<part> round to the same
@@ -169,10 +188,14 @@ pushes and manual dispatch ([what CI runs](../../development.md#what-ci-runs)).
 ## Limits
 
 - Experimental: meshloom is not yet accepted, and the mesh's quality is meshloom's.
-- Boxes and slab layers only. Footprint layers alone take the extrude route; with other
-  features they are refused until a later slice. Cylinders and spheres come with slice 3.
+- Boxes, slab layers and extrudes of straight-edged profiles only. Footprint layers alone
+  take the extrude route; with other features they are refused until a later slice.
+  Cylinders, spheres and extruded circles come with slice 3.
+- A vertex of one profile on the sloped edge of another (a T-junction) is exact in the
+  complex but not in doubles: meshloom may refuse such a set with `RoundingError`, re-reported
+  with the provenance of the facets involved (fuzz F below).
 - One size per region; no graded sizes or sizes on surfaces yet.
 - Faces and cells are listed per fine 2D cell and slab; the complex is an in-memory
   diagnostic structure, not a persisted format.
-- Python: the complex is built in pure Python with exact integers. A component with many
-  boxes builds an arrangement that grows with the number of distinct planes.
+- Python: the complex is built in pure Python with exact rationals. A component with many
+  prisms builds an arrangement that grows with the number of distinct planes and edges.

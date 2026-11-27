@@ -399,14 +399,17 @@ def test_g5_e1_is_the_same_mesh_in_three_fresh_processes():
 BOX = {"name": "core", "type": "box", "xmin": 1, "xmax": 4, "ymin": 1, "ymax": 4, "zmin": 0, "zmax": 2,
        "material": "Cu"}
 REFUSALS = {
-    "extrude": ([BOX, {"name": "pad", "type": "extrude", "profile": {"type": "rect", "x": 0, "y": 0, "w": 1, "h": 1},
+    "extrude": ([BOX, {"name": "pad", "type": "extrude", "profile": {"type": "circle", "cx": 7, "cy": 7, "r": 1},
                        "zmin": 0, "zmax": 1, "material": "Cu"}], None, 1,
-                ["extrude 'pad' is not taken yet in a 3d component; boxes and slab layers are"]),
+                ["extrude 'pad' is not taken yet in a 3d component (an extruded circle is a cylinder); boxes, slab "
+                 "layers and rect, trapezoid and polygon extrudes are"]),
     "cylinder": ([BOX, {"name": "via", "type": "cylinder", "cx": 5, "cy": 5, "r": 1, "zmin": 0, "zmax": 1,
                         "material": "Cu"}], None, 1,
-                 ["cylinder 'via' is not taken yet in a 3d component; boxes and slab layers are"]),
+                 ["cylinder 'via' is not taken yet in a 3d component; boxes, slab layers and rect, trapezoid and "
+                  "polygon extrudes are"]),
     "sphere": ([BOX, {"name": "ball", "type": "sphere", "cx": 7, "cy": 7, "cz": 1, "r": 0.5, "material": "Cu"}], None,
-               1, ["sphere 'ball' is not taken yet in a 3d component; boxes and slab layers are"]),
+               1, ["sphere 'ball' is not taken yet in a 3d component; boxes, slab layers and rect, trapezoid and "
+                   "polygon extrudes are"]),
     "footprint layers": ([BOX, {"name": "stack", "type": "layers", "z0": 0, "layers": [
         {"name": "sub", "thickness": 1, "footprint": "plan"}]}], None, 1,
         ["layers 'stack' has footprint layers; with other features a 3d component takes slab layers only, "
