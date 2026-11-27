@@ -50,6 +50,7 @@ mesh and slab-mode checks that tell you whether to trust them.
 | Heat with material regions | Yes | `thermal.steady2d`, `thermal.transient2d` with shapes | Dedicated views, within region limits |
 | 3D static elasticity and prescribed-temperature thermoelasticity | [Tetrahedral solids](packages/galerkin/elasticity3d.md) and [thermal stress](packages/galerkin/thermoelasticity3d.md) | No | No |
 | 3D transient heat and quasistatic thermal stress | [Switched heater](packages/galerkin/transient_heater_3d.md) | No | No |
+| Voltage-driven 3D heater with temperature-dependent resistivity | [Coupled transient example](packages/galerkin/temperature_dependent_heater_3d.md) | No | No |
 | Linear elasticity | Yes | Homogeneous rectangle `mechanics.elasticity2d` | No |
 | Steady heat→thermal stress | Yes | Homogeneous rectangle `mechanics.thermoelastic2d` | No |
 | Prescribed-temperature and transient heat→mechanics | Yes | No | No |

@@ -2,6 +2,8 @@
 
 **English** | [한국어](../../locales/ko/pages/packages/galerkin/transient_heater_3d.md)
 
+For temperature-dependent resistance at fixed voltage, see the [feedback example](temperature_dependent_heater_3d.md).
+
 Run `python examples/galerkin/transient_heater_3d.py` from the repository root.
 The [example](../../../examples/galerkin/transient_heater_3d.py) uses a single
 static `Mesh3D` in metres. It solves both DC states, passes the corresponding

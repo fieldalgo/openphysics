@@ -2,6 +2,8 @@
 
 [English](../../../../../packages/galerkin/transient_heater_3d.md) | **한국어**
 
+정전압에서 온도에 따른 저항 변화는 [피드백 예제](temperature_dependent_heater_3d.md)에서 다룹니다.
+
 저장소 루트에서 `python examples/galerkin/transient_heater_3d.py`를 실행합니다.
 [예제](../../../../../../examples/galerkin/transient_heater_3d.py)는 좌표가 m 단위인
 정적 `Mesh3D` 하나를 사용합니다. 전원을 켠 상태와 끈 상태의 직류 전도를 각각 풀고,
