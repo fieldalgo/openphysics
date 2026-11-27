@@ -58,6 +58,15 @@ def _transient_heat_3d():
     return solve_transient_heat_3d, kwargs
 
 
+def _transient_joule_heat_3d():
+    from galerkin.transient_joule_heat3d import solve_transient_joule_heat_3d
+    _, kwargs = _transient_heat_3d()
+    kwargs.pop("heat_source_density")
+    kwargs.update(electrical_conductivity=2.0, prescribed_electric_potential={"x0": 0.0, "x1": 1.0},
+                  temperature_tolerance=1e-8)
+    return solve_transient_joule_heat_3d, kwargs
+
+
 def _step_error():
     from galerkin.transient_heat import TransientHeatStepError
     return TransientHeatStepError, dict(time_index=1, time=0.5)
@@ -353,6 +362,7 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
                 "galerkin.transient_heat3d:solve_transient_heat_3d": _transient_heat_3d,
+                "galerkin.transient_joule_heat3d:solve_transient_joule_heat_3d": _transient_joule_heat_3d,
                 "galerkin.transient_heat:TransientHeatStepError": _step_error,
                 # L2 commit 7 emptied electric, joule_heating and temperature_joule_heating
                 "galerkin.electric:solve_steady_electric": _steady_electric,
