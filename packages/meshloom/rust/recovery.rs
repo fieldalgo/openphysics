@@ -148,6 +148,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
     }
     let acute: Vec<bool> = (0..n).map(|v| is_acute(points, segments, &incident[v], v)).collect();
     let mut centres = vec![false; n];
+    let mut hub_radius = vec![0.0f64; n];
     for (k, s) in segments.iter().enumerate() {
         pieces[k][0].toward = match (acute[s[0] as usize], acute[s[1] as usize]) {
             (true, true) => BOTH,
@@ -161,6 +162,8 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
     // in the last round and those with a piece whose two ends are both next to a point
     // it inserted (an edge that an insertion removes has both ends on the new point's
     // cavity, so both become its neighbours); the other pieces are still edges
+    let profiling = std::env::var_os("MESHLOOM_PROFILE").is_some();
+    let round_clock = std::time::Instant::now();
     let mut look: std::collections::BTreeSet<usize> = (0..segments.len()).collect();
     // each piece's segment by its ends, for the pieces an insertion may have removed
     let mut seg_of_s: Vec<u32> = Vec::new();
@@ -186,6 +189,11 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
         }
         let mut next: std::collections::BTreeSet<usize> = missing.iter().map(|&(k, _)| k).collect();
         stats.rounds += 1;
+        if profiling {
+            let c = mesh.g.n;
+            eprintln!("meshloom profile: segment round {}: {} missing, {} points, mixed calls {} exact {} sos {}, {:.3} s",
+                      stats.rounds, missing.len(), mesh.g.s.len(), c.calls, c.exact, c.sos, round_clock.elapsed().as_secs_f64());
+        }
         if missing.is_empty() {
             break;
         }
@@ -194,11 +202,55 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
         // the points of one sphere, inserted in angular order, would each meet the long
         // tetrahedra around it: a cavity as large as the fan); a piece that an earlier
         // insertion of the round made an edge is left alone
-        let mut plans: Vec<(usize, f64, Rule)> = Vec::with_capacity(missing.len());
+        let mut plans: Vec<(usize, f64, Rule, bool)> = Vec::with_capacity(missing.len());
+        // a hub (an input vertex with more than HUB segments, a fan's centre) at which a
+        // piece is missing is protected first, Shewchuk-style: every segment at it gets a
+        // point at one distance rc from it (rc = min of 2/3 of the distance to its
+        // nearest neighbour, a third of each segment, half of each segment's first
+        // piece), so that the thin wedges between its segments get common shells
+        let mut hubs_now: Vec<u32> = Vec::new();
         for &(k, i) in &missing {
             let p = pieces[k][i];
+            for c in [p.u, p.v] {
+                if (c as usize) < n && incident[c as usize].len() > HUB && hub_radius[c as usize] == 0.0
+                    && !hubs_now.contains(&c) {
+                    hubs_now.push(c);
+                }
+            }
+        }
+        for &c in &hubs_now {
+            let xc = points[c as usize];
+            let nb = mesh.neighbours(c);
+            let m = mesh.g.view();
+            let mut rc = f64::INFINITY;
+            for w in nb {
+                rc = rc.min(2.0 * dist(&xc, &m.rounded(m.from_id(w))) / 3.0);
+            }
+            for &j in &incident[c as usize] {
+                let sj = segments[j as usize];
+                let len = dist(&points[sj[0] as usize], &points[sj[1] as usize]);
+                let ps = &pieces[j as usize];
+                let first = if sj[0] == c { ps[0].t1 } else { 1.0 - ps[ps.len() - 1].t0 };
+                rc = rc.min(len / 3.0).min(first * len / 2.0);
+            }
+            hub_radius[c as usize] = rc;
+            for &j in &incident[c as usize] {
+                let sj = segments[j as usize];
+                let (a, b) = (&points[sj[0] as usize], &points[sj[1] as usize]);
+                let tr = rc / dist(a, b);
+                let w = tr * 2f64.powi(-30);
+                let exact = |t: f64| exact_point(a, b, t);
+                let t = if sj[0] == c { pick_t(tr - w, tr, exact) } else { pick_t(1.0 - tr, 1.0 - tr + w, exact) };
+                plans.push((j as usize, t, Rule::Centre(c), true));
+            }
+        }
+        for &(k, i) in &missing {
+            let p = pieces[k][i];
+            if hubs_now.contains(&p.u) || hubs_now.contains(&p.v) {
+                continue; // after the hub's protection, next round
+            }
             let s = segments[k];
-            let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)]);
+            let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)], &hub_radius);
             if !(t > p.t0 && t < p.t1) {
                 return Err(Error::Internal(format!(
                     "segment {}: a piece is too short to split (do segments cross?)", p.seg)));
@@ -208,18 +260,18 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                 return Err(Error::Internal(format!(
                     "segment {} needs more than {max_depth} halvings near t = {}", p.seg, p.t0)));
             }
-            plans.push((k, t, rule));
+            plans.push((k, t, rule, false));
         }
-        let at: Vec<P3> = plans.iter().map(|&(k, t, _)| {
+        let at: Vec<P3> = plans.iter().map(|&(k, t, _, _)| {
             let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
             std::array::from_fn(|c| a[c] + t * (b[c] - a[c]))
         }).collect();
         for o in delaunay::brio_order(&at) {
-            let (k, t, rule) = plans[o as usize];
+            let (k, t, rule, force) = plans[o as usize];
             // the piece of segment k that holds t (pieces are in order of t)
             let i = pieces[k].partition_point(|q| q.t1 <= t);
             let p = pieces[k][i];
-            if edge(&mut mesh, p.u, p.v) {
+            if !force && edge(&mut mesh, p.u, p.v) {
                 continue;
             }
             let s = segments[k];
@@ -403,7 +455,7 @@ enum Rule {
 /// target, preferring an exact double point (so points of one centre lie on a common
 /// sphere up to that).
 fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool],
-                   degree: [usize; 2]) -> (f64, Rule) {
+                   degree: [usize; 2], hub_radius: &[f64]) -> (f64, Rule) {
     let _ = acute;
     let mid = (p.t0 + (p.t1 - p.t0) / 2.0, Rule::Midpoint);
     if p.toward == BOTH {
@@ -482,20 +534,31 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
             let at = |t: f64| -> P3 { std::array::from_fn(|k| pa[k] + t * (pb[k] - pa[k])) };
             let xv0 = at(v0);
             let xfar = at(far);
+            // about a protected hub (radius rc), radii are rounded down to rc 2^-k, so
+            // the points of all its segments lie on common spheres (shells that differ by
+            // a rounding encroach each other's pieces without end in a thin fan); rounded
+            // down, the reference point stays farther from c
+            let rc = hub_radius[c as usize];
+            let shell = |d: f64| if rc > 0.0 && d > 0.0 { rc * 2f64.powi((d / rc).log2().floor() as i32) } else { d };
             if dist(&xv0, &xfar) >= dist(&xv0, &xp) {
-                (v0, Rule::Centre(c)) // rule 2
+                (to_t(shell(r)), Rule::Centre(c)) // rule 2
             } else {
                 let (se, s0) = (sd(near), sd(v0));
                 let pv0 = dist(&xp, &xv0);
                 let r3 = if pv0 < (s0 - se) / 2.0 { s0 - pv0 } else { se + (s0 - se) / 2.0 };
-                (to_t(r3), Rule::Centre(c))
+                (to_t(shell(r3)), Rule::Centre(c))
             }
         }
     };
     if !(target >= lo && target <= hi) {
         return mid;
     }
-    let w = span * 2f64.powi(-24);
+    // the parameter: within 2^-24 of the piece; about an acute end, within 2^-30 of the
+    // distance from it, so that points of one shell lie at one distance up to that
+    let w = match rule {
+        Rule::Centre(c) => (if c == s[0] { target } else { 1.0 - target }) * 2f64.powi(-30),
+        _ => span * 2f64.powi(-24),
+    };
     let exact = |t: f64| exact_point(pa, pb, t);
     (pick_t((target - w).max(lo), (target + w).min(hi), exact), rule)
 }
