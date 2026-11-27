@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- Tests: **electromagnetic cavities from a geometry document, end to end** (stage 5, slice 4a). In `tests/simcase/test_geometry_cavity3d.py`, two `3d` documents go through `simcase.build_mesh3d` (meshloom) to `galerkin.solve_cavity` and `galerkin.solve_material_cavity`: E4 is the empty [0, 1]³ m cavity and E5 adds an ε_r = 4 `box` slab over z ∈ [0, 0.5] m, with PEC on every face. They are compared with `refsol.cavity.rectangular_cavity_modes` and `refsol.material_cavity.slab_loaded_cavity_modes`. P4 measures the first cluster's k² error at h = 0.24, 0.12, 0.06 m: 1.5e-2, 1.9e-3, 3.8e-4, order 2.63. P5 measures the first four modes: 1.1e-2, 2.8e-3, 9.0e-4, order 1.77. Both are monotone, there are no spurious modes, and the pre-registered thresholds (order ≥ 1.5, finest < 1e-2 and < 2e-2) hold. The studies run in the main-tier CI job `geometry3d-full`, and pull requests run a smoke test at h = 0.24 m. No format, solver or route changes. [3D boxes and slab layers](docs/packages/simcase/geometry_engine3d.md#validation).
+
+## 한국어
+
+- 테스트: **형상 문서에서 시작하는 전자기 공동을 처음부터 끝까지 검증합니다**(5단계 슬라이스 4a). `tests/simcase/test_geometry_cavity3d.py`에서 `3d` 문서 두 개를 `simcase.build_mesh3d`(meshloom)로 메시하고 `galerkin.solve_cavity`와 `galerkin.solve_material_cavity`로 풉니다. E4는 비어 있는 [0, 1]³ m 공동이고, E5는 여기에 z ∈ [0, 0.5] m를 덮는 ε_r = 4 `box` 판을 더한 것입니다. 모든 면은 PEC입니다. 두 사례를 `refsol.cavity.rectangular_cavity_modes`와 `refsol.material_cavity.slab_loaded_cavity_modes`에 비교합니다. P4는 h = 0.24, 0.12, 0.06 m에서 첫 묶음의 k² 오차를 잽니다. 결과는 1.5e-2, 1.9e-3, 3.8e-4이고 차수는 2.63입니다. P5는 첫 네 모드를 잽니다. 결과는 1.1e-2, 2.8e-3, 9.0e-4이고 차수는 1.77입니다. 둘 다 단조 감소하고 허위 모드가 없으며, 사전 등록 기준(차수 ≥ 1.5, 가장 촘촘한 메시 < 1e-2, < 2e-2)을 지킵니다. 이 연구는 main 단계 CI job `geometry3d-full`에서 돌고, 풀 리퀘스트는 h = 0.24 m smoke 시험을 돌립니다. 형식, solver, 경로는 바뀌지 않습니다. [3D 상자와 판 층](packages/simcase/geometry_engine3d.md#검증).

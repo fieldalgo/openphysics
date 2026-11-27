@@ -137,7 +137,8 @@ A component that holds only one `layers` feature keeps the `meshine.extrude` rou
 
 ## Validation
 
-Pre-registered checks, run by `tests/simcase/test_geometry_engine3d.py`:
+Pre-registered checks, run by `tests/simcase/test_geometry_engine3d.py` (G1–G6, P1) and
+`tests/simcase/test_geometry_cavity3d.py` (P4, P5):
 
 | ID | Case | Metric | Threshold | Measured (Linux, 2026-11-27) |
 |---|---|---|---|---|
@@ -148,6 +149,8 @@ Pre-registered checks, run by `tests/simcase/test_geometry_engine3d.py`:
 | G5 | E1, h = 0.8 mm, 3 fresh processes | SHA-256 | identical | identical |
 | G6 | one document per refusal above | code, path, names in the message | 100% | 100% |
 | P1 | E1 through meshloom and through `meshine.extrude`, against `refsol.thermal3d.layered_slab` (exact for P1) | max nodal \|T_h − T\|; relative error of the top heat rate | ≤ 1e-10; ≤ 1e-9 | below |
+| P4 | E4 at h = 0.24, 0.12, 0.06 m through `galerkin.solve_cavity`, against `refsol.cavity.rectangular_cavity_modes` | relative k² error of the first cluster (the three modes at k² = 2π²), the maximum over the three | decreases with h; observed order ≥ 1.5; finest < 1e-2 | 1.5e-2, 1.9e-3, 3.8e-4; order 2.63; finest 3.8e-4 |
+| P5 | E5 at h = 0.24, 0.12, 0.06 m through `galerkin.solve_material_cavity`, against `refsol.material_cavity.slab_loaded_cavity_modes` | relative k² error of the first four modes, ascending computed matched to ascending reference roots, the maximum over the four | decreases with h; observed order ≥ 1.5; finest < 2e-2 | 1.1e-2, 2.8e-3, 9.0e-4; order 1.77; finest 9.0e-4 |
 
 E1 is three slab layers of thickness 1, 0.5 and 1 mm (z levels 0, 1, 1.5, 2.5 mm) with
 k = 1, 0.01 and 1 W/(m K) over a 10 × 10 mm domain; T = 0 on `z0`, T = 1 on `z1`, sides
@@ -162,9 +165,33 @@ P1, measured:
 | `meshine.extrude` | 0.8 | 7,680 | 4.8e-15 | 8.8e-14 |
 | `meshine.extrude` | 0.4 | 49,152 | 9.4e-15 | 5.0e-15 |
 
+E4 and E5 are cavities written as geometry documents and meshed by `build_mesh3d`; the tests
+call galerkin's public cavity solvers on the `Mesh3D` with every face PEC. E4 is one `3d`
+component with the domain [0, 1]³ m, a vacuum background and no features. E5 adds a `box`
+over z ∈ [0, 0.5] m with the full x and y extent, which is the region `slab` (ε_r = 4); the rest
+is the region `background` (vacuum). The observed order is the least-squares slope of log e
+against log h over the three sizes. The pairwise orders, the spurious-mode count (computed modes
+more than 10% from every reference root) and the times are reported and not gated. The
+reference roots of E5 are k²/π² = 0.6907, 0.6979, 0.6979, 1.0021, then 1.4625 twice.
+
+P4 and P5, measured (one core; mesh and solve seconds):
+
+| Case | h (m) | Nodes | Tetrahedra | Error | Spurious | Mesh (s) | Solve (s) |
+|---|---|---|---|---|---|---|---|
+| E4 | 0.24 | 243 | 682 | 1.5e-2 | 0 | 0.2 | 0.1 |
+| E4 | 0.12 | 1,072 | 3,897 | 1.9e-3 | 0 | 0.8 | 0.4 |
+| E4 | 0.06 | 5,867 | 26,122 | 3.8e-4 | 0 | 4.5 | 13 |
+| E5 | 0.24 | 270 | 753 | 1.1e-2 | 0 | 0.2 | 0.1 |
+| E5 | 0.12 | 1,145 | 4,197 | 2.8e-3 | 0 | 0.8 | 1.0 |
+| E5 | 0.06 | 6,189 | 27,775 | 9.0e-4 | 0 | 4.8 | 203 |
+
+The pairwise orders are 2.99 and 2.27 for P4, and 1.94 and 1.61 for P5.
+
 Pull requests run G1 on 25 fixed seeds of the 200 (every eighth) in the source test parts;
 `OPENPHYSICS_GEOMETRY3D_FULL=1` runs all 200, as the CI job `geometry3d-full` does on main
-pushes and manual dispatch ([what CI runs](../../development.md#what-ci-runs)).
+pushes and manual dispatch ([what CI runs](../../development.md#what-ci-runs)). P4 and P5 run
+in that job only. Pull requests run a smoke test of E4 and E5 at h = 0.24 m, which checks only
+that each case meshes and solves.
 
 ## Limits
 

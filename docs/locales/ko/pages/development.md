@@ -200,7 +200,7 @@ requirements 파일 이름은 예전 이름이며 Windows 전용이라는 뜻이
 | `blas-kernels` | Ubuntu 24.04, job 두 개 | 수치에 민감한 추적·고유공간·재료 공진기(복소 조밀·희소 고유값 풀이)·광섬유 기준·길이 단위 독립성 시험을 OpenBLAS 커널 두 개로 강제해 실행 |
 | `installed-platforms` | Ubuntu 24.04, macOS 15, Windows 2022 | 패키지 여덟 개를 sdist에서 wheel로 빌드해 checkout 밖 새 환경에서 시험 |
 | `meshloom-v26-wheel`, `meshloom-v26`, `meshloom-v26-compare` | Ubuntu 24.04, job 네 개; main push와 수동 dispatch에서만 | meshloom V26 전체: C3를 포함한 C1–C9를 h = 0.1로, abi3 wheel 하나를 Python 3.12와 3.15에서 돌리고 두 Python의 다이제스트를 비교 |
-| `geometry3d-full` | Ubuntu 24.04; main push와 수동 dispatch에서만 | 5단계 형상 검사 G1 전체: `OPENPHYSICS_GEOMETRY3D_FULL=1`로 `tests/simcase/test_geometry_engine3d.py`를 실행(시드 고정 상자 집합 200개 모두, pull request에서는 소스 부분이 25개 실행), `meshloom-v26-wheel`의 abi3 wheel로([3D 상자와 판 층](packages/simcase/geometry_engine3d.md#검증)) |
+| `geometry3d-full` | Ubuntu 24.04; main push와 수동 dispatch에서만 | 5단계 형상 검사 G1 전체: `OPENPHYSICS_GEOMETRY3D_FULL=1`로 `tests/simcase/test_geometry_engine3d.py`를 실행(시드 고정 상자 집합 200개 모두, pull request에서는 소스 부분이 25개 실행), `tests/simcase/test_geometry_cavity3d.py`의 공동 연구 P4와 P5도 실행(pull request에서는 건너뜀), `meshloom-v26-wheel`의 abi3 wheel로([3D 상자와 판 층](packages/simcase/geometry_engine3d.md#검증)) |
 
 필수 검사는 **`tests`** 하나입니다. 다섯 부분이(나뉜 부분의 job 열여섯 개씩 모두 포함) 모두 성공해야 통과하며, 하나라도
 실패·취소·건너뜀이면 실패합니다. main push와 수동 dispatch에서는 meshloom V26 job 세 개와 `geometry3d-full`도 성공해야 합니다. pull request에서는
