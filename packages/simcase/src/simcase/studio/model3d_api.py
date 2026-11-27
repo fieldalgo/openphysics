@@ -18,16 +18,18 @@ the engine's own words (``E-3D-COMBINATION`` names the feature).
 from __future__ import annotations
 
 import base64
+import re
 from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from simcase import GeometryError, display_complex3d, parse_geometry
 from .bodies import RequestRefused, diagnostics, exact_json, read_envelope
+from . import mesh3d_jobs
 
 STATIC = Path(__file__).parent / "static"
 PM = 10 ** 12
@@ -37,6 +39,7 @@ NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 # The view's own files; a request only selects one of these fixed paths by name.
 ASSETS = {name: (STATIC / name, mime) for name, mime in (
     ("model3d-view.mjs", "text/javascript"), ("model3d-model.mjs", "text/javascript"),
+    ("model3d-mesh-view.mjs", "text/javascript"), ("model3d-mesh-model.mjs", "text/javascript"),
     ("model3d-via-stack.json", "application/json"))}
 
 
@@ -327,6 +330,83 @@ async def model3d_section(request: Request):
     if found:
         return exact_json(_found(found))
     return exact_json(await run_in_threadpool(_reply, section_view, tree["doc"], tree.get("component"), axis, at))
+
+
+# ----------------------------------------------------------------------------- the mesh job
+# /api/model3d/mesh/estimate answers I-MESH-ESTIMATE; /api/model3d/mesh starts a job in a child
+# process (mesh3d_jobs); /api/model3d/jobs/{job} answers its status, /cancel ends it and /result
+# answers the mesh's surface. A job id is server-made and only a key of the jobs table.
+
+jobs = mesh3d_jobs.Mesh3DJobs()
+_JOB_ID = re.compile(r"m3d-[0-9a-f]{12}")
+
+
+def _job_refusal(exc: mesh3d_jobs.Refused):
+    return JSONResponse({"detail": exc.message, **exc.extra}, status_code=exc.status, headers=NO_STORE)
+
+
+def _estimate_reply(doc, component) -> dict:
+    try:
+        return {"ok": True, "estimate": mesh3d_jobs.estimate(doc, component), "key": mesh3d_jobs.reuse_key(doc)}
+    except GeometryError as exc:
+        return {"ok": False, "refused": str(exc), "code": getattr(exc, "code", None)}
+
+
+@router.post("/api/model3d/mesh/estimate")
+async def model3d_mesh_estimate(request: Request):
+    try:
+        tree, found = await _read(request)
+    except RequestRefused as exc:
+        return exc.reply()
+    if found:
+        return exact_json(_found(found))
+    return exact_json(await run_in_threadpool(_estimate_reply, tree["doc"], tree.get("component")))
+
+
+@router.post("/api/model3d/mesh")
+async def model3d_mesh(request: Request):
+    try:
+        tree, found = await _read(request)
+    except RequestRefused as exc:
+        return exc.reply()
+    if found:
+        return JSONResponse({"detail": _found(found)["refused"]}, status_code=400, headers=NO_STORE)
+    try:
+        reply = await run_in_threadpool(jobs.start, tree["doc"], tree.get("component"))
+    except mesh3d_jobs.Refused as exc:
+        return _job_refusal(exc)
+    return JSONResponse(reply, headers=NO_STORE)
+
+
+def _job(job_id: str) -> str:
+    if not _JOB_ID.fullmatch(job_id):
+        raise mesh3d_jobs.Refused(404, "no such 3D mesh job")
+    return job_id
+
+
+@router.get("/api/model3d/jobs/{job_id}")
+def model3d_job(job_id: str):
+    try:
+        return JSONResponse(jobs.status(_job(job_id)), headers=NO_STORE)
+    except mesh3d_jobs.Refused as exc:
+        return _job_refusal(exc)
+
+
+@router.post("/api/model3d/jobs/{job_id}/cancel")
+def model3d_job_cancel(job_id: str):
+    """Cancel meshing: the child process is terminated and nothing is kept."""
+    try:
+        return JSONResponse(jobs.cancel_job(_job(job_id)), headers=NO_STORE)
+    except mesh3d_jobs.Refused as exc:
+        return _job_refusal(exc)
+
+
+@router.get("/api/model3d/jobs/{job_id}/result")
+def model3d_job_result(job_id: str):
+    try:
+        return JSONResponse(jobs.result(_job(job_id)), headers=NO_STORE)
+    except mesh3d_jobs.Refused as exc:
+        return _job_refusal(exc)
 
 
 @router.get("/model3d-assets/{filename}")

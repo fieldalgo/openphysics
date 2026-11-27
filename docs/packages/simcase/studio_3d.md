@@ -8,8 +8,9 @@ Status: **experimental.** The 3D view shows a `3d` component of a version 1
 geometry document ([contract](geometry_document.md)) on the
 [geometry lab](geometry_lab.md) page at `/geometry-lab`. It is read-only and takes
 what the stage 5 engine takes: boxes and the slab layers of `layers` features
-(`simcase.geometry_engine3d`). The model workspace does not show it yet. Its page,
-its controls and its HTTP answers may change in any release.
+(`simcase.geometry_engine3d`), and it can mesh them ([Mesh](#mesh)). The model
+workspace does not show it yet. Its page, its controls and its HTTP answers may change
+in any release.
 
 ## Use
 
@@ -51,7 +52,46 @@ feature `stack`) and a copper box `via` with x and y in [4, 6] through the oxide
   yet is named (`E-3D-COMBINATION`, for example `cylinder 'pin' is not taken yet in
   a 3d component; boxes and slab layers are`).
 
-Mesh edges are not drawn: the view shows the exact geometry, not the mesh.
+The 3D view draws no mesh edges: it shows the exact geometry. The mesh is drawn
+in its own view under **Mesh**.
+
+## Mesh
+
+**Mesh** makes the tetrahedral mesh of the shown `3d` component with
+`simcase.build_mesh3d` (meshloom), in a child process of the server, and shows the
+mesh's surface. It runs no physics and changes no file.
+
+- **Estimate first.** Whenever the 3D view shows a component, the page asks for the
+  `I-MESH-ESTIMATE` estimate (`simcase.estimate_mesh3d`, which meshes nothing) and shows
+  it as, for example, "Estimate 48,000 tetrahedra · about 30 s": T = 6.3 Σ V_r / h_r³,
+  rounded to two significant figures, and the expected time at 0.6 ms per tetrahedron
+  (the slow end of the engine's 0.4–0.6 ms). Above `mesh.element_count_limit`, **Mesh** is
+  disabled and the page shows the refusal in the estimate's words (`E-MESH-ESTIMATE`); the
+  server refuses such a request before it starts any process.
+- **Progress.** While the job runs, the page shows the steps Studio knows,
+  "Forming geometry → Meshing (expected about N s) → Checking the mesh → Ready", and the
+  elapsed time as m:ss. Once the elapsed time passes twice the estimate it adds "taking
+  longer than the estimate". There is no percentage: meshloom reports none.
+- **Cancel meshing** terminates the child process; the page says "Meshing cancelled;
+  nothing kept." Cancel is the one name for this action ("Stop run" stays the name for
+  runs). meshloom cannot be interrupted and, on some thin inputs, does not return at all
+  (for example two boxes with a background strip 6e-8 of the domain diagonal wide between
+  them); the child process is what makes such a job end.
+- **One job at a time.** A server meshes one 3D model at a time; a second request is
+  answered 429 "Studio is already meshing one 3D model; wait for it or cancel it."
+- **Reuse.** The server keeps the latest mesh of each component (up to four components),
+  keyed by the SHA-256 of the canonical `geometry` and `mesh` blocks (keys sorted, no
+  spaces, numbers as written), for the life of the server process. **Mesh** on an
+  unchanged block answers the kept mesh at once; a later Run reuses it when the key
+  matches. When the document changes, the mesh view is dimmed until the next mesh.
+- **The mesh view** draws the mesh's exterior and interface triangles coloured by
+  region, with mesh edges, beside the 3D view's controls: the same keys, camera, hidden
+  regions and section. A pick on it selects the same face, by the same face id, and the
+  **Names** panel lists the same names (the mesh's `provenance_faces`). Its stats are
+  nodes, tetrahedra, regions and the minimum and median shape quality q = 3 r_in/R_circ
+  (1 for the regular tetrahedron), the measure meshloom's validation grades
+  ([meshloom](../meshloom/overview.md)); meshloom's own `stats` carry no per-tetrahedron
+  quality, so Studio computes q from the mesh.
 
 ## What it sends and answers
 
@@ -80,6 +120,34 @@ Mesh edges are not drawn: the view shows the exact geometry, not the mesh.
   float32, two end points each, same frame; `segment_faces`), the faces cut and
   the regions met. A plane outside the domain is refused by name.
 - The answer is deterministic (W15): nothing unordered reaches it.
+
+The mesh job:
+
+- `POST /api/model3d/mesh/estimate` takes the display envelope and answers
+  `{"ok": true, "estimate": {"code": "I-MESH-ESTIMATE", "message", "component",
+  "tetrahedra", "limit", "seconds"}, "key"}` or `{"ok": false, "refused", "code"}`.
+- `POST /api/model3d/mesh` takes the same envelope. It answers the estimate's refusal
+  with 400, a running job with 429, and otherwise `{"job", "status", "reused",
+  "estimate", "key"}`: `status` is `"done"` with `reused: true` when the kept mesh's key
+  matches, else `"running"`.
+- `GET /api/model3d/jobs/{job}` answers `status` (`running`, `done`, `error` or
+  `cancelled`), `step` (`forming`, `meshing`, `checking`, `ready`), `elapsed_s`,
+  `expected_s`, `longer_than_estimate`, `error` and `has_result`.
+  `POST /api/model3d/jobs/{job}/cancel` terminates the child (terminate, then kill after
+  1 s) and removes its directory. `GET /api/model3d/jobs/{job}/result` answers the mesh
+  (409 until the job is done). Job ids are made by the server (`m3d-` and 12 hex digits);
+  any other id is 404.
+- The child is started with `multiprocessing`'s `spawn` context on every platform. It
+  writes the mesh as NumPy arrays under fixed names into a temporary directory the
+  server made (`tempfile.mkdtemp`); the server reads them back and removes the directory
+  before it reports the job done, after a cancel or a failure, and when the server exits.
+  No path comes from a request.
+- The mesh answer has the display answer's frame, `faces` (with the mesh's triangle
+  range per face), `regions`, `selections` and `tags`, and in place of the display
+  triangles the mesh's surface only: `positions` (float32), `indices`, `triangle_faces`
+  (the complex face id), `triangle_regions` (int32 index into `region_names`: the plus
+  side's region, else the minus side's), `edge_indices` (uint32 pairs) with `edge_faces`,
+  and `stats`. The tetrahedra stay on the server.
 
 The page loads three.js 0.186.1 from Studio itself
 ([browser-served files](../../third-party.md#browser-served-files)) and the view's
@@ -111,9 +179,32 @@ Pre-registered (fixed before measuring; never loosened):
 | W1 | every display triangle carries an exact surface's provenance, on E1, the card and 50 seeded G1 sets: (a) face id missing or name set different from the face's; (b) vertex off the face's plane or outside its polygon, or centroid not inside (exact, on pm values before float32) | (a) 0; (b) 0 | 0; 0 (52 documents, 1458 faces, 3066 triangles) | `tests/simcase/test_studio_model3d.py` |
 | W2 | per face, area of its float32 triangles against the exact face area | ≤ 1e-6 relative | 9.5e-8 worst (G1 seed 0, face 7) | same |
 | W3 | picking at 40 fixed points, 1440 × 900 window, isometric camera, card: face id and first name, against an independent ray cast on the exact complex written before the view (`tests/simcase/model3d_pick_oracle.py`, `studio_model3d_pick_points.json`; 26 raster points within 3 px of an edge excluded) | 40/40 | 40/40 | `tools/studio_browser/model3d_view_browser.mjs` |
-| W12 | first view at 1440 × 900 and 390 × 844: no console error, no CSP violation, canvas visible and not empty, no horizontal scroll at 390, faces list reachable by Tab; screenshots kept | all hold | all hold (faces list after 17 Tabs) | same |
+| W12 | first view at 1440 × 900 and 390 × 844: no console error, no CSP violation, canvas visible and not empty, no horizontal scroll at 390, faces list reachable by Tab; screenshots kept | all hold | all hold (faces list after 17 Tabs; 18 since the **Mesh** button, rerun 2026-11-27) | same |
 | W13 | keyboard only: rotate, an axis view, select `via.z1` from the faces list, with no pointer event | complete | complete, 0 pointer events | same |
 | W15 | SHA-256 of the display answer over 3 fresh server processes | identical | identical | `tests/simcase/test_studio_model3d.py` |
+| W8 | Cancel: a mesh job estimated ≥ 60 s (the card at 0.28 µm: about 69 s), cancelled 3 s after it starts, on a real server process | the child process has exited 2 s after Cancel; no result is kept; server RSS within 50 MB of before | all hold | all hold, 3 of 3 runs (RSS +0.2 MB; no file left) | `tests/simcase/test_studio_mesh3d_job.py`, CI job `studio-mesh3d-w8` (main pushes and manual dispatch) |
+| W9 | Estimate: the card at 0.5×, 0.99× and 1.5× the limit | `I-MESH-ESTIMATE` answered before meshing; the 1.5× document refused before a process starts | 3/3 | 3/3 | `tests/simcase/test_studio_mesh3d_job.py` |
+| W12 (mesh view) | first mesh view of the card at 1440 × 900 and 390 × 844: no console error, no CSP violation, mesh canvas visible and not empty, no horizontal scroll at 390, faces list reachable by Tab; screenshots kept | all hold | all hold (faces list after 5 Tabs) | `tools/studio_browser/model3d_mesh_browser.mjs` |
+| W14 | performance at the card at about 48,000 tetrahedra and at 150,000 surface triangles: mesh answer time, mesh view frame time (median of 120 frames), tab JS heap | recorded; gate in Chromium with hardware GL: heap ≤ 300 MB, median frame ≤ 33 ms | recorded below; gate **not run** (software GL only) | same |
+
+W14, recorded on 2026-11-27 in headless Chromium 158 on Linux (Xeon at 2.1 GHz, 4 CPUs, no GPU: the
+renderer was ANGLE on SwiftShader, so the hardware-GL gate was not run and is not
+claimed). The 150,000-triangle case is a mesh answer made by the script from the card's
+display triangles (each split into four until the count is reached) and served to the
+page in place of the server's, so that it measures the view at that size:
+
+| Case | Mesh answer | Click to mesh drawn | Median frame (120) | JS heap + array stores |
+|---|---|---|---|---|
+| card, 0.375 µm: 47,047 tetrahedra, 12,411 surface triangles | 10 ms, 0.73 MB | 11.5 s (meshing included) | 53 ms | 10.1 MB |
+| 150,002 surface triangles | 197 ms, 8.9 MB | 1.0 s | 392 ms | 41.1 MB |
+
+The job's own tests also check the 429 answer, that a cancelled job keeps nothing (no
+mesh, no directory, a 409 result), that the reuse key changes with the geometry or mesh
+block and not with other blocks or key order, that a job in meshloom's non-return (the
+thin-strip document) is still meshing long past twice its estimate and ends within 2 s of
+Cancel, that a server that exits mid-job leaves no child and no directory, and the mesh
+answer (every face meshed on its own plane, faces and names as the display answer's). The
+platform-install workflow runs these tests on Linux, macOS and Windows.
 
 Also tested: section outlines lie on their plane and have the exact cut length of
 each face (four planes of the card, one along an edge of the via's hole);
@@ -127,12 +218,18 @@ CI); run them against a running Studio:
 ```sh
 python -m simcase.studio --no-browser --port 8765 &
 node tools/studio_browser/model3d_view_browser.mjs http://127.0.0.1:8765 out-dir
+node tools/studio_browser/model3d_mesh_browser.mjs http://127.0.0.1:8765 out-dir-mesh
 ```
 
 ## Limits
 
 - Boxes and slab layers only, as stage 5 slice 1; read-only (no feature editing in
-  3D); no mesh view yet.
+  3D).
+- The mesh is meshloom's (experimental) and its quality is meshloom's. The estimate is
+  the engine's T; the actual count differs (the card: 20,160 estimated, 23,652 made).
+  The steps are the ones Studio knows; inside meshloom there is no progress to show.
+- The kept meshes live in the server's memory and end with it; the model workspace does
+  not show the mesh yet.
 - A component holding one `layers` feature (E1) is meshed through
   `meshine.extrude`, and `evaluate3d` refuses it; the view takes its complex from
   the public `simcase.display_complex3d`, which builds for it the complex the
@@ -140,5 +237,6 @@ node tools/studio_browser/model3d_view_browser.mjs http://127.0.0.1:8765 out-dir
 - Each request evaluates the whole component on the server; the CPU pick visits
   every shown triangle (fine for the few hundred of these documents).
 - A section removes one side and draws the outline; cut regions are not capped.
-- The canvas is 720 × 504 CSS px from a 1300 px wide window, otherwise the column
-  width at 10:7. The checks ran in headless Chromium on Linux only.
+- The canvases are 720 × 504 CSS px from a 1300 px wide window, otherwise the column
+  width at 10:7. The browser checks ran in headless Chromium on Linux only, with software
+  GL; the mesh view's frame time with hardware GL is not measured here.
