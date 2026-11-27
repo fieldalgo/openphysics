@@ -111,6 +111,21 @@ def _source(mesh, heat_source):
     return _per_region(mesh, heat_source, "heat_source_density", positive=False)
 
 
+def _prescribed_nodes(mesh, exterior_faces, dirichlet):
+    if not isinstance(dirichlet, Mapping):
+        raise ValueError("prescribed_temperature must map exterior node indices to temperatures in K")
+    boundary = set(np.unique(exterior_faces).tolist())
+    prescribed = {}
+    for node, value in dirichlet.items():
+        if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)):
+            raise ValueError("Dirichlet node indices must be integers")
+        if not 0 <= node < mesh.num_nodes or int(node) not in boundary:
+            raise ValueError(f"Dirichlet node {node} must lie on the exterior mesh boundary")
+        _refuse_live(value, "Dirichlet temperature")
+        prescribed[int(node)] = finite_scalar(value, "Dirichlet temperature")
+    return prescribed
+
+
 def _natural_faces(mesh, exterior_faces, prescribed, inward_heat_flux, convection):
     """Yield validated triangles, areas and constant data for each natural tag."""
     for name, data in (("inward_heat_flux", inward_heat_flux), ("convection", convection)):
@@ -226,19 +241,8 @@ def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_tempe
                                            heat_source_density=heat_source_density)
     k = _per_region(mesh, thermal_conductivity, "thermal_conductivity", positive=True)
     source = _source(mesh, 0.0 if heat_source_density is None else heat_source_density)
-    dirichlet = prescribed_temperature
-    if not isinstance(dirichlet, Mapping):
-        raise ValueError("prescribed_temperature must map exterior node indices to temperatures in K")
     exterior_faces = mesh.boundary_faces()
-    boundary = set(np.unique(exterior_faces).tolist())
-    prescribed = {}
-    for node, value in dirichlet.items():
-        if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)):
-            raise ValueError("Dirichlet node indices must be integers")
-        if not 0 <= node < mesh.num_nodes or int(node) not in boundary:
-            raise ValueError(f"Dirichlet node {node} must lie on the exterior mesh boundary")
-        _refuse_live(value, "Dirichlet temperature")
-        prescribed[int(node)] = finite_scalar(value, "Dirichlet temperature")
+    prescribed = _prescribed_nodes(mesh, exterior_faces, prescribed_temperature)
     fixed = np.array(sorted(prescribed), dtype=int)
     pairs = mesh.tets[:, [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]].reshape(-1, 2)
     graph = sp.coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])),

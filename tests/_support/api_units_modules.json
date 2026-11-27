@@ -6,6 +6,7 @@
       "galerkin",
       "galerkin.thermal",
       "galerkin.thermal3d",
+      "galerkin.transient_heat3d",
       "galerkin.transient_heat",
       "galerkin.electric",
       "galerkin.electric3d",

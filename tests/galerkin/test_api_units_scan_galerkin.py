@@ -49,6 +49,15 @@ def _steady_heat_3d():
                                       heat_source_density=5.0)
 
 
+def _transient_heat_3d():
+    import numpy as np
+    from galerkin.transient_heat3d import solve_transient_heat_3d
+    _, kwargs = _steady_heat_3d()
+    kwargs.update(volumetric_heat_capacity=3.0, time=[0.0, 0.5],
+                  initial_temperature=np.full(kwargs["mesh"].num_nodes, 300.0))
+    return solve_transient_heat_3d, kwargs
+
+
 def _step_error():
     from galerkin.transient_heat import TransientHeatStepError
     return TransientHeatStepError, dict(time_index=1, time=0.5)
@@ -343,6 +352,7 @@ _PANEL_CASES = {
 STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:solve_transient_heat": _transient_heat,
                 "galerkin.thermal3d:solve_steady_heat_3d": _steady_heat_3d,
+                "galerkin.transient_heat3d:solve_transient_heat_3d": _transient_heat_3d,
                 "galerkin.transient_heat:TransientHeatStepError": _step_error,
                 # L2 commit 7 emptied electric, joule_heating and temperature_joule_heating
                 "galerkin.electric:solve_steady_electric": _steady_electric,
