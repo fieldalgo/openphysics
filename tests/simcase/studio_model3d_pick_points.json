@@ -1,0 +1,388 @@
+{
+ "document": "simcase/studio/static/model3d-via-stack.json",
+ "component": "stack3d",
+ "canvas": {
+  "width": 720,
+  "height": 504
+ },
+ "window": {
+  "width": 1440,
+  "height": 900
+ },
+ "camera": "isometric (contract in tests/simcase/model3d_pick_oracle.py)",
+ "exclude_within_px": 3.0,
+ "points": [
+  {
+   "px": 175,
+   "py": 102,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 242,
+   "py": 102,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 377,
+   "py": 102,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 478,
+   "py": 102,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 175,
+   "py": 136,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 242,
+   "py": 136,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 310,
+   "py": 136,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 478,
+   "py": 136,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 545,
+   "py": 136,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 209,
+   "py": 169,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 343,
+   "py": 169,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 410,
+   "py": 169,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 545,
+   "py": 169,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 209,
+   "py": 202,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 276,
+   "py": 202,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 444,
+   "py": 202,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 511,
+   "py": 202,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 242,
+   "py": 235,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 310,
+   "py": 235,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 444,
+   "py": 235,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 242,
+   "py": 269,
+   "face": 13,
+   "first_name": "domain.x1"
+  },
+  {
+   "px": 310,
+   "py": 269,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 444,
+   "py": 269,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 209,
+   "py": 302,
+   "face": 11,
+   "first_name": "domain.x1"
+  },
+  {
+   "px": 343,
+   "py": 302,
+   "face": 5,
+   "first_name": "domain.z1"
+  },
+  {
+   "px": 511,
+   "py": 302,
+   "face": 19,
+   "first_name": "domain.y1"
+  },
+  {
+   "px": 175,
+   "py": 335,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 242,
+   "py": 335,
+   "face": 11,
+   "first_name": "domain.x1"
+  },
+  {
+   "px": 343,
+   "py": 335,
+   "face": 13,
+   "first_name": "domain.x1"
+  },
+  {
+   "px": 410,
+   "py": 335,
+   "face": 20,
+   "first_name": "domain.y1"
+  },
+  {
+   "px": 511,
+   "py": 335,
+   "face": 19,
+   "first_name": "domain.y1"
+  },
+  {
+   "px": 175,
+   "py": 368,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 242,
+   "py": 368,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 410,
+   "py": 368,
+   "face": 19,
+   "first_name": "domain.y1"
+  },
+  {
+   "px": 478,
+   "py": 368,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 545,
+   "py": 368,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 242,
+   "py": 402,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 343,
+   "py": 402,
+   "face": 11,
+   "first_name": "domain.x1"
+  },
+  {
+   "px": 478,
+   "py": 402,
+   "face": null,
+   "first_name": null
+  },
+  {
+   "px": 545,
+   "py": 402,
+   "face": null,
+   "first_name": null
+  }
+ ],
+ "excluded": [
+  {
+   "px": 310,
+   "py": 102,
+   "edge_distance_px": 0.594
+  },
+  {
+   "px": 410,
+   "py": 102,
+   "edge_distance_px": 0.594
+  },
+  {
+   "px": 343,
+   "py": 136,
+   "edge_distance_px": 1.262
+  },
+  {
+   "px": 377,
+   "py": 136,
+   "edge_distance_px": 1.262
+  },
+  {
+   "px": 242,
+   "py": 169,
+   "edge_distance_px": 1.386
+  },
+  {
+   "px": 478,
+   "py": 169,
+   "edge_distance_px": 1.386
+  },
+  {
+   "px": 310,
+   "py": 202,
+   "edge_distance_px": 2.168
+  },
+  {
+   "px": 410,
+   "py": 202,
+   "edge_distance_px": 2.168
+  },
+  {
+   "px": 175,
+   "py": 235,
+   "edge_distance_px": 2.999
+  },
+  {
+   "px": 343,
+   "py": 235,
+   "edge_distance_px": 1.178
+  },
+  {
+   "px": 377,
+   "py": 235,
+   "edge_distance_px": 1.178
+  },
+  {
+   "px": 545,
+   "py": 235,
+   "edge_distance_px": 2.999
+  },
+  {
+   "px": 175,
+   "py": 269,
+   "edge_distance_px": 2.999
+  },
+  {
+   "px": 209,
+   "py": 269,
+   "edge_distance_px": 2.045
+  },
+  {
+   "px": 343,
+   "py": 269,
+   "edge_distance_px": 1.178
+  },
+  {
+   "px": 377,
+   "py": 269,
+   "edge_distance_px": 1.178
+  },
+  {
+   "px": 511,
+   "py": 269,
+   "edge_distance_px": 2.045
+  },
+  {
+   "px": 545,
+   "py": 269,
+   "edge_distance_px": 2.999
+  },
+  {
+   "px": 276,
+   "py": 302,
+   "edge_distance_px": 2.876
+  },
+  {
+   "px": 310,
+   "py": 302,
+   "edge_distance_px": 2.168
+  },
+  {
+   "px": 410,
+   "py": 302,
+   "edge_distance_px": 2.168
+  },
+  {
+   "px": 444,
+   "py": 302,
+   "edge_distance_px": 2.876
+  },
+  {
+   "px": 343,
+   "py": 368,
+   "edge_distance_px": 1.262
+  },
+  {
+   "px": 377,
+   "py": 368,
+   "edge_distance_px": 1.262
+  },
+  {
+   "px": 310,
+   "py": 402,
+   "edge_distance_px": 0.594
+  },
+  {
+   "px": 410,
+   "py": 402,
+   "edge_distance_px": 0.594
+  }
+ ]
+}

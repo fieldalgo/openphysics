@@ -48,7 +48,9 @@ python -m simcase.studio            # then open http://127.0.0.1:8765/geometry-l
   parameter (for example `feature 'bow': its boundary crosses itself …` or
   `component 'xs': selection 'gold' selects nothing`).
 - **Component** chooses among several components; without a choice the first
-  `2d` or `axisymmetric` one is shown. A `3d` component is refused by name.
+  `2d` or `axisymmetric` one is shown. A `3d` component (boxes and slab layers)
+  is shown in the [3D view](studio_3d.md) instead of the drawing, through its
+  own routes; `POST /api/geometry-lab/evaluate` still refuses it by name.
 - **Save JSON** downloads the document as edited (two-space JSON). Nothing is
   stored on the server.
 
@@ -99,7 +101,8 @@ Registered before the page was written:
 
 ## Limits
 
-- 2D and axisymmetric components only (the engine's scope); no editing of
+- The drawing takes 2D and axisymmetric components only (the engine's scope);
+  `3d` components go to the read-only [3D view](studio_3d.md). No editing of
   features or selections yet, only parameters.
 - Each edit re-evaluates the whole component on the server; the engine's
   measured times are in the [engine's validation](geometry_engine.md#validation).

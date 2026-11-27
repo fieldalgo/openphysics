@@ -5,19 +5,31 @@
 <body>
 <header><strong>OpenPhysics <span>Studio</span></strong><span>Geometry lab</span><span class="badge">EXPERIMENTAL</span></header>
 <div class="actions">
- <label>Start from <select id="starter"><option value="">Choose…</option><option value="geometry_v1_soi_strip">SOI strip (example)</option><option value="geometry_v1_imprint_rib">Imprinted rib (example)</option><option value="new">New document</option></select></label>
+ <label>Start from <select id="starter"><option value="">Choose…</option><option value="geometry_v1_soi_strip">SOI strip (example)</option><option value="geometry_v1_imprint_rib">Imprinted rib (example)</option><option value="model3d_via_stack">Via in a layer stack (3D example)</option><option value="new">New document</option></select></label>
  <button id="open-file">Open file</button><input id="file" type="file" accept=".json,application/json" hidden>
  <button id="save-file" disabled>Save JSON</button>
  <label>Component <select id="component" disabled></select></label>
  <span id="status" role="status">Open or create a version 1 geometry document.</span>
 </div>
-<p class="note">Experimental: works on version 1 geometry documents through the exact 2D engine. The document stays in this page; nothing is stored on the server. It runs no physics.</p>
+<p class="note">Experimental: works on version 1 geometry documents through the exact 2D engine, and shows 3d components of boxes and slab layers in a read-only 3D view. The document stays in this page; nothing is stored on the server. It runs no physics.</p>
 <section id="refusal" role="alert" hidden></section>
 <main>
  <aside id="parameters"><h2>Parameters</h2><p class="muted" id="no-parameters">No parameters.</p><div id="parameter-rows"></div></aside>
- <section class="drawing"><svg id="view" viewBox="0 0 800 560" role="img" aria-label="Region complex"></svg><div id="unit" class="muted"></div></section>
+ <section class="drawing"><svg id="view" viewBox="0 0 800 560" role="img" aria-label="Region complex"></svg>
+  <div id="view3d" hidden>
+   <div class="toolbar" role="toolbar" aria-label="3D view">
+    <button data-view="iso" title="Isometric view (0)">Iso</button><button data-view="+x" title="+X view (1)">+X</button><button data-view="-x" title="−X view (2)">−X</button><button data-view="+y" title="+Y view (3)">+Y</button><button data-view="-y" title="−Y view (4)">−Y</button><button data-view="+z" title="+Z view (5)">+Z</button><button data-view="-z" title="−Z view (6)">−Z</button><button id="fit3d" title="Fit (F)">Fit</button>
+    <label>Section <select id="section-axis"><option value="">none</option><option value="x">x</option><option value="y">y</option><option value="z">z</option></select></label>
+    <input type="range" id="section-at" aria-label="Section position" disabled><output id="section-value" for="section-at"></output>
+   </div>
+   <canvas id="canvas3d" tabindex="0" aria-label="3D view. Arrow keys rotate, Shift with arrow keys pans, plus and minus zoom, F fits, 1 to 6 choose the axis views, 0 the isometric view." aria-describedby="keys3d"></canvas>
+   <p id="keys3d" class="muted">Drag to rotate, Shift-drag to pan, wheel to zoom, click to pick a face. Keys on the view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views, 0 isometric.</p>
+   <section id="names" aria-live="polite"><h2>Names</h2><p id="names-title" class="muted">Pick a face in the view or in the faces list.</p><p id="names-detail" class="muted"></p><ul id="face-names"></ul></section>
+  </div>
+  <div id="unit" class="muted"></div></section>
  <aside id="lists">
   <h2>Regions</h2><ul id="regions"></ul>
+  <h2 id="faces-heading" hidden>Faces</h2><ul id="faces" hidden aria-labelledby="faces-heading"></ul>
   <h2>Selections</h2><ul id="selections"></ul>
   <h2>Boundary tags</h2><ul id="tags"></ul>
   <h2>Engine listing</h2><pre id="summary"></pre>

@@ -56,6 +56,7 @@
 - [정확 2D 형상 엔진(2단계)](../packages/simcase/geometry_engine.md)
 - [meshloom을 거치는 3D 상자와 판 층(5단계, 실험 단계)](../packages/simcase/geometry_engine3d.md)
 - [Studio 형상 실험실(실험적)](../packages/simcase/geometry_lab.md)
+- [Studio 3D 보기(실험적)](../packages/simcase/studio_3d.md)
 - [직육면체 공진기 문서와 결과](../packages/simcase/cavity3d.md)
 - [전기전도·Joule heating 문서](../packages/simcase/electric_joule.md)
 - [흡수 도파관 모드](../packages/simcase/lossy_modes.md)
