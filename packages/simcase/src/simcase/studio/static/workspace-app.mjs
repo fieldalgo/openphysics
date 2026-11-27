@@ -207,7 +207,7 @@ function library3d(host){
  const cards=host.querySelector('.cards');if(!cards||host.querySelector('.library-3d'))return;
  const section=document.createElement('section');section.className='library-3d';
  const heading=document.createElement('h3');heading.textContent='3D models (experimental)';
- const group=document.createElement('div');group.className='cards cards-3d';
+ const group=document.createElement('div');group.className='cards-3d';
  const button=document.createElement('button');button.type='button';button.dataset.model3dCard=CARD3D.id;
  const title=document.createElement('strong');title.textContent=CARD3D.title;
  const status=document.createElement('span');status.className='application-status available';status.textContent=CARD3D.status;

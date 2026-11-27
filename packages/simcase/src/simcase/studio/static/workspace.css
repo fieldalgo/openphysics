@@ -522,10 +522,16 @@ dialog::backdrop{background:#162a4b66}
 /* round 24 (B6): a loss column header, "Loss (dB/cm)" over what it counts */
 .loss-name,.loss-qualifier{display:block}.loss-qualifier{white-space:normal;max-width:11em;font-size:10px;font-weight:400;color:#586c87}.compare-table thead th[scope=colgroup] .loss-qualifier{margin:0 auto}
 /* The 3D model (slice B of the Studio 3D view; workspace-model3d-view.mjs) */
-.library-3d{margin-top:18px}
 .library-3d h3{margin:0 0 8px}
-.cards-3d{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
-.cards-3d button[data-model3d-card]::before{content:"▣"}
+/* the 3D group: styled as the application cards, but not one of them (.cards holds the application cards only) */
+.library-3d{max-width:1100px;margin:18px auto 0}
+.cards-3d{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,340px));gap:18px;margin:8px 0 20px}
+.cards-3d button[data-model3d-card]{display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;text-align:left;padding:0 22px 22px;background:#fff;border:1px solid #ccd6e2;border-radius:4px;overflow:hidden;box-shadow:0 2px 5px #35517408}
+.cards-3d button[data-model3d-card]::before{content:"▣";display:flex;align-items:center;justify-content:center;height:112px;margin:0 -22px 12px;background:#e6f1ee;color:#3f8a78;font:64px/1 Georgia,serif;border-bottom:1px solid #d6dfec}
+.cards-3d strong{display:block;font-size:16px;font-weight:600;margin-bottom:10px}
+.cards-3d p{font-size:12px;margin:8px 0}
+.cards-3d .card-scope{font-size:11px;color:#718197;display:block}
+.cards-3d .card-action{display:block;margin-top:auto;padding-top:14px;font-size:12px;font-weight:600;color:#2f5f9e}
 .m3-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
 .m3-head h2{margin:0}
 .m3-run{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
