@@ -78,7 +78,7 @@ Escape는 한 단계를 닫고 초점을 돌려주며, Tab은 메뉴를 모두 �
 
 | 종류 | 담는 것 | 이름 | 만드는 명령 |
 |---|---|---|---|
-| 프로젝트 파일 | 탭의 모든 모델을 각각 세션 파일로 한 파일에(버전 1, [프로젝트 파일](#프로젝트-파일)). | Save As에서 고른 이름, 이름 없는 프로젝트에는 `untitled-project.json` 제안 | **File › Save**, **Save As…** |
+| 프로젝트 파일 | 탭의 모든 모델을 각각 세션 파일로 한 파일에(버전 1, [3D 모델](#3d-모델실험적)이 있으면 버전 2, [프로젝트 파일](#프로젝트-파일)). | Save As에서 고른 이름, 이름 없는 프로젝트에는 `untitled-project.json` 제안 | **File › Save**, **Save As…** |
 | 세션 파일 | 한 모델의 입력과 완료한 실행, 실행 이름과 고정, 비교(광학, 버전 9, [열린 경계](#광학-작업-공간의-열린-경계)가 있으면 10), 정상 열과 Joule 가열의 입력, 또는 실행과 히터 없는 결과를 포함한 다중물리 모델(버전 8). | `<model>-session-YYYY-MM-DD-HHMM.json`, 또는 고른 이름 | **File › Export › Model with runs (session file)…**, **Results › Export this run** |
 | 모델 파일 | 모델 입력만: 실행도 계산 결과도 없음(광학, 정상 열, Joule 가열 입력, 버전 7 또는 8, 열린 경계가 있으면 9, 또는 다중물리 문서). | 모델 이름. 예: `optical-waveguide.json`, `heat-conduction.json`, `joule-heating.json`, `heated-silicon-waveguide.json` | **File › Export › Model file…** |
 | 브라우저 초안 | 광학 입력, 이 브라우저에만(파일 아님). | — | **File › Browser copy › Save browser draft** |
@@ -197,9 +197,9 @@ runs (session file)…**에만 나옵니다.
 작업 공간, 실행, Undo는 그대로입니다. 검사 순서:
 
 1. 텍스트를 해석하기 전에 크기(64 MiB 이하), 그다음 올바른 JSON(맨 앞 byte order mark는 뺌)
-2. 바깥 구조: `format`, `version`(더 새 버전은 이름을 들어 거부: *This project file is version 2, newer than
-   this Studio reads (version 1). Open it in a newer Studio.*), 모르는 키 없음, 형식, id가 겹치지 않는 1–8개
-   모델, 작업 공간 모델은 많아야 하나, `active`가 그중 하나를 가리킴
+2. 바깥 구조: `format`, `version` 1 또는 2(더 새 버전은 이름을 들어 거부: *This project file is version 3, newer
+   than this Studio reads (version 2). Open it in a newer Studio.*), 모르는 키 없음, 형식, id가 겹치지 않는 1–8개
+   모델, 작업 공간 모델은 많아야 하나, 3D 모델(종류 `model3d`, 버전 2에서만)도 많아야 하나, `active`가 그중 하나를 가리킴
 3. 모델마다 종류와 세션 버전, 파일에서 다시 만든 세션 텍스트의 크기와 SHA-256(*Heated silicon waveguide changed
    after it was saved (its check value does not match).*), 그리고 세션 파일처럼 읽은 세션. 메시지마다 모델
    제목이 앞에 붙음
@@ -240,7 +240,11 @@ File › Save하면 저장한 모든 모델의 브라우저 복구 기록이, �
 바이트까지 같습니다(버전 7은 `JSON.stringify`, 버전 8과 9는 음의 0을 `-0.0`으로 유지). `bytes`와 `digest`는 그
 텍스트의 UTF-8 길이와 `sha256:`입니다. 손상되거나 편집된 파일을 찾을 뿐 인증하지는 않으며, 버전 8과 9 안의 실행별
 digest도 마찬가지입니다. 모델 하나는 16 MiB 이하라서 모든 모델을 이전 Studio가 여는 세션 파일로 여전히 내보낼
-수 있습니다. 버전 1에 없는 것: 모델 사이의 비교, 정상 열과 Joule 가열 결과(입력은 작업 공간 모델에 있음), undo
+수 있습니다. **버전 2**(결정 F1)는 버전 1에 종류 `model3d`(카드 `layer-stack-3d`)를 더한 것이며, 그 세션은
+[3D 모델의 세션 파일](#3d-모델실험적)입니다. Studio는 3D 모델이 있는 프로젝트만 버전 2로 쓰고, 없는 프로젝트는
+전처럼 바이트까지 같은 버전 1로 씁니다. 버전 1 파일은 전처럼 읽습니다(버전 1 파일 안의 `model3d` 항목은 *of an
+unknown kind*). 모델의 종류는 그 세션과 맞아야 합니다: *Via in a layer stack (3D heat) is a model3d model, but its
+session is of version 9 (an optical session).* 버전 1에 없는 것: 모델 사이의 비교, 정상 열과 Joule 가열 결과(입력은 작업 공간 모델에 있음), undo
 기록, provider 목록, 실패하거나 멈춘 실행. 브라우저 복구는 전처럼 모델마다 기록하며 프로젝트 전체를 복원하지
 않습니다.
 
@@ -256,6 +260,26 @@ with runs (session file)…**은 이전 Studio도 여는 파일을 씁니다.
 *Heater study*와 제안 이름 `heater-study.json`으로 Save As, 서버 재시작과 새 브라우저 프로필, File › Open, 두 모델이 실행 없이 같은 값을 다시 읽음(V-P7,
 V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`에서 바꾼 저장 대화상자(V-P10), 손상된 파일
 세 개를 탭 그대로 거부(V-P3). `--old-python`을 주면 이전 Studio에서 파일을 여는 것(V-P9)도 봅니다.
+
+## 3D 모델(실험적)
+
+상태: **실험적**, 이 단계에서는 파일만. 3D 모델은 문서 하나를 담습니다(버전 1 geometry 블록이 있는 형식 0.3, 예를 들어
+카드 문서 "Via in a layer stack (3D heat)", `static/model3d-layer-stack-3d.json`, [3D 보기의 경로](studio_3d.md#보내는-것과-응답)가
+검사). 그것을 열고 편집하고 저장하는 작업 공간 빌더는 다음 단계에서 옵니다. 그때까지 Studio의 어떤 것도 3D 모델을
+만들지 않으므로, 버전 2 프로젝트 파일이나 model3d 세션 파일은 손으로 만든 것뿐입니다.
+
+**세션 파일**(결정 F2)은
+`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`이며, 선택적 `view` 객체와
+세션 한도 16 MiB를 따릅니다. 지금은 문서를 담고, 실행은 나중 버전에서 옵니다. File › Open은 `application`이
+`"model3d"`인 세션을 광학과 다중물리 세션의 버전 규칙보다 먼저 자체 규칙으로 보내며, 그 규칙은 바뀌지 않습니다(단위
+배치 이전의 버전 1 파일은 거부를 유지). 거부는 파일 종류를 밝힙니다: *This model3d session is version 2, newer than this
+Studio reads (version 1). Open it in a newer Studio.*, *Unknown key "runs" in the model3d session.*, *The model3d session
+holds no document.*, *The model3d session holds a document that is not format 0.3.*, *The model3d session holds a
+document without a version 1 geometry block.*, *The model3d session has an invalid view.*
+
+**검사**(W11 실행 없음, 파일 부분, 미리 정함): 문서 digest(문서의 세션 JSON의 SHA-256)가 세션과 프로젝트 파일 모두에서
+저장하고 읽은 뒤 같음; 두 번째 저장은 같은 바이트를 씀; 3D 모델이 없는 프로젝트는 바이트까지 같은 버전 1로 씀(커밋된
+`project-v1.json` fixture). 측정: 같음, 바뀌지 않음(`tests/simcase/studio_model3d_files.cjs`).
 
 ## 첫 광학 해석
 

@@ -1,8 +1,10 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 
-// The project file, version 1 (docs/packages/simcase/workspace.md, "Project files"): every model
-// of a Studio tab in one file. One compact JSON object, keys in this order:
+// The project file, versions 1 and 2 (docs/packages/simcase/workspace.md, "Project files"): every
+// model of a Studio tab in one file. Version 2 (decision F1) adds the kind "model3d" (one 3D model,
+// card "layer-stack-3d"); a project without a 3D model is written as version 1, byte for byte as
+// before, and version 1 files are read as before. One compact JSON object, keys in this order:
 //   {"format":"openphysics-studio-project","version":1,"name","savedAt","studio","active","models":[…]}
 // and each model {id, kind, title, card, bytes, digest, session}. session is the model's session
 // object as it is today, unchanged: written alone by its own writer it is byte for byte the session
@@ -14,9 +16,12 @@
 // only and are in no digest.
 import {parseSession,OPTICAL_SESSION_VERSIONS,SESSION_VERSION,MAX_SESSION_BYTES} from './workspace-notebook.mjs';
 import {MULTIPHYSICS_VERSIONS,sessionJson,sha256Hex,byteLength,sizeText} from './workspace-multiphysics-session.mjs';
+import {isModel3dSession} from './workspace-model3d-session.mjs';
 
 export const PROJECT_FORMAT='openphysics-studio-project';
 export const PROJECT_FILE_VERSION=1;
+/** The version a project holding a 3D model is written as, and the highest one this Studio reads. */
+export const PROJECT_FILE_VERSION_3D=2;
 /** The whole file, checked before it is parsed. */
 export const MAX_PROJECT_BYTES=64*1024*1024;
 /** One model: today's session limit, so every model still exports as a session file. */
@@ -26,8 +31,10 @@ export const MAX_MODELS=8;
 export const MAX_MULTIPHYSICS=7;
 export const PROJECT_KEYS=Object.freeze(['format','version','name','savedAt','studio','active','models']);
 export const ENTRY_KEYS=Object.freeze(['id','kind','title','card','bytes','digest','session']);
-export const KINDS=Object.freeze(['workspace','multiphysics']);
-export const CARDS=Object.freeze(['optical','heat','joule','heated-waveguide']);
+export const KINDS=Object.freeze(['workspace','multiphysics','model3d']);
+/** The kinds a version 1 file holds; "model3d" needs version 2. */
+const KINDS_V1=Object.freeze(['workspace','multiphysics']);
+export const CARDS=Object.freeze(['optical','heat','joule','heated-waveguide','layer-stack-3d']);
 export const UNTITLED_PROJECT='Untitled project';
 export const NAME_LIMIT=80;
 /** The session versions each kind holds: an optical session (parseSession's own list) or a
@@ -99,7 +106,8 @@ export function writeProject({name,savedAt,studio,active,entries},{limit=MAX_PRO
  const checked=validateProjectName(name);
  if(!entries.length||entries.length>MAX_MODELS)fail(`A project holds 1 to ${MAX_MODELS} models.`);
  if(!entries.some(e=>e.id===active))fail('The model shown is not in the project.');
- const head=`{"format":${JSON.stringify(PROJECT_FORMAT)},"version":${PROJECT_FILE_VERSION},"name":${JSON.stringify(checked)},"savedAt":${JSON.stringify(savedAt)},"studio":${JSON.stringify(String(studio))},"active":${JSON.stringify(active)},"models":[`;
+ const version=entries.some(e=>e.kind==='model3d')?PROJECT_FILE_VERSION_3D:PROJECT_FILE_VERSION;
+ const head=`{"format":${JSON.stringify(PROJECT_FORMAT)},"version":${version},"name":${JSON.stringify(checked)},"savedAt":${JSON.stringify(savedAt)},"studio":${JSON.stringify(String(studio))},"active":${JSON.stringify(active)},"models":[`;
  const pieces=entries.map(e=>{
   if(e.bytes>MAX_ENTRY_BYTES)fail(`${e.title} is ${sizeText(e.bytes)}, over the 16 MiB session limit.`);
   return `{"id":${JSON.stringify(e.id)},"kind":${JSON.stringify(e.kind)},"title":${JSON.stringify(e.title)},"card":${JSON.stringify(e.card)},"bytes":${e.bytes},"digest":${JSON.stringify(e.digest)},"session":`;});
@@ -108,7 +116,7 @@ export function writeProject({name,savedAt,studio,active,entries},{limit=MAX_PRO
  return {ok:true,bytes,text:head+pieces.map((p,i)=>p+entries[i].text+'}').join(',')+']}'};
 }
 /** The refusal of a project file newer than this Studio reads. */
-export const newerProjectText=version=>`This project file is version ${version}, newer than this Studio reads (version ${PROJECT_FILE_VERSION}). Open it in a newer Studio.`;
+export const newerProjectText=version=>`This project file is version ${version}, newer than this Studio reads (version ${PROJECT_FILE_VERSION_3D}). Open it in a newer Studio.`;
 /** Whether a parsed JSON value is a project file (any version): the File › Open route. */
 export const isProjectDocument=doc=>isObject(doc)&&doc.format===PROJECT_FORMAT;
 
@@ -129,8 +137,9 @@ export function readProject(text,{limit=MAX_PROJECT_BYTES,parse=JSON.parse}={}){
  if(size>limit)fail(`This project file is ${sizeText(size)}, over the 64 MiB limit.`);
  let doc;try{doc=parse(text.startsWith('﻿')?text.slice(1):text);}catch{fail('This project file is not valid JSON.');}
  if(!isProject(doc))fail('This is not a project file.');
- if(Number.isInteger(doc.version)&&doc.version>PROJECT_FILE_VERSION)fail(newerProjectText(doc.version));
- if(doc.version!==PROJECT_FILE_VERSION)fail('Unsupported project file version.');
+ if(Number.isInteger(doc.version)&&doc.version>PROJECT_FILE_VERSION_3D)fail(newerProjectText(doc.version));
+ if(doc.version!==PROJECT_FILE_VERSION&&doc.version!==PROJECT_FILE_VERSION_3D)fail('Unsupported project file version.');
+ const kinds=doc.version===PROJECT_FILE_VERSION?KINDS_V1:KINDS;
  const unknown=Object.keys(doc).find(k=>!PROJECT_KEYS.includes(k));if(unknown!==undefined)fail(`Unknown key ${JSON.stringify(unknown)} in the project file.`);
  const missing=PROJECT_KEYS.find(k=>!Object.hasOwn(doc,k));if(missing!==undefined)fail(`The project file has no ${JSON.stringify(missing)}.`);
  let name;try{name=validateProjectName(doc.name);}catch(e){fail(`The project name is not one Studio writes: ${e.message}`);}
@@ -138,7 +147,7 @@ export function readProject(text,{limit=MAX_PROJECT_BYTES,parse=JSON.parse}={}){
  if(typeof doc.savedAt!=='string'||!Number.isFinite(Date.parse(doc.savedAt)))fail('The project file has an invalid save time.');
  if(typeof doc.studio!=='string'||doc.studio.length>64||CONTROL.test(doc.studio))fail('The project file has an invalid Studio version.');
  if(!Array.isArray(doc.models)||doc.models.length<1||doc.models.length>MAX_MODELS)fail(`A project file holds 1 to ${MAX_MODELS} models.`);
- const ids=new Set();let workspaces=0,multi=0;
+ const ids=new Set();let workspaces=0,multi=0,solid=0;
  doc.models.forEach((raw,i)=>{
   const what=titleOf(raw,i);
   if(!isObject(raw))fail(`Model ${i+1} of the project file is not a model entry.`);
@@ -146,8 +155,8 @@ export function readProject(text,{limit=MAX_PROJECT_BYTES,parse=JSON.parse}={}){
   const absent=ENTRY_KEYS.find(k=>!Object.hasOwn(raw,k));if(absent!==undefined)fail(`${what}: missing ${absent}.`);
   if(typeof raw.id!=='string'||!ID.test(raw.id))fail(`${what} has an invalid id (m followed by 1 to 3 digits).`);
   if(ids.has(raw.id))fail(`Two models have the same id ${raw.id}.`);ids.add(raw.id);
-  if(!KINDS.includes(raw.kind))fail(`${what} is of an unknown kind.`);
-  if(raw.kind==='workspace')workspaces++;else multi++;
+  if(!kinds.includes(raw.kind))fail(`${what} is of an unknown kind.`);
+  if(raw.kind==='workspace')workspaces++;else if(raw.kind==='model3d')solid++;else multi++;
   if(typeof raw.title!=='string'||!raw.title||CONTROL.test(raw.title)||[...raw.title].length>200)fail(`Model ${i+1} has an invalid title.`);
   if(raw.card!==null&&!CARDS.includes(raw.card))fail(`${what} names an unknown Library card.`);
   if(!Number.isInteger(raw.bytes)||raw.bytes<0)fail(`${what} has an invalid size.`);
@@ -155,13 +164,18 @@ export function readProject(text,{limit=MAX_PROJECT_BYTES,parse=JSON.parse}={}){
   if(!isObject(raw.session))fail(`${what} has no session.`);
  });
  if(workspaces>1)fail('A project file holds at most one workspace model.');
+ if(solid>1)fail('A project file holds at most one model3d model.');
  if(multi>MAX_MULTIPHYSICS)fail(`A project file holds at most ${MAX_MULTIPHYSICS} multiphysics models.`);
  if(typeof doc.active!=='string'||!ids.has(doc.active))fail('The model to show (active) is not in the project file.');
  const models=doc.models.map(raw=>{
   const what=raw.title,s=raw.session,known=[...KIND_VERSIONS.workspace,...KIND_VERSIONS.multiphysics];
+  // a 3D model's session is of its own application; the other kinds never hold one
+  if(raw.kind==='model3d'&&!isModel3dSession(s)&&s.format==='openphysics-studio-session'&&known.includes(s.version))
+   fail(`${what} is a model3d model, but its session is of version ${s.version}${KIND_VERSIONS.workspace.includes(s.version)?' (an optical session)':' (a multiphysics session)'}.`);
+  if(raw.kind!=='model3d'&&isModel3dSession(s))fail(`${what} is a ${raw.kind} model, but its session is a model3d session.`);
   // a session of a version this Studio reads must be of the entry's kind; any other version is
   // refused below by parseSession's own words (a newer one by name)
-  if(s.format==='openphysics-studio-session'&&known.includes(s.version)&&!KIND_VERSIONS[raw.kind].includes(s.version))
+  if(raw.kind!=='model3d'&&s.format==='openphysics-studio-session'&&known.includes(s.version)&&!KIND_VERSIONS[raw.kind].includes(s.version))
    fail(`${what} is a ${raw.kind} model, but its session is of version ${s.version}${raw.kind==='workspace'?' (a multiphysics session)':' (an optical session)'}.`);
   let entryText;try{entryText=sessionWriterText(s);}catch(e){fail(`${what}: ${e.message}`);}
   const bytes=byteLength(entryText);
