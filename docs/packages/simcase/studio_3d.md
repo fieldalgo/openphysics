@@ -30,6 +30,9 @@ feature `stack`) and a copper box `via` with x and y in [4, 6] through the oxide
 The same view is the Model page of the workspace's 3D model, which edits a document
 and makes selections from picked faces: see [3D models](workspace.md#3d-models-experimental).
 
+The same view is the Model page of the workspace's 3D model, which edits a document
+and makes selections from picked faces: see [3D models](workspace.md#3d-models-experimental).
+
 | Action | Pointer | Keyboard (focus on the view) |
 |---|---|---|
 | Rotate | drag | arrow keys (15° per press) |

@@ -177,7 +177,8 @@ A **project file** holds every model of a Studio tab, so one file brings back th
 and the heated silicon waveguide with their runs. **File › Save** and **Save As…** write it, and
 **File › Open…** reads it. A project holds the workspace model (the optical, steady heat or Joule
 heating inputs, with the optical runs) once one of its cards was chosen or a workspace file opened,
-and the multiphysics model once one was opened.
+and the multiphysics model once one was opened, and the [3D model](#3d-models-experimental) once its
+card was chosen or its session file opened.
 
 **The project in the tab.** The title bar names the project and its file in the words of the
 indicator:
@@ -311,28 +312,106 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
 
 ## 3D models (experimental)
 
-Status: **experimental**, files only in this step. A 3D model holds one document (format 0.3 with a
-version 1 geometry block, for example the card document "Via in a layer stack (3D heat)",
-`static/model3d-layer-stack-3d.json`, checked by the [3D view's routes](studio_3d.md#what-it-sends-and-answers)).
-The workspace builder that opens, edits and saves it comes with the next step; until then nothing in
-Studio creates a 3D model, so a version 2 project file or a model3d session file is one made by hand.
+Status: **experimental.** The Library's group **3D models (experimental)** holds the card **Via in a
+layer stack (3D heat)** (`layer-stack-3d`), beside the application cards, not among them. It is a 3d
+component in µm over a 200 × 200 µm domain (z from 0 to 610 µm): one `layers` feature `stack`
+(substrate 500 µm of Si, k = 130 W/(m K); oxide 10 µm of SiO2, k = 1.4 W/(m K); top silicon 100 µm of
+Si) and a later box `via` (x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through
+the oxide. The via is square until cylinders come: *Square via (a round via needs cylinders, coming
+with the next geometry step)*. Choosing the card adds the 3D model to the tab; the workspace and
+multiphysics models stay as they are, and the card of another model returns to it. The 3D model has no
+mesh, run or result yet; **Mesh** and **Run** are shown disabled with their reason (*Meshing and heat
+come in a later step of the 3D model.*).
 
-**The session file** (decision F2) is
+**The tree** (design §5.2, for this step). The group **Component 1 · 3D · µm** holds **Parameters**
+(beside it the parameters as written, *t_ox = 10 um · via_w = 20 um*), **Geometry 1** with **Domain**
+(*200 × 200 × 610 µm*, or *200 × 200 µm, z from the features*), the features numbered in order (later
+wins: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*, *2 Box via* · *20 × 20 × 10
+µm*) and **Form result** (*3 regions · 22 faces*, from the server's check), then **Materials** (*Si ·
+SiO2 · Cu*). The coverage words come from the exact complex: *covered in part by 2 (via)*, or
+*covered by 2 (b), 3 (c); adds no region* when later features take all of it. Heat transfer, Mesh,
+Study and Results come with the next steps. Geometry 1 offers **Add feature** with **Box** and
+**Layers**; **Extrude**, **Cylinder** and **Sphere** are greyed with their reason (*Extrude comes with a
+later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
+geometry step*). A feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its
+tree row), **Duplicate** and **Delete** (*via deleted; Undo restores it.*); a layers feature also has
+**Add layer** and **Remove layer** (1 to 32 layers). There is no drag. **Form result** lists the
+regions and the selections, and the faces are listed under the view.
+
+**Fields.** Each length takes a number in the component's unit, a quantity (`0.1 mm`), a parameter
+name or an expression (`100 - w / 2`). Beside it: the SI value of a number or quantity (*= 0.00009 m*),
+or a parameter with its value as written (*= t_ox (10 µm)*); an expression is evaluated by the server.
+Studio's own guards, before the server (they keep sizes usable and are not contract rules: a document
+opened from a file with other values is read as written):
+
+| Field | Allowed |
+|---|---|
+| name | starts with a letter or `_`, then letters, digits and `_`; unique among the features (a layer's name unique in its feature) |
+| material | one of the model's materials, or empty (void) |
+| box xmin … zmax | min < max on each axis; inside the domain where the domain is a number |
+| layers thickness | greater than 0; 1 to 32 layers |
+| element_size (optional) | domain diagonal / 400 to domain diagonal / 4 |
+| Domain xmin … zmax | min < max |
+
+A refused value uses the 2D builder's range sentence (*Via x max must be between 90–200 µm.*,
+*Stack oxide thickness must be greater than 0 µm.*, *Via element size must be between 1.68–168 µm.*)
+and stays as a highlighted draft with **Restore last valid value**. While a draft is shown, File ›
+Save, Save As and Export are disabled, and Mesh and Run name the draft as their reason. Combinations
+of features are checked by the server only. The **Parameters** table lists each parameter's name,
+value, kind (length or ratio), range (when the document gives one), SI value and how many fields use
+it; a refusal about a parameter (E-DOMAIN, E-EXPRESSION-KIND, a cycle) is shown on its row. A used
+parameter is not deleted, and the refusal names its users in feature order: *t_ox is used by
+stack.oxide thickness.* (several: *w is used by domain xmax, stack.oxide thickness, via xmin, via
+xmax.*).
+
+**Every edit is checked.** The whole document goes to `POST /api/model3d/check`
+([3D view](studio_3d.md#what-it-sends-and-answers)). A refusal is shown in Messages with the engine's
+words as written and its code and path under **Details** (for example *sphere 'ball' is not taken yet
+in a 3d component; boxes and slab layers are* · `E-3D-COMBINATION` at
+`geometry.components.c.features[2]`); Studio adds no words of its own to them. The tree marks the
+feature it names (the later one), the view keeps the last shape that could be formed, greyed and
+labelled *Last shape that could be formed*, and Mesh and Run say *Fix 1 problem in Messages to mesh*.
+
+**The view and selections.** The view is the [3D view](studio_3d.md) with its controls (keys on the
+view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views, 0 isometric). A face
+picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names; **Use for → New
+selection** with **Apply** writes `selections[<name>] = {"boundary": <name>}` with the first of the
+face's sorted names that selects that face alone (`POST /api/model3d/selection`). A face that no single
+name selects is not made into a selection, and says so.
+
+**Undo.** The 3D model has one history of documents, apart from the other models' (Ctrl+Z and Ctrl+Y
+follow the model shown). Each committed edit is one step: a field committed with Enter or on leaving
+it, add, delete, duplicate, move, a layer added or removed, a parameter, and a selection made by
+picking. An edit the server refuses stays in the history, so Undo takes it back. The page, the
+selection in the tree, the picked face and the camera are not in it.
+
+**Files.** File › Save writes the project file as version 2 with the 3D model's entry. **File ›
+Export › Model with runs (session file)…** writes the 3D model alone as a session file (decision F2):
 `{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, with an
 optional `view` object and the 16 MiB session limit. It holds the document now; runs come with a later
-version. File › Open routes a session whose `application` is `"model3d"` to its own rules, before the
-version rules of the optical and multiphysics sessions, which are unchanged (a version 1 file of before
-the units batch keeps its refusal). Its refusals name the file: *This model3d session is version 2,
-newer than this Studio reads (version 1). Open it in a newer Studio.*, *Unknown key "runs" in the
-model3d session.*, *The model3d session holds no document.*, *The model3d session holds a document
-that is not format 0.3.*, *The model3d session holds a document without a version 1 geometry block.*,
-*The model3d session has an invalid view.*
+version. File › Open reads both; a session whose `application` is `"model3d"` is read by its own rules
+before the version rules of the optical and multiphysics sessions, which are unchanged (a version 1
+file of before the units batch keeps its refusal). Its refusals name the file: *This model3d session
+is version 2, newer than this Studio reads (version 1). Open it in a newer Studio.*, *Unknown key
+"runs" in the model3d session.*, *The model3d session holds no document.*, *The model3d session holds
+a document that is not format 0.3.*, *The model3d session holds a document without a version 1
+geometry block.*, *The model3d session has an invalid view.* The 3D model is not kept in browser
+recovery yet.
 
-**Checks** (W11 without runs, file part, pre-registered): the document digest (SHA-256 of the
-session JSON of the document) is equal after save and read, for the session and for the project file;
-a second save writes the same bytes; a project without a 3D model is written as version 1 byte for
-byte (the committed `project-v1.json` fixture). Measured: equal, and unchanged
-(`tests/simcase/studio_model3d_files.cjs`).
+**Checks.** Pre-registered, fixed before measuring:
+
+| Check | What | Threshold | Measured | Where |
+|---|---|---|---|---|
+| W4 | 10 listed faces of the card (`stack.sub.domain.x0`, `stack.oxide.domain.y1`, `stack.top.domain.x1`, `stack.top.top`, `via.x0`, `via.x1`, `via.y0`, `via.y1`, `via.z0`, `via.z1`) picked, Use for → New selection; the written selection and the listed name typed by hand resolve to the picked face (server: through `build_mesh3d`, to the picked face's mesh faces) | 10/10 | 10/10 (server and browser; two faces picked in the view, eight in the faces list) | `tests/simcase/test_studio_model3d_check.py`, `tools/studio_browser/model3d_builder_browser.mjs` |
+| W5 | one document per E-3D-COMBINATION stem the check raises (footprint layers alone; beside other features; extrude, cylinder, sphere not taken yet): the engine's words in Messages, the code under Details, the tree mark on features[i], Mesh and Run's reason | 100% | 5/5. The stems "… round to the same coordinate" and circle_segments come from `build_mesh3d` when meshing (a later step) | same |
+| W11 (no runs) | the document digest after Save and Open, project and session; a version 1 project without 3D written byte for byte as before | equal; unchanged | equal; unchanged | `tests/simcase/studio_model3d_files.cjs`, the browser check |
+| W12 | the Library, and the Model with the card, at 1440 × 900 and 390 × 844: no console error or CSP violation, canvas drawn, no horizontal scroll at 390, faces list reached by Tab; screenshots kept | all hold | all hold | the browser check |
+| W13 (part B) | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → New selection | no pointer event | 0 pointer events | the browser check |
+
+The pure helpers (`workspace-model3d.mjs`) are checked by `tests/simcase/studio_model3d_builder.cjs`;
+the browser check also compares the tree's rows and notes with the server's answer. It is local
+(Playwright with a Chromium it can launch, not in CI); run it against a running Studio with
+`node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`.
 
 ## First optical study
 
