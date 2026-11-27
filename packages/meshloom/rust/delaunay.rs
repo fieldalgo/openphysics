@@ -265,6 +265,41 @@ impl<G: Geom> Mesh<G> {
         false
     }
 
+    /// The vertices joined to a by an edge (no ghost), in walk order: the same walk
+    /// over the tetrahedra around a as [`Mesh::has_edge`].
+    pub(crate) fn neighbours(&mut self, a: u32) -> Vec<u32> {
+        debug_assert!(self.track, "neighbours needs a mesh built with track");
+        let mut out = Vec::new();
+        let Some(&t0) = self.vt.get(a as usize) else { return out };
+        if t0 == u32::MAX || !self.verts(t0).contains(&a) {
+            return out;
+        }
+        self.epoch += 1;
+        let seen = 2 * self.epoch;
+        self.stack.clear();
+        self.stack.push(t0);
+        self.mark[t0 as usize] = seen;
+        while let Some(t) = self.stack.pop() {
+            let v = self.verts(t);
+            for &w in &v {
+                if w != a && w != GHOST && !out.contains(&w) {
+                    out.push(w);
+                }
+            }
+            for i in 0..4 {
+                if v[i] == a {
+                    continue;
+                }
+                let nb = self.adj(4 * t + i as u32) >> 2;
+                if self.mark[nb as usize] != seen {
+                    self.mark[nb as usize] = seen;
+                    self.stack.push(nb);
+                }
+            }
+        }
+        out
+    }
+
     fn new(g: G) -> Self {
         let cap = 7 * g.len() + 16;
         Mesh {
