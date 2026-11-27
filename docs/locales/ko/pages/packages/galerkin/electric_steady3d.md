@@ -26,7 +26,7 @@ electric = solve_steady_electric_3d(
 thermal = solve_steady_heat_3d(
     mesh, thermal_conductivity=4.0,
     prescribed_temperature={int(i): 300.0 for i in mesh.boundary["x0"]},
-    heat_source_density=lambda centroids: electric.joule_power_density,
+    heat_source_density=electric.joule_power_density,
 )
 ```
 
@@ -35,17 +35,29 @@ thermal = solve_steady_heat_3d(
 | `electric_potential` | 노드 순서의 (N,) V |
 | `electric_field`, `current_density` | (T, 3) V/m와 A/m² |
 | `electrical_conductivity`, `joule_power_density` | (T,) S/m와 W/m³ |
-| `terminal_current` | 면 태그별 A, 도체 안으로 흐르면 양수 |
+| `inward_current` | 면 태그별 A, 도체 안으로 흐르면 양수 |
 | `joule_power`, `inward_electric_power` | 체적 발열 적분과 단자 공급 전력, 각각 W |
 
 조립한 강성 행렬에서 단자별 노드 반력을 합산해 전류를 얻습니다. 공급
 전력은 Σ Vₖ Iₖ이며, 공통 전압 이동에 따른 상쇄를 줄이기 위해 연결 성분마다
 기준 전압을 뺀 값으로 계산합니다. 사면체마다 J·E를 하나씩 반환하며 모든
 요소 배열은 입력 `mesh.tets` 순서를 따릅니다. J·E에 사면체 부피를 곱해
-합하면 `joule_power`입니다. 위 열원 콜백은 같은 메시에서 이 배열을 그대로
-반환합니다. 형상이나 요소 순서가 바뀌면 전기 해를 다시 구합니다.
+합하면 `joule_power`입니다. 같은 메시의 열 솔버에 이 배열을 바로 넘깁니다.
+형상이나 요소 순서가 바뀌면 전기 해를 다시 구합니다.
+[3D 줄 발열 예제](../../../../../../examples/galerkin/joule_heating_3d.py)는 한쪽 단자의
+대류 냉각까지 실행합니다. 전기전도도가 온도에 따라 변하지 않는 단방향 연성입니다.
 
 ## 검증
+
+- [3D 연성 시험](../../../../../../tests/galerkin/test_joule_heating_3d_coupling.py)은
+  단면 10 × 10 mm, 길이 20 mm인 도체를 길이가 같은 두 층으로 나눕니다.
+  전기전도도는 각각 1·3 S/m, 열전도율은 1·2 W/(m K)입니다. 2 V를 가하면
+  전류는 15 mA이고 발열은 0.030 W입니다. 한쪽 끝에서 300 K 주변으로 대류
+  냉각(h = 100 W/(m² K))할 때 반대편 단열 끝의 이론 최고 온도는 305.4375 K입니다.
+  두 층의 국소 열원, 냉각 면의 독립 열량 적분, 세 단계 메시의 노드·요소 중심 온도를 검사합니다.
+- [scikit-fem 연성 비교](../../../../../../tests/galerkin/test_crosscheck_skfem_joule_heating_3d.py)에서는
+  한쪽 끝 면의 절반만 전극으로 덮습니다. 두 솔버가 각각 전위, 발열밀도, 온도 상승을
+  구합니다. 이 세 필드와 단자 전력, 체적 발열, 대류 방출의 상대 허용오차는 10⁻⁹입니다.
 
 - 0.4 m × 0.2 m × 0.3 m 균질 도체에 σ = 8 S/m, ΔV = 5 V를 적용하면
   R = L/(σA) = 5/6 Ω, 전류 6 A, 발열 30 W입니다. 세 메시 해상도에서

@@ -8,6 +8,8 @@ DC 전기 해석, 전기에서 열로의 단방향 전달, 온도 의존 전도�
 
 ## 첫 Python 해석 튜토리얼
 
+- [3D 직류 전기전도와 대류 냉각 고체의 줄 발열](../packages/galerkin/electric_steady3d.md)
+
 - [첫 Joule 발열 해석: 전력을 열로 전달하기](../packages/galerkin/joule_tutorial.md)
 
 - [온도 의존 Joule 튜토리얼: 되먹임과 수렴](../packages/galerkin/temperature_joule_tutorial.md)

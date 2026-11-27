@@ -10,6 +10,7 @@
     {"module": "galerkin.transient_heat", "class": "PlanarTransientHeatResult", "reason": "returned by solve_transient_heat (cartesian)"},
     {"module": "galerkin.transient_heat", "class": "AxisymmetricTransientHeatResult", "reason": "returned by solve_transient_heat (axisymmetric)"},
     {"module": "galerkin.electric", "class": "SteadyElectricResult", "reason": "returned by solve_steady_electric"},
+    {"module": "galerkin.electric3d", "class": "SteadyElectric3DResult", "reason": "returned by solve_steady_electric_3d"},
     {"module": "galerkin.electrostatics", "class": "ElectrostaticsResult", "reason": "returned by solve_electrostatics"},
     {"module": "galerkin.waveguide", "class": "WaveguideModes", "reason": "returned by solve_waveguide_modes (L3 commit 11b)"},
     {"module": "galerkin.waveguide", "class": "DegenerateModeBranches", "reason": "returned by degenerate_branch_derivatives (shape-derivative follow-up 4, 2026-11-21)"},

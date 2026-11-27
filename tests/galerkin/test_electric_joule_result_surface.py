@@ -16,6 +16,7 @@ import pytest
 
 import api_scan
 from galerkin.electric import SteadyElectricResult, solve_steady_electric
+from galerkin.electric3d import SteadyElectric3DResult
 from galerkin.joule_heating import SteadyJouleHeatResult, solve_steady_joule_heat
 from galerkin.mesh import rectangle_mesh
 from galerkin.temperature_joule_heating import (ConductivityModel, JouleIteration, TemperatureJouleHeatResult,
@@ -38,7 +39,7 @@ def _fields(cls):
     return [f.name for f in dataclasses.fields(cls)]
 
 
-@pytest.mark.parametrize("cls", RESULTS)
+@pytest.mark.parametrize("cls", (*RESULTS, SteadyElectric3DResult))
 def test_fields_are_registry_or_structural_names_and_units_are_canonical(cls, rules):
     registry_fields = []
     for name in _fields(cls):

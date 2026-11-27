@@ -29,7 +29,7 @@ def test_uniform_box(n):
     np.testing.assert_allclose(result.electric_field, expected_field, atol=1e-10, rtol=0)
     np.testing.assert_allclose(result.current_density, 8. * expected_field, atol=1e-9, rtol=0)
     np.testing.assert_allclose(result.joule_power_density, 8. * (5. / .4)**2, rtol=1e-10)
-    assert result.terminal_current == pytest.approx({"x0": current, "x1": -current}, rel=1e-10)
+    assert result.inward_current == pytest.approx({"x0": current, "x1": -current}, rel=1e-10)
     assert result.inward_electric_power == pytest.approx(5. * current, rel=1e-10)
     assert result.joule_power == pytest.approx(5. * current, rel=1e-10)
 
@@ -53,7 +53,7 @@ def test_series_materials_and_thermal_handoff():
     np.testing.assert_allclose(result.current_density[:, 0], flux, rtol=1e-10)
     np.testing.assert_allclose(result.current_density[:, 1:], 0., atol=1e-9, rtol=0)
     np.testing.assert_allclose(result.joule_power_density, flux**2 / expected_sigma, rtol=1e-10)
-    assert result.terminal_current == pytest.approx({"x0": flux * area, "x1": -flux * area}, rel=1e-10)
+    assert result.inward_current == pytest.approx({"x0": flux * area, "x1": -flux * area}, rel=1e-10)
     assert result.inward_electric_power == pytest.approx(5. * flux * area, rel=1e-10)
     assert result.joule_power == pytest.approx(result.joule_power_density @ mesh.volumes(), rel=1e-10)
     thermal = solve_steady_heat_3d(
@@ -76,7 +76,7 @@ def test_layered_approximation_converges_to_graded_bar():
         mesh = Mesh3D(box.nodes, box.tets.copy(), regions=slabs, region_names=names,
                       tagged_faces=box.tagged_faces)
         result = _solve(mesh, {name: 2. + (i + .5) / n for i, name in enumerate(names)})
-        errors.append(abs(result.terminal_current["x0"] - exact_current) / exact_current)
+        errors.append(abs(result.inward_current["x0"] - exact_current) / exact_current)
     assert errors[-1] < 6e-5
     assert np.all(np.asarray(errors[:-1]) / errors[1:] > 3.9)
 
@@ -93,7 +93,7 @@ def test_single_terminal_constant_and_large_voltage_offset():
     base = _solve(mesh, 8.)
     np.testing.assert_array_equal(shifted.electric_potential, base.electric_potential + shift)
     np.testing.assert_array_equal(shifted.electric_field, base.electric_field)
-    assert shifted.terminal_current == base.terminal_current
+    assert shifted.inward_current == base.inward_current
     assert shifted.inward_electric_power == base.inward_electric_power
 
 
@@ -126,5 +126,5 @@ def test_unanchored_component():
         mesh, electrical_conductivity=1.,
         prescribed_electric_potential={"x0": 2., "x1": 0., "x0b": 1e10 + 1., "x1b": 1e10},
     )
-    assert result.terminal_current == pytest.approx({"x0": 2., "x1": -2., "x0b": 1., "x1b": -1.})
+    assert result.inward_current == pytest.approx({"x0": 2., "x1": -2., "x0b": 1., "x1b": -1.})
     assert result.inward_electric_power == pytest.approx(5.)

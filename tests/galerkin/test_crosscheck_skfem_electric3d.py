@@ -72,6 +72,6 @@ def test_steady_electric_3d_against_skfem():
                          ("Joule density", "W/m^3", ours.joule_power_density, heat),
                          ("Joule power", "W", ours.joule_power, power),
                          ("terminal power", "W", ours.inward_electric_power, supplied),
-                         ("terminal currents", "A", list(ours.terminal_current.values()), current),
+                         ("terminal currents", "A", list(ours.inward_current.values()), current),
                      ]],
     ))
