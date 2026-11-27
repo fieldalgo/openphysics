@@ -8,6 +8,9 @@ Choose plane stress or plane strain and define displacement constraints and load
 
 ## First Python calculations
 
+- [3D loads and displacement constraints](../packages/galerkin/elasticity3d.md)
+- [Compute 3D thermal stress in a powered conductor](../packages/galerkin/electrothermomechanical_3d.md)
+
 - [First thermal expansion calculation: heat then mechanics](../packages/galerkin/thermoelastic_tutorial.md)
 
 ## Execution routes and limits
