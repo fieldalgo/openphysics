@@ -187,7 +187,9 @@ def test_a_geodesic_sphere_is_recovered():
 def test_a_twisted_prism_is_recovered():
     pts, facets = twisted_prism()
     r = recover_checked(pts, facets)
-    assert r["stats"]["protected_vertices"] == 6
+    # Schönhardt-like: it cannot be tetrahedralized without Steiner points; each split
+    # segment has two acute ends, so it is first split at its middle (Si's rules)
+    assert r["stats"]["bisection_points"] + r["stats"]["protection_points"] > 0
 
 
 def test_an_acute_fan_and_long_segments_through_a_cloud():
@@ -196,7 +198,10 @@ def test_an_acute_fan_and_long_segments_through_a_cloud():
     pts += [[rng.uniform(-0.5, 1.5), rng.uniform(-1, 1), rng.uniform(-0.1, 0.1)] for _ in range(300)]
     segs = [[0, 1], [0, 2], [0, 3], [0, 4]]
     r = recover_checked(np.array(pts), segments=segs)
-    assert r["stats"]["protection_points"] == 4
+    # only the origin is acute; the missing spokes are split on spheres about it (rules 2
+    # and 3), the others are left alone
+    assert r["stats"]["protected_vertices"] == 1 and r["stats"]["protection_points"] > 0
+    assert r["stats"]["bisection_points"] == 0
     # two long skew segments that miss every other segment (crossings are invalid input):
     # their z = 0 points lie at -18 and 65 degrees, away from the fan
     pts += [[-0.6, -1.1, -0.2], [1.6, 1.1, 0.25], [1.4, -1.1, 0.12], [-0.6, 1.1, -0.07]]

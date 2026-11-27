@@ -4,33 +4,38 @@
 //! Segment recovery (M4 stage 3 of the pre-registered 3D plan; design note section 3).
 //!
 //! Every input segment must become a union of edges of the tetrahedralization. Starting
-//! from the Delaunay tetrahedralization of the input points:
-//! 1. **Protection at acute vertices** (Shewchuk 2002, step i), lazily: when a piece
-//!    that ends at a vertex where two segments meet at less than 90 degrees is not an
-//!    edge, each segment at that vertex gets a point at distance r = min(l/3, 2d/3, h/2)
-//!    from it (l the shortest incident segment, d the distance to the nearest other
-//!    input point, h the distance to the first split already on an incident segment).
-//!    Vertices whose segments are all edges are left alone: on a triangulated surface
-//!    every vertex has an acute pair, and eager protection would split every segment. All points of one vertex lie at the
-//!    same distance up to a relative 2^-30 (the parameter is the shortest dyadic
-//!    fraction in that window, preferring one whose point is exactly a double), so the
-//!    pieces from the vertex are Gabriel and halving them splits all incident segments
-//!    on common spheres r/2, r/4, ... (concentric shells).
-//! 2. **Recursive bisection** of every other piece of a segment that is not an edge of
-//!    the current tetrahedralization, round by round until every piece is an edge.
+//! from the Delaunay tetrahedralization of the input points, round by round, every
+//! piece of a segment that is not an edge is split once, where Si and Gärtner's rules
+//! put the point (Si's thesis and IJNME 2011; the choice of Diazzi et al. 2023), so only
+//! missing pieces get points (see [`split_parameter`]):
+//! - the reference point p is the mesh neighbour of the piece's ends strictly inside its
+//!   diametral ball that sees it under the largest angle;
+//! - a piece of a segment with an acute end c (two segments meeting there at less than
+//!   90 degrees) is split on the sphere about c through p (rule 2), or by rule 3 when
+//!   that point is nearer the piece's far end than p; points about one vertex so build
+//!   its protecting spheres lazily, only on missing segments;
+//! - another piece at |e - p| from its end e nearer p when that is under half the piece
+//!   (rule 1);
+//! - a segment with two acute ends, a piece without a reference point, and a target
+//!   outside the middle 62/64 of the piece: the middle.
+//!
+//! The parameter is a short dyadic within a relative 2^-24 of the piece around the
+//! target, preferring one whose point is exactly a double. A round looks again only at
+//! segments with a missing piece and at segments with a vertex next to a point the last
+//! round inserted: an insertion removes an edge only when both its ends are on the new
+//! point's cavity, so both become the point's neighbours.
 //!
 //! New points are S points `(a, b, t)` of the input segment a-b, inserted by the same
 //! Bowyer-Watson kernel with the exact mixed predicates, so the result is the Delaunay
 //! tetrahedralization (under the index-ordered perturbation) of the input points and
-//! the S points. A piece that would need more than `max_depth` halvings is an error,
-//! not a hang: termination of bisection after rounded protection is not proven (design
-//! note, open point).
+//! the S points. A piece shorter than 2^-`max_depth` of its segment is an error, not a
+//! hang: termination after rounding the parameter is not proven (as for Diazzi et al.).
 //!
 //! The segments must be elementary and pairwise non-crossing (the output of the PLC
 //! check: no point strictly inside a segment), so S points never coincide.
 
 use crate::delaunay::{self, Error, Mesh};
-use crate::mixed::{MixedCounters, MixedPoints, Pt, SPoint};
+use crate::mixed::{MixedCounters, MixedPoints, SPoint};
 use crate::predicates::P3;
 use std::collections::HashMap;
 
@@ -62,8 +67,13 @@ struct Piece {
     t1: f64,
     u: u32,
     v: u32,
-    depth: u32,
+    /// the acute input end the piece is protected from (`NONE_END`), or `BOTH` for a
+    /// whole segment whose two ends are acute
+    toward: u32,
 }
+
+const NONE_END: u32 = u32::MAX;
+const BOTH: u32 = u32::MAX - 1;
 
 fn dist(a: &P3, b: &P3) -> f64 {
     ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt()
@@ -129,97 +139,93 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
 
     // pieces of each segment, in order along it
     let mut pieces: Vec<Vec<Piece>> = segments.iter().enumerate()
-        .map(|(k, s)| vec![Piece { seg: k as u32, t0: 0.0, t1: 1.0, u: s[0], v: s[1], depth: 0 }])
+        .map(|(k, s)| vec![Piece { seg: k as u32, t0: 0.0, t1: 1.0, u: s[0], v: s[1], toward: NONE_END }])
         .collect();
     let mut incident: Vec<Vec<u32>> = vec![Vec::new(); n];
     for (k, s) in segments.iter().enumerate() {
         incident[s[0] as usize].push(k as u32);
         incident[s[1] as usize].push(k as u32);
     }
-    let nearest = nearest_distances(points);
-    let mut protected = vec![false; n];
+    let acute: Vec<bool> = (0..n).map(|v| is_acute(points, segments, &incident[v], v)).collect();
+    let mut centres = vec![false; n];
+    for (k, s) in segments.iter().enumerate() {
+        pieces[k][0].toward = match (acute[s[0] as usize], acute[s[1] as usize]) {
+            (true, true) => BOTH,
+            (true, false) => s[0],
+            (false, true) => s[1],
+            (false, false) => NONE_END,
+        };
+    }
 
+    // the segments to look at in a round: at first all; then those with a missing piece
+    // in the last round and those with a vertex next to a point it inserted (an edge
+    // that an insertion removes has both ends on the new point's cavity, so both
+    // become its neighbours); the other pieces are still edges
+    let mut look: std::collections::BTreeSet<usize> = (0..segments.len()).collect();
+    let mut seg_of_s: Vec<u32> = Vec::new();
     loop {
-        // the pieces that are not edges, and the acute, unprotected vertices they end at
+        // the pieces that are not edges
         let mut missing: Vec<(usize, usize)> = Vec::new();
-        let mut protect: Vec<usize> = Vec::new();
-        for (k, ps) in pieces.iter().enumerate() {
-            for (i, p) in ps.iter().enumerate() {
-                if mesh.has_edge(p.u, p.v) {
-                    continue;
-                }
-                missing.push((k, i));
-                let s = segments[k];
-                for (end, at) in [(s[0] as usize, p.t0 == 0.0), (s[1] as usize, p.t1 == 1.0)] {
-                    if at && !protected[end] && is_acute(points, segments, &incident[end], end) {
-                        protected[end] = true;
-                        protect.push(end);
-                    }
+        for &k in &look {
+            for (i, p) in pieces[k].iter().enumerate() {
+                if !mesh.has_edge(p.u, p.v) {
+                    missing.push((k, i));
                 }
             }
         }
+        let mut next: std::collections::BTreeSet<usize> = missing.iter().map(|&(k, _)| k).collect();
         stats.rounds += 1;
         if missing.is_empty() {
             break;
         }
-        if !protect.is_empty() {
-            // 1. protection (lazily, where a missing piece ends at an acute vertex): every
-            //    incident segment gets a point at the same distance r from the vertex
-            for v in protect {
-                stats.protected_vertices += 1;
-                let pv = &points[v];
-                let mut r = 2.0 * nearest[v] / 3.0;
-                for &k in &incident[v] {
-                    let s = segments[k as usize];
-                    let len = dist(&points[s[0] as usize], &points[s[1] as usize]);
-                    r = r.min(len / 3.0);
-                    // stay inside the first piece from v, whatever splits it already has
-                    let ps = &pieces[k as usize];
-                    let near = if s[0] as usize == v { ps[0].t1 } else { 1.0 - ps[ps.len() - 1].t0 };
-                    r = r.min(near * len / 2.0);
-                }
-                for &k in &incident[v] {
-                    let s = segments[k as usize];
-                    let (a, b) = (&points[s[0] as usize], &points[s[1] as usize]);
-                    let tr = r / dist(a, b);
-                    let exact = |t: f64| exact_point(a, b, t);
-                    // the same distance r from v, up to a relative 2^-30: the pieces from
-                    // v are Gabriel and halving keeps concentric shells r/2, r/4, ...
-                    let w = tr * 2f64.powi(-30);
-                    let t = if s[0] as usize == v { pick_t(tr - w, tr, exact) } else { pick_t(1.0 - tr, 1.0 - tr + w, exact) };
-                    let _ = pv;
-                    let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], t), &mut stats)?;
-                    stats.protection_points += 1;
-                    let ps = &mut pieces[k as usize];
-                    let i = ps.iter().position(|p| p.t0 < t && t < p.t1).ok_or_else(|| {
-                        Error::Internal(format!("segment {k}: no piece holds the protection point"))
-                    })?;
-                    let p = ps[i];
-                    ps[i] = Piece { t1: t, v: id, ..p };
-                    ps.insert(i + 1, Piece { t0: t, u: id, ..p });
-                }
-            }
-            continue;
-        }
-        // 2. bisection of every missing piece
+        // one split of each, from the back of each segment's list so indices stay valid;
+        // a piece that an earlier split of this round made an edge is left alone
         for &(k, i) in missing.iter().rev() {
             let p = pieces[k][i];
-            if p.depth >= max_depth {
-                return Err(Error::Internal(format!(
-                    "segment {} needs more than {max_depth} halvings near t = {}", p.seg, p.t0)));
+            if mesh.has_edge(p.u, p.v) {
+                continue;
             }
-            let tm = p.t0 + (p.t1 - p.t0) / 2.0;
-            if !(tm > p.t0 && tm < p.t1) {
+            let s = segments[k];
+            let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute);
+            if !(t > p.t0 && t < p.t1) {
                 return Err(Error::Internal(format!(
                     "segment {}: a piece is too short to split (do segments cross?)", p.seg)));
             }
-            let s = segments[k];
-            let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], tm), &mut stats)?;
-            stats.bisection_points += 1;
-            stats.max_depth = stats.max_depth.max(p.depth + 1);
-            pieces[k][i] = Piece { t1: tm, v: id, depth: p.depth + 1, ..p };
-            pieces[k].insert(i + 1, Piece { t0: tm, u: id, depth: p.depth + 1, ..p });
+            let depth = (-(t - p.t0).min(p.t1 - t).log2()).ceil() as u32;
+            if depth > max_depth {
+                return Err(Error::Internal(format!(
+                    "segment {} needs more than {max_depth} halvings near t = {}", p.seg, p.t0)));
+            }
+            let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], t), &mut stats)?;
+            seg_of_s.push(k as u32);
+            for w in mesh.neighbours(id) {
+                if (w as usize) < n {
+                    next.extend(incident[w as usize].iter().map(|&j| j as usize));
+                } else {
+                    next.insert(seg_of_s[w as usize - n] as usize);
+                }
+            }
+            match rule {
+                Rule::Midpoint | Rule::Near => stats.bisection_points += 1,
+                Rule::Centre(c) => {
+                    stats.protection_points += 1;
+                    if !centres[c as usize] {
+                        centres[c as usize] = true;
+                        stats.protected_vertices += 1;
+                    }
+                }
+            }
+            stats.max_depth = stats.max_depth.max(depth);
+            // the halves: a segment whose two ends are acute is first split at its middle,
+            // and each half is then protected from its own end
+            let (lo, hi) = match p.toward {
+                BOTH => (s[0], s[1]),
+                c => (c, c),
+            };
+            pieces[k][i] = Piece { t1: t, v: id, toward: lo, ..p };
+            pieces[k].insert(i + 1, Piece { t0: t, u: id, toward: hi, ..p });
         }
+        look = next;
     }
 
     let chains: Vec<Vec<u32>> = pieces.iter()
@@ -326,6 +332,117 @@ impl StageClock {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Rule {
+    /// the middle of the piece
+    Midpoint,
+    /// rule 1: on the sphere about the piece end nearer the reference point
+    Near,
+    /// rules 2 and 3: on a sphere about the acute input end c
+    Centre(u32),
+}
+
+/// Where to split a missing piece of segment a-b (Si–Gärtner's rules, as in Si's thesis
+/// and Diazzi et al. 2023). The reference point p is, among the mesh neighbours of the
+/// piece's ends that lie strictly inside its diametral ball (exactly), the one seeing
+/// the piece under the largest angle (in doubles; ties by index). With no such point,
+/// or when a rule's point falls outside the middle 62/64 of the piece, the middle.
+/// - Rule 1 (no acute end): the point at |u - p| from u when that is under half the
+///   piece, else at |v - p| from v when that is, else the middle.
+/// - Rule 2 (protected from the acute end c): the point at distance |c - p| from c;
+///   rejected when it is nearer the far end than p, then
+/// - Rule 3: with v0 that point and e the near end, at s(v0) - |p - v0| from c when
+///   |p - v0| < |e - v0| / 2, else halfway between e and v0.
+/// The parameter is a short dyadic within a relative 2^-24 of the piece around the
+/// target, preferring an exact double point (so points of one centre lie on a common
+/// sphere up to that).
+fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool]) -> (f64, Rule) {
+    let _ = acute;
+    let mid = (p.t0 + (p.t1 - p.t0) / 2.0, Rule::Midpoint);
+    if p.toward == BOTH {
+        return mid;
+    }
+    let m = mesh.g.view();
+    let (pu, pv) = (m.from_id(p.u), m.from_id(p.v));
+    let (xu, xv) = (m.rounded(pu), m.rounded(pv));
+    let mut cand = mesh.neighbours(p.u);
+    for w in mesh.neighbours(p.v) {
+        if !cand.contains(&w) {
+            cand.push(w);
+        }
+    }
+    let m = mesh.g.view();
+    let mut best: Option<(f64, u32, P3)> = None;
+    for w in cand {
+        if w == p.u || w == p.v {
+            continue;
+        }
+        let pw = m.from_id(w);
+        if !m.in_diametral_ball(pw, pu, pv) {
+            continue;
+        }
+        let x = m.rounded(pw);
+        // cos of the angle u-w-v: smaller is wider
+        let (a, b) = (sub(&xu, &x), sub(&xv, &x));
+        let c = dot(&a, &b) / (dot(&a, &a) * dot(&b, &b)).sqrt();
+        if best.is_none_or(|(bc, bw, _)| c < bc || (c == bc && w < bw)) {
+            best = Some((c, w, x));
+        }
+    }
+    let Some((_, _, xp)) = best else { return mid };
+    let (pa, pb) = (&points[s[0] as usize], &points[s[1] as usize]);
+    let len = dist(pa, pb);
+    let span = p.t1 - p.t0;
+    let (lo, hi) = (p.t0 + span / 64.0, p.t1 - span / 64.0);
+    let (target, rule) = match p.toward {
+        NONE_END => {
+            let (du, dv, l) = (dist(&xu, &xp), dist(&xv, &xp), span * len);
+            if du < l / 2.0 {
+                (p.t0 + du / len, Rule::Near)
+            } else if dv < l / 2.0 {
+                (p.t1 - dv / len, Rule::Near)
+            } else {
+                return mid;
+            }
+        }
+        c => {
+            // distances along the segment from c
+            let from_a = c == s[0];
+            let sd = |t: f64| if from_a { t * len } else { (1.0 - t) * len };
+            let to_t = |d: f64| if from_a { d / len } else { 1.0 - d / len };
+            let xc = &points[c as usize];
+            let (near, far) = if from_a { (p.t0, p.t1) } else { (p.t1, p.t0) };
+            let r = dist(xc, &xp);
+            let v0 = to_t(r);
+            let at = |t: f64| -> P3 { std::array::from_fn(|k| pa[k] + t * (pb[k] - pa[k])) };
+            let xv0 = at(v0);
+            let xfar = at(far);
+            if dist(&xv0, &xfar) >= dist(&xv0, &xp) {
+                (v0, Rule::Centre(c)) // rule 2
+            } else {
+                let (se, s0) = (sd(near), sd(v0));
+                let pv0 = dist(&xp, &xv0);
+                let r3 = if pv0 < (s0 - se) / 2.0 { s0 - pv0 } else { se + (s0 - se) / 2.0 };
+                (to_t(r3), Rule::Centre(c))
+            }
+        }
+    };
+    if !(target >= lo && target <= hi) {
+        return mid;
+    }
+    let w = span * 2f64.powi(-24);
+    let exact = |t: f64| exact_point(pa, pb, t);
+    (pick_t((target - w).max(lo), (target + w).min(hi), exact), rule)
+}
+
+fn sub(a: &P3, b: &P3) -> P3 {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn dot(a: &P3, b: &P3) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
 /// True when two of the segments `inc` at vertex v meet at less than 90 degrees.
 fn is_acute(points: &[P3], segments: &[[u32; 2]], inc: &[u32], v: usize) -> bool {
     let pv = &points[v];
@@ -342,7 +459,7 @@ fn is_acute(points: &[P3], segments: &[[u32; 2]], inc: &[u32], v: usize) -> bool
 fn exact_point(a: &P3, b: &P3, t: f64) -> bool {
     let input = [*a, *b];
     let s = [SPoint::seg(0, 1, t)];
-    crate::mixed::Mixed { input: &input, s: &s }.is_exact(Pt::S(0))
+    crate::mixed::Mixed { input: &input, s: &s }.is_exact(crate::mixed::Pt::S(0))
 }
 
 fn insert_s(mesh: &mut Mesh<MixedPoints>, sp: SPoint, stats: &mut RecoveryStats) -> Result<u32, Error> {
@@ -354,41 +471,6 @@ fn insert_s(mesh: &mut Mesh<MixedPoints>, sp: SPoint, stats: &mut RecoveryStats)
         None => Ok(id),
         Some(v) => Err(Error::Internal(format!("the point on segment {}-{} at t = {} equals vertex {v}", sp.a, sp.b, sp.t))),
     }
-}
-
-/// For each point, the distance to the nearest other point (a sweep over x with a
-/// shrinking window; exact choice of the radius is not needed).
-fn nearest_distances(points: &[P3]) -> Vec<f64> {
-    let mut by: Vec<u32> = (0..points.len() as u32).collect();
-    by.sort_unstable_by(|&i, &j| points[i as usize][0].total_cmp(&points[j as usize][0]));
-    let mut best = vec![f64::INFINITY; points.len()];
-    for x in 0..by.len() {
-        let i = by[x] as usize;
-        for &j in &by[x + 1..] {
-            let j = j as usize;
-            let dx = points[j][0] - points[i][0];
-            if dx > best[i] {
-                break;
-            }
-            let d = dist(&points[i], &points[j]);
-            best[i] = best[i].min(d);
-            best[j] = best[j].min(d);
-        }
-    }
-    // the backward direction: the window above covers it for i, but j's best may need
-    // points before it; a second pass in reverse order completes it
-    for x in (0..by.len()).rev() {
-        let i = by[x] as usize;
-        for &j in by[..x].iter().rev() {
-            let j = j as usize;
-            let dx = points[i][0] - points[j][0];
-            if dx > best[i] {
-                break;
-            }
-            best[i] = best[i].min(dist(&points[i], &points[j]));
-        }
-    }
-    best
 }
 
 #[cfg(test)]
@@ -464,8 +546,10 @@ mod tests {
             pts.push([lcg(&mut s) * 2.0 - 0.5, lcg(&mut s) * 2.0 - 1.0, lcg(&mut s) * 0.2 - 0.1]);
         }
         let r = check(&pts, &segs);
+        // only the origin is acute, and only missing pieces are split (Si's rules 2 and 3
+        // about it): the 1 and 5 degree spokes cannot all be edges
         assert_eq!(r.stats.protected_vertices, 1, "{:?}", r.stats);
-        assert_eq!(r.stats.protection_points, 4);
+        assert!(r.stats.protection_points >= 1 && r.stats.protection_points < 40, "{:?}", r.stats);
         eprintln!("fan: {:?}", r.stats);
     }
 

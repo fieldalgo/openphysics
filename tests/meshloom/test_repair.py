@@ -44,7 +44,13 @@ CASES = 60
 # seed 227 as above. These inputs now make no 2-3 flip: one of an inverted tetrahedron and
 # a positive neighbour cannot occur (their other vertices lie on one side of the shared
 # face), and one of two inverted tetrahedra would fold. The floor stays as measured before.
+# Since segment recovery splits only missing pieces (Si and Gärtner's rules, 2026-11-27):
+# the first 60 seeds give 58 valid meshes and 2 RoundingError; of 400, 374 valid, 25
+# RoundingError and seed 227 as above. Facet flips are now rare (seeds 152 and one other of
+# 400), so seed 152 is added to keep that repair exercised; the floor is not changed.
 MIN_MESHED = 42
+#: seeds outside the first CASES that exercise a repair the first CASES no longer reach
+COVERAGE_SEEDS = (152,)
 
 
 def rotation(rng):
@@ -106,17 +112,17 @@ def volume(points, facets):
 def test_rounding_repair_keeps_every_mesh_valid():
     from meshloom._core import RoundingError, mesh_plc
     meshed, refused, used = 0, 0, {}
-    for seed in range(CASES):
+    for seed in list(range(CASES)) + list(COVERAGE_SEEDS):
         pts, facets = case(seed)
         try:
             m = mesh_plc(pts, facets, domain="parity")
         except RoundingError:
-            refused += 1
+            refused += seed < CASES
             continue
         A.check(m, pts, facets, [volume(pts, facets)], False, euler=True, inner_cover=False)
         src = m["node_source"]
         assert ((src >= 0) | (src == -1)).all() and (src == -1).sum() == m["stats"]["points_added"]
-        meshed += 1
+        meshed += seed < CASES
         for k in ("flips23", "flips32", "edge_removals", "facet_flips", "cavity_fills"):
             used[k] = used.get(k, 0) + m["stats"][k]
     assert meshed + refused == CASES
