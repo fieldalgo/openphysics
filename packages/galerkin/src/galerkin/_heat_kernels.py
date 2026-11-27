@@ -17,7 +17,8 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from .core.backend import Backend, backend_of, is_live, lift, live_namespace, scatter_add, to_numpy
-from .core.checks import contains_live, finite_scalar
+from .core.checks import finite_scalar
+from ._tetra_materials import refuse_live_3d
 from .core.sparse import CooMatrix
 from .mesh3d import Mesh3D
 
@@ -83,13 +84,6 @@ def scalar_boundary_system(samples, n, labels, anchors, constrained):
         return coo_matrix((entries, (rows, cols)), shape=(n, n)).tocsr(), G, B, shifted_B
     return CooMatrix(rows, cols, xp.concat(entries) if entries else xp.zeros(0, dtype=xp.float64),
                      (n, n)), G, B, shifted_B
-
-
-def refuse_live_3d(value, name):
-    if contains_live(value) or (isinstance(value, Mapping)
-                                and any(contains_live(v) for v in value.values())):
-        raise TypeError(f"{name}: solve_steady_heat_3d runs on NumPy and carries no derivative; "
-                        "pass NumPy numbers")
 
 
 def source_load_3d(mesh: Mesh3D, heat_source) -> np.ndarray:

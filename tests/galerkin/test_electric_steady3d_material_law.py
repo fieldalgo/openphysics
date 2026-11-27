@@ -4,7 +4,8 @@
 import numpy as np
 import pytest
 
-from galerkin.electric3d import _conductivity_at_temperature_3d, solve_steady_electric_3d
+from galerkin._tetra_materials import conductivity_at_temperature
+from galerkin.electric3d import solve_steady_electric_3d
 from galerkin.mesh3d import Mesh3D, box_mesh
 from galerkin.temperature_joule_heating import ConductivityModel
 
@@ -27,7 +28,7 @@ def solve(mesh, sigma):
 def test_fixed_voltage_series_bar_at_material_temperatures(n, kelvin):
     mesh = layered_mesh(n)
     model = ConductivityModel(lambda t: 4 / (1 + .01 * (t - 300)), (300., 400.))
-    sigma = _conductivity_at_temperature_3d(mesh, {"heater": model, "lead": 8.},
+    sigma = conductivity_at_temperature(mesh, {"heater": model, "lead": 8.},
                                              np.full(mesh.num_nodes, kelvin))
     result = solve(mesh, sigma)
     heater_sigma = 4 / (1 + .01 * (kelvin - 300))
@@ -54,7 +55,7 @@ def test_element_mean_and_input_ownership():
 
     law = ConductivityModel(evaluate, (300., 350.))
     materials = {"lead": 8., "heater": law}
-    sigma = _conductivity_at_temperature_3d(mesh, materials, temperature)
+    sigma = conductivity_at_temperature(mesh, materials, temperature)
     mean = original[mesh.tets].mean(axis=1)
     expected = np.where(mesh.regions == 0, 1 + (mean - 300)**2 / 100, 8.)
     np.testing.assert_allclose(sigma, expected, rtol=1e-13)
@@ -63,8 +64,8 @@ def test_element_mean_and_input_ownership():
     assert materials == {"lead": 8., "heater": law}
     sigma[:] = 1.
     np.testing.assert_allclose(result.electrical_conductivity, expected, rtol=1e-13)
-    np.testing.assert_array_equal(_conductivity_at_temperature_3d(mesh, 3., temperature), 3.)
-    np.testing.assert_allclose(_conductivity_at_temperature_3d(mesh, law, temperature), (1 + (mean - 300) ** 2 / 100))
+    np.testing.assert_array_equal(conductivity_at_temperature(mesh, 3., temperature), 3.)
+    np.testing.assert_allclose(conductivity_at_temperature(mesh, law, temperature), (1 + (mean - 300) ** 2 / 100))
 
 
 @pytest.mark.parametrize("bad", [lambda n: np.ones(n - 1), lambda n: np.ones((n, 1)),
@@ -80,7 +81,7 @@ def test_invalid_element_arrays(bad):
 def test_invalid_model_outputs(callback):
     mesh = layered_mesh(2)
     with pytest.raises(ValueError, match="sigma"):
-        _conductivity_at_temperature_3d(mesh, ConductivityModel(callback, (299., 301.)),
+        conductivity_at_temperature(mesh, ConductivityModel(callback, (299., 301.)),
                                         np.full(mesh.num_nodes, 300.))
 
 
@@ -93,11 +94,11 @@ def test_invalid_temperatures_and_region_tables():
     for temperature, message in [(outlier, "outside"), (valid[:-1], "shape"),
                                  (-valid, "nonnegative"), (valid * np.inf, "finite")]:
         with pytest.raises(ValueError, match=message):
-            _conductivity_at_temperature_3d(mesh, law, temperature)
+            conductivity_at_temperature(mesh, law, temperature)
     for table in ({"heater": law}, {"heater": law, "lead": -8.},
                   {"heater": law, "lead": 8., "extra": 1.}):
         with pytest.raises(ValueError, match="electrical_conductivity"):
-            _conductivity_at_temperature_3d(mesh, table, valid)
+            conductivity_at_temperature(mesh, table, valid)
     bare = Mesh3D(mesh.nodes, mesh.tets)
     with pytest.raises(ValueError, match="named tetrahedral regions"):
-        _conductivity_at_temperature_3d(bare, {"heater": law, "lead": 8.}, valid)
+        conductivity_at_temperature(bare, {"heater": law, "lead": 8.}, valid)
