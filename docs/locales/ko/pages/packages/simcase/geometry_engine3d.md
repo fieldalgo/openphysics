@@ -125,7 +125,8 @@ across, <ratio> of the component's diagonal, below the mesher tolerance 3e-08; i
 
 ## 검증
 
-사전 등록된 검사이며 `tests/simcase/test_geometry_engine3d.py`가 실행합니다.
+사전 등록된 검사이며 `tests/simcase/test_geometry_engine3d.py`(G1–G6, P1)와
+`tests/simcase/test_geometry_cavity3d.py`(P4, P5)가 실행합니다.
 
 | ID | 사례 | 지표 | 기준 | 측정(Linux, 2026-11-27) |
 |---|---|---|---|---|
@@ -136,6 +137,8 @@ across, <ratio> of the component's diagonal, below the mesher tolerance 3e-08; i
 | G5 | E1, h = 0.8 mm, 새 프로세스 3개 | SHA-256 | 같음 | 같음 |
 | G6 | 위 거부마다 문서 하나 | 코드, 경로, 메시지 안의 이름 | 100% | 100% |
 | P1 | meshloom과 `meshine.extrude`를 거친 E1, `refsol.thermal3d.layered_slab`(P1에서 정확)과 비교 | 노드 최대 \|T_h − T\|; 윗면 열 비율 상대 오차 | ≤ 1e-10; ≤ 1e-9 | 아래 |
+| P4 | h = 0.24, 0.12, 0.06 m의 E4를 `galerkin.solve_cavity`로 풀어 `refsol.cavity.rectangular_cavity_modes`와 비교 | 첫 묶음(k² = 2π²인 세 모드)의 k² 상대 오차, 셋 중 최대 | h에 따라 감소; 관측 차수 ≥ 1.5; 가장 촘촘한 메시 < 1e-2 | 1.5e-2, 1.9e-3, 3.8e-4; 차수 2.63; 가장 촘촘한 메시 3.8e-4 |
+| P5 | h = 0.24, 0.12, 0.06 m의 E5를 `galerkin.solve_material_cavity`로 풀어 `refsol.material_cavity.slab_loaded_cavity_modes`와 비교 | 첫 네 모드의 k² 상대 오차(오름차순 계산값을 오름차순 기준 근에 대응), 넷 중 최대 | h에 따라 감소; 관측 차수 ≥ 1.5; 가장 촘촘한 메시 < 2e-2 | 1.1e-2, 2.8e-3, 9.0e-4; 차수 1.77; 가장 촘촘한 메시 9.0e-4 |
 
 E1은 두께 1, 0.5, 1 mm(z 높이 0, 1, 1.5, 2.5 mm)인 판 층 셋으로, k = 1, 0.01, 1 W/(m K)이고 도메인은
 10 × 10 mm입니다. `z0`에서 T = 0, `z1`에서 T = 1, 옆면은 단열이며 `galerkin.solve_steady_heat_3d`로
@@ -150,9 +153,32 @@ P1 측정값:
 | `meshine.extrude` | 0.8 | 7,680 | 4.8e-15 | 8.8e-14 |
 | `meshine.extrude` | 0.4 | 49,152 | 9.4e-15 | 5.0e-15 |
 
+E4와 E5는 형상 문서로 쓴 공동이며 `build_mesh3d`가 메시합니다. 테스트는 그 `Mesh3D`에 galerkin의
+공개 공동 solver를 적용하고, 모든 면은 PEC입니다. E4는 도메인이 [0, 1]³ m인 `3d` 구성 요소 하나입니다.
+배경은 진공이고 피처는 없습니다. E5는 여기에 x와 y 전체 범위에서 z ∈ [0, 0.5] m를 덮는 `box`를
+더합니다. 이 상자가 영역 `slab`(ε_r = 4)이고 나머지는 영역 `background`(진공)입니다. 관측 차수는
+세 크기에서 log e를 log h에 대해 최소제곱으로 맞춘 기울기입니다. 두 크기씩 본 차수, 허위 모드 수
+(모든 기준 근에서 10%보다 먼 계산 모드), 시간은 보고만 하고 판정하지 않습니다. E5의 기준 근은
+k²/π² = 0.6907, 0.6979, 0.6979, 1.0021이고 그다음은 1.4625 두 개입니다.
+
+P4와 P5 측정값(코어 하나, 메시와 풀이 초):
+
+| 사례 | h (m) | 노드 | 사면체 | 오차 | 허위 모드 | 메시(s) | 풀이(s) |
+|---|---|---|---|---|---|---|---|
+| E4 | 0.24 | 243 | 682 | 1.5e-2 | 0 | 0.2 | 0.1 |
+| E4 | 0.12 | 1,072 | 3,897 | 1.9e-3 | 0 | 0.8 | 0.4 |
+| E4 | 0.06 | 5,867 | 26,122 | 3.8e-4 | 0 | 4.5 | 13 |
+| E5 | 0.24 | 270 | 753 | 1.1e-2 | 0 | 0.2 | 0.1 |
+| E5 | 0.12 | 1,145 | 4,197 | 2.8e-3 | 0 | 0.8 | 1.0 |
+| E5 | 0.06 | 6,189 | 27,775 | 9.0e-4 | 0 | 4.8 | 203 |
+
+두 크기씩 본 차수는 P4가 2.99와 2.27, P5가 1.94와 1.61입니다.
+
 풀 리퀘스트는 소스 시험 부분에서 G1을 200개 가운데 고정 시드 25개(여덟 번째마다)로 돌립니다.
 `OPENPHYSICS_GEOMETRY3D_FULL=1`이면 200개를 모두 돌리며, CI job `geometry3d-full`이 main push와 수동 dispatch에서
-그렇게 합니다([CI가 돌리는 것](../../development.md#ci가-돌리는-것)).
+그렇게 합니다([CI가 돌리는 것](../../development.md#ci가-돌리는-것)). P4와 P5는 그 job에서만
+돕니다. 풀 리퀘스트는 h = 0.24 m에서 E4와 E5의 smoke 시험을 돌리며, 각 사례가 메시되고 풀리는지만
+확인합니다.
 
 ## 한계
 

@@ -468,7 +468,9 @@ jobs:
     # tests/simcase/test_geometry_engine3d.py. The source test parts run the file on every pull
     # request with 25 fixed seeds; this job runs all 200 (about 7 min on one core, 2026-11-27) on
     # main pushes and manual dispatch only, so pull requests allocate no runner for it, and is in
-    # the tests gate there. It installs the abi3 wheel meshloom-v26-wheel builds.
+    # the tests gate there. It also runs the cavity studies P4 and P5 of
+    # tests/simcase/test_geometry_cavity3d.py (about 4 min locally, 2026-11-27), which pull
+    # requests skip. It installs the abi3 wheel meshloom-v26-wheel builds.
     needs: meshloom-v26-wheel
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
@@ -513,6 +515,26 @@ jobs:
           g1 = [c for c in suite.iter("testcase") if c.get("name", "").startswith("test_g1_g2_g3_later_wins_boxes")]
           assert len(g1) == 200, len(g1)
           print(suite.get("tests"), "tests,", len(g1), "G1 sets")
+          PY
+      # P4 and P5 (slice 4a): the empty and slab-loaded cavity convergence studies, from a copy
+      # outside the checkout for the same reason; their measurements are JUnit properties.
+      - name: Run the cavity studies P4 and P5, and check that they ran
+        env:
+          OPENPHYSICS_GEOMETRY3D_FULL: "1"
+        run: |
+          cp tests/simcase/test_geometry_cavity3d.py "$RUNNER_TEMP/g3d/"
+          cd "$RUNNER_TEMP/g3d"
+          python -m pytest -q -ra -s -p no:cacheprovider test_geometry_cavity3d.py --junitxml="$RUNNER_TEMP/g3d-out/cavity3d.xml"
+          python - "$RUNNER_TEMP/g3d-out/cavity3d.xml" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
+          counts = {k: int(suite.get(k)) for k in ("skipped", "failures", "errors")}
+          assert counts == {"skipped": 0, "failures": 0, "errors": 0}, counts
+          names = {c.get("name") for c in suite.iter("testcase")}
+          for check in ("test_p4_empty_cavity_first_cluster_converges",
+                        "test_p5_slab_loaded_cavity_first_four_modes_converge"):
+              assert check in names, (check, sorted(names))
+          print(suite.get("tests"), "tests; P4 and P5 ran")
           PY
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
