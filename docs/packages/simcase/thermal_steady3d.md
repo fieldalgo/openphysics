@@ -47,6 +47,7 @@ The route follows the contract's [mesher route](geometry_document.md#stage-5-com
 |---|---|---|
 | one `layers` feature of slab layers | `meshine.extrude`: the domain rectangle meshed by meshine at the element size, extruded through the layer levels in sub-layers at most that thick | `z0`, `z1`, and the footprint's sides `left`, `right`, `bottom`, `top` |
 | anything else of the [boxes and slab layers](geometry_engine3d.md) slice 1 takes | `simcase.build_mesh3d` through meshloom (**experimental**) | `x0`–`z1` on the domain faces, `void` elsewhere, or `boundary_tags` |
+| a cylinder or spheres in one of [meshloom's builder shapes](geometry_engine3d.md#cylinders-and-spheres-in-builder-shapes-slice-3) | "builder": `simcase.build_mesh3d` through the builder (**experimental**) | `x0`–`z1` on the domain faces, `void` elsewhere; parts `<id>.side`, `<id>.bottom`, `<id>.top`, `<id>.surface` |
 
 The result's `route` (and the summary's `mesh_route`) says which route ran. A lone `layers`
 feature with footprint layers is not taken yet. On the extrude route the faces carry their
@@ -56,7 +57,7 @@ tags only, so `selections` and `boundary_tags` are refused there.
 
 | Key | Meaning |
 |---|---|
-| `physics.<name>.prescribed_temperature` | `{boundary name: temperature}`. On the meshloom route a name is resolved by the [selector rules](geometry_document.md#selector-rules-frozen): a tag, a named boundary selection, a provenance name (`domain.z0`, `via.x1`, `stack.c.top`) or a feature id. On the extrude route it is one of the tags above. Required: at least one. |
+| `physics.<name>.prescribed_temperature` | `{boundary name: temperature}`. On the meshloom route a name is resolved by the [selector rules](geometry_document.md#selector-rules-frozen): a tag, a named boundary selection, a provenance name (`domain.z0`, `via.x1`, `stack.c.top`) or a feature id. On the extrude route it is one of the tags above. On the builder route it is a tag, an exterior part (`via.bottom`, `sa.surface`, `domain.z0`) or a feature id (all its parts). Required: at least one. |
 | `physics.<name>.heat_source_density` | one value, or `{region: value}` over the meshed regions; absent: no source |
 | `materials.<m>.thermal_conductivity` | the conductivity of every region whose material is `m` |
 | `mesh.element_size` | required; on the meshloom route also `mesh.element_count_limit` and `mesh.controls` `element_size`, as [build_mesh3d](geometry_engine3d.md#use) takes them |
@@ -111,11 +112,24 @@ Measured on Linux (2026-11-27), `tests/simcase/test_thermal_steady3d.py`:
 | Bit identity, extrude route | E1 against `meshine.extrude` + `solve_steady_heat_3d` called directly | the same SHA-256 of nodes, tetrahedra, temperature and reaction heat rate | the same |
 | Bit identity, meshloom route | E1 with a copper box in the core layer against `build_mesh3d` + `solve_steady_heat_3d` | the same SHA-256 | the same |
 
+Builder route (stage 5, slice 4b; `tests/simcase/test_thermal_steady3d_builders.py`). The physics is
+gated on `build_mesh3d` + `solve_steady_heat_3d` called directly, and the kind must equal it:
+
+| Check | Case | Threshold | Measured (Linux, 2026-11-27) |
+|---|---|---|---|
+| P2 (main) | E2: C4 in m, slab [−1,1]² × [0,1] with k = 1 W/(m K), via r = 0.3 with k = 100 W/(m K), T = 300 K on `z0` and 301 K on `z1`; Q = ΔT/L (k_v πr² + k_s(A − πr²)) = 31.99 W; h 0.2, 0.1, 0.05 | e_Q(0.05) ≤ 1e-2; slope against the ring chord s = 2πr/m (m from `I-SURFACE-SAMPLED`) ≥ 1.5 | e_Q 1.68e-2, 7.51e-3, 2.71e-3 (m = 16, 24, 40); slope 1.99 |
+| P3 (main) | E3: C11 with a hole r = 0.5, k = 1 on (0.5, 0.75), k = 4 on (0.75, 1), T = 301 K inside and 300 K outside; Q = 16π/3 W; h 0.2, 0.1, 0.05 | e_Q(0.05) ≤ 5e-3; slope against h ≥ 1.6 | e_Q 3.25e-2, 1.05e-2, 2.07e-3; slope 1.99 |
+| P3(a) | E3: Q_h against V24's C_h = uᵀKu on the same mesh (Σ k_T \|∇u_T\|² V_T, u = T − 300 K) | ≤ 1e-9 relative (PR at 0.2, 0.1; main at all three) | 3.8e-14, 5.0e-15 |
+| The kind | E2 and E3 through `thermal.steady3d` against the direct path | Q_h and nodal T within 1e-12 relative | identical (0) |
+| Refusal | a fixed temperature on `via.side` (E2) or `sb.surface` (E3) | `Fixed temperature needs an outer face; <name> is inside` (`E-CONTRACT`) | as stated |
+
 ## Limits
 
 - Steady conduction with prescribed temperatures and volumetric sources only: no flux,
   convection, transient or coupling yet. Studio does not open the kind.
 - The meshloom route is experimental until meshloom's acceptance, and takes boxes and slab
   layers ([3D boxes and slab layers](geometry_engine3d.md)); the extrude route takes a lone
-  stack of slab layers.
+  stack of slab layers. The builder route takes meshloom's four builder shapes with one
+  element size; its result's `mesh_route` is `"builder"` and its diagnostics carry
+  `I-MESH-ESTIMATE` and one `I-SURFACE-SAMPLED` per sampled surface.
 - `simcase export` refuses the layout as unsupported.
