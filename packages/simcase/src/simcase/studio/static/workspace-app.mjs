@@ -33,7 +33,7 @@ import {runOfResult} from './workspace-result-run.mjs';
 import {chooseFieldsAtArrival,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {placeChannelNotes} from './workspace-mode-channel.mjs';
 import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
-import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes} from './workspace-match.mjs';
+import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes,compareCores,coreMark,coreMatchText,CORE_MARK} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
 import {solverApi} from './workspace-api.mjs';
@@ -1985,16 +1985,20 @@ function compareTable(a,b,match){
  const ngCell=(run,unit,side)=>{const v=unitGroupIndex(run,unit);return cell('td',v.text,{class:'num',title:v.title,['data-group-index-'+side]:v.value===null?'':String(v.value)});};
  // "1", or "1–2" for a pair or group; "—" for no unit
  const short=unit=>unit?(unit.length===1?String(unit[0]+1):`${unit[0]+1}–${unit.at(-1)+1}`):'—';
+ // round 36 (C1): a core mode of its run (Results' core-mode note) reads "3 (core)"
+ // (round 36, coordinator's choice (e)): when both sides are core modes, one mark after the pair, "3 ↔ 1 (core)",
+ // so the frozen Modes column stays narrow (N1 one line, O2 24 px); the accessible name keeps both marks
+ const cores=compareCores({a,b}),pairShort=(ua,ub)=>{const ma=coreMark(cores.a,ua),mb=coreMark(cores.b,ub);return ma&&mb?`${short(ua)} ↔ ${short(ub)}${CORE_MARK}`:`${short(ua)}${ma} ↔ ${short(ub)}${mb}`;};
  const body=document.createElement('tbody');
- for(const r of compareMatchRows(match)){
+ for(const r of compareMatchRows(match,cores)){
   const tr=document.createElement('tr');
   if(r.kind==='match'){
    const mean=index(a,r.unitA);tr.dataset.match=`${r.unitA.join('-')}:${r.unitB.join('-')}`;
-   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':`A ${unitName(r.unitA)} ↔ B ${unitName(r.unitB)}`}),polarizationCell(unitPolarization(a,r.unitA)),polarizationCell(unitPolarization(b,r.unitB)),cell('td',formatOverlap(r.pair.eta),{'data-overlap':String(r.pair.eta),class:'num'}),
+   tr.append(cell('th',pairShort(r.unitA,r.unitB),{scope:'row',title:r.text,'aria-label':`A ${unitName(r.unitA)}${coreMark(cores.a,r.unitA)} ↔ B ${unitName(r.unitB)}${coreMark(cores.b,r.unitB)}`}),polarizationCell(unitPolarization(a,r.unitA)),polarizationCell(unitPolarization(b,r.unitB)),cell('td',formatOverlap(r.pair.eta),{'data-overlap':String(r.pair.eta),class:'num'}),
     cell('td',indexText(a,r.unitA),{class:'num'}),cell('td',indexText(b,r.unitB),{class:'num'}),cell('td',formatDelta(r.pair.delta),{class:'num','data-delta':''}),cell('td',formatPercent(mean===0?null:r.pair.delta/mean*100),{class:'num','data-delta-percent':''}),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
   }else{
    tr.dataset.noMatch=`${r.kind.toUpperCase()}:${(r.unitA||r.unitB).join('-')}`;
-   tr.append(cell('th',`${short(r.unitA)} ↔ ${short(r.unitB)}`,{scope:'row',title:r.text,'aria-label':r.text}),polarizationCell(r.unitA?unitPolarization(a,r.unitA):'—'),polarizationCell(r.unitB?unitPolarization(b,r.unitB):'—'),bestCell(r.best,r.kind==='a'?'B':'A'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
+   tr.append(cell('th',pairShort(r.unitA,r.unitB),{scope:'row',title:r.text,'aria-label':r.text}),polarizationCell(r.unitA?unitPolarization(a,r.unitA):'—'),polarizationCell(r.unitB?unitPolarization(b,r.unitB):'—'),bestCell(r.best,r.kind==='a'?'B':'A'),cell('td',indexText(a,r.unitA)),cell('td',indexText(b,r.unitB)),cell('td','—'),cell('td','—'),areaCell(a,r.unitA,'a'),areaCell(b,r.unitB,'b'),lossCell(a,r.unitA,'a'),lossCell(b,r.unitB,'b'),ngCell(a,r.unitA,'a'),ngCell(b,r.unitB,'b'));
   }
   body.append(tr);
  }
@@ -2004,7 +2008,9 @@ function compareTable(a,b,match){
  scroll.addEventListener('scroll',cue,{passive:true});new ResizeObserver(cue).observe(scroll);
  // an open run without physical bounds is not matched (workspace-match.mjs MATCH_OPEN_TEXT): every mode is listed unmatched
  const note=cell('p',match.disabled?match.disabled+'. Every mode of A and of B is listed, not matched.':MATCH_NOTE,{class:'table-note',id:'compare-match-note'});
- box.append(runs,more,frame,note);
+ // round 36 (C1): the first modes not matched with each other but the core modes matched: one line above the table
+ const coreLine=coreMatchText(match,{a,b});
+ box.append(runs,...(coreLine?[cell('p',coreLine,{class:'table-note',id:'compare-core-line'})]:[]),more,frame,note);
  // round 17 (U1): a closed run whose modes lie mostly in a shape touching the window edge says so,
  // which also says why such a run matches none of an open run's modes
  {const lines=[['A',a],['B',b]].flatMap(([side,run])=>edgeNotes(run).map(n=>`${side} · ${runTitle(runNumber(run),run.label)}: ${n.text}`));

@@ -1,6 +1,6 @@
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
-import {degenerateGroups,physicalBounds,physicalWindow,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
+import {coreModes,degenerateGroups,physicalBounds,physicalWindow,polarizationWord,polarizationShare,tePercent,modeTableRows,opticalModes,areaText,lossText,lossColumn,groupIndexCell,AREA_HELP,AREA_MEAN_NOTE,AREA_PAIR_NOTE} from './workspace-modes.mjs';
 import {isOpenRun,openLoss,LOSS_FLOOR,FLOOR_TEXT,FLOOR_HELP} from './workspace-open-run.mjs';
 
 // Matching the modes of two runs by field overlap, in Studio only (the engine never sees both
@@ -155,9 +155,16 @@ export function formatOverlap(eta){
 }
 // a difference that rounds to zero reads +0.00000000, never −0.00000000
 export const formatDelta=d=>(d>=0||Math.abs(d).toFixed(8)===(0).toFixed(8)?'+':'−')+Math.abs(d).toFixed(8);
-/** "A mode 1 ↔ B mode 1 · overlap 0.99 · Δn_eff +0.00214000" */
-export function matchText(pair){
- return `A ${unitName(pair.unitA)} ↔ B ${unitName(pair.unitB)} · overlap ${formatOverlap(pair.eta)} · Δn_eff ${formatDelta(pair.delta)}`;
+// Round 36 (C1): a unit holding a mode that its run's notes call the core mode (coreModes, the rule
+// of Results' core-mode note) reads "mode 3 (core)" in Compare; a run without one gets no mark.
+export const CORE_MARK=' (core)';
+/** The core modes of the two runs of a Compare, {a, b}: Sets, empty without a run or a core mode. */
+export const compareCores=(runs={})=>({a:runs.a?coreModes(runs.a):new Set(),b:runs.b?coreModes(runs.b):new Set()});
+/** " (core)" when the unit holds a core mode of cores (a Set), else "". */
+export const coreMark=(cores,unit)=>cores&&unit?.some(i=>cores.has(i))?CORE_MARK:'';
+/** "A mode 1 ↔ B mode 1 · overlap 0.99 · Δn_eff +0.00214000"; marks: {a, b}, the core marks of the two units. */
+export function matchText(pair,marks={}){
+ return `A ${unitName(pair.unitA)}${marks.a??''} ↔ B ${unitName(pair.unitB)}${marks.b??''} · overlap ${formatOverlap(pair.eta)} · Δn_eff ${formatDelta(pair.delta)}`;
 }
 /** The Overlap cell of an unmatched row (round 17, U4): "best 0.05 (< 0.8, not matched)", the best
  * overlap with any mode of the other run, which is below the threshold or not clear of the next
@@ -166,10 +173,10 @@ export function bestOverlapText(best){
  if(!best||!Number.isFinite(best.eta))return '—';
  return `best ${formatOverlap(best.eta)} (${best.eta<MATCH_THRESHOLD?'< '+MATCH_THRESHOLD:'margin < '+MATCH_MARGIN}, not matched)`;
 }
-/** "A mode 2: no match in B (best overlap 0.43, with B mode 2)"; side is the unmatched side. */
-export function noMatchText(side,unit,best){
+/** "A mode 2: no match in B (best overlap 0.43, with B mode 2)"; side is the unmatched side, mark its core mark. */
+export function noMatchText(side,unit,best,mark=''){
  const other=side==='A'?'B':'A';
- return `${side} ${unitName(unit)}: no match in ${other}${best?` (best overlap ${formatOverlap(best.eta)}, with ${other} ${unitName(best.unit)})`:''}`;
+ return `${side} ${unitName(unit)}${mark}: no match in ${other}${best?` (best overlap ${formatOverlap(best.eta)}, with ${other} ${unitName(best.unit)})`:''}`;
 }
 
 // ---- Optical runs -----------------------------------------------------------------------
@@ -255,8 +262,10 @@ export function unitGroupIndex(run,unit){
  return {text:'mean '+mean.toFixed(4),value:mean,title:cells[0].title};
 }
 /** The Compare table rows of a match: accepted pairs and unmatched A units in A's rank order,
- * then the unmatched B units. kind: 'match' | 'a' | 'b'. */
-export function compareMatchRows(match){
+ * then the unmatched B units. kind: 'match' | 'a' | 'b'. cores: optional compareCores of the two
+ * runs, whose core modes the row texts mark "(core)" (round 36, C1). */
+export function compareMatchRows(match,cores={}){
+ const mA=unit=>coreMark(cores.a,unit),mB=unit=>coreMark(cores.b,unit);
  const out=[];
  // matching off (an open run): each mode is listed with the reason, never "no match"
  if(match.disabled){
@@ -265,22 +274,35 @@ export function compareMatchRows(match){
   return out;
  }
  for(const row of match.rows){
-  if(row.match)out.push({kind:'match',text:matchText(row.match),pair:row.match,unitA:row.unit,unitB:row.match.unitB});
-  else out.push({kind:'a',text:noMatchText('A',row.unit,row.best),unitA:row.unit,unitB:null,best:row.best});
+  if(row.match)out.push({kind:'match',text:matchText(row.match,{a:mA(row.unit),b:mB(row.match.unitB)}),pair:row.match,unitA:row.unit,unitB:row.match.unitB});
+  else out.push({kind:'a',text:noMatchText('A',row.unit,row.best,mA(row.unit)),unitA:row.unit,unitB:null,best:row.best});
  }
- for(const u of match.unmatchedB)out.push({kind:'b',text:noMatchText('B',u.unit,u.best),unitA:null,unitB:u.unit,best:u.best});
+ for(const u of match.unmatchedB)out.push({kind:'b',text:noMatchText('B',u.unit,u.best,mB(u.unit)),unitA:null,unitB:u.unit,best:u.best});
  return out;
 }
 /** The field picker of Compare: one entry per matched mode, {a, b, label}; a matched pair gives
  * one entry per member, in rank order (any rotation within a pair is a solution). */
 // runs: optional {a, b}, the two runs: a single-mode pair then names its polarization word, once
-// when A and B agree ("… · overlap 0.98 · TM-like"), else both ("… · A TE-like, B hybrid").
+// when A and B agree ("… · overlap 0.98 · TM-like"), else both ("… · A TE-like, B hybrid"), and
+// a core mode of either run reads "mode 3 (core)" (round 36, C1).
 export function fieldChoices(match,runs={}){
+ const cores=compareCores(runs),mA=i=>coreMark(cores.a,[i]),mB=i=>coreMark(cores.b,[i]);
  const out=[],word=(run,i)=>{const f=run?opticalModes(run)[i]?.fte:null;return Number.isFinite(f)?polarizationWord(f):null;};
  const words=(a,b)=>{const wa=word(runs.a,a),wb=word(runs.b,b);return !wa||!wb?'':wa===wb?' · '+wa:` · A ${wa}, B ${wb}`;};
  for(const p of match.pairs?.filter(x=>x.accepted)??[]){
-  if(p.unitA.length===1&&p.unitB.length===1){out.push({a:p.unitA[0],b:p.unitB[0],label:`A mode ${p.unitA[0]+1} ↔ B mode ${p.unitB[0]+1} · overlap ${formatOverlap(p.eta)}${words(p.unitA[0],p.unitB[0])}`});continue;}
-  p.unitA.forEach((a,k)=>{const b=p.unitB[Math.min(k,p.unitB.length-1)];out.push({a,b,label:`A mode ${a+1} ↔ B mode ${b+1} (pair, any rotation) · overlap ${formatOverlap(p.eta)}`});});
+  if(p.unitA.length===1&&p.unitB.length===1){out.push({a:p.unitA[0],b:p.unitB[0],label:`A mode ${p.unitA[0]+1}${mA(p.unitA[0])} ↔ B mode ${p.unitB[0]+1}${mB(p.unitB[0])} · overlap ${formatOverlap(p.eta)}${words(p.unitA[0],p.unitB[0])}`});continue;}
+  p.unitA.forEach((a,k)=>{const b=p.unitB[Math.min(k,p.unitB.length-1)];out.push({a,b,label:`A mode ${a+1}${mA(a)} ↔ B mode ${b+1}${mB(b)} (pair, any rotation) · overlap ${formatOverlap(p.eta)}`});});
  }
  return out.sort((x,y)=>x.a-y.a);
+}
+/** Round 36 (C1): "Core modes: A mode 3 ↔ B mode 1 · overlap 0.99", the line above the Compare
+ * table when each run has a core mode (coreModes), the core modes are matched with each other and
+ * the two runs' first modes are not; "" otherwise. Several matched core pairs are joined by "; ". */
+export function coreMatchText(match,runs={}){
+ if(!match||match.error||match.disabled)return '';
+ const accepted=match.pairs?.filter(p=>p.accepted)??[];
+ if(accepted.some(p=>p.unitA.includes(0)&&p.unitB.includes(0)))return '';
+ const cores=compareCores(runs);if(!cores.a.size||!cores.b.size)return '';
+ const pairs=accepted.filter(p=>coreMark(cores.a,p.unitA)&&coreMark(cores.b,p.unitB));
+ return pairs.length?'Core modes: '+pairs.map(p=>`A ${unitName(p.unitA)} ↔ B ${unitName(p.unitB)} · overlap ${formatOverlap(p.eta)}`).join('; '):'';
 }
