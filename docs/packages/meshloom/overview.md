@@ -442,9 +442,13 @@ See [third-party software](../../third-party.md).
     On C7, the 15° wedge, it fails at all three sizes with `RecoveryError`: 18–38 points
     near the wedge's edges cannot move. There, the space a new point would have to lie
     in is thinner than double resolution.
-- The PLC check compares candidate pairs from a sweep over bounding boxes and the facet
-  triangulation uses linear scans: both are meant for builder-sized inputs and are
-  not yet tuned for very large surfaces.
+- The PLC check takes candidate pairs from a uniform grid (cells about the median edge
+  extent; each segment and triangle listed in the cells its pieces meet) and checks
+  pairs that share a vertex in that vertex's star (a planar fan by the angular order
+  of its rays), so its time grows about linearly with the facet count on the
+  synthetic surfaces of `tests/meshloom/cdt_inputs.py`; an invalid input is reported
+  with the first failing pair of the full bounding-box sweep, as before. Facet
+  triangulations walk their triangle adjacency. Neither is tuned further yet.
 - The kernel refuses fewer than four affinely independent points and
   coordinates outside 0 or [2⁻¹²⁰, 2¹²⁰] in magnitude. It runs on one thread.
 - No musllinux, 32-bit or free-threaded CPython wheels.
