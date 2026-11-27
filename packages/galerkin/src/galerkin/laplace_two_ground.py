@@ -231,6 +231,74 @@ def _ground_coefficients(a, b, charges, width, height, *, modes, order):
         integrated[1, 1:] += weight * common * np.exp(-k[:, None] * (height - y)) * (1 - np.exp(-2 * k[:, None] * y))
     return -integrated @ charges
 
+GROUND_INTERVAL_FRACTION = 0.75
+GROUND_IMAGE_FLOOR = 1e-30
+
+def _ground_intervals(xs, distance, width, fraction=GROUND_INTERVAL_FRACTION):
+    """Edges of x intervals over [0, width] for one grounded plane.
+
+    The plane density of a source at (xs, d) is analytic in x except at
+    xs +- i*d, so r(x) = min over sources of hypot(x - xs, d) is the distance
+    to the nearest singularity. Each interval starting at x0 has width
+    fraction*r(x0); r changes by at most that much across it, so the interval
+    is at most fraction/(1-fraction) times r at any of its points (3 for 0.75).
+    Intervals are fine only near conductors and wide where the density is smooth.
+    """
+    edges = [0.0]
+    while edges[-1] < width:
+        step = fraction * float(np.min(np.hypot(edges[-1] - xs, distance)))
+        if not step > 0 or len(edges) > 100000:
+            raise ValueError('ground interval subdivision failed')
+        edges.append(min(width, edges[-1] + step))
+    return np.asarray(edges)
+
+def _ground_gram(a, b, charges, width, height, *, order):
+    """Plane current Gram int sigma_i sigma_j dx of both grounded planes.
+
+    sigma is the induced plane charge density of unit integrated conductor
+    currents, evaluated in physical space with the closed-form strip Poisson
+    kernel P = sin(c) E / (H ((1-E)^2 + 4E sin^2(c/2))), E = exp(-pi|dx|/H),
+    c = pi d/H for a source at distance d from the plane, plus lateral
+    side-wall images whose factor exp(-pi |shift|/H) can exceed 1e-30 over the
+    whole x range. Panels and x intervals use ``order``-point Gauss rules.
+    Unlike a cosine (Parseval) sum, a small entry between conductors with
+    little overlap is not left by cancellation, so it keeps its own relative
+    accuracy. Normalized coordinates; divide by the length unit for 1/metre.
+    """
+    nodes, weights = leggauss(order)
+    points = a[:, None] + ((nodes + 1) / 2)[None, :, None] * (b - a)[:, None]
+    sources = np.repeat(charges, order, axis=0) * np.tile(weights / 2, len(a))[:, None]
+    xs = points[..., 0].ravel()
+    result = []
+    for plane in range(2):
+        distance = (points[..., 1] if plane == 0 else height - points[..., 1]).ravel()
+        edges = _ground_intervals(xs, distance, width)
+        middle, half = (edges[:-1] + edges[1:]) / 2, (edges[1:] - edges[:-1]) / 2
+        x = (middle[:, None] + half[:, None] * nodes[None]).ravel()
+        dx_weights = (half[:, None] * weights[None]).ravel()
+        angle = np.pi * distance / height
+        numerator, half_sine = np.sin(angle) / height, 4 * np.sin(angle / 2) ** 2
+        images = []
+        # Beyond |m| > reach every image factor is below the floor: exp(-pi(2|m|w - 2w)/H) < floor.
+        reach = int(np.ceil(-np.log(GROUND_IMAGE_FLOOR) * height / (2 * np.pi * width))) + 2
+        for m in range(-reach, reach + 1):
+            for sign in (1, -1):
+                low = x.min() - (xs.max() if sign == 1 else -xs.min()) - 2 * m * width
+                high = x.max() - (xs.min() if sign == 1 else -xs.max()) - 2 * m * width
+                nearest = 0.0 if low <= 0 <= high else min(abs(low), abs(high))
+                if np.exp(-np.pi * nearest / height) > GROUND_IMAGE_FLOOR:
+                    images.append((sign, 2 * m * width))
+        density = np.empty((len(x), charges.shape[1]))
+        for first in range(0, len(x), 256):
+            target = x[first:first + 256, None]
+            kernel_values = np.zeros((len(target), len(xs)))
+            for sign, shift in images:
+                e = np.exp(-np.pi / height * np.abs(target - sign * xs[None] - shift))
+                kernel_values += numerator * e / ((1 - e) ** 2 + half_sine * e)
+            density[first:first + 256] = -(kernel_values @ sources)
+        result.append((density * dx_weights[:, None]).T @ density)
+    return np.asarray(result)
+
 def _factors(solution, width, height, *, modes=256, order=16):
     a = solution['normalized_panel_starts']
     b = solution['normalized_panel_ends']
@@ -247,11 +315,12 @@ def _factors(solution, width, height, *, modes=256, order=16):
         q = charges[selected]
         parts.append(q.T @ (q / length[selected, None]))
         integrals.append(q.sum(axis=0))
-    coeff = _ground_coefficients(a, b, charges, w, h, modes=modes, order=order)
-    ground_parts = w / unit * (np.einsum('bi,bj->bij', coeff[:, 0], coeff[:, 0]) + 0.5 * np.einsum('bni,bnj->bij', coeff[:, 1:], coeff[:, 1:]))
+    # Plane totals are the zero cosine mode, (1-y/H) and y/H of each charge.
+    coeff = _ground_coefficients(a, b, charges, w, h, modes=0, order=order)
+    ground_parts = _ground_gram(a, b, charges, w, h, order=order) / unit
     parts.append(ground_parts.sum(axis=0))
     integrals.append(w * coeff[:, 0].sum(axis=0))
-    return dict(parts=np.array(parts), current_integrals=np.array(integrals), ground_parts=ground_parts, ground_integrals=w * coeff[:, 0], _ground_coefficients=coeff)
+    return dict(parts=np.array(parts), current_integrals=np.array(integrals), ground_parts=ground_parts, ground_integrals=w * coeff[:, 0])
 
 def solve_two_ground_rectangle(polygons, *, width, height, panels_per_edge=32, ground_modes=128, interpolation_degree=12):
     """Solve convex closed conductors with grounded bottom and top planes.
@@ -259,8 +328,10 @@ def solve_two_ground_rectangle(polygons, *, width, height, panels_per_edge=32, g
     Side normal flux is zero. Accept 1..16 disjoint convex polygons, strictly
     inside a rectangle of width/height in [0.25,64], separated from side walls
     by at least the cluster extent. At most 2048 cubic-graded panels are used.
-    Interpolation degree explicitly selects 10,12,14,16; ground_modes selects
-    64..4096 cosine modes, compared with twice that number. No fallback occurs.
+    Interpolation degree explicitly selects 10,12,14,16. The plane current
+    Gram is integrated in physical space with 12- and 16-point rules on the
+    same intervals; ground_modes is admitted (64..4096) but no longer changes
+    it. No fallback occurs.
 
     Matrix and ground refinement, reciprocity, charge conservation and energy
     checks use 1e-10; condition bound must be below 1e10. These internal checks
