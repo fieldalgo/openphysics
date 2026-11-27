@@ -85,6 +85,7 @@ pub fn check(plc: &Plc) -> Result<Checked, InputError> {
 }
 
 fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
+    let clock = crate::recovery::StageClock::start();
     let malformed = |m: String| InputError::new(None, m);
     let bad = |w: u8, m: String| InputError::new(Some(w), m);
     let pts = &plc.points;
@@ -138,6 +139,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     let mut n = Counters::default();
     let mut tested = 0usize;
 
+    clock.lap("PLC check, input");
     // the broad phase's grid: cells about the median edge extent
     let grid = {
         let mut ext: Vec<f64> = out.segments.iter()
@@ -179,6 +181,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
             true
         });
     }
+    clock.lap("PLC check, 1 points on edges");
     let mut edge_subs: Vec<HashSet<(u32, u32)>> = Vec::with_capacity(edges.len());
     let mut sub_edges: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
     for (e, &[p, q]) in edges.iter().enumerate() {
@@ -233,11 +236,13 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     };
     let cell_ref = |e: u32| CellRef::Segment(edges[e as usize]);
 
+    // the sub-segments' grid cells (steps 2 and 5)
+    let sub_grid_cells: Vec<Vec<u64>> = subs.iter().map(|&(a, b)| grid.cells(&[pts[a as usize], pts[b as usize]])).collect();
     // 2. two sub-segments meet only at a shared end (an identical piece is one key)
     {
         let boxes: Vec<_> = subs.iter().map(|&(a, b)| bbox(pts, &[a, b])).collect();
         let verts: Vec<Verts> = subs.iter().map(|&(a, b)| [a, b, u32::MAX]).collect();
-        let cells: Vec<Vec<u64>> = subs.iter().map(|&(a, b)| grid.cells(&[pts[a as usize], pts[b as usize]])).collect();
+        let cells = &sub_grid_cells;
         let mut bad_pair = false;
         let mut test = |x: usize, y: usize| -> bool {
             tested += 1;
@@ -247,7 +252,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         };
         let ok = grid_pairs(&cells, &verts, &boxes, |_, _| true, &mut test)
             && star_pairs(pts.len(), &verts, |v, star| {
-                if star.len() <= 32 {
+                if star.len() < 3 {
                     return None;
                 }
                 let mut ends: Vec<u32> = star.iter().map(|&i| { let s = subs[i as usize]; if s.0 == v { s.1 } else { s.0 } }).collect();
@@ -274,6 +279,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         }
     }
 
+    clock.lap("PLC check, 2 sub-segment pairs");
     // 3. each facet triangulated with the points and sub-segments on its plane
     let mut facet_tris: Vec<HashSet<[u32; 3]>> = Vec::with_capacity(plc.facets.len());
     let mut facet_edges: Vec<HashSet<(u32, u32)>> = Vec::with_capacity(plc.facets.len());
@@ -290,6 +296,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     let mut point_cells: Vec<(u64, u32)> = (0..pts.len() as u32).map(|v| (grid.cells(&[pts[v as usize]])[0], v)).collect();
     point_cells.sort_unstable();
     // the sub-segments at each point, so that a facet visits only those at its members
+    let sub_index: HashMap<(u32, u32), u32> = subs.iter().enumerate().map(|(i, &k)| (k, i as u32)).collect();
     let mut subs_at: Vec<Vec<u32>> = vec![Vec::new(); pts.len()];
     for (i, &(a, b)) in subs.iter().enumerate() {
         subs_at[a as usize].push(i as u32);
@@ -328,8 +335,23 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         }
         let members: HashSet<u32> = own.iter().copied().chain(extra.iter().copied()).collect();
         // the sub-segments with both ends among the members, in the order of subs
-        let mut at: Vec<u32> = members.iter().flat_map(|&v| subs_at[v as usize].iter().copied())
-            .filter(|&i| { let (a, b) = subs[i as usize]; members.contains(&a) && members.contains(&b) }).collect();
+        let mut at: Vec<u32> = if members.len() <= 64 {
+            // the pairs of members that are sub-segments (a vertex such as a fan's centre
+            // may have far more sub-segments than the facet has members)
+            let mv: Vec<u32> = members.iter().copied().collect();
+            let mut found = Vec::new();
+            for x in 0..mv.len() {
+                for y in x + 1..mv.len() {
+                    if let Some(&i) = sub_index.get(&(mv[x].min(mv[y]), mv[x].max(mv[y]))) {
+                        found.push(i);
+                    }
+                }
+            }
+            found
+        } else {
+            members.iter().flat_map(|&v| subs_at[v as usize].iter().copied())
+                .filter(|&i| { let (a, b) = subs[i as usize]; members.contains(&a) && members.contains(&b) }).collect()
+        };
         at.sort_unstable();
         at.dedup();
         let inner: Vec<(u32, u32)> = at.iter().map(|&i| subs[i as usize]).collect();
@@ -365,6 +387,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         facet_edges.push(eds);
     }
 
+    clock.lap("PLC check, 3 facets");
     // closure (type 6): each elementary sub-segment on the boundary of an even number
     // of facets; a facet's boundary is its loop edges, each split into sub-segments
     {
@@ -458,6 +481,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         covered(&tri_cells[k], k.to_vec())?;
     }
 
+    clock.lap("PLC check, 4 shared pieces");
     // 5. sub-segments against facet triangles, and triangles of different facets, meet
     //    only in shared faces
     let mut items: Vec<(bool, usize)> = subs.iter().enumerate().map(|(i, _)| (true, i)).collect();
@@ -483,8 +507,10 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     let verts: Vec<Verts> = items.iter()
         .map(|&(is_seg, i)| if is_seg { [subs[i].0, subs[i].1, u32::MAX] } else { tri_keys[i] })
         .collect();
-    let cells: Vec<Vec<u64>> = verts.iter()
-        .map(|vs| grid.cells(&vs.iter().filter(|&&v| v != u32::MAX).map(|&v| pts[v as usize]).collect::<Vec<_>>()))
+    let cells: Vec<Vec<u64>> = items.iter().zip(&verts)
+        .map(|(&(is_seg, i), vs)| if is_seg { sub_grid_cells[i].clone() } else {
+            grid.cells(&vs.iter().map(|&v| pts[v as usize]).collect::<Vec<_>>())
+        })
         .collect();
     let failed = std::cell::Cell::new(false);
     {
@@ -500,7 +526,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
             !failed.get()
         };
         let fast = |v: u32, star: &[u32]| -> Option<bool> {
-            if star.len() <= 48 {
+            if star.len() < 4 {
                 return None;
             }
             // the plane of the first triangle at v; items in it are checked by their
@@ -593,6 +619,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         return Err(e.with(Detail::Point { cells, at }));
     }
     out.pairs_tested = tested;
+    clock.lap("PLC check, 5 crossings");
     Ok(out)
 }
 
@@ -696,6 +723,17 @@ fn seg_seg_ok(pts: &[P3], a: [u32; 2], b: [u32; 2], n: &mut Counters) -> bool {
     }
 }
 
+/// For p, q in the plane of a, b, c (projection `axis`): closed segment p-q meets
+/// closed triangle a-b-c.
+fn seg_meets_tri_2d(axis: usize, p: &P3, q: &P3, a: &P3, b: &P3, c: &P3) -> bool {
+    let inside = |x: &P3| {
+        let s = [pr::orient2d_proj(axis, a, b, x), pr::orient2d_proj(axis, b, c, x), pr::orient2d_proj(axis, c, a, x)];
+        s.iter().all(|&v| v >= 0) || s.iter().all(|&v| v <= 0)
+    };
+    inside(p) || inside(q) || segs_meet_2d(axis, p, q, a, b) || segs_meet_2d(axis, p, q, b, c)
+        || segs_meet_2d(axis, p, q, c, a)
+}
+
 /// True when closed segment p-q meets closed triangle a-b-c (no shared vertices).
 fn seg_meets_tri(p: &P3, q: &P3, a: &P3, b: &P3, c: &P3, n: &mut Counters) -> bool {
     let op = pr::orient3d(a, b, c, p, n);
@@ -704,13 +742,7 @@ fn seg_meets_tri(p: &P3, q: &P3, a: &P3, b: &P3, c: &P3, n: &mut Counters) -> bo
         return false;
     }
     if op == 0 && oq == 0 {
-        let axis = plane_axis(a, b, c).unwrap();
-        let inside = |x: &P3| {
-            let s = [pr::orient2d_proj(axis, a, b, x), pr::orient2d_proj(axis, b, c, x), pr::orient2d_proj(axis, c, a, x)];
-            s.iter().all(|&v| v >= 0) || s.iter().all(|&v| v <= 0)
-        };
-        return inside(p) || inside(q) || segs_meet_2d(axis, p, q, a, b) || segs_meet_2d(axis, p, q, b, c)
-            || segs_meet_2d(axis, p, q, c, a);
+        return seg_meets_tri_2d(plane_axis(a, b, c).unwrap(), p, q, a, b, c);
     }
     // the line p-q crosses the plane at one point, inside the segment: is it in the triangle?
     let s = [pr::orient3d(p, q, a, b, n), pr::orient3d(p, q, b, c, n), pr::orient3d(p, q, c, a, n)];
@@ -761,6 +793,22 @@ fn tri_tri_ok(pts: &[P3], t: [u32; 3], u: [u32; 3], n: &mut Counters) -> bool {
             }
             let axis = plane_axis(p(sh[0]), p(sh[1]), p(a)).unwrap();
             pr::orient2d_proj(axis, p(sh[0]), p(sh[1]), p(a)) * pr::orient2d_proj(axis, p(sh[0]), p(sh[1]), p(b)) < 0
+        }
+        0 => {
+            // u wholly on one side of t's plane: disjoint; coplanar: the closed triangles
+            // in a projection, as the edge tests below would decide without orient3d
+            let o = u.map(|w| pr::orient3d(p(t[0]), p(t[1]), p(t[2]), p(w), n));
+            if o.iter().all(|&x| x > 0) || o.iter().all(|&x| x < 0) {
+                return true;
+            }
+            if o.iter().all(|&x| x == 0) {
+                let axis = plane_axis(p(t[0]), p(t[1]), p(t[2])).unwrap();
+                let edges = |x: [u32; 3]| [[x[0], x[1]], [x[1], x[2]], [x[2], x[0]]];
+                let meets = |e: [u32; 2], x: [u32; 3]| seg_meets_tri_2d(axis, p(e[0]), p(e[1]), p(x[0]), p(x[1]), p(x[2]));
+                return !(edges(t).iter().any(|&e| meets(e, u)) || edges(u).iter().any(|&e| meets(e, t)));
+            }
+            let edges = |x: [u32; 3]| [[x[0], x[1]], [x[1], x[2]], [x[2], x[0]]];
+            edges(t).iter().all(|&e| seg_tri_ok(pts, e, u, n)) && edges(u).iter().all(|&e| seg_tri_ok(pts, e, t, n))
         }
         _ => {
             // every edge of each against the other triangle (shared vertices allowed)
