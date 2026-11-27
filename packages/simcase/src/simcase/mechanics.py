@@ -640,7 +640,7 @@ class MechanicsRunResult:
         return owned.path
 
 
-def solve_03(mesh, inputs, heat_args, thermal, label=None):
+def solve_03(mesh, inputs, heat_args, thermal, label=None, *, temperature=None):
     """Solve the heat stage (thermoelastic) and the mechanical stage on ``mesh``; returns
     ``(solved, heat, snapshot)``. ``label`` prefixes a solver refusal with the physics entry
     (region documents)."""
@@ -650,8 +650,10 @@ def solve_03(mesh, inputs, heat_args, thermal, label=None):
     heat = snapshot = None
     try:
         if thermal:
-            heat = solve_steady_heat(mesh, **views.galerkin_heat_arguments(heat_args))
-            snapshot = freeze_temperature(mesh, temperature=heat.temperature)
+            if temperature is None:
+                heat = solve_steady_heat(mesh, **views.galerkin_heat_arguments(heat_args))
+                temperature = heat.temperature
+            snapshot = freeze_temperature(mesh, temperature=temperature)
             solved = solve_thermoelasticity(mesh, snapshot, **inputs)
         else:
             solved = solve_elasticity(mesh, **inputs)
@@ -709,10 +711,36 @@ def _accepts_mesh_limits(data):
     return is_region_mechanics(data)
 
 
+def _coupling_prepare(doc, name):
+    from .thermal_regions import prepare_coupled_region
+    return prepare_coupled_region(doc.views[name])
+
+
+def _coupling_solve(state, inputs, verbose):
+    from .mechanics_regions import run_region_mechanics
+    field = inputs.get('temperature')
+    temperature = None if field is None else field.values
+    return run_region_mechanics(state.view, verbose, prepared=state, temperature=temperature), {}
+
+
+def _coupling_check(view, name, coupled, materials):
+    from physmat.units import Diagnostic
+    from .mechanics_regions import is_region_mechanics
+    if not is_region_mechanics(view.data):
+        yield Diagnostic('E-CONTRACT', f'physics.{name}', 'coupled mechanics requires planar 2D region geometry')
+
+
+def _coupling():
+    from .multiphysics import CouplingHook
+    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, check=_coupling_check,
+                        ignored_mesh_keys=frozenset({'grading'}), outputs=frozenset(),
+                        types=frozenset({THERMOELASTIC}))
+
+
 #: the kind this module registers; the built-in provider openphysics-fem reads it here
 KIND = register(PhysicsKind(
     name='mechanics', types=frozenset(TYPES), precedence=15,
     validate=validate_mechanics, run=run_mechanics, summary=document_summary,
     result_types=(MechanicsRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM stage; use run(document) for mechanics physics',
-    accepts_mesh_limits=_accepts_mesh_limits, slots=mechanics_slots()))
+    accepts_mesh_limits=_accepts_mesh_limits, slots=mechanics_slots(), coupling=_coupling()))

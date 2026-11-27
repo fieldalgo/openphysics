@@ -796,8 +796,7 @@ def _forms():
 
 
 class _CoupledHeat:
-    """A coupled thermal.steady2d entry before its solve: it has no input ports, so no mesh is
-    needed before the solve (``simcase.multiphysics``)."""
+    """A thermal.steady2d entry with no incoming field: no mesh is needed before its solve (``simcase.multiphysics``)."""
     mesh = None
     triangle_regions = None
 
@@ -806,22 +805,44 @@ class _CoupledHeat:
 
 
 def _coupling_prepare(doc, name):
-    return _CoupledHeat(doc.views[name])
+    from .thermal_regions import prepare_coupled_region
+    view = doc.views[name]
+    if 'heat_source_density' in view._resolution.coupled_inputs:
+        return prepare_coupled_region(view)
+    return _CoupledHeat(view)
 
 
 def _coupling_solve(state, inputs, verbose):
     """The view's steady heat solve, as a single run solves it; the ``temperature`` output is the
     node temperature on the region mesh (K)."""
     from galerkin.coupling import Field
-    result = run_thermal(state.view, verbose=verbose)
+    from .thermal_regions import run_region_thermal
+    if 'heat_source_density' in inputs:
+        result = run_region_thermal(state.view, verbose, prepared=state,
+                                    element_source=inputs['heat_source_density'].values)
+    else:
+        result = run_thermal(state.view, verbose=verbose)
     return result, {'temperature': Field(result.mesh, np.asarray(result.temperature, dtype=float),
                                          location='node', unit='K', name='temperature')}
+
+
+def _coupling_check(view, name, coupled, materials):
+    from physmat.units import Diagnostic
+    from .thermal_regions import component_03, is_region_thermal
+    if 'heat_source_density' not in coupled:
+        return
+    path = f'physics.{name}'
+    if not is_region_thermal(view.data) or component_03(view)[1].get('dimension') != '2d':
+        yield Diagnostic('E-CONTRACT', path, 'Joule heat input requires planar 2D region geometry')
+    if view.si['physics'][name].get('heat_source_density') is not None:
+        yield Diagnostic('E-CONTRACT', path + '.heat_source_density',
+                         'choose one heat source: the Joule coupling or an authored heat_source_density')
 
 
 def _coupling():
     from .multiphysics import CouplingHook
     # mesh.grading (the em.modes2d radial grading) is not read: a heat region mesh is built without it
-    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, ignored_mesh_keys=frozenset({'grading'}),
+    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, check=_coupling_check, ignored_mesh_keys=frozenset({'grading'}),
                         outputs=frozenset({'temperature'}))
 
 

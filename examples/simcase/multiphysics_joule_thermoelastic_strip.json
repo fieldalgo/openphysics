@@ -1,0 +1,79 @@
+{
+  "openphysics": "0.3/multiphysics.1",
+  "name": "Joule-heated strip with transverse restraint",
+  "geometry": {
+    "version": 1,
+    "components": {
+      "strip": {
+        "dimension": "2d",
+        "length_unit": "mm",
+        "depth": "0.2 mm",
+        "domain": {
+          "xmin": 0,
+          "xmax": 1,
+          "ymin": 0,
+          "ymax": 0.5
+        },
+        "background": {
+          "material": "strip"
+        }
+      }
+    }
+  },
+  "materials": {
+    "strip": {
+      "electrical_conductivity": "1000 S/m",
+      "thermal_conductivity": "2 W/(m K)",
+      "youngs_modulus": "10 GPa",
+      "poisson_ratio": 0.25,
+      "linear_expansion_coefficient": "1e-5 1/K"
+    }
+  },
+  "physics": {
+    "structure": {
+      "type": "mechanics.thermoelastic2d",
+      "plane": "strain",
+      "stress_free_temperature": "300 K",
+      "prescribed_displacement": {
+        "left": {
+          "x": "0 mm"
+        },
+        "bottom": {
+          "y": "0 mm"
+        },
+        "top": {
+          "y": "0 mm"
+        }
+      }
+    },
+    "heat": {
+      "type": "thermal.steady2d",
+      "prescribed_temperature": {
+        "left": "300 K",
+        "right": "300 K"
+      }
+    },
+    "dc": {
+      "type": "electric.steady2d",
+      "prescribed_electric_potential": {
+        "left": "0 V",
+        "right": "0.2 V"
+      }
+    }
+  },
+  "couplings": {
+    "joule_heat": {
+      "from": "dc.joule_power_density",
+      "to": "heat.heat_source_density",
+      "transfer": "same_mesh"
+    },
+    "expansion": {
+      "from": "heat.temperature",
+      "to": "structure.temperature",
+      "transfer": "same_mesh"
+    }
+  },
+  "mesh": {
+    "element_size": "0.1 mm"
+  }
+}

@@ -233,6 +233,10 @@ def _out(name: str, quantity: str, unit: str, location: str) -> dict:
     return {"name": name, "direction": "output", "quantity": quantity, "unit": unit, "location": location}
 
 
+def _in(name: str, quantity: str, unit: str, location: str) -> dict:
+    return {**_out(name, quantity, unit, location), "direction": "input", "combine": "single"}
+
+
 #: the outputs every document of a built-in kind saves in its fields.npz under the port's
 #: name when it saves fields (``results.save_fields``, true by default; false saves no
 #: fields.npz). A "scalar" port is not on the mesh: one value per mode, for example. An input
@@ -251,11 +255,13 @@ _BUILTIN_MANIFEST = {
         "field": "structure", "engine": "galerkin", "process": "in_process",
         "ports": [_out("displacement", "displacement", "m", "node"),
                   _out("strain", "strain", "1", "element"),
-                  _out("stress", "stress", "Pa", "element")]},
+                  _out("stress", "stress", "Pa", "element"),
+                  _in("temperature", "temperature", "K", "node")]},
     "thermal.transient2d": {"field": "heat", "engine": "galerkin", "process": "in_process",
                             "ports": _THERMAL_PORTS},
     "thermal.steady2d": {"field": "heat", "engine": "galerkin", "process": "in_process",
-                         "ports": _THERMAL_PORTS},
+                         "ports": [*_THERMAL_PORTS,
+                                   _in("heat_source_density", "joule_power_density", "W/m^3", "element")]},
     "em.cavity3d": {"field": "electromagnetics", "engine": "galerkin", "process": "in_process",
                     "ports": [_out("resonant_frequency", "resonant_frequency", "Hz", "scalar")]},
     "em.modes2d": {"field": "electromagnetics", "engine": "galerkin", "process": "in_process",

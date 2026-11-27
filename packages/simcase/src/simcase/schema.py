@@ -161,7 +161,8 @@ class Document:
         so that ``validate`` checks what it holds now. Refused with the reader's diagnostics;
         otherwise the SI tree follows the new values."""
         from .resolve import resolve_tree
-        again = resolve_tree(copy.deepcopy(self.data))
+        inputs = self._resolution.coupled_inputs if self._resolution is not None else frozenset()
+        again = resolve_tree(copy.deepcopy(self.data), coupled_inputs=inputs)
         fresh = again.document()
         if fresh is None:
             raise DocumentError(refusal, diagnostics=list(again.diagnostics))

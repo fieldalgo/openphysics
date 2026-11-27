@@ -725,6 +725,33 @@ def run_electric_joule(doc, verbose=True, *, mesh_limits=None):
     return ElectricJouleRunResult(doc, arrays, metadata, log_lines_03(doc, printed))
 
 
+def _coupling_prepare(doc, name):
+    from .thermal_regions import prepare_coupled_region
+    return prepare_coupled_region(doc.views[name])
+
+
+def _coupling_solve(state, inputs, verbose):
+    from galerkin.coupling import Field
+    result = run_region_electric(state.view, verbose, prepared=state)
+    power = Field(state.mesh, result.fields['joule_power_density'], location='element',
+                  unit='W/m^3', name='joule_power_density')
+    return result, {'joule_power_density': power}
+
+
+def _coupling_check(view, name, coupled, materials):
+    from physmat.units import Diagnostic
+    from .thermal_regions import component_03
+    if not is_region_electric(view.data) or component_03(view)[1].get('dimension') != '2d':
+        yield Diagnostic('E-CONTRACT', f'physics.{name}', 'Joule output requires planar 2D region geometry')
+
+
+def _coupling():
+    from .multiphysics import CouplingHook
+    return CouplingHook(prepare=_coupling_prepare, solve=_coupling_solve, check=_coupling_check,
+                        ignored_mesh_keys=frozenset({'grading'}), outputs=frozenset({'joule_power_density'}),
+                        types=frozenset({'electric.steady2d'}))
+
+
 def _slots():
     return electric_slots()
 
@@ -735,4 +762,4 @@ KIND = register(PhysicsKind(
     validate=validate_electric_joule, run=run_electric_joule, summary=document_summary,
     result_types=(ElectricJouleRunResult,), fresh_output=True,
     stage_refusal='{stage} is an EM stage; use run(document) for electric/Joule physics',
-    accepts_mesh_limits=is_region_document, slots=_slots()))
+    accepts_mesh_limits=is_region_document, slots=_slots(), coupling=_coupling()))

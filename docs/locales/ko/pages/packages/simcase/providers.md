@@ -125,15 +125,13 @@ listing = [p.as_dict() for p in providers.providers()]   # JSON 데이터
 | `em.cavity3d` | `em.cavity3d` | `electromagnetics` | `resonant_frequency` (Hz, 모드마다 scalar) |
 | `em.modes2d` | `em.modes2d` | `electromagnetics` | `effective_index` (1, 모드마다 scalar) |
 
-내장 종류 가운데 하나에 입력 포트가 있다. [다중물리 문서](multiphysics_document.md)에서만 읽는다.
+[다중물리 문서](multiphysics_document.md)에서 내장 입력 포트를 읽습니다.
 
-| 종류 | 입력 포트 (양, 단위, 위치, `combine`) | 종류가 하는 일 |
+| 유형 | 입력 포트 (양, 단위, 위치, `combine`) | 사용 |
 |---|---|---|
-| `em.modes2d` | `temperature` (temperature, K, element, `single`) | 절점 온도를 삼각형마다 평균하고 n = n₀(λ) + (dn/dT)(T − T_ref)로 둔다 |
-
-입력 포트는 출력처럼 그 이름으로 저장하지 않는다. 결합된 `em.modes2d` 결과는 쓴 온도와 그 온도가
-준 굴절률을 `fields.npz`에 `temperature`와 `refractive_index`로 저장한다. Joule 온도 흐름과
-열탄성 흐름은 여전히 한 종류 안에서 결합하며 다른 종류의 출력을 읽지 않는다.
+| `thermal.steady2d` | `heat_source_density` (joule_power_density, W/m^3, element, `single`) | `electric.steady2d`의 요소별 줄 발열을 체적 열원으로 적분 |
+| `mechanics.thermoelastic2d` | `temperature` (temperature, K, node, `single`) | 절점 온도를 고정해 열팽창을 계산하고 온도도 저장 |
+| `em.modes2d` | `temperature` (temperature, K, element, `single`) | 절점 온도를 삼각형마다 평균하고 n = n₀(λ) + (dn/dT)(T − T_ref)로 설정 |
 
 ## 공급자 만들기
 

@@ -74,10 +74,10 @@ couplings`. 형상은 버전 1 블록입니다([형상 문서](geometry_document
 남겨서 값을 검사하고 쓰이지 않는다고 알립니다(`I-UNUSED-PROPERTY`). 진단은 문서 경로를 그대로
 쓰고, 두 뷰가 공유 블록에 대해 같은 진단을 내면 한 번만 알립니다.
 
-물리 이름은 식별자(문자, 숫자, `_`)입니다. 이 릴리스의 다중물리 문서는 결합 훅이 있는 종류
-`thermal.steady2d`와 `em.modes2d`를 받습니다. 다른 유형은 `physics.<이름>.type`에서
-`E-CONTRACT`("is not coupled in this release")입니다. 복합 종류(`joule.temperature2d`,
-`mechanics.thermoelastic2d`)는 자체 반복을 가진 단일 물리 문서로 남습니다.
+물리 이름은 식별자(문자, 숫자, `_`)입니다. 결합을 지원하는 유형은
+`electric.steady2d`, `thermal.steady2d`, `mechanics.thermoelastic2d`, `em.modes2d`입니다.
+다른 유형은 `physics.<이름>.type`에서 `E-CONTRACT`를 냅니다. 전용
+`joule.steady2d`와 `joule.temperature2d`는 단일 물리 문서를 사용합니다.
 
 ## 결합
 
@@ -120,6 +120,43 @@ couplings`. 형상은 버전 1 블록입니다([형상 문서](geometry_document
 `thermal.steady2d`와 `em.modes2d`는 같은 형상과 `mesh` 블록에서 똑같은 메시를 만듭니다. 단
 `mesh.grading`(`em.modes2d`의 방사형 등급)은 열 종류가 읽지 않습니다. 그래서 둘 사이의 `same_mesh`
 결합은 `mesh.grading`을 거부하고, 둘 다 읽는 `mesh.controls`로 메시를 조절합니다.
+
+## 직류 전기전도 → 줄 발열 → 열팽창
+
+[줄 발열 스트립 예제](../../../../../../examples/simcase/multiphysics_joule_thermoelastic_strip.json)는
+이름이 있는 재료 영역으로 구성된 하나의 평면 2D 성분과 온도 독립 전도도를 사용합니다.
+두 연결은 다음 순서로 실행됩니다.
+
+| 출발 | 도착 | 장 |
+|---|---|---|
+| `dc.joule_power_density` (`electric.steady2d`) | `heat.heat_source_density` (`thermal.steady2d`) | 각 삼각형에서 일정한 줄 발열 밀도, W/m³ |
+| `heat.temperature` (`thermal.steady2d`) | `structure.temperature` (`mechanics.thermoelastic2d`) | 절대온도, 노드당 한 값, K |
+
+두 입력에는 각각 `same_mesh` 연결 하나를 사용합니다. 열 솔버가 전달받은 요소 값을
+체적 열원으로 직접 적분합니다. 열 경계 조건은 열 항목에 작성하고 줄 발열을 연결했으면
+그 항목의 `heat_source_density`는 생략합니다. 구조 항목은 노드 온도와 자체
+`stress_free_temperature`, 구조 구속, 재료 열팽창 계수를 사용합니다. 정적 해석에서
+전달받은 온도를 고정하고 변위·응력과 함께 저장합니다. 이 연결을 쓸 때 열 경계 조건과
+열원은 열 항목에 둡니다. 독립 열탄성 문서는 자체 열 해석 단계를 계속 풉니다.
+
+```sh
+simcase validate examples/simcase/multiphysics_joule_thermoelastic_strip.json
+simcase run examples/simcase/multiphysics_joule_thermoelastic_strip.json -o joule-strip
+```
+
+스트립 길이 L, 전압차 V, 전기전도도 σ, 열전도도 k에 대해 발열 밀도는 q = σ(V/L)²,
+온도 상승은 ΔT(x) = q x(L − x)/(2k)입니다. 횡방향으로 구속된 평면 변형률 해는
+u_y = σ_xx = σ_xy = 0, du_x/dx = α(1 + ν)ΔT/(1 − ν),
+σ_yy = σ_zz = −EαΔT/(1 − ν)입니다.
+요소 크기 0.1, 0.05, 0.025 mm에서 최대 노드 온도 오차는 0.00503, 0.00146,
+0.000316 K, 최대 변위 오차는 1.54e-10, 4.17e-11, 1.01e-11 m였습니다.
+요소 중심의 평면 내 최대 응력 오차는 23.1, 11.4, 6.31 kPa였습니다. 전기 발열,
+조립된 열원, 외부로 빠져나간 열은 각각 20 W/m(예제 깊이에서 4 mW)였습니다.
+두 재료를 사용한 별도 사례에서는 요소별 발열, 노드 열하중, 온도, 변위, 응력을
+기존 전용 줄 발열 및 처방 온도 열탄성 솔버와 비교합니다.
+[검증 시험](../../../../../../tests/simcase/test_multiphysics_joule_thermoelastic.py).
+0.1 mm 메시에서 scikit-fem 12.0.2로 독립 조립한 결과와의 최대 차이는 온도 5.7e-14 K,
+변위 7.3e-23 m, 평면 내 응력 4.8e-9 Pa였습니다.
 
 ## 열 → n(T) → 광 모드
 

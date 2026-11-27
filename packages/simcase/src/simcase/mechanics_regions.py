@@ -62,6 +62,10 @@ def _boundary_names(table, allowed, interior, where):
                     f'{sorted(allowed)}', path, 'E-SELECTION-UNKNOWN')
 
 
+def _coupled_temperature(doc):
+    return doc._resolution is not None and 'temperature' in doc._resolution.coupled_inputs
+
+
 def validate_region_mechanics(doc):
     """mechanics.elasticity2d and mechanics.thermoelastic2d on regions, format 0.3."""
     name, p, path, kind = entry_03(doc)
@@ -76,7 +80,14 @@ def validate_region_mechanics(doc):
     h = handoff_03(doc)
     names = region_geometry_03(doc, h, 'mechanics')
     mesh_controls_03(doc, h)
-    region_materials_table_03(doc, h, MATERIAL_KEYS[kind], kind, 'thermal, electrical and mechanical properties')
+    required = MATERIAL_KEYS[kind]
+    coupled = thermal and _coupled_temperature(doc)
+    if coupled:
+        required = tuple(key for key in required if key != 'thermal_conductivity')
+        for key in ('prescribed_temperature', 'inward_heat_flux', 'convection', 'heat_source_density'):
+            if key in doc.data['physics'][name]:
+                _refuse(f'{path}.{key}: give heat inputs on the coupled thermal.steady2d entry', f'{path}.{key}')
+    region_materials_table_03(doc, h, required, kind, 'thermal, electrical and mechanical properties')
     materials = doc.si.get('materials') or {}
     for mname, spec in materials.items():
         if 'youngs_modulus' in spec and not spec['youngs_modulus'] > 0:
@@ -107,7 +118,7 @@ def validate_region_mechanics(doc):
             _refuse(f'{path}.gauge_pressure.{tag}: {tag!r} also has a traction; give that boundary one entry',
                     f'{path}.gauge_pressure.{tag}')
     default_traction_free_03(doc, name, p, sides)
-    if thermal:
+    if thermal and not coupled:
         region_source_03(p, names, path)
         sides_03(p, name, sides, (tags, outside, inside))
         default_boundaries_03(doc, name, p, sides)
@@ -118,17 +129,22 @@ def region_mechanics_summary(doc):
     from .electric_regions import summary_lines_03
     name, p, where, kind = entry_03(doc)
     thermal = kind == THERMOELASTIC
+    coupled = thermal and _coupled_temperature(doc)
+    stage = ', coupled-temperature mechanics' if coupled else (
+        ', steady heat then prescribed-temperature mechanics' if thermal else '')
     out = summary_lines_03(doc, f'{kind}, headless single static solve, named material regions, plane {p["plane"]}'
-                           + (', steady heat then prescribed-temperature mechanics' if thermal else ''), ())
+                           + stage, ())
     body = p.get('body_force_density')
     from .thermal import _authored
     out.append(boundary_text_03(doc, where, p) + ('' if body is None else
                                                   f'; body_force_density {_authored(doc, where + ".body_force_density")}'))
-    if thermal:
+    if coupled:
+        out.append(f'  coupled temperature; stress_free_temperature {p["stress_free_temperature"]} K')
+    elif thermal:
         out.append(heat_text_03(doc, where, p))
     out += [f'  result: {RESULT_FORMATS[kind]}; layout: {FIELD_LAYOUTS[kind]}',
             '  output: SI (displacement m, strain 1, stress Pa; nodal forces N/m of depth; triangle regions'
-            + ('; temperature K, heat rates W/m of depth)' if thermal else ')')]
+            + ('; temperature K)' if coupled else '; temperature K, heat rates W/m of depth)' if thermal else ')')]
     return '\n'.join(out)
 
 
@@ -247,7 +263,7 @@ def regions_block_03(doc, mesh, region_materials, p, kind):
            'traction': {tag: tagged_array(v, 'traction') for tag, v in p.get('traction', {}).items()},
            'gauge_pressure': {tag: vo(v, 'gauge_pressure') for tag, v in p.get('gauge_pressure', {}).items()},
            'gauge_pressure_sign': GAUGE_PRESSURE_SIGN}
-    if kind == THERMOELASTIC:
+    if kind == THERMOELASTIC and not _coupled_temperature(doc):
         source = p.get('heat_source_density')
         if isinstance(source, dict):
             out['heat_source_density'] = {r: vo(v, 'heat_source_density') for r, v in source.items()}
@@ -263,28 +279,38 @@ def regions_block_03(doc, mesh, region_materials, p, kind):
     return out
 
 
-def run_region_mechanics(doc, verbose=True, *, mesh_limits=None):
+def run_region_mechanics(doc, verbose=True, *, mesh_limits=None, prepared=None, temperature=None):
     doc.validate()
     given, doc = doc, doc.copy()
     doc.validate()
     name, p, path, kind = entry_03(doc)
     thermal = kind == THERMOELASTIC
     start = time.perf_counter()
-    h = handoff_03(doc)
-    mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    if prepared is None:
+        h = handoff_03(doc)
+        mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    else:
+        h, mesh, region_materials, tri = (prepared.handoff, prepared.mesh, prepared.region_materials,
+                                         prepared.triangulation)
     # the mesher's findings reach the caller's document as coded diagnostics
     for target in (given, doc):
         mesh_diagnostics_03(target, component_03(doc)[0], h.notes)
     inputs = region_mechanics_inputs(doc, mesh, region_materials)
-    heat_args = region_inputs(doc, mesh, region_materials, views.region_heat_03(doc), NAMES_03) if thermal else None
-    mesh_time = time.perf_counter() - start
+    if thermal and _coupled_temperature(doc) and temperature is None:
+        _refuse(f'{path}: the coupled temperature input is required', path)
+    heat_args = (region_inputs(doc, mesh, region_materials, views.region_heat_03(doc), NAMES_03)
+                 if thermal and temperature is None else None)
+    mesh_time = time.perf_counter() - start + (prepared.mesh_time if prepared is not None else 0.0)
     start = time.perf_counter()
-    solved, heat, snapshot = solve_03(mesh, inputs, heat_args, thermal, label=f'{path} ({kind})')
+    solved, heat, snapshot = solve_03(mesh, inputs, heat_args, thermal, label=f'{path} ({kind})',
+                                      temperature=temperature)
     solve_time = time.perf_counter() - start
     fixed = inputs['prescribed_displacement']
     heat_fixed = None if heat_args is None else heat_args['dirichlet']
     arrays = result_arrays(mesh, solved, fixed, thermal=thermal, regions=np.asarray(mesh.regions).astype(np.int64),
                            heat=heat, heat_fixed=heat_fixed)
+    if temperature is not None:
+        arrays['temperature'] = np.asarray(temperature)
     balance = balance_03(arrays, solved, mesh, thermal=thermal, heat=heat, heat_fixed=heat_fixed)
     metadata = summary_03(doc, result_format=RESULT_FORMATS[kind], field_layout=FIELD_LAYOUTS[kind], arrays=arrays,
                           balance=balance, timings={'mesh': mesh_time, 'solve': solve_time}, mesh=mesh,
@@ -295,7 +321,7 @@ def run_region_mechanics(doc, verbose=True, *, mesh_limits=None):
     printed = [doc.summary(), f'mesh: {mesh.num_nodes} nodes, {mesh.num_triangles} triangles, regions '
                               f'{mesh.region_names}',
                *([f'shapes fully covered by later shapes (no triangles): {covered}'] if covered else []),
-               solved_line(mesh, balance, thermal)]
+               solved_line(mesh, balance, heat is not None)]
     if verbose:
         print('\n'.join(printed))
     from .thermal import log_lines_03

@@ -240,7 +240,7 @@ def regions_block_03(doc, mesh, region_materials, keys):
                         for r, m in region_materials.items()}}
 
 
-def run_region_electric(doc, verbose=True, *, mesh_limits=None):
+def run_region_electric(doc, verbose=True, *, mesh_limits=None, prepared=None):
     from galerkin.electric import solve_steady_electric
     from .electric_joule import (RegionElectricRunResult, electric_balance, result_arrays, summary_03)
     from .thermal import log_lines_03
@@ -249,13 +249,17 @@ def run_region_electric(doc, verbose=True, *, mesh_limits=None):
     doc.validate()
     name, p = doc.sole_physics()
     t0 = time.perf_counter()
-    h = handoff_03(doc)
-    mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    if prepared is None:
+        h = handoff_03(doc)
+        mesh, region_materials, tri = build_region_mesh(h, mesh_limits)
+    else:
+        h, mesh, region_materials, tri = (prepared.handoff, prepared.mesh, prepared.region_materials,
+                                         prepared.triangulation)
     # the mesher's findings reach the caller's document as coded diagnostics
     for target in (given, doc):
         mesh_diagnostics_03(target, component_03(doc)[0], h.notes)
     kwargs, fixed_by = region_inputs(doc, mesh, region_materials)
-    t_mesh = time.perf_counter()-t0
+    t_mesh = time.perf_counter()-t0 + (prepared.mesh_time if prepared is not None else 0.0)
     calculation_json = doc.canonical_json(separators=(',', ':'))
     t0 = time.perf_counter()
     try:
