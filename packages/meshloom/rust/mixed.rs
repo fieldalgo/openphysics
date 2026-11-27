@@ -129,6 +129,28 @@ fn s_interval(input: &[P3], sp: &SPoint) -> [Iv; 3] {
     x
 }
 
+/// `s_interval`, but a point interval at the exact coordinates when they are doubles
+/// (decided once, exactly): [`Mixed::double_only`] then hands the point to the exact
+/// double predicates, which decide without big integers (the same signs: the same
+/// exact coordinates).
+fn s_interval_tight(input: &[P3], sp: &SPoint) -> [Iv; 3] {
+    let x = s_interval(input, sp);
+    if sp.kind() == Kind::Volume || x.iter().all(|c| c.lo == c.hi) {
+        return x;
+    }
+    let m = Mixed::new(input, std::slice::from_ref(sp));
+    let e = m.exact(Pt::S(0));
+    let mut out = x;
+    for c in 0..3 {
+        let v = e[c].to_f64();
+        if !(v.is_finite() && Dy::from_f64(v).sub(&e[c]).exact_sign() == 0) {
+            return x;
+        }
+        out[c] = Iv::point(v);
+    }
+    out
+}
+
 /// Checks an S table against the input points: existing, distinct ends and t a double
 /// strictly between 0 and 1.
 pub fn check_spoints(input: &[P3], s: &[SPoint]) -> Result<(), String> {
@@ -335,20 +357,27 @@ impl<'a> Mixed<'a> {
         }
     }
 
-    /// The points' coordinates when every one is a double triple: an input point or a
-    /// volume S point (stored as its doubles). The exact predicates of
-    /// [`crate::predicates`] then decide directly, without the interval filter.
-    fn double_only<const N: usize>(&self, p: &[Pt; N]) -> Option<[&P3; N]> {
-        let mut out = [&self.input[0]; N];
+    /// The points' coordinates when every one is a double triple: an input point, a
+    /// volume S point (stored as its doubles) or an S point whose cached interval is a
+    /// point (its exact coordinates are doubles, see `s_interval_tight`). The exact
+    /// predicates of [`crate::predicates`] then decide directly, without the interval
+    /// filter or big integers.
+    fn double_only<const N: usize>(&self, p: &[Pt; N]) -> Option<[P3; N]> {
+        let mut out = [[0.0; 3]; N];
         for (o, q) in out.iter_mut().zip(p) {
             match q {
-                Pt::In(i) => *o = &self.input[*i as usize],
+                Pt::In(i) => *o = self.input[*i as usize],
                 Pt::S(k) => {
                     let sp = &self.s[*k as usize];
-                    if sp.kind() != Kind::Volume {
-                        return None;
+                    if sp.kind() == Kind::Volume {
+                        *o = sp.p;
+                    } else {
+                        let x = self.iv.get(*k as usize)?;
+                        if !x.iter().all(|c| c.lo == c.hi) {
+                            return None;
+                        }
+                        *o = [x[0].lo, x[1].lo, x[2].lo];
                     }
-                    *o = &sp.p;
                 }
             }
         }
@@ -370,7 +399,7 @@ impl<'a> Mixed<'a> {
     pub fn orient3d(&self, p: [Pt; 4], n: &mut MixedCounters) -> i8 {
         n.calls += 1;
         if let Some(q) = self.double_only(&p) {
-            return pr::orient3d(q[0], q[1], q[2], q[3], &mut n.input);
+            return pr::orient3d(&q[0], &q[1], &q[2], &q[3], &mut n.input);
         }
         n.interval += 1;
         if let Some(s) = orient(&p.map(|q| self.approx(q))).sign() {
@@ -392,7 +421,7 @@ impl<'a> Mixed<'a> {
     pub fn insphere(&self, p: [Pt; 5], n: &mut MixedCounters) -> i8 {
         n.calls += 1;
         if let Some(q) = self.double_only(&p) {
-            return pr::insphere(q[0], q[1], q[2], q[3], q[4], &mut n.input);
+            return pr::insphere(&q[0], &q[1], &q[2], &q[3], &q[4], &mut n.input);
         }
         n.interval += 1;
         if let Some(s) = insph(&p.map(|q| self.approx(q))).sign() {
@@ -754,14 +783,14 @@ impl MixedPoints {
 
     /// Adds an S point; returns its global index.
     pub fn push(&mut self, sp: SPoint) -> u32 {
-        self.siv.push(s_interval(&self.input, &sp));
+        self.siv.push(s_interval_tight(&self.input, &sp));
         self.s.push(sp);
         (self.input.len() + self.s.len() - 1) as u32
     }
 
     /// Replaces S point k (an index into the S table).
     pub fn set_s(&mut self, k: usize, sp: SPoint) {
-        self.siv[k] = s_interval(&self.input, &sp);
+        self.siv[k] = s_interval_tight(&self.input, &sp);
         self.s[k] = sp;
     }
 
@@ -1045,5 +1074,38 @@ mod tests {
             }
         }
         assert!(checked > 1500);
+    }
+
+    #[test]
+    fn exact_double_points_take_the_double_predicates() {
+        // segment points with t a power of two between small-integer ends are exact
+        // doubles: their cached interval is a point and orient3d/insphere decide them as
+        // the exact double predicates, with the signs of the uncached mixed path
+        let mut sd = 7u64;
+        let input: Vec<P3> = (0..8).map(|_| std::array::from_fn(|_| (lcg(&mut sd) * 16.0).floor())).collect();
+        let mut mp = MixedPoints::new(input.clone());
+        let mut s = Vec::new();
+        for k in 0..12u32 {
+            let sp = SPoint::seg(k % 8, (k * 3 + 1) % 8, 0.5f64.powi(1 + (k % 3) as i32));
+            if sp.a == sp.b { continue; }
+            mp.push(sp);
+            s.push(sp);
+        }
+        let plain = Mixed::new(&input, &s);
+        let cached = mp.view();
+        let (mut n1, mut n2) = (MixedCounters::default(), MixedCounters::default());
+        let n = (input.len() + s.len()) as u32;
+        let mut points = 0;
+        for k in 0..s.len() {
+            if mp.siv[k].iter().all(|c| c.lo == c.hi) { points += 1; }
+        }
+        assert!(points > 0);
+        for i in 0..400u64 {
+            let v: [u32; 5] = std::array::from_fn(|j| ((i * 7 + j as u64 * 13 + i * i) % n as u64) as u32);
+            let q4 = [v[0], v[1], v[2], v[3]].map(|x| plain.from_id(x));
+            assert_eq!(plain.orient3d(q4, &mut n1), cached.orient3d(q4, &mut n2));
+            let q5 = v.map(|x| plain.from_id(x));
+            assert_eq!(plain.insphere(q5, &mut n1), cached.insphere(q5, &mut n2));
+        }
     }
 }
