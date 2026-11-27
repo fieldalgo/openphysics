@@ -237,11 +237,30 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
             for &j in &incident[c as usize] {
                 let sj = segments[j as usize];
                 let (a, b) = (&points[sj[0] as usize], &points[sj[1] as usize]);
-                let tr = rc / dist(a, b);
-                let w = tr * 2f64.powi(-30);
+                let len = dist(a, b);
+                // the radii rc 2^k below the far end, then one of the coarsest grid with a
+                // point within 2^-9 of it (common to segments whose lengths differ by a
+                // rounding): the next segments' points then lie at the ends of a piece,
+                // never inside it
+                let mut radii = Vec::new();
+                let mut r = rc;
+                let near_end = len * (1.0 - 2f64.powi(-9));
+                while r < near_end {
+                    radii.push(r);
+                    r *= 2.0;
+                }
+                if let Some(g) = grid_floor(rc, len * (1.0 - 2f64.powi(-10)), near_end) {
+                    if radii.last().is_none_or(|&l| g > l) {
+                        radii.push(g);
+                    }
+                }
                 let exact = |t: f64| exact_point(a, b, t);
-                let t = if sj[0] == c { pick_t(tr - w, tr, exact) } else { pick_t(1.0 - tr, 1.0 - tr + w, exact) };
-                plans.push((j as usize, t, Rule::Centre(c), true));
+                for d in radii {
+                    let tr = d / len;
+                    let w = tr * 2f64.powi(-30);
+                    let t = if sj[0] == c { pick_t(tr - w, tr, exact) } else { pick_t(1.0 - tr, 1.0 - tr + w, exact) };
+                    plans.push((j as usize, t, Rule::Centre(c), true));
+                }
             }
         }
         for &(k, i) in &missing {
@@ -271,7 +290,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
             // the piece of segment k that holds t (pieces are in order of t)
             let i = pieces[k].partition_point(|q| q.t1 <= t);
             let p = pieces[k][i];
-            if !force && edge(&mut mesh, p.u, p.v) {
+            if !force && edge(&mut mesh, p.u, p.v) || !(t > p.t0 && t < p.t1) {
                 continue;
             }
             let s = segments[k];
@@ -456,6 +475,42 @@ enum Rule {
 /// sphere up to that).
 fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool],
                    degree: [usize; 2], hub_radius: &[f64]) -> (f64, Rule) {
+    let (t, rule) = split_parameter_si(mesh, points, s, p, acute, degree, hub_radius);
+    // on a segment at a protected hub, every split point lies on the hub's grid of radii
+    // (see `grid_floor`), whichever rule chose it: a midpoint at a distance set by the
+    // segment's length (float32 rim points make those differ by a rounding) would
+    // encroach the pieces of the next segments of a thin fan, and they its
+    let hub = |c: u32| hub_radius.get(c as usize).copied().unwrap_or(0.0) > 0.0;
+    if matches!(rule, Rule::Centre(c) if hub(c)) {
+        return (t, rule);
+    }
+    let (pa, pb) = (&points[s[0] as usize], &points[s[1] as usize]);
+    let len = dist(pa, pb);
+    let span = p.t1 - p.t0;
+    let (lo, hi) = (p.t0 + span / 64.0, p.t1 - span / 64.0);
+    // the hub end nearer the point
+    let ends = [(s[0], t), (s[1], 1.0 - t)];
+    let Some(&(c, _)) = ends.iter().filter(|&&(c, _)| hub(c)).min_by(|x, y| x.1.total_cmp(&y.1)) else {
+        return (t, rule);
+    };
+    let from_a = c == s[0];
+    let sd = |t: f64| if from_a { t * len } else { (1.0 - t) * len };
+    let to_t = |d: f64| if from_a { d / len } else { 1.0 - d / len };
+    let (dlo, dhi) = { let (x, y) = (sd(lo), sd(hi)); (x.min(y), x.max(y)) };
+    let Some(g) = grid_floor(hub_radius[c as usize], sd(t).min(dhi), dlo) else {
+        return (t, rule);
+    };
+    let target = to_t(g);
+    if !(target >= lo && target <= hi) {
+        return (t, rule);
+    }
+    let w = (if from_a { target } else { 1.0 - target }) * 2f64.powi(-30);
+    let exact = |t: f64| exact_point(pa, pb, t);
+    (pick_t((target - w).max(lo), (target + w).min(hi), exact), Rule::Centre(c))
+}
+
+fn split_parameter_si(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool],
+                      degree: [usize; 2], hub_radius: &[f64]) -> (f64, Rule) {
     let _ = acute;
     let mid = (p.t0 + (p.t1 - p.t0) / 2.0, Rule::Midpoint);
     if p.toward == BOTH {
