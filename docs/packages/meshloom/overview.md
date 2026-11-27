@@ -15,6 +15,7 @@ the mesh (sliver removal, smoothing and flips). `meshloom.builder` adds curved
 primitives (spheres, cylinder vias), sampled on their surfaces. The quality gates
 measured so far pass, V10 on all 15 of its pairs included, but meshloom has no
 refinement on curved surfaces yet, and it is slower than the baseline (see Limits).
+Closed triangle surfaces (STL-like inputs) are **experimental** (see Limits).
 
 ```python
 import numpy as np
@@ -78,7 +79,10 @@ mesh["region_names"]           # ['via', 'slab']
 
 A closed triangle surface (an STL-like input: points and triangles, with a tag per
 triangle) goes through `builder.triangle_surface(points, triangles, tags=...,
-region_points=...)`.
+region_points=...)`. **Experimental:** the 3D plan's import gate (V20, on the Thingi10K
+population C14) was not met at milestone M4, so meshing such inputs can fail or exceed
+the plan's time limits on real files. Version 1 supports polyhedral inputs and the
+builder's primitives; closed-surface import is gated again at M8, and V20 stays reported.
 - **What it joins.** Two triangles are joined into one polygon facet when they:
   - share an edge that no other triangle uses;
   - carry the same tag;
@@ -382,8 +386,9 @@ See [third-party software](../../third-party.md).
   (none so far in the tests) is an error, not yet repaired with extra points. The
   gift-wrapping fallback takes time quadratic in the cavity size; the Delaunay path
   filled every cavity side in the tests (a cavity of 25,979 tetrahedra in 0.26 s).
-- A closed triangle surface given as one facet per triangle (an STL-like input) meshes,
-  small angles between its triangles included. Its quality is not guaranteed, and it
+- **Closed triangle surfaces (STL-like inputs) are experimental**: the import gate (V20
+  on C14) was not met at M4 and is run again at M8. A closed triangle surface given as one
+  facet per triangle meshes, small angles between its triangles included. Its quality is not guaranteed, and it
   can be slow. Every triangle edge is then a segment.
   - Inside an input angle too small for any triangle to meet the quality bound
     (19.5° for subfacets, 20.9° for tetrahedra at the default bound 1.4), refinement
