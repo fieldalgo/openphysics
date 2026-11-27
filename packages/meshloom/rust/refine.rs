@@ -99,8 +99,6 @@ struct State<'a> {
     /// input vertex of a triangle surface, which the polygon path would have as a Steiner
     /// point on its facet)
     tri_vertex: Vec<bool>,
-    /// shape() by sorted vertex set, while flip_improve runs (no vertex moves then)
-    shape_memo: std::cell::RefCell<Option<HashMap<[u32; 4], (f64, f64), FastKey>>>,
     /// While flip_improve runs: faces and edges whose flip was refused, until a tetrahedron
     /// on them is replaced (a refusal depends only on those tetrahedra)
     clean_faces: std::collections::HashSet<[u32; 3], FastKey>,
@@ -241,6 +239,21 @@ fn circumcentre(p: [P3; 4]) -> Option<P3> {
     let (bc, ca, ab) = (cross(&b, &c), cross(&c, &a), cross(&a, &b));
     let o: P3 = std::array::from_fn(|k| p[0][k] + (aa * bc[k] + bb * ca[k] + cc * ab[k]) / d);
     o.iter().all(|x| x.is_finite()).then_some(o)
+}
+
+/// The vertex pairs (i, j) of the six edges of a tetrahedron with the other two (k, l).
+const DIHEDRAL_PAIRS: [(usize, usize, usize, usize); 6] = [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)];
+
+/// q = 3 r_in / R of a tetrahedron with no degenerate face pair (shape's q, doubles).
+fn shape_q(x: &[P3; 4]) -> f64 {
+    let (a, b, c) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]), sub3(&x[3], &x[0]));
+    let v6 = dot(&a, &cross(&b, &c)).abs();
+    let area = |p: P3, q: P3, r: P3| { let n = cross(&sub3(&q, &p), &sub3(&r, &p)); dot(&n, &n).sqrt() / 2.0 };
+    let s = area(x[1], x[2], x[3]) + area(x[0], x[2], x[3]) + area(x[0], x[1], x[3]) + area(x[0], x[1], x[2]);
+    let num: P3 = std::array::from_fn(|k| dot(&a, &a) * cross(&b, &c)[k] + dot(&b, &b) * cross(&c, &a)[k]
+                                           + dot(&c, &c) * cross(&a, &b)[k]);
+    let r = dot(&num, &num).sqrt() / (2.0 * v6);
+    if r > 0.0 { 3.0 * (v6 / 2.0 / s) / r } else { 0.0 }
 }
 
 impl State<'_> {
@@ -774,26 +787,19 @@ impl State<'_> {
         self.xyz[v as usize] = p;
     }
 
-    /// (smallest dihedral angle in degrees, q) of four vertices, positive or not (doubles).
-    fn shape(&self, v: [u32; 4]) -> (f64, f64) {
-        let mut key = v;
-        key.sort_unstable();
-        if let Some(m) = self.shape_memo.borrow().as_ref() {
-            if let Some(&r) = m.get(&key) {
-                return r;
-            }
-        }
-        let r = self.shape_of(v);
-        if let Some(m) = self.shape_memo.borrow_mut().as_mut() {
-            m.insert(key, r);
-        }
-        r
+    /// (smallest dihedral angle in degrees, q) of four vertices, positive or not (doubles),
+    /// computed on the vertices in sorted order so that it does not depend on their order.
+    /// Until 2026-11-27 a memo by sorted vertex set returned the value of the first order
+    /// queried; it held about 60% of peak memory on V14's graded 1M cube.
+    fn shape(&self, mut v: [u32; 4]) -> (f64, f64) {
+        v.sort_unstable();
+        self.shape_of(v)
     }
 
     fn shape_of(&self, v: [u32; 4]) -> (f64, f64) {
         let x = v.map(|i| self.xyz[i as usize]);
         let mut m = 180.0f64;
-        for (i, j, k, l) in [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)] {
+        for (i, j, k, l) in DIHEDRAL_PAIRS {
             let e = sub3(&x[j], &x[i]);
             let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
             let d = (dot(&n1, &n1) * dot(&n2, &n2)).sqrt();
@@ -802,14 +808,21 @@ impl State<'_> {
             }
             m = m.min((dot(&n1, &n2) / d).clamp(-1.0, 1.0).acos().to_degrees());
         }
-        let (a, b, c) = (sub3(&x[1], &x[0]), sub3(&x[2], &x[0]), sub3(&x[3], &x[0]));
-        let v6 = dot(&a, &cross(&b, &c)).abs();
-        let area = |p: P3, q: P3, r: P3| { let n = cross(&sub3(&q, &p), &sub3(&r, &p)); dot(&n, &n).sqrt() / 2.0 };
-        let s = area(x[1], x[2], x[3]) + area(x[0], x[2], x[3]) + area(x[0], x[1], x[3]) + area(x[0], x[1], x[2]);
-        let num: P3 = std::array::from_fn(|k| dot(&a, &a) * cross(&b, &c)[k] + dot(&b, &b) * cross(&c, &a)[k]
-                                               + dot(&c, &c) * cross(&a, &b)[k]);
-        let r = dot(&num, &num).sqrt() / (2.0 * v6);
-        (m, if r > 0.0 { 3.0 * (v6 / 2.0 / s) / r } else { 0.0 })
+        (m, shape_q(&x))
+    }
+
+    /// shape(v).1 alone, bit for bit: the same degeneracy test without the six arc cosines.
+    fn q_of(&self, mut v: [u32; 4]) -> f64 {
+        v.sort_unstable();
+        let x = v.map(|i| self.xyz[i as usize]);
+        for (i, j, k, l) in DIHEDRAL_PAIRS {
+            let e = sub3(&x[j], &x[i]);
+            let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
+            if !((dot(&n1, &n1) * dot(&n2, &n2)).sqrt() > 0.0) {
+                return 0.0;
+            }
+        }
+        shape_q(&x)
     }
 
     /// The worst (dihedral, q) of a set of tetrahedra, compared dihedral first (below 15
@@ -821,7 +834,7 @@ impl State<'_> {
     /// The sum of badness 1/q - 1 over tetrahedra (0 for regular ones): the energy that
     /// flips lower when they keep the worst shape at least min(before, SMOOTH_FLOOR).
     fn badness(&self, ts: &[[u32; 4]]) -> f64 {
-        ts.iter().map(|t| { let q = self.shape(*t).1; if q > 0.0 { 1.0 / q - 1.0 } else { f64::INFINITY } }).sum()
+        ts.iter().map(|t| { let q = self.q_of(*t); if q > 0.0 { 1.0 / q - 1.0 } else { f64::INFINITY } }).sum()
     }
 
     /// A replacement is taken when it raises the worst (dihedral, q), or keeps the worst at
@@ -888,14 +901,12 @@ impl State<'_> {
     /// subsegment; exact orient3d for every new tetrahedron. Faces and edges are visited in
     /// sorted order (deterministic); up to four passes.
     fn flip_improve(&mut self) {
-        *self.shape_memo.borrow_mut() = Some(HashMap::with_hasher(FastKey));
         self.track_clean = true;
         self.flip_passes();
         self.track_clean = false;
         self.clean_faces.clear();
         self.clean_e32.clear();
         self.clean_er.clear();
-        *self.shape_memo.borrow_mut() = None;
     }
 
     fn flip_passes(&mut self) {
@@ -1051,8 +1062,8 @@ impl State<'_> {
             if !self.cx.alive[t as usize] || !self.inside[t as usize] {
                 continue;
             }
-            let (d, q) = self.shape(self.cx.tets[t as usize]);
-            if d >= DIHEDRAL_MIN && q > 0.9 {
+            // q first: the dihedral angle decides only when q > 0.9
+            if self.q_of(self.cx.tets[t as usize]) > 0.9 && self.shape(self.cx.tets[t as usize]).0 >= DIHEDRAL_MIN {
                 continue;
             }
             let v = self.cx.tets[t as usize];
@@ -1149,7 +1160,7 @@ impl State<'_> {
                         }
                         let ta = if sa > 0 { [tr[0], tr[1], tr[2], a] } else { [tr[1], tr[0], tr[2], a] };
                         let tb = if sa > 0 { [tr[1], tr[0], tr[2], b] } else { [tr[0], tr[1], tr[2], b] };
-                        self.shape(ta).1.min(self.shape(tb).1)
+                        self.q_of(ta).min(self.q_of(tb))
                     });
                     let v = q.min(best[i][k].0).min(best[k][j].0);
                     if v > best[i][j].0 {
@@ -2807,7 +2818,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
         (0..plc.points.len()).map(|v| all[v] > 0 && all[v] == tri[v]).collect()
     };
     let mut st = State {
-        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, shape_memo: std::cell::RefCell::new(None), clean_faces: std::collections::HashSet::with_hasher(FastKey), clean_e32: std::collections::HashSet::with_hasher(FastKey), clean_er: std::collections::HashSet::with_hasher(FastKey), track_clean: false, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
+        g, cx, xyz, rins, inside, hsz, sub, seg, chains: b.plc.rec.chains.clone(), chain_of, small_apex, seg_ends, tri_chain, tri_vertex, clean_faces: std::collections::HashSet::with_hasher(FastKey), clean_e32: std::collections::HashSet::with_hasher(FastKey), clean_er: std::collections::HashSet::with_hasher(FastKey), track_clean: false, fverts, fedges, locked_facet, locked_edge, splitting: Vec::new(), frame, opt, stats: RefineStats::default(),
         segq: VecDeque::new(), subq: VecDeque::new(), tetq: BinaryHeap::new(), dihq: BinaryHeap::new(), n: MixedCounters::default(),
         size,
         _p: std::marker::PhantomData,
