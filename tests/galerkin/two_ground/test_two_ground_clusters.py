@@ -115,3 +115,17 @@ def test_unresolved_plane_scaled_check_still_refuses(monkeypatch):
     monkeypatch.setattr(module, '_matrix', noisy)
     with pytest.raises(ValueError, match='matrix quadrature/interpolation failed'):
         solve(polygons, width=width, height=H, panels_per_edge=64, interpolation_degree=14)
+
+
+def test_layered_coupled_coplanar_section_passes_the_ground_check_with_margin():
+    """SIPI coupled_layered_coplanar_stripline: 0.3 mm pair, 0.2 mm gaps, 1 mm grounds, 35 um copper
+    at 0.1 mm in a 0.2 mm plane spacing. Its top-plane ground-to-ground Gram entry is about 3e-6 of
+    its Cauchy-Schwarz bound; as a cosine sum it was left by cancellation, and the entrywise ground
+    check (1.1e-10) failed by rounding. The physical-space Gram keeps its relative accuracy."""
+    y0, t = 1e-4, 35e-6
+    polygons = [rectangle(1.6e-3, 3e-4, y0, t), rectangle(2.1e-3, 3e-4, y0, t),
+                rectangle(4e-4, 1e-3, y0, t), rectangle(2.6e-3, 1e-3, y0, t)]
+    result = solve(polygons, width=4e-3, height=2e-4, panels_per_edge=64, ground_modes=512,
+                   interpolation_degree=14)
+    assert result.smooth_interpolation_boxes == 42
+    assert result.ground_refinement_error < 1e-12
