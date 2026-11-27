@@ -26,7 +26,7 @@ Categories (each also sets the share of the other features):
 - ``fan``: a terrain and a separate cylinder of ``k`` sides with fan caps, apex angles
   360/k degrees (0.01 degree at k = 36000).
 - ``touch``: pits whose lowest vertex lies a gap g above the bottom vertex below it,
-  and a box whose face is g away from a wall, with g log-uniform down to 1e-6 of the
+  and a box whose face is g away from a wall, with g log-uniform down to 1e-7 of the
   bounding-box diagonal.
 - ``mixed``: all of the above at once.
 
@@ -47,7 +47,7 @@ import numpy as np
 CATEGORIES = ("coplanar", "nearflat", "needle", "fan", "touch", "mixed")
 #: face counts of the readiness set (the task's range: 1e5 to 2e6)
 SIZES = (100_000, 300_000, 1_000_000, 2_000_000)
-GAP_MIN = 1e-6  # smallest near-touching gap, over the bounding-box diagonal
+GAP_MIN = 1e-7  # smallest near-touching gap, over the bounding-box diagonal
 ANGLE_MIN_DEG = 0.01  # smallest in-plane angle targeted by needles and fans
 DIHEDRAL_DEV_DEG = 0.1  # largest deviation from 180 degrees in near-flat regions
 
