@@ -40,7 +40,10 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 `z_divisions`는 3D 구성 요소에서 이름을 밝혀 거부합니다.
 
 `simcase.geometry_engine3d.evaluate3d(model, component=None)`은 `simcase.geometry_document.parse`로 읽은
-모델의 영역 구성만 돌려줍니다.
+모델의 영역 구성만 돌려줍니다. 압출 경로로 메시되는, `layers` 피처 하나만 가진 구성 요소는 거부합니다. 표시용(Studio)
+`simcase.geometry_engine3d.display_complex3d(model, component=None)`은 그런 구성 요소를 포함해 슬라이스 1이 받는 모든
+`3d` 구성 요소의 정확한 영역 구성, 곧 meshloom 경로가 만들 구성을 돌려줍니다. 아무것도 메시하지 않으며
+`build_mesh3d`가 하거나 거부하는 것을 바꾸지 않습니다.
 
 ## 만드는 것
 
