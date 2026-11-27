@@ -47,6 +47,7 @@ from . import joule_regions_api as joule
 from . import transient_thermal_api as transient
 from . import security
 from . import geometry_api
+from . import model3d_api
 from . import multiphysics_api
 
 STATIC = Path(__file__).parent / "static"
@@ -1238,6 +1239,7 @@ async def transient_history(job_id: str, request: Request):
 
 
 geometry_api.install(app)    # the experimental geometry lab, /geometry-lab
+model3d_api.install(app)     # its experimental 3D view: /api/model3d/display and /section
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
