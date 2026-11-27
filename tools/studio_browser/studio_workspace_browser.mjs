@@ -3508,7 +3508,7 @@ try {
        short:[...t.tBodies[0].rows].map(x=>x.cells[0].textContent),labels:[...t.tBodies[0].rows].map(x=>x.cells[0].getAttribute('aria-label')),matched:[...t.tBodies[0].rows].map(x=>x.dataset.match||null),
        overlap:[...t.querySelectorAll('[data-overlap]')].map(x=>Number(x.dataset.overlap)),best:[...t.querySelectorAll('tr[data-no-match]')].map(x=>x.cells[3].textContent),
        core:document.getElementById('compare-core-line')?.textContent??null,coreBefore:!!document.getElementById('compare-core-line')&&!!(document.getElementById('compare-core-line').compareDocumentPosition(t)&Node.DOCUMENT_POSITION_FOLLOWING),
-       shown:document.getElementById('compare-description').textContent,slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),page:document.documentElement.scrollWidth-document.documentElement.clientWidth}})()`);
+       shown:document.getElementById('compare-description').textContent,search:[...document.querySelectorAll('#compare-description button')].map(x=>[x.id,x.textContent]),slack:box.clientWidth-Math.ceil(t.getBoundingClientRect().width),page:document.documentElement.scrollWidth-document.documentElement.clientWidth}})()`);
     const c1Pick = async (a, b, tag) => {
       await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-a')", 'C1 Compare ' + tag);
       for (const [id, n] of [['#compare-a', a], ['#compare-b', b]]) {
@@ -3551,6 +3551,44 @@ try {
       assert.ok(v.slack >= 24, `C1 Compare as set: ${v.slack} px to spare at 1440 (O2, 24 px)`);
       assert.ok(v.picker.every(t => !t.includes('A mode 1 (core)') && !t.includes('A mode 2 (core)')), JSON.stringify(v.picker));
       assert.equal(v.core, null);
+    }
+    // round 37 (D3): beside the note on the closed run as set (A · Run 2: its modes are mostly in
+    // Substrate, …; the core mode was not found), its shortcut "Set search near 2.46 · 4 modes"; none
+    // on the open run, none when the modes are matched (Run 3 ↔ Run 4). Pressing it makes Run 2's
+    // inputs current (Use this run's inputs), sets the shortcut and opens Model, running nothing; the
+    // Messages line is the shortcut's, with the "No need to run" offer of Run 3. Undo takes back Modes
+    // to find (the shortcut's step), then Run 2's inputs (the Use this run's inputs step)
+    {
+      const d3 = {shortcut: c1.shortcut.at1440.search, asSet: c1.asSet.at1440.search, asSet390: c1.asSet.at390.search, note: c1.asSet.at1440.shown};
+      await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'D3 Results'); d3.before = await runItems();
+      await r.click('nav [data-page=Compare]'); await r.until("!!document.getElementById('compare-core-search-a')", 'D3 Compare');
+      await r.click('#compare-core-search-a');
+      await r.until("document.getElementById('page-tab-Model').getAttribute('aria-selected')==='true'&&document.getElementById('file-status').textContent.includes('No need to run: ')", 'D3 Model', 30000);
+      await sleep(1500);
+      const d3Read = async () => {
+        // the closed window's Modes to return is shown only with the closed window
+        await rTree('Optical modes', "!!document.querySelector('input[name=\"outer-boundary\"][value=closed]')"); await sleep(300);
+        return {closed: await r.eval("document.querySelector('input[name=\"outer-boundary\"][value=closed]').checked"), nearest: await r.eval("document.getElementById('closed-search-nearest')?.checked??null"),
+          modes: await r.eval("document.getElementById('mode-count-number').value"), plan: await rText('#run-plan'), running: await r.eval("document.getElementById('run-optical').textContent")};
+      };
+      d3.page = await r.eval("document.querySelector('[role=tab][aria-selected=true]').dataset.page"); d3.message = await rText('#file-status');
+      d3.model = await d3Read();
+      await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'D3 Results after'); d3.after = await runItems();
+      await r.click('#undo-edit'); await sleep(600); d3.undo1 = await d3Read();
+      await r.click('#undo-edit'); await sleep(600); d3.undo2 = await d3Read();
+      stage('R37 D3 Compare offers the closed core search', d3);
+      assert.ok(d3.note.includes('A · Run 2: its modes are mostly in Substrate, which touches the window edge; the core mode was not found. Open Run 2 in Results. Set search near 2.46 · 4 modes'), d3.note);
+      assert.deepEqual(d3.asSet, [['compare-core-search-a', 'Set search near 2.46 · 4 modes']]); assert.deepEqual(d3.asSet390, d3.asSet);
+      assert.deepEqual(d3.shortcut, []);
+      assert.equal(d3.page, 'Model');
+      assert.deepEqual(d3.after, d3.before, 'D3: nothing run'); assert.equal(d3.after.length, 4);
+      assert.deepEqual([d3.model.closed, d3.model.nearest, d3.model.modes, d3.model.running], [true, true, '4', 'Run study']);
+      assert.match(d3.model.plan, /^Closed window · near n_eff 2\.46 · 4 modes(?: · last such run \d+:\d\d)?$/);
+      // the shortcut's message; the offer of Run 3 takes the place of "Press Run study to compute." (offerMatchingRun, as in G3)
+      assert.equal(d3.message, 'Modes to return: nearest to n_eff 2.460 in the closed window. The next run returns the modes nearest it. Modes to find set to 4. No need to run: Run 3 already has these results. Run study adds a copy with the same values. Show Run 3');
+      assert.deepEqual([d3.undo1.closed, d3.undo1.nearest, d3.undo1.modes], [true, true, '2']);
+      // the second Undo: Run 4's inputs again (open boundary, Modes to find 2)
+      assert.deepEqual([d3.undo2.closed, d3.undo2.modes], [false, '2']);
     }
     await browserPage.call('Target.disposeBrowserContext', {browserContextId});
   }

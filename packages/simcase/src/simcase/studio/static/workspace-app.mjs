@@ -32,7 +32,7 @@ import {markPageTabs,installPageTabs} from './workspace-tabs.mjs';
 import {runOfResult} from './workspace-result-run.mjs';
 import {chooseFieldsAtArrival,COMPACT_RESULTS_TEXT,compactExportNotice,compactRunListNote,isCompactField,fieldLetGoHere,selectedAndPinnedBytes,letGoField,takeBackField,heldField,forgetHeldFields,fieldSwapCandidate,fieldsNotKeptAfterText,pinnedFieldsText,keepFieldsInsteadLabel,fieldsBackText,VALUES_ONLY,fieldsNotKeptResultsText,recomputeFirstText,compareNoFieldsText,COMPARE_BY_NUMBER,keepsValuesText,keepsValuesWhileRunningText,predictedLetGo,unestimatedFieldRisk,FIELDS_MAY_GO_TEXT,fieldSizeKey,recomputeLabel,recomputeEstimate,recomputingText,recomputedText,notRecomputedText,cannotRecomputeText,valuesAgainText,recomputeDocument,recomputeMismatch,attachField} from './workspace-retention.mjs';
 import {placeChannelNotes} from './workspace-mode-channel.mjs';
-import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText} from './workspace-modes.mjs';
+import {RANKING_TEXT,POLARIZATION_HELP,SOURCE_TEXT,AREA_HELP,LOSS_HEADER,ABSORPTION_HELP,LOSS_QUALIFIER,PML_LOSS_QUALIFIER,lossHeaderNodes,modeTableRows,edgeNotes,coreNotes,openRegionNotes,modeOptionLabel,opticalModes,groupIndexCell,groupIndexHelp,GROUP_INDEX_NOTE,GROUP_INDEX_HINT,OPTICAL_MATERIAL_DATA,GROUP_INDEX_OFF_HELP,groupIndexNotice,hasGroupIndex,edgeSlabRisk,edgeSlabWarningText,edgeSlabShortText,firstModeEdgeShape,noMatchEdgeText,noMatchCoreSearch} from './workspace-modes.mjs';
 import {MATCH_NOTE,COMPARE_MATCH_TEXT,opticalMatch,compareMatchRows,fieldChoices,unitPolarization,unitArea,unitLoss,unitGroupIndex,unitName,formatOverlap,formatDelta,bestOverlapText,MATCH_THRESHOLD,MATCH_MARGIN,unmatchedModes,compareCores,coreMark,coreMatchText,CORE_MARK} from './workspace-match.mjs';
 import {sessionFileName,recoveryOffText,modelInProjectTitle,persistenceTitle,persistenceHint,physicsList,untouchedWorkspace,sessionLoadText,leaveConfirmText,opticalRunsStayText,projectTitle,projectHint,projectLeaveText,recoveredProjectName} from './workspace-persistence.mjs';
 import {opticalBlock as opticalSupport,opticalDocument as buildOpticalDocument} from './workspace-optical.mjs';
@@ -989,6 +989,7 @@ function useRunInputs(run){
  const text=`Current inputs set from ${runNumberTitle(run)}: ${changed.length?changed.join(' · '):'no listed setting changes'}. ${undo}`;
  runInputsNote={text,revision:edits.revision,job:run.job};
  restoreEdit(doc,null);state.searchTarget=runTarget;inputsChangedSinceResult();render();notice(text);
+ return true;
 }
 // round 22 (V6): Use this run's inputs sets the closed window's Modes to return, which Undo does not change
 const TARGET_NOT_UNDONE='Modes to return is set and is not part of Undo.';
@@ -1353,6 +1354,10 @@ function setOuterBoundary(open){
 // K10: when a kept run has the new inputs, the message offers it (No need to run: Run N …)
 function setClosedSearch(t){state.searchTarget=t;render();notice(closedSearchNotice(t));offerMatchingRun();}
 function useClosedSearch(t){if(state.openBoundary||(state.searchTarget===t&&state.modeCount===SHORTCUT_MODE_COUNT))return;shortcutModes.set(state.modeCount,SHORTCUT_MODE_COUNT,t);state.searchTarget=t;state.modeCount=SHORTCUT_MODE_COUNT;render();notice(`${closedSearchNotice(t)} Modes to find set to ${SHORTCUT_MODE_COUNT}. ${SHORTCUT_RUN_TEXT}`);offerMatchingRun();}
+// round 37 (D3): Compare's shortcut for a closed run whose core mode was not found: that run's inputs
+// (Use this run's inputs, one Undo step), then the shortcut (useClosedSearch: its own Undo step for
+// Modes to find; Modes to return is not part of Undo), shown on Model; nothing runs
+function useRunClosedSearch(run,t){if(!useRunInputs(run))return;ui.page='Model';render();useClosedSearch(t);}
 // the field's index while Highest is chosen: the last one typed, if still in this design's range, else the default
 const closedNearDraft=()=>{try{if(ui.closedNear!=null)return checkClosedTarget(ui.closedNear,state.shapes);}catch{}return defaultTarget(state.shapes);};
 // round 22 (V2): before a run, the closed window's slab warning (a geometry and material check, no
@@ -2073,7 +2078,9 @@ function renderComparison(){
   const link=document.createElement('a');link.href='#';link.id='compare-edge-open-'+side.toLowerCase();link.dataset.showRun=String(runNumber(run));link.textContent=`Open Run ${runNumber(run)} in Results`;
   link.onclick=e=>{e.preventDefault();if(!runs.includes(run))return;solverRun=run;ui.page='Results';render();notice(`${runNumberTitle(run)} shown under Results; the inputs are unchanged.`);};
   const reason=document.createElement('span');reason.className='compare-edge-reason';reason.id='compare-edge-reason-'+side.toLowerCase();reason.textContent=noMatchEdgeText(side,runNumberTitle(run),shape);
-  description.append(description.textContent.endsWith(' ')?'':' ',reason,' ',link,'.');});
+  description.append(description.textContent.endsWith(' ')?'':' ',reason,' ',link,'.');
+  // round 37 (D3): a closed run with no core mode: its shortcut beside the note (sets the inputs, runs nothing)
+  const near=noMatchCoreSearch(run);if(near!=null){const search=document.createElement('button');search.type='button';search.className='message-action';search.id='compare-core-search-'+side.toLowerCase();search.textContent=shortcutText(near);search.onclick=()=>useRunClosedSearch(run,near);description.append(' ',search);}});
  // the plots first, right under the pickers (as Results shows its plot), then what they show
  host.append(grid,description);
  const legend=document.createElement('div');legend.innerHTML='<div style="display:flex;gap:8px;align-items:center"><span>0</span><div style="flex:1;height:12px;background:linear-gradient(to right,#12263b,#176f8b,#45bb9f,#f9eb82)"></div><span>1</span></div><p>Shared coordinates and 0–1 color scale. Each mode is normalized to its own max|E|; this compares shapes, not absolute amplitudes. Components share their mode vector denominator. No interpolation or field subtraction across meshes.</p>';host.append(legend,compareTable(a,b,match));

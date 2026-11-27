@@ -2268,6 +2268,16 @@ Compare는 실행 A와 B의 모드를 장으로 짝지으므로, 설계 사이�
   코어 모드끼리 짝지어지지 않았으면 이 줄은 없습니다. 코어 모드 안내가 없는 실행에는 표시가 붙지 않습니다: 그대로 실행한
   닫힌 실행(가장 높은 n_eff)이나, 창 가장자리에 닿는 형상이 없는 코어만의 Design A/B 실행. 짝짓기, 모드 번호와 순서, 선택
   목록이 처음 보여 주는 쌍, 다른 문구, 값, 파일과 실행 기록은 바뀌지 않습니다.
+- **닫힌 코어 검색(37차, D3).** Compare가 모드를 하나도 짝짓지 못하고 닫힌 실행의 안내가 *A · Run 2: its modes are
+  mostly in Substrate, which touches the window edge; the core mode was not found.*이며 그 실행에 코어 모드가 없으면(T18에서
+  그대로 실행한 닫힌 실행), 안내의 *Open Run 2 in Results* 링크 옆에 그 실행의 형상에 맞는 바로 가기 단추 *Set search near
+  2.46 · 4 modes*가 나옵니다(슬래브 경고와 *Slab modes first* 대화 상자와 같은 목표 추정). 누르면 아무것도 실행하지
+  않고, *Use this run's inputs*처럼 그 실행의 입력을 현재 입력으로 만들고, 바로 가기를 설정하며(Modes to return은 n_eff
+  2.46에 가장 가까운 모드, Modes to find는 4), Model을 엽니다. Messages 줄은 바로 가기의 문구이며, 그런 실행이 있으면
+  *No need to run: Run 3 already has these results … Show Run 3*가 뒤따릅니다. Undo는 먼저 Modes to find를(바로 가기의
+  단계), 다음에 그 실행의 입력을(*Use this run's inputs*의 단계) 되돌립니다. Modes to return은 Undo에 들지 않습니다. 코어
+  모드가 있는 실행, 열린 실행, Compare가 모드를 짝지었을 때는 단추가 없습니다. 짝짓기, Compare의 다른 문구, 값, 파일,
+  실행 기록과 대화 상자는 바뀌지 않습니다.
 - **이전 파일.** 짝짓기는 저장된 샘플만 쓰므로 버전 6·7 세션 파일의 모든 광 실행에서 동작하며 파일에
   아무것도 더하지 않습니다.
 - **한계.** η는 조각별 상수인 중심 샘플에서 구하므로, 크기 h인 메시에서 폭 w인 모드는 약 1.2 (h / w)²의
