@@ -28,6 +28,7 @@ E1: three slab layers of thickness 1, 0.5 and 1 mm (z levels 0, 1, 1.5, 2.5) wit
 and 1 W/(m K) over a 10 x 10 mm domain; T = 0 on z0, T = 1 on z1, sides insulated.
 """
 
+import copy
 import hashlib
 import json
 import os
@@ -479,6 +480,31 @@ def test_the_display_complex_of_a_lone_layers_component_is_the_meshloom_route_co
     # a component with boxes gives evaluate3d's complex
     boxes = parse(doc([BOX]))
     assert [f.provenance for f in display_complex3d(boxes).faces] == [f.provenance for f in evaluate3d(boxes).faces]
+
+
+def test_display_complex3d_is_public_and_picks_the_component():
+    import simcase
+    from simcase.geometry_document import parse
+    assert "display_complex3d" in simcase.__all__ and "evaluate3d" not in simcase.__all__
+    assert simcase.display_complex3d is display_complex3d
+    d = e1()
+    d["geometry"]["components"]["plan"] = {"dimension": "2d", "length_unit": "mm", "depth": None,
+                                           "domain": {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10},
+                                           "background": {"material": "air"}, "features": []}
+    model = simcase.parse_geometry(d)
+    assert simcase.display_complex3d(model).component == "c"              # the one 3d component
+    assert simcase.display_complex3d(model, "c").component == "c"
+    with pytest.raises(GeometryError) as err:
+        simcase.display_complex3d(model, "nope")
+    assert err.value.code == "E-CONTRACT" and err.value.path == "geometry.components.nope"
+    assert "no component 'nope'" in str(err.value)
+    with pytest.raises(GeometryError) as err:
+        simcase.display_complex3d(model, "plan")
+    assert err.value.code == "E-CONTRACT" and err.value.path == "geometry.components.plan.dimension"
+    assert "component 'plan' is 2d" in str(err.value)
+    d["geometry"]["components"]["other"] = copy.deepcopy(d["geometry"]["components"]["c"])
+    with pytest.raises(GeometryError, match="name a 3d component: the model has 2"):
+        simcase.display_complex3d(parse(d))
 
 
 def test_the_estimate_is_checked_before_meshing():

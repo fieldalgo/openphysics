@@ -45,9 +45,13 @@ grading (`near`, `far`, `refinement_distance`) and `z_divisions` are refused by 
 `simcase.geometry_engine3d.evaluate3d(model, component=None)` returns the complex alone,
 for a model from `simcase.geometry_document.parse`. It refuses a component holding one
 `layers` feature, which is meshed on the extrude route. For display (Studio),
-`simcase.geometry_engine3d.display_complex3d(model, component=None)` returns the exact complex
-of any `3d` component slice 1 takes, that one included: the complex the meshloom route would
-build. It meshes nothing and changes nothing `build_mesh3d` does or refuses.
+`simcase.display_complex3d(model, component=None)` returns the exact complex of any `3d`
+component slice 1 takes, that one included: the complex the meshloom route would build. It
+meshes nothing and changes nothing `build_mesh3d` does or refuses. `model` is what
+`simcase.parse_geometry` returns; `component` may be left out when the model has exactly one
+`3d` component (2d footprints beside it are allowed). An unknown name, a `2d` or axisymmetric
+component, and an omitted name with no or several `3d` components are refused by name
+(`E-CONTRACT` at `geometry.components.<name>`).
 
 ## What it builds
 
