@@ -294,6 +294,9 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         x_rank[v as usize] = r as u32;
     }
     let mut point_cells: Vec<(u64, u32)> = (0..pts.len() as u32).map(|v| (grid.cells(&[pts[v as usize]])[0], v)).collect();
+    // the cells of each one-triangle facet, by its sorted vertices, kept for step 5 (a
+    // thin triangle across many cells, such as a fan's, costs much to cover twice)
+    let mut tri_grid_cells: HashMap<[u32; 3], Vec<u64>> = HashMap::new();
     point_cells.sort_unstable();
     // the sub-segments at each point, so that a facet visits only those at its members
     let sub_index: HashMap<(u32, u32), u32> = subs.iter().enumerate().map(|(i, &k)| (k, i as u32)).collect();
@@ -314,10 +317,14 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
             let tri: Option<[u32; 3]> = (loops.len() == 1 && loops[0].len() == 3).then(|| [loops[0][0], loops[0][1], loops[0][2]]);
             let tri_axis = tri.and_then(|t| plane_axis(&pts[t[0] as usize], &pts[t[1] as usize], &pts[t[2] as usize]));
             if let Some(t) = tri {
-                for k in grid.cells(&[pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]]) {
+                let cells = grid.cells(&[pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]]);
+                for &k in &cells {
                     let start = point_cells.partition_point(|x| x.0 < k);
                     near.extend(point_cells[start..].iter().take_while(|x| x.0 == k).map(|x| x.1));
                 }
+                let mut key = t;
+                key.sort_unstable();
+                tri_grid_cells.insert(key, cells);
                 near.sort_unstable_by_key(|&v| x_rank[v as usize]);
                 near.dedup();
             } else if grid.box_cells(&lo, &hi) <= 64 + pts.len() as u64 / 8 {
@@ -529,7 +536,10 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         .collect();
     let cells: Vec<Vec<u64>> = items.iter().zip(&verts)
         .map(|(&(is_seg, i), vs)| if is_seg { sub_grid_cells[i].clone() } else {
-            grid.cells(&vs.iter().map(|&v| pts[v as usize]).collect::<Vec<_>>())
+            let mut key = *vs;
+            key.sort_unstable();
+            tri_grid_cells.remove(&key)
+                .unwrap_or_else(|| grid.cells(&vs.iter().map(|&v| pts[v as usize]).collect::<Vec<_>>()))
         })
         .collect();
     let failed = std::cell::Cell::new(false);
