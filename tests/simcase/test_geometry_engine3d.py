@@ -45,7 +45,7 @@ if not meshloom.kernel_available():
     pytest.skip("meshloom's compiled kernel is not built in this environment", allow_module_level=True)
 
 from simcase.geometry_document import GeometryError  # noqa: E402
-from simcase.geometry_engine3d import _build, build_mesh3d, evaluate3d  # noqa: E402
+from simcase.geometry_engine3d import _build, _evaluate, build_mesh3d, display_complex3d, evaluate3d  # noqa: E402
 
 PM = 10 ** 12
 FULL = os.environ.get("OPENPHYSICS_GEOMETRY3D_FULL") == "1"
@@ -461,6 +461,24 @@ def test_a_lone_layers_feature_keeps_the_extrude_route():
     with pytest.raises(GeometryError, match="takes the meshine.extrude route"):
         from simcase.geometry_document import parse
         evaluate3d(parse(e1()))
+
+
+def test_the_display_complex_of_a_lone_layers_component_is_the_meshloom_route_complex():
+    from simcase.geometry_document import parse
+    model = parse(e1())
+    shown = display_complex3d(model)
+    built = _evaluate(model.components["c"], through_meshloom=True)
+    assert [(c.region, c.material, c.fine, c.slab, c.volume) for c in shown.cells] == \
+        [(c.region, c.material, c.fine, c.slab, c.volume) for c in built.cells]
+    assert [(f.axis, f.coord, f.loops, f.provenance, f.minus, f.plus, f.tag) for f in shown.faces] == \
+        [(f.axis, f.coord, f.loops, f.provenance, f.minus, f.plus, f.tag) for f in built.faces]
+    assert shown.region_names() == list(E1_K) and shown.levels == [0, 10 ** 9, 15 * 10 ** 8, 25 * 10 ** 8]
+    # build_mesh3d still refuses it for the extrude route
+    with pytest.raises(GeometryError, match="takes the meshine.extrude route"):
+        build_mesh3d(e1())
+    # a component with boxes gives evaluate3d's complex
+    boxes = parse(doc([BOX]))
+    assert [f.provenance for f in display_complex3d(boxes).faces] == [f.provenance for f in evaluate3d(boxes).faces]
 
 
 def test_the_estimate_is_checked_before_meshing():

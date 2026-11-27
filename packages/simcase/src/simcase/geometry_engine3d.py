@@ -37,7 +37,8 @@ from fractions import Fraction
 from .geometry_document import (_MISSING, PM_PER_M, Component, Feature, GeometryError, GeometryModel, _keys,
                                 _pick, _Reader, parse)
 
-__all__ = ["Complex3D", "Cell3D", "Face3D", "Mesh3DResult", "Mesh3DError", "evaluate3d", "build_mesh3d",
+__all__ = ["Complex3D", "Cell3D", "Face3D", "Mesh3DResult", "Mesh3DError", "evaluate3d", "display_complex3d",
+           "build_mesh3d",
            "SIDE_TAGS", "VOID_TAG", "TETRAHEDRA_PER_VOLUME", "DEFAULT_ELEMENT_COUNT_LIMIT"]
 
 #: the default tags of the domain faces (contract: default tags, 3D through meshloom)
@@ -246,6 +247,14 @@ def evaluate3d(model: GeometryModel, component: str | None = None) -> Complex3D:
     A component holding one ``layers`` feature is refused here: it keeps the ``meshine.extrude``
     route (``simcase.geometry_document.layer_stack``)."""
     return _evaluate(_pick(model, component), through_meshloom=False)
+
+
+def display_complex3d(model: GeometryModel, component: str | None = None) -> Complex3D:
+    """The exact 3D complex of any ``3d`` component slice 1 takes, for display: ``evaluate3d``'s
+    complex, and for a component holding one ``layers`` feature of slab layers (which is meshed on
+    the ``meshine.extrude`` route) the same complex the meshloom route would build. It meshes nothing
+    and does not change what ``build_mesh3d`` does or refuses."""
+    return _evaluate(_pick(model, component), through_meshloom=True)
 
 
 def _evaluate(comp: Component, *, through_meshloom: bool) -> Complex3D:
