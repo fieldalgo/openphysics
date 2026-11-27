@@ -3246,7 +3246,8 @@ try {
     // Open boundary sets 2 back with its sentence; Undo gives back 4 with Open boundary still chosen,
     // a second Undo the closed window; a count typed after the shortcut (3) is kept. Nothing runs.
     const l1Read = async () => ({modes: await r.eval("document.getElementById('mode-count-number')?.value??null"), open: await r.eval("document.querySelector('input[name=\"outer-boundary\"][value=open]')?.checked??null"),
-      message: await rText('#file-status'), plan: await rText('#run-plan'), items: (await runItems()).length});
+      message: await rText('#file-status'), plan: await rText('#run-plan'), items: (await runItems()).length,
+      note: await r.eval("document.getElementById('mode-count-back-note')?.textContent??null")});
     await rTree('Optical modes', "!!document.getElementById('mode-count-number')");
     await r.click('input[name="outer-boundary"][value="open"]'); await sleep(400);
     const l1 = {open: await l1Read()};
@@ -3262,6 +3263,9 @@ try {
     const L1_OPEN = "Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries. Modes to find back to 2: 4 was for the closed window's search near 2.46.";
     assert.equal(l1.open.modes, '2'); assert.equal(l1.open.open, true); assert.ok(l1.open.message.startsWith(L1_OPEN), l1.open.message);
     assert.match(l1.open.plan, /^Open boundary · 2 modes · /);
+    // round 35 (L4): the same reason under Modes to find, gone after Undo, a typed count and the closed window
+    assert.equal(l1.open.note, "Back to 2 with Open boundary: 4 was for the closed window's search near 2.46.");
+    for (const tag of ['undo', 'undo2', 'shortcut', 'typed', 'closed']) assert.equal(l1[tag].note, null, 'L4 note ' + tag);
     assert.deepEqual([l1.undo.modes, l1.undo.open], ['4', true]); assert.match(l1.undo.plan, /^Open boundary · 4 modes · /);
     assert.deepEqual([l1.undo2.modes, l1.undo2.open], ['4', false]);
     assert.equal(l1.shortcut.modes, '4');
@@ -3438,6 +3442,34 @@ try {
     assert.equal(d2.after.core.length, 1, JSON.stringify(d2.after.core)); assert.equal(d2.after.core[0][0], '3'); assert.ok(d2.after.core[0][1].startsWith('Mode 3 is the core mode: '), d2.after.core[0][1]);
     assert.deepEqual(d2.after.edge.map(n => n[0]), ['1', '2', '4'], JSON.stringify(d2.after.edge)); assert.ok(d2.after.edge.every(n => n[1].includes('is mostly in Substrate')), JSON.stringify(d2.after.edge));
     assert.ok(Math.abs(Number(d2.after.neff[2]) - 2.43931663) <= 1e-4, JSON.stringify(d2.after.neff));
+    // round 35 (L4): after the dialog's "Set search near 2.46 · 4 modes and run" and its closed run,
+    // Open boundary sets Modes to find back to 2 with the round-29 sentence, and the note under the
+    // field says why; it stays after another notice (group index ticked) and goes with the closed window
+    const openRadio = 'document.querySelector(\'input[name="outer-boundary"][value="open"]\')';
+    const l4Read = async () => ({modes: await r.eval("document.getElementById('mode-count-number')?.value??null"), open: await r.eval(openRadio + '?.checked??null'),
+      message: await rText('#file-status'), note: await r.eval("document.getElementById('mode-count-back-note')?.textContent??null"), items: (await runItems()).length});
+    await rTree('Optical modes', '!!' + openRadio);
+    const l4 = {before: await l4Read()};
+    await r.click('input[name="outer-boundary"][value="open"]');
+    await r.until(openRadio + ".checked&&document.getElementById('file-status').textContent.startsWith('Open boundary: ')", 'L4 Open boundary');
+    l4.open = await l4Read();
+    await r.click('#group-index-check');
+    await r.until("document.getElementById('group-index-check').checked&&!document.getElementById('file-status').textContent.startsWith('Open boundary: ')", 'L4 group index on');
+    l4.group = await l4Read();
+    await r.click('#group-index-check'); await r.until("!document.getElementById('group-index-check').checked", 'L4 group index off');
+    await r.click('input[name="outer-boundary"][value="closed"]');
+    await r.until("document.querySelector('input[name=\"outer-boundary\"][value=closed]').checked&&document.getElementById('file-status').textContent.startsWith('Closed window: ')", 'L4 closed window');
+    l4.closed = await l4Read();
+    stage('R35 L4 dialog path then Open boundary', l4);
+    const L4_OPEN = "Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries. Modes to find back to 2: 4 was for the closed window's search near 2.46.";
+    const L4_NOTE = "Back to 2 with Open boundary: 4 was for the closed window's search near 2.46.";
+    assert.deepEqual([l4.before.modes, l4.before.open, l4.before.note], ['4', false, null]);
+    assert.deepEqual([l4.open.modes, l4.open.open], ['2', true]);
+    assert.ok(l4.open.message.startsWith(L4_OPEN), l4.open.message); assert.equal(l4.open.note, L4_NOTE);
+    assert.deepEqual([l4.group.modes, l4.group.open, l4.group.note], ['2', true, L4_NOTE]);
+    assert.ok(!l4.group.message.includes('Modes to find back to'), l4.group.message);
+    assert.deepEqual([l4.closed.modes, l4.closed.open, l4.closed.note], ['2', false, null]);
+    for (const v of Object.values(l4)) assert.equal(v.items, d2.after.items, 'L4: nothing runs');
     // round 28 (G3): Run 3 has the shortcut's results. Run 1 shown, Highest n_eff and Modes to find 2
     // again (P02's T22): asked again, the first button names Run 3; it sets the shortcut and shows
     // Run 3 under Results, running nothing (the panel button's "No need to run"); the dialog's role,

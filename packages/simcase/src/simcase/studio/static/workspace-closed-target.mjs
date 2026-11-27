@@ -90,11 +90,19 @@ export const slabQuestionButtons=(t,shown=null)=>[shown==null?`${shortcutText(t)
  * Redo, new inputs); onOpen(count) when the outer boundary turns to Open boundary: {modeCount: from,
  * text} when the shortcut changed the count and it is still the shortcut's, else null; it then
  * forgets. "Modes to find back to 2: 4 was for the closed window's search near 2.46." */
-export const shortcutModesBackText=(from,to,t)=>`Modes to find back to ${from}: ${to} was for the closed window's search near ${shortTarget(t)}.`;
+const shortcutModesReason=(to,t)=>`${to} was for the closed window's search near ${shortTarget(t)}.`;
+export const shortcutModesBackText=(from,to,t)=>`Modes to find back to ${from}: ${shortcutModesReason(to,t)}`;
+/** Round 35 (L4): the same reason under the Modes to find field, where the count is shown, since the
+ * Messages line is replaced by the next notice. "Back to 2 with Open boundary: 4 was for the closed
+ * window's search near 2.46." The memory keeps it after onOpen until clearNote() (the next run starts,
+ * the outer boundary changes again) or clear() (any other change of Modes to find: typed, Undo, Redo,
+ * Use this run's inputs, a new model or file); note() reads it ('' when none). */
+export const shortcutModesNoteText=(from,to,t)=>`Back to ${from} with Open boundary: ${shortcutModesReason(to,t)}`;
 export function shortcutModesMemory(){
- let memo=null;
- return {set(from,to,t){memo={from,to,t};},clear(){memo=null;},
-  onOpen(count){const m=memo;memo=null;return m&&m.from!==m.to&&count===m.to?{modeCount:m.from,text:shortcutModesBackText(m.from,m.to,m.t)}:null;}};
+ let memo=null,note='';
+ return {set(from,to,t){memo={from,to,t};note='';},clear(){memo=null;note='';},
+  note(){return note;},clearNote(){note='';},
+  onOpen(count){const m=memo;memo=null;if(!(m&&m.from!==m.to&&count===m.to))return null;note=shortcutModesNoteText(m.from,m.to,m.t);return {modeCount:m.from,text:shortcutModesBackText(m.from,m.to,m.t)};}};
 }
 /** What the question is asked for: the geometry (shapes), the boundary and Modes to return. */
 export const slabQuestionKey=({shapes,openBoundary=null,searchTarget=null})=>JSON.stringify([shapes,openBoundary??null,searchTarget??null]);
