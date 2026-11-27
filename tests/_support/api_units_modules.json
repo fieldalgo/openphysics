@@ -13,6 +13,7 @@
       "galerkin.joule_heating",
       "galerkin.temperature_joule_heating",
       "galerkin.elasticity",
+      "galerkin.elasticity3d",
       "galerkin.thermoelasticity",
       "galerkin.thermal_mechanical",
       "galerkin.transient_thermal_mechanical",
