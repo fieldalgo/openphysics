@@ -524,7 +524,7 @@ jobs:
         run: |
           cp tests/simcase/test_geometry_cavity3d.py "$RUNNER_TEMP/g3d/"
           cd "$RUNNER_TEMP/g3d"
-          python -m pytest -q -ra -s -p no:cacheprovider test_geometry_cavity3d.py --junitxml="$RUNNER_TEMP/g3d-out/cavity3d.xml"
+          python -m pytest -q -ra -s -p no:cacheprovider -o junit_family=legacy test_geometry_cavity3d.py --junitxml="$RUNNER_TEMP/g3d-out/cavity3d.xml"
           python - "$RUNNER_TEMP/g3d-out/cavity3d.xml" <<'PY'
           import sys, xml.etree.ElementTree as ET
           suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
