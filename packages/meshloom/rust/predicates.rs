@@ -391,7 +391,132 @@ pub fn orient3d(a: &P3, b: &P3, c: &P3, d: &P3, n: &mut Counters) -> i8 {
 
 // ---------------------------------------------------------------- insphere
 
+/// det3 of three rows of two-component expansions on the stack (at most 192
+/// components), as `orient3d_exact_stack` computes it on differences.
+fn det3_stack(u: &[([f64; 2], usize); 3], v: &[([f64; 2], usize); 3], w: &[([f64; 2], usize); 3],
+              out: &mut [f64; 192]) -> usize {
+    let minor = |i: usize, j: usize, h: &mut [f64; 16]| -> usize {
+        let (mut p, mut q) = ([0.0; 8], [0.0; 8]);
+        let np = mul2_into(&v[i].0[..v[i].1], &w[j].0[..w[j].1], &mut p);
+        let nq = mul2_into(&v[j].0[..v[j].1], &w[i].0[..w[i].1], &mut q);
+        for x in &mut q[..nq] {
+            *x = -*x;
+        }
+        sum_into(&p[..np], &q[..nq], h)
+    };
+    let term = |k: usize, h: &mut [f64; 64]| -> usize {
+        let (i, j) = [(1, 2), (2, 0), (0, 1)][k];
+        let mut m = [0.0; 16];
+        let nm = minor(i, j, &mut m);
+        let mut a = [0.0; 32];
+        let na = scale_into(&m[..nm], u[k].0[0], &mut a);
+        if u[k].1 == 1 {
+            h[..na].copy_from_slice(&a[..na]);
+            return na;
+        }
+        let mut b = [0.0; 32];
+        let nb = scale_into(&m[..nm], u[k].0[1], &mut b);
+        sum_into(&a[..na], &b[..nb], h)
+    };
+    let (mut t0, mut t1, mut t2) = ([0.0; 64], [0.0; 64], [0.0; 64]);
+    let n0 = term(0, &mut t0);
+    let n1 = term(1, &mut t1);
+    let n2 = term(2, &mut t2);
+    let mut s01 = [0.0; 128];
+    let n01 = sum_into(&t0[..n0], &t1[..n1], &mut s01);
+    sum_into(&s01[..n01], &t2[..n2], out)
+}
+
+const INSPHERE_CAP: usize = 2048;
+
+/// The product of two expansions into h (capacity INSPHERE_CAP), or None when it
+/// could exceed it.
+fn mul_into(x: &[f64], y: &[f64], h: &mut [f64; INSPHERE_CAP]) -> Option<usize> {
+    let mut n = 0usize;
+    let mut tmp = [0.0; 2 * 192];
+    let mut acc = [0.0; INSPHERE_CAP];
+    for &c in x {
+        if 2 * y.len() > tmp.len() || n + 2 * y.len() > INSPHERE_CAP {
+            return None;
+        }
+        let nt = scale_into(y, c, &mut tmp);
+        if n == 0 {
+            acc[..nt].copy_from_slice(&tmp[..nt]);
+            n = nt;
+        } else {
+            n = sum_into(&acc[..n], &tmp[..nt], h);
+            acc[..n].copy_from_slice(&h[..n]);
+        }
+    }
+    h[..n].copy_from_slice(&acc[..n]);
+    Some(n)
+}
+
+/// insphere_exact without heap expansions while they fit in fixed arrays (the usual
+/// case: zero elimination keeps them short); None otherwise.
+fn insphere_exact_stack(a: &P3, b: &P3, c: &P3, d: &P3, e: &P3) -> Option<i8> {
+    let diff = |p: &P3, k: usize| -> ([f64; 2], usize) {
+        let (x, y) = two_diff(p[k], e[k]);
+        if y != 0.0 { ([y, x], 2) } else { ([x, 0.0], 1) }
+    };
+    let rows: [[([f64; 2], usize); 3]; 4] = [a, b, c, d].map(|p| std::array::from_fn(|k| diff(p, k)));
+    let lift = |r: &[([f64; 2], usize); 3], h: &mut [f64; 24]| -> usize {
+        let mut sq = [[0.0; 8]; 3];
+        let ns: [usize; 3] = std::array::from_fn(|k| { let x = &r[k].0[..r[k].1]; mul2_into(x, x, &mut sq[k]) });
+        let mut s01 = [0.0; 16];
+        let n01 = sum_into(&sq[0][..ns[0]], &sq[1][..ns[1]], &mut s01);
+        sum_into(&s01[..n01], &sq[2][..ns[2]], h)
+    };
+    // term i: lift_i times det3 of the other rows
+    let term = |i: usize, h: &mut [f64; INSPHERE_CAP]| -> Option<usize> {
+        let others = [[1, 2, 3], [0, 2, 3], [0, 1, 3], [0, 1, 2]][i];
+        let mut det = [0.0; 192];
+        let nd = det3_stack(&rows[others[0]], &rows[others[1]], &rows[others[2]], &mut det);
+        let mut l = [0.0; 24];
+        let nl = lift(&rows[i], &mut l);
+        mul_into(&l[..nl], &det[..nd], h)
+    };
+    let mut t = [[0.0; INSPHERE_CAP]; 4];
+    let mut nt = [0usize; 4];
+    for i in 0..4 {
+        nt[i] = term(i, &mut t[i])?;
+    }
+    // det4 = t1 - t0 + t3 - t2 (as insphere_exact); the value's sign is negated
+    for i in [0, 2] {
+        for x in &mut t[i][..nt[i]] {
+            *x = -*x;
+        }
+    }
+    if nt[1] + nt[0] > INSPHERE_CAP || nt[3] + nt[2] > INSPHERE_CAP {
+        return None;
+    }
+    let (mut x, mut y) = ([0.0; INSPHERE_CAP], [0.0; INSPHERE_CAP]);
+    let nx = sum_into(&t[1][..nt[1]], &t[0][..nt[0]], &mut x);
+    let ny = sum_into(&t[3][..nt[3]], &t[2][..nt[2]], &mut y);
+    if nx + ny > 2 * INSPHERE_CAP {
+        return None;
+    }
+    let mut all = vec![0.0; 0];
+    let top = if nx + ny <= INSPHERE_CAP {
+        let mut z = [0.0; INSPHERE_CAP];
+        let nz = sum_into(&x[..nx], &y[..ny], &mut z);
+        z[nz - 1]
+    } else {
+        all.resize(nx + ny, 0.0);
+        let nz = sum_into(&x[..nx], &y[..ny], &mut all);
+        all[nz - 1]
+    };
+    Some(if top > 0.0 { -1 } else if top < 0.0 { 1 } else { 0 })
+}
+
 pub fn insphere_exact(a: &P3, b: &P3, c: &P3, d: &P3, e: &P3) -> i8 {
+    if let Some(s) = insphere_exact_stack(a, b, c, d, e) {
+        return s;
+    }
+    insphere_exact_heap(a, b, c, d, e)
+}
+
+fn insphere_exact_heap(a: &P3, b: &P3, c: &P3, d: &P3, e: &P3) -> i8 {
     // Shewchuk's determinant det[p - e, |p - e|^2] is positive for a point inside when
     // his orientation is positive, which is ours negated.
     let rows = [diff3(a, e), diff3(b, e), diff3(c, e), diff3(d, e)];
@@ -640,6 +765,39 @@ pub fn lex_cmp(a: &P3, b: &P3) -> Ordering {
 
 #[cfg(test)]
 mod tests {
+
+    /// The stack insphere agrees with the heap one, on cospherical grid points (exact
+    /// zeros), near-degenerate and random points.
+    #[test]
+    fn insphere_on_the_stack_equals_the_heap_version() {
+        let mut s = 99u64;
+        let mut lcg = || {
+            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (s >> 11) as f64 / (1u64 << 53) as f64
+        };
+        let mut zeros = 0;
+        for k in 0..30000 {
+            let mut p = [[0.0; 3]; 5];
+            for q in &mut p {
+                for c in q.iter_mut() {
+                    *c = match k % 3 {
+                        0 => (lcg() * 4.0).floor() * 0.5 + 1.0,
+                        1 => (lcg() * 4.0).floor() * 0.5 + 1.0 + (lcg() - 0.5) * 1e-14,
+                        _ => lcg() * 1e3 - 500.0,
+                    };
+                }
+            }
+            let (a, b, c, d, e) = (&p[0], &p[1], &p[2], &p[3], &p[4]);
+            let want = insphere_exact_heap(a, b, c, d, e);
+            if let Some(got) = insphere_exact_stack(a, b, c, d, e) {
+                assert_eq!(got, want, "{p:?}");
+            }
+            assert_eq!(insphere_exact(a, b, c, d, e), want);
+            zeros += (want == 0) as u32;
+        }
+        assert!(zeros > 1000, "{zeros}");
+    }
+
     use super::*;
 
     #[test]
