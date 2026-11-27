@@ -120,6 +120,13 @@ built yet, and `evaluate3d` and `display_complex3d` refuse such a component by n
 One size only: a feature or background `element_size`, `mesh.controls` sizes, `selections`
 and `boundary_tags` are refused by name with a sampled surface, until a later slice.
 
+The below-tolerance refusal applies here too, before the hand-off and after the touch and cross
+stems: the smallest exact clearance, a via's surface to each domain side (C4), a sphere to each
+domain face (C5) or the difference of consecutive radii (C11), below `MESHER_RELATIVE_TOLERANCE`
+(3e-8) of the diagonal is refused with `E-CONTRACT` at `geometry.components.<name>` and the
+parser's sentence, naming the later feature. C1's and C11's domains only bound void space (the
+builders mesh no box there), so a sphere's distance to them is not checked.
+
 ## The meshloom hand-off
 
 - **Coordinates (rule H1).** Each pm value k becomes `float(Fraction(k, 10**12))` metres,

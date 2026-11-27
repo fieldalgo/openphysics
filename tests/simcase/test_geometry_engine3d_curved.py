@@ -392,3 +392,57 @@ def test_prepare_gives_the_estimate_and_the_limit_refusal_before_meshing():
     with pytest.raises(GeometryError) as err:
         _prepare(d)
     assert err.value.code == "E-MESH-ESTIMATE" and err.value.path == "mesh.element_count_limit"
+
+
+# ----------------------------------------------------------------------------- below the mesher tolerance
+#
+# Registered before measuring (coordinator review of #410): on the builder route, the smallest exact
+# clearance (pm) below MESHER_RELATIVE_TOLERANCE = 3e-8 of the component's diagonal is refused before the
+# hand-off, with E-CONTRACT, the parser's sentence and the later feature: a C4 via surface to each domain
+# side, a C5 sphere to each domain face, and C11's consecutive radii. 1.5e-8 is refused; 6e-8 passes and
+# the hand-off is formed (meshing it is not asserted, as #408's R2). C1's and C11's domains only bound
+# void space, so a sphere's distance to them makes no thin piece and is not checked.
+
+def _thin_sentence(name, size, diag_pm):
+    return (f"geometry.components.c: feature {name!r} is {size} pm across, {size / diag_pm:.2e} of the component's "
+            "diagonal, below the mesher tolerance 3e-08; it would vanish in the mesh. Meshing such multi-scale geometry "
+            "is not supported yet.")
+
+
+def _m(pm):
+    """pm as an exact decimal metre value for a document."""
+    return float(Fraction(pm, 10 ** 12))
+
+
+def _thin(case, ratio):
+    if case == "C4":
+        diag = 3 * 10 ** 12                           # [-1,1]^2 x [0,1]
+        gap = round(ratio * diag)
+        cx = _m(10 ** 12 - 3 * 10 ** 11 - gap)        # via surface `gap` from domain.x1
+        return c4(0.2, cx=cx, ref=False)[0], "via", gap, diag
+    if case == "C5":
+        diag = math.sqrt(12) * 10 ** 12
+        gap = round(ratio * diag)
+        return c5(0.24, r=_m(10 ** 12 - gap), ref=False)[0], "ball", gap, diag
+    diag = math.sqrt(3 * 2.4 ** 2) * 10 ** 12
+    gap = round(ratio * diag)
+    d = c11(0.2)[0]
+    d["geometry"]["components"]["c"]["features"][2]["r"] = _m(75 * 10 ** 10 - gap)   # sa just inside sb
+    return d, "sa", gap, diag
+
+
+@pytest.mark.parametrize("case", ["C4", "C5", "C11"])
+def test_a_clearance_below_the_tolerance_is_refused_naming_the_feature(case):
+    d, name, gap, diag = _thin(case, 1.5e-8)
+    with pytest.raises(GeometryError) as err:
+        build_mesh3d(d)
+    assert err.value.code == "E-CONTRACT" and err.value.path == "geometry.components.c"
+    assert str(err.value) == _thin_sentence(name, gap, diag)
+
+
+@pytest.mark.parametrize("case", ["C4", "C5", "C11"])
+def test_a_clearance_above_the_tolerance_passes_and_the_hand_off_is_formed(case):
+    from simcase.geometry_engine3d import _prepare
+    d, _, _, _ = _thin(case, 6e-8)
+    cx, comp, ho, info = _prepare(d)
+    assert cx is None and len(ho.kwargs["points"]) and ho.kwargs["facets"] and info.code == "I-MESH-ESTIMATE"

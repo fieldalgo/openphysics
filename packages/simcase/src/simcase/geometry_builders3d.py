@@ -129,6 +129,35 @@ def _staged(comp: Component, i: int):
     _refuse(f"{f.type} {f.name!r} {STAGED}", _path(comp, i))
 
 
+def _check_clearance(comp: Component, shape: str, curved: list) -> None:
+    """The contract's below-tolerance refusal ("What the grid does not fix") on the builder route, as
+    ``geometry_engine3d._check_small_pieces`` on the arrangement route: the smallest exact clearance
+    (pm) below ``MESHER_RELATIVE_TOLERANCE`` of the component's diagonal is refused before the hand-off,
+    naming the later feature. Clearances: a via surface to each domain side (C4), a sphere to each domain
+    face (C5), consecutive radii (C11). C1's and C11's domains only bound void space (the builders mesh
+    no box), so a sphere's distance to them is no piece of the mesh and is not checked. Runs after the
+    touch and cross stems, which refuse a clearance <= 0."""
+    from .geometry_document import MESHER_RELATIVE_TOLERANCE, small_feature_error
+    dom, feats = comp.domain, comp.features
+    found = []                                          # (clearance pm, feature index)
+    if shape in ("via_in_slab", "sphere_in_box"):
+        i = curved[0]
+        d = feats[i].data
+        for axis, end, _side in _SIDES[:4] if shape == "via_in_slab" else _SIDES:
+            c, bound = d[f"c{axis}"], dom[f"{axis}{'max' if end else 'min'}"]
+            found.append((((bound - c) if end else (c - bound)) - d["r"], i))
+    elif shape == "nested_spheres":
+        for outer, inner in zip(curved, curved[1:]):
+            found.append((feats[outer].data["r"] - feats[inner].data["r"], inner))
+    if not found:
+        return
+    diag2 = sum((dom[f"{a}max"] - dom[f"{a}min"]) ** 2 for a in "xyz")
+    size, i = min(found)
+    if size * size < Fraction(MESHER_RELATIVE_TOLERANCE) ** 2 * diag2:      # exact, as on the arrangement route
+        raise small_feature_error(f"geometry.components.{comp.name}", feats[i].name, size, size / math.sqrt(diag2),
+                                  located=True)
+
+
 def _sizes_refused(comp: Component, opts: dict) -> None:
     where = None
     if opts["controls"]:
@@ -173,6 +202,7 @@ def prepare(data: dict, comp: Component, opts: dict):
     from .geometry_engine3d import TETRAHEDRA_PER_VOLUME
 
     shape, curved = recognise(comp)
+    _check_clearance(comp, shape, curved)
     _sizes_refused(comp, opts)
     feats, dom = comp.features, comp.domain
     h = _m(opts["size"])
