@@ -1,0 +1,55 @@
+{
+ "finding": "two boxes touching at x = 5 mm; B's y0 face is offset from A's y0 face by 862 pm (6e-8 of the 14.36 mm diagonal, above the contract tolerance 3e-8): an 862 pm fine curve and face strip. meshloom.generate3d does not return (over 600 s in mesh_plc, meshloom/_core.py:371; such box documents mesh in about 1 s), h = 0.8 mm",
+ "recorded_on": "main a5c61f8 (simcase.build_mesh3d, slice 1 code)",
+ "reproduce": "simcase.build_mesh3d(document)",
+ "document": {
+  "openphysics": "0.3",
+  "geometry": {
+   "version": 1,
+   "components": {
+    "c": {
+     "dimension": "3d",
+     "length_unit": "pm",
+     "domain": {
+      "xmin": 0,
+      "xmax": 10000000000,
+      "ymin": 0,
+      "ymax": 10000000000,
+      "zmin": 0,
+      "zmax": 2500000000
+     },
+     "background": {
+      "material": "air"
+     },
+     "features": [
+      {
+       "name": "A",
+       "type": "box",
+       "xmin": 2000000000,
+       "xmax": 5000000000,
+       "ymin": 2000000000,
+       "ymax": 8000000000,
+       "zmin": 0,
+       "zmax": 2000000000,
+       "material": "Cu"
+      },
+      {
+       "name": "B",
+       "type": "box",
+       "xmin": 5000000000,
+       "xmax": 8000000000,
+       "ymin": 2000000862,
+       "ymax": 7000000000,
+       "zmin": 0,
+       "zmax": 2000000000,
+       "material": "Al"
+      }
+     ]
+    }
+   }
+  },
+  "mesh": {
+   "element_size": "0.8 mm"
+  }
+ }
+}
