@@ -539,7 +539,9 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
             // a rounding encroach each other's pieces without end in a thin fan); rounded
             // down, the reference point stays farther from c
             let rc = hub_radius[c as usize];
-            let shell = |d: f64| if rc > 0.0 && d > 0.0 { rc * 2f64.powi((d / rc).log2().floor() as i32) } else { d };
+            // (inside rc only: farther out, plain rule 2 cuts a piece at the radius of the
+            // input point that encroaches it, such as a neighbouring rim point)
+            let shell = |d: f64| if rc > 0.0 && d > 0.0 && d < rc { rc * 2f64.powi((d / rc).log2().floor() as i32) } else { d };
             if dist(&xv0, &xfar) >= dist(&xv0, &xp) {
                 (to_t(shell(r)), Rule::Centre(c)) // rule 2
             } else {
