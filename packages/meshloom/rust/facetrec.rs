@@ -112,29 +112,60 @@ impl std::hash::Hasher for FastHasher {
     }
 }
 
+/// A tetrahedralization that changes by removing and adding tetrahedra. Each tetrahedron
+/// keeps the tetrahedron across each of its faces (`nbr[t][i]`, across `face(tets[t], i)`,
+/// or NONE on the hull), and each vertex keeps its live tetrahedra (`star`). A face is found
+/// from the star of one of its vertices, so the complex needs no table keyed by face. At
+/// most two live tetrahedra share a face: every caller removes a cavity before it fills it.
 pub(crate) struct Complex {
     pub(crate) tets: Vec<[u32; 4]>,
     pub(crate) alive: Vec<bool>,
-    pub(crate) faces: HashMap<[u32; 3], [u32; 2], FastKey>,
+    nbr: Vec<[u32; 4]>,
     pub(crate) star: Vec<Vec<u32>>,
+}
+
+/// The slot of tetrahedron v whose opposite face has the (sorted) vertices k, if any.
+fn slot(v: &[u32; 4], k: &[u32; 3]) -> Option<usize> {
+    let mut miss = None;
+    for (i, x) in v.iter().enumerate() {
+        if !k.contains(x) {
+            if miss.is_some() {
+                return None;
+            }
+            miss = Some(i);
+        }
+    }
+    miss
 }
 
 impl Complex {
     pub(crate) fn new(n: usize, tets: &[[u32; 4]]) -> Complex {
-        let mut c = Complex { tets: Vec::new(), alive: Vec::new(), faces: HashMap::with_hasher(FastKey), star: vec![Vec::new(); n] };
+        let mut c = Complex { tets: Vec::new(), alive: Vec::new(), nbr: Vec::new(), star: vec![Vec::new(); n] };
         for t in tets {
             c.add(*t);
         }
         c
     }
 
+    /// A live tetrahedron on face k (sorted) and its slot, other than `skip`.
+    fn on_face(&self, k: &[u32; 3], skip: u32) -> Option<(u32, usize)> {
+        let v = *k.iter().min_by_key(|&&x| self.star[x as usize].len()).unwrap();
+        self.star[v as usize].iter().filter(|&&t| t != skip)
+            .find_map(|&t| slot(&self.tets[t as usize], k).map(|i| (t, i)))
+    }
+
     pub(crate) fn add(&mut self, v: [u32; 4]) -> u32 {
         let id = self.tets.len() as u32;
         self.tets.push(v);
         self.alive.push(true);
+        self.nbr.push([NONE; 4]);
         for i in 0..4 {
-            let e = self.faces.entry(key(face(&v, i))).or_insert([NONE, NONE]);
-            if e[0] == NONE { e[0] = id } else { e[1] = id }
+            let k = key(face(&v, i));
+            if let Some((u, j)) = self.on_face(&k, id) {
+                debug_assert!(self.nbr[u as usize][j] == NONE, "a third tetrahedron on face {k:?}");
+                self.nbr[u as usize][j] = id;
+                self.nbr[id as usize][i] = u;
+            }
             self.star[v[i] as usize].push(id);
         }
         id
@@ -144,12 +175,10 @@ impl Complex {
         self.alive[t as usize] = false;
         let v = self.tets[t as usize];
         for i in 0..4 {
-            let k = key(face(&v, i));
-            let e = self.faces.get_mut(&k).unwrap();
-            if e[0] == t { e[0] = e[1] }
-            e[1] = NONE;
-            if e[0] == NONE {
-                self.faces.remove(&k);
+            let u = std::mem::replace(&mut self.nbr[t as usize][i], NONE);
+            if u != NONE {
+                let j = slot(&self.tets[u as usize], &key(face(&v, i))).unwrap();
+                self.nbr[u as usize][j] = NONE;
             }
         }
         for x in v {
@@ -158,12 +187,48 @@ impl Complex {
         }
     }
 
+    /// The live tetrahedra on face k (sorted): the lower id first, NONE second when the
+    /// face is on the hull; None when no live tetrahedron has the face.
+    pub(crate) fn face_tets(&self, k: &[u32; 3]) -> Option<[u32; 2]> {
+        let (t, i) = self.on_face(k, NONE)?;
+        let u = self.nbr[t as usize][i];
+        Some(if u == NONE { [t, NONE] } else { [t.min(u), t.max(u)] })
+    }
+
+    pub(crate) fn has_face(&self, k: &[u32; 3]) -> bool {
+        self.on_face(k, NONE).is_some()
+    }
+
+    /// The tetrahedron across face k from t; NONE on the hull. When t is not a live
+    /// tetrahedron on k, the lower live tetrahedron on k (as the face table gave).
     pub(crate) fn neighbor(&self, t: u32, k: &[u32; 3]) -> u32 {
-        match self.faces.get(k) {
+        if self.alive[t as usize] {
+            if let Some(i) = slot(&self.tets[t as usize], k) {
+                return self.nbr[t as usize][i];
+            }
+        }
+        match self.face_tets(k) {
             Some(e) if e[0] == t => e[1],
             Some(e) => e[0],
             None => NONE,
         }
+    }
+
+    /// The faces shared by two live tetrahedra (sorted vertex triples, unordered).
+    pub(crate) fn interior_faces(&self) -> Vec<[u32; 3]> {
+        let mut out = Vec::new();
+        for (t, v) in self.tets.iter().enumerate() {
+            if !self.alive[t] {
+                continue;
+            }
+            for i in 0..4 {
+                let u = self.nbr[t][i];
+                if u != NONE && (t as u32) < u {
+                    out.push(key(face(v, i)));
+                }
+            }
+        }
+        out
     }
 
     pub(crate) fn live(&self) -> Vec<[u32; 4]> {
@@ -543,7 +608,7 @@ pub fn recover_facets_with(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[
         by_key.entry(key(*t)).or_default().push(i);
     }
     let mut missing_idx: std::collections::BTreeSet<usize> = (0..all.len())
-        .filter(|&i| !cx.faces.contains_key(&key(all[i].1)))
+        .filter(|&i| !cx.has_face(&key(all[i].1)))
         .collect();
     for _pass in 0..4 * (constraints.len() + 1) {
         let missing: Vec<(usize, [u32; 3])> = missing_idx.iter().map(|&i| all[i]).collect();
@@ -656,7 +721,7 @@ pub fn recover_facets_with(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[
         }
         for k in changed {
             if let Some(ids) = by_key.get(&k) {
-                let present = cx.faces.contains_key(&k);
+                let present = cx.has_face(&k);
                 for &i in ids {
                     if present {
                         missing_idx.remove(&i);
