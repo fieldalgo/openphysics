@@ -22,6 +22,39 @@ use std::collections::{HashMap, HashSet};
 
 const GHOST: u32 = u32::MAX;
 
+/// A fast hasher for the small integer keys of the triangulation's lookup tables
+/// (multiply-rotate, as in rustc's FxHash). The tables are only looked up, never
+/// iterated, so no result depends on it.
+#[derive(Default, Clone, Copy)]
+struct Fx(u64);
+
+impl std::hash::Hasher for Fx {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(b as u64);
+        }
+    }
+
+    fn write_u32(&mut self, x: u32) {
+        self.write_u64(x as u64);
+    }
+
+    fn write_u64(&mut self, x: u64) {
+        self.0 = (self.0.rotate_left(5) ^ x).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
+
+    fn write_usize(&mut self, x: usize) {
+        self.write_u64(x as u64);
+    }
+}
+
+type FxMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<Fx>>;
+type FxSet<K> = HashSet<K, std::hash::BuildHasherDefault<Fx>>;
+
 #[derive(Debug)]
 pub struct Facet {
     /// Triangles as global point indices, wound like the outer (first) loop.
@@ -82,15 +115,87 @@ impl PlanePred for Plain2<'_> {
     }
 }
 
+/// The triangulation: triangle slots in creation order, of which the live ones (in
+/// slot order) are the triangulation. A removed triangle leaves a dead slot and new
+/// ones are appended, so the live order is the order a list that drops the removed
+/// triangles and appends the new ones would have. Each directed edge of a live
+/// triangle maps to its slot (the adjacency).
 struct Tri<'a, P: PlanePred> {
     pred: &'a P,
     axis: usize,
     tris: Vec<[u32; 3]>, // counter-clockwise in the projection; ghosts as (a, b, GHOST)
+    alive: Vec<bool>,
+    edge: FxMap<(u32, u32), usize>,
+    last: usize,
     points: Vec<u32>,
     constraints: HashSet<(u32, u32)>,
 }
 
-impl<P: PlanePred> Tri<'_, P> {
+impl<'a, P: PlanePred> Tri<'a, P> {
+    fn new(pred: &'a P, axis: usize, points: Vec<u32>) -> Tri<'a, P> {
+        Tri { pred, axis, tris: Vec::new(), alive: Vec::new(), edge: FxMap::default(), last: 0, points,
+              constraints: HashSet::new() }
+    }
+
+    fn add(&mut self, t: [u32; 3]) {
+        let k = self.tris.len();
+        self.tris.push(t);
+        self.alive.push(true);
+        for (u, v) in edges(&t) {
+            self.edge.insert((u, v), k);
+        }
+        self.last = k;
+    }
+
+    fn kill(&mut self, k: usize) {
+        self.alive[k] = false;
+        for (u, v) in edges(&self.tris[k]) {
+            if self.edge.get(&(u, v)) == Some(&k) {
+                self.edge.remove(&(u, v));
+            }
+        }
+    }
+
+    /// The live triangles' slots, in order.
+    fn live(&self) -> impl Iterator<Item = usize> + '_ {
+        (0..self.tris.len()).filter(move |&k| self.alive[k])
+    }
+
+    /// A triangle in conflict with q: a visibility walk from the last new triangle,
+    /// else (a walk that does not end in conflict) the first in slot order.
+    fn seed(&self, q: u32) -> Option<usize> {
+        let mut t = if self.alive.get(self.last) == Some(&true) { self.last } else { self.live().next()? };
+        let mut steps = 0;
+        'walk: while steps <= self.tris.len() {
+            steps += 1;
+            let tri = self.tris[t];
+            if tri[2] != GHOST {
+                for (u, v) in edges(&tri) {
+                    if self.orient(u, v, q) < 0 {
+                        match self.edge.get(&(v, u)) {
+                            Some(&n) => {
+                                t = n;
+                                continue 'walk;
+                            }
+                            None => break 'walk,
+                        }
+                    }
+                }
+            }
+            if self.conflict(t, q) {
+                return Some(t);
+            }
+            if tri[2] == GHOST && steps == 1 {
+                // a walk that starts at a ghost goes into the triangle across its edge
+                if let Some(&n) = self.edge.get(&(tri[1], tri[0])) {
+                    t = n;
+                    continue;
+                }
+            }
+            break;
+        }
+        self.live().find(|&t| self.conflict(t, q))
+    }
     fn orient(&self, a: u32, b: u32, c: u32) -> i8 {
         self.pred.orient(self.axis, a, b, c)
     }
@@ -110,18 +215,42 @@ impl<P: PlanePred> Tri<'_, P> {
             }
             // on the hull line: the half-plane is the limit of the circle of the finite
             // triangle across the edge
-            let n = self.tris.iter().position(|u| u[2] != GHOST && has_edge(u, b, a)).unwrap();
+            let n = self.edge[&(b, a)];
             return self.conflict(n, q);
         }
         self.in_circle(a, b, c, q)
     }
 
+    /// The triangles in conflict with q, in slot order: the conflict region is
+    /// connected across edges (it is star-shaped from q), so a search from one of them
+    /// finds them all.
+    fn cavity(&self, q: u32) -> Vec<usize> {
+        let Some(s) = self.seed(q) else { return Vec::new() };
+        let mut seen: FxSet<usize> = FxSet::default();
+        seen.insert(s);
+        let mut stack = vec![s];
+        let mut out = Vec::new();
+        while let Some(t) = stack.pop() {
+            out.push(t);
+            for (u, v) in edges(&self.tris[t]) {
+                if let Some(&n) = self.edge.get(&(v, u)) {
+                    if seen.insert(n) && self.conflict(n, q) {
+                        stack.push(n);
+                    }
+                }
+            }
+        }
+        out.sort_unstable();
+        debug_assert_eq!(out, self.live().filter(|&t| self.conflict(t, q)).collect::<Vec<_>>());
+        out
+    }
+
     fn insert(&mut self, q: u32) -> Result<(), String> {
-        let cavity: Vec<usize> = (0..self.tris.len()).filter(|&t| self.conflict(t, q)).collect();
+        let cavity = self.cavity(q);
         if cavity.is_empty() {
             return Err(format!("point {q} is in conflict with no triangle"));
         }
-        let mut count: HashMap<(u32, u32), i32> = HashMap::new();
+        let mut count: FxMap<(u32, u32), i32> = FxMap::default();
         for &t in &cavity {
             for (u, v) in edges(&self.tris[t]) {
                 *count.entry((u.min(v), u.max(v))).or_default() += 1;
@@ -135,21 +264,28 @@ impl<P: PlanePred> Tri<'_, P> {
                 }
             }
         }
-        let keep: HashSet<usize> = cavity.into_iter().collect();
-        let mut tris: Vec<[u32; 3]> = self.tris.iter().enumerate().filter(|(i, _)| !keep.contains(i)).map(|(_, t)| *t).collect();
-        tris.extend(new);
-        self.tris = tris;
+        for &t in &cavity {
+            self.kill(t);
+        }
+        for t in new {
+            self.add(t);
+        }
         Ok(())
     }
 
     fn has_edge(&self, a: u32, b: u32) -> bool {
-        self.tris.iter().any(|t| has_edge(t, a, b) || has_edge(t, b, a))
+        self.edge.contains_key(&(a, b)) || self.edge.contains_key(&(b, a))
     }
 
     /// Inserts the constraint a-b. It may not pass through a point or cross another
     /// constraint: callers split edges at the points on them, and crossings are input
     /// errors found before triangulating.
     fn insert_edge(&mut self, a: u32, b: u32) -> Result<(), String> {
+        // an edge of the triangulation holds no point inside it
+        if self.has_edge(a, b) {
+            self.constraints.insert((a.min(b), a.max(b)));
+            return Ok(());
+        }
         if let Some(&v) = self.points.iter().find(|&&v| v != a && v != b && self.orient(a, b, v) == 0 && strictly_between(self, a, b, v)) {
             return Err(format!("constraint {a}-{b} passes through point {v}"));
         }
@@ -159,7 +295,7 @@ impl<P: PlanePred> Tri<'_, P> {
         }
         // triangles whose interior the open segment a-b crosses: those with an edge it
         // crosses properly
-        let crossed: Vec<usize> = (0..self.tris.len())
+        let crossed: Vec<usize> = self.live()
             .filter(|&t| {
                 let tri = self.tris[t];
                 tri[2] != GHOST
@@ -212,13 +348,15 @@ impl<P: PlanePred> Tri<'_, P> {
         };
         let below = chain(a, b)?; // counter-clockwise from a to b runs right of a-b
         let above = chain(b, a)?;
-        let keep: HashSet<usize> = crossed.into_iter().collect();
-        let mut tris: Vec<[u32; 3]> = self.tris.iter().enumerate().filter(|(i, _)| !keep.contains(i)).map(|(_, t)| *t).collect();
         let mut fill = Vec::new();
         self.fill(b, a, &below, &mut fill); // b-a with the lower chain on its left
         self.fill(a, b, &above, &mut fill);
-        tris.extend(fill);
-        self.tris = tris;
+        for &t in &crossed {
+            self.kill(t);
+        }
+        for t in fill {
+            self.add(t);
+        }
         self.constraints.insert((a.min(b), a.max(b)));
         Ok(())
     }
@@ -245,10 +383,6 @@ impl<P: PlanePred> Tri<'_, P> {
 
 fn edges(t: &[u32; 3]) -> impl Iterator<Item = (u32, u32)> + '_ {
     (0..3).map(move |i| (t[i], t[(i + 1) % 3]))
-}
-
-fn has_edge(t: &[u32; 3], a: u32, b: u32) -> bool {
-    edges(t).any(|(u, v)| u == a && v == b)
 }
 
 fn ghost_last(t: [u32; 3]) -> [u32; 3] {
@@ -399,7 +533,7 @@ pub fn triangulate_with(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], ex
         .ok_or_else(|| bad(3, "the facet's normal is zero".into()))?;
 
     let plain = Plain2 { pts };
-    let t = Tri { pred: &plain, axis, tris: Vec::new(), points: Vec::new(), constraints: HashSet::new() };
+    let t = Tri::new(&plain, axis, Vec::new());
     let cons: Vec<(u32, u32)> = loops.iter()
         .flat_map(|lp| (0..lp.len()).map(move |k| (lp[k], lp[(k + 1) % lp.len()])))
         .collect();
@@ -473,12 +607,14 @@ pub fn triangulate_with(pts: &[P3], loops: &[Vec<u32>], extra_points: &[u32], ex
 /// type: 3 for the facet itself, 5 when an inner edge cannot be inserted.
 pub(crate) fn cdt<P: PlanePred>(pred: &P, axis: usize, points: &[u32], boundary: &[(u32, u32)],
                                 inner: &[(u32, u32)], flip: bool) -> Result<Vec<[u32; 3]>, (u8, String)> {
-    let mut t = Tri { pred, axis, tris: Vec::new(), points: points.to_vec(), constraints: HashSet::new() };
+    let mut t = Tri::new(pred, axis, points.to_vec());
     let x = *points.first().ok_or((3, "the facet has no points".to_string()))?;
     let y = *points.iter().find(|&&v| v != x).ok_or((3, "the facet has one point".to_string()))?;
     let z = *points.iter().find(|&&v| t.orient(x, y, v) != 0).ok_or((3, "the facet's points are collinear".to_string()))?;
     let (y, z) = if t.orient(x, y, z) > 0 { (y, z) } else { (z, y) };
-    t.tris = vec![[x, y, z], [y, x, GHOST], [z, y, GHOST], [x, z, GHOST]];
+    for tri in [[x, y, z], [y, x, GHOST], [z, y, GHOST], [x, z, GHOST]] {
+        t.add(tri);
+    }
     for &v in points {
         if v != x && v != y && v != z {
             t.insert(v).map_err(|m| (3, m))?;
@@ -491,6 +627,8 @@ pub(crate) fn cdt<P: PlanePred>(pred: &P, axis: usize, points: &[u32], boundary:
         t.insert_edge(p, q).map_err(|m| (5, m))?;
     }
     // even-odd labelling from the outside: only the boundary pieces count
+    let live: Vec<[u32; 3]> = t.live().map(|k| t.tris[k]).collect();
+    t.tris = live;
     let constraint: HashSet<(u32, u32)> = boundary.iter().map(|&(p, q)| (p.min(q), p.max(q))).collect();
     let mut by_edge: HashMap<(u32, u32), usize> = HashMap::new();
     for (k, tri) in t.tris.iter().enumerate() {
