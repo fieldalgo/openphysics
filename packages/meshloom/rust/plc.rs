@@ -309,7 +309,18 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         let mut extra = Vec::new();
         if let Some((a, b, c)) = plane {
             let mut near: Vec<u32> = Vec::new();
-            if grid.box_cells(&lo, &hi) <= 64 + pts.len() as u64 / 8 {
+            // a facet that is one triangle takes only the points on it (closed); its
+            // cells are those the triangle meets
+            let tri: Option<[u32; 3]> = (loops.len() == 1 && loops[0].len() == 3).then(|| [loops[0][0], loops[0][1], loops[0][2]]);
+            let tri_axis = tri.and_then(|t| plane_axis(&pts[t[0] as usize], &pts[t[1] as usize], &pts[t[2] as usize]));
+            if let Some(t) = tri {
+                for k in grid.cells(&[pts[t[0] as usize], pts[t[1] as usize], pts[t[2] as usize]]) {
+                    let start = point_cells.partition_point(|x| x.0 < k);
+                    near.extend(point_cells[start..].iter().take_while(|x| x.0 == k).map(|x| x.1));
+                }
+                near.sort_unstable_by_key(|&v| x_rank[v as usize]);
+                near.dedup();
+            } else if grid.box_cells(&lo, &hi) <= 64 + pts.len() as u64 / 8 {
                 // the points in the cells of the box widened by the margin (all of the
                 // listed points with a cell there: a point lies in its own cell)
                 let mut keys = Vec::new();
@@ -327,6 +338,15 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
                 let pv = &pts[v as usize];
                 if own.contains(&v) || (0..3).any(|k| pv[k] < lo[k] || pv[k] > hi[k]) {
                     continue;
+                }
+                if let Some(t) = tri {
+                    // off the triangle (in projection): not on it, whatever its plane
+                    let axis = tri_axis.unwrap();
+                    let o = |i: usize, j: usize| pr::orient2d_proj(axis, &pts[t[i] as usize], &pts[t[j] as usize], pv);
+                    let s = [o(0, 1), o(1, 2), o(2, 0)];
+                    if !(s.iter().all(|&x| x >= 0) || s.iter().all(|&x| x <= 0)) {
+                        continue;
+                    }
                 }
                 if pr::orient3d(&pts[a as usize], &pts[b as usize], &pts[c as usize], pv, &mut n) == 0 {
                     extra.push(v);
