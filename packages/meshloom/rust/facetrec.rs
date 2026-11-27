@@ -717,14 +717,18 @@ pub fn recover_boundary(plc: &crate::plc::Plc, max_depth: u32) -> Result<Boundar
 /// `recover_boundary` after the caller's own PLC check (its result on this PLC).
 pub fn recover_boundary_checked(plc: &crate::plc::Plc, checked: crate::plc::Checked, max_depth: u32)
     -> Result<Boundary, String> {
+    let clock = crate::recovery::StageClock::start();
     let pr = crate::recovery::recover_checked(plc, checked, max_depth)?;
+    clock.lap("segments and subfacets");
     let mut g = MixedPoints::new(plc.points.clone());
     for s in &pr.rec.s {
         g.push(*s);
     }
     let hull = hull_faces(&pr.rec.tets);
     let (tets, stats) = recover_facets(&mut g, &pr.rec.tets, &pr.subfacets)?;
+    clock.lap("facet recovery");
     let report = verify_cdt(&mut g, &tets, &pr.subfacets, &pr.rec.chains, &hull)?;
+    clock.lap("CDT verifier");
     Ok(Boundary { plc: pr, tets, stats, report, mixed: g.n })
 }
 

@@ -250,8 +250,10 @@ pub fn recover_plc(plc: &crate::plc::Plc, max_depth: u32) -> Result<PlcRecovered
 /// `recover_plc` after the caller's own PLC check (its result on this PLC).
 pub fn recover_checked(plc: &crate::plc::Plc, checked: crate::plc::Checked, max_depth: u32)
     -> Result<PlcRecovered, String> {
+    let clock = StageClock::start();
     let segs = checked.subsegments.clone();
     let rec = recover(&plc.points, &segs, max_depth).map_err(|e| e.to_string())?;
+    clock.lap("segment recovery");
     let (subfacets, missing, plane_n) = {
     let chain_of: HashMap<(u32, u32), &Vec<u32>> = segs.iter().zip(&rec.chains)
         .map(|(s, c)| ((s[0].min(s[1]), s[0].max(s[1])), c)).collect();
@@ -300,9 +302,28 @@ pub fn recover_checked(plc: &crate::plc::Plc, checked: crate::plc::Checked, max_
             }
         }
     }
+    clock.lap("subfacets");
     (subfacets, missing, plane.n.get())
     };
     Ok(PlcRecovered { rec, subfacets, missing, plane: plane_n })
+}
+
+/// Stage timings on stderr when `MESHLOOM_PROFILE` is set (profiling only; no effect
+/// on results).
+pub struct StageClock(Option<std::cell::Cell<std::time::Instant>>);
+
+impl StageClock {
+    pub fn start() -> StageClock {
+        StageClock(std::env::var_os("MESHLOOM_PROFILE").map(|_| std::cell::Cell::new(std::time::Instant::now())))
+    }
+
+    pub fn lap(&self, stage: &str) {
+        if let Some(c) = &self.0 {
+            let now = std::time::Instant::now();
+            eprintln!("meshloom profile: {stage}: {:.3} s", (now - c.get()).as_secs_f64());
+            c.set(now);
+        }
+    }
 }
 
 /// True when two of the segments `inc` at vertex v meet at less than 90 degrees.

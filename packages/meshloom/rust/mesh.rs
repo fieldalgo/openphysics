@@ -108,7 +108,10 @@ pub fn build(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> Res
         }
         closed(points.len(), b)?;
     }
-    build_inner(points, b, domain, seeds).map_err(|e| {
+    let clock = crate::recovery::StageClock::start();
+    let r = build_inner(points, b, domain, seeds);
+    clock.lap("regions, rounding, certification and repair");
+    r.map_err(|e| {
         if let Some(m) = e.strip_prefix("seed: ") {
             MeshError::Seed(m.to_string())
         } else if e.starts_with("rounding") || e.contains("repair") {
