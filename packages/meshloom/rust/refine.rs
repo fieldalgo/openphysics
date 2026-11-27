@@ -902,14 +902,15 @@ impl State<'_> {
         for _pass in 0..4 {
             let mut done = 0u32;
             // 2-3 across interior faces
-            let mut faces: Vec<[u32; 3]> = self.cx.interior_faces().into_iter()
-                .filter(|k| !self.sub.contains_key(k)).collect();
+            // each face once, so sorting by (face, tetrahedron) is sorting by face
+            let mut faces: Vec<([u32; 3], u32)> = self.cx.interior_faces().into_iter()
+                .filter(|(k, _)| !self.sub.contains_key(k)).collect();
             faces.sort_unstable();
-            for k in faces {
+            for (k, t) in faces {
                 if self.clean_faces.contains(&k) {
                     continue; // rejected before, and no tetrahedron on it changed since
                 }
-                if self.try_23(k) {
+                if self.try_23(k, t) {
                     done += 1;
                 } else {
                     self.clean_faces.insert(k);
@@ -951,8 +952,9 @@ impl State<'_> {
     /// One 2-3 flip try across face k (the body of flip_passes' first loop): true when it
     /// flipped. A refusal depends only on the two tetrahedra on k, so flip_passes skips k
     /// until a tetrahedron on it is replaced.
-    fn try_23(&mut self, k: [u32; 3]) -> bool {
-        let Some(o) = self.cx.face_tets(&k) else { return false };
+    /// `t`: a tetrahedron that had face k when the pass listed it (read from if still live).
+    fn try_23(&mut self, k: [u32; 3], t: u32) -> bool {
+        let Some(o) = self.cx.face_tets_from(t, &k) else { return false };
         if o[0] == NONE || o[1] == NONE || self.sub.contains_key(&k) {
             return false;
         }
@@ -1235,25 +1237,25 @@ impl State<'_> {
     /// tetrahedra that replace `start`, for the queues.
     fn lawson(&mut self, start: Vec<u32>) -> Vec<u32> {
         let mut made: Vec<u32> = start.clone();
-        let mut stack: Vec<[u32; 3]> = Vec::new();
-        let push = |st: &Self, t: u32, stack: &mut Vec<[u32; 3]>| {
+        let mut stack: Vec<([u32; 3], u32)> = Vec::new();
+        let push = |st: &Self, t: u32, stack: &mut Vec<([u32; 3], u32)>| {
             let v = st.cx.tets[t as usize];
             for i in 0..4 {
-                stack.push(key(face(&v, i)));
+                stack.push((key(face(&v, i)), t));
             }
         };
         for &t in &start {
             push(self, t, &mut stack);
         }
         let mut flips = 0u32;
-        while let Some(k) = stack.pop() {
+        while let Some((k, from)) = stack.pop() {
             if flips >= LAWSON_CAP {
                 break;
             }
             if self.sub.contains_key(&k) {
                 continue;
             }
-            let Some(o) = self.cx.face_tets(&k) else { continue };
+            let Some(o) = self.cx.face_tets_from(from, &k) else { continue };
             if o[0] == NONE || o[1] == NONE {
                 continue;
             }

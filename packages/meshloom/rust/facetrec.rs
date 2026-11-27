@@ -195,6 +195,18 @@ impl Complex {
         Some(if u == NONE { [t, NONE] } else { [t.min(u), t.max(u)] })
     }
 
+    /// face_tets(k), read from the arrays when t is a live tetrahedron on k (a caller that
+    /// took k from t's faces), else found as face_tets does.
+    pub(crate) fn face_tets_from(&self, t: u32, k: &[u32; 3]) -> Option<[u32; 2]> {
+        if self.alive[t as usize] {
+            if let Some(i) = slot(&self.tets[t as usize], k) {
+                let u = self.nbr[t as usize][i];
+                return Some(if u == NONE { [t, NONE] } else { [t.min(u), t.max(u)] });
+            }
+        }
+        self.face_tets(k)
+    }
+
     pub(crate) fn has_face(&self, k: &[u32; 3]) -> bool {
         self.on_face(k, NONE).is_some()
     }
@@ -214,8 +226,9 @@ impl Complex {
         }
     }
 
-    /// The faces shared by two live tetrahedra (sorted vertex triples, unordered).
-    pub(crate) fn interior_faces(&self) -> Vec<[u32; 3]> {
+    /// The faces shared by two live tetrahedra (sorted vertex triples, unordered), each with
+    /// the lower of its two tetrahedra.
+    pub(crate) fn interior_faces(&self) -> Vec<([u32; 3], u32)> {
         let mut out = Vec::new();
         for (t, v) in self.tets.iter().enumerate() {
             if !self.alive[t] {
@@ -224,7 +237,7 @@ impl Complex {
             for i in 0..4 {
                 let u = self.nbr[t][i];
                 if u != NONE && (t as u32) < u {
-                    out.push(key(face(v, i)));
+                    out.push((key(face(v, i)), t as u32));
                 }
             }
         }
