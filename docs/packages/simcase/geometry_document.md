@@ -18,7 +18,7 @@ the hand-off to meshloom and the mesher route of a `3d` component (see the
 [stage 5 compile conditions](#stage-5-compile-conditions-amended-2026-11-27));
 the 3D route through meshloom is experimental until meshloom's own acceptance.
 [`simcase.geometry_engine3d`](geometry_engine3d.md) takes boxes and slab layers
-through that route (slice 1).
+through that route (slice 1), and cylinders and spheres in meshloom's builder shapes (slice 3).
 Repository facts were checked against `main` at `015a6d8`, and those of the stage 5
 amendment against `b4177fa`.
 
@@ -797,7 +797,7 @@ keyword.
 | [region mechanics](mechanics2d.md#material-regions-and-named-boundaries) (`mechanics.elasticity2d`, `mechanics.thermoelastic2d`) | `2d` components through the stage 2 engine, with E, ν, α and k from `materials` and the boundary names of region heat for displacement, traction and pressure (2026-11-08) | `axisymmetric`; a void background; interface selections for displacement, traction and pressure (galerkin fixes exterior nodes only) |
 | FEM 2.5D (`meshine.extrude`) | `layers`, and `extrude` along z | sloped or curved sidewalls: the extruder makes vertical prisms only (`packages/meshine/src/meshine/extrude.py:4-19`) |
 | `em.cavity3d` | `box` with the grid-plane rule | other 3D features |
-| FEM 3D (meshloom, stage 5; experimental) | every `3d` component but a lone `layers` feature (the extrude route) and `em.cavity3d` documents: the [stage 5 combinations](#stage-5-compile-conditions-amended-2026-11-27); [`simcase.geometry_engine3d`](geometry_engine3d.md) takes boxes and slab layers (slice 1) | everything else, refused by name (`E-3D-COMBINATION`); a gmshio route is not planned |
+| FEM 3D (meshloom, stage 5; experimental) | every `3d` component but a lone `layers` feature (the extrude route) and `em.cavity3d` documents: the [stage 5 combinations](#stage-5-compile-conditions-amended-2026-11-27); [`simcase.geometry_engine3d`](geometry_engine3d.md) takes boxes and slab layers (slice 1), and cylinders and spheres in meshloom's builder shapes (slice 3) | everything else, refused by name (`E-3D-COMBINATION`); a gmshio route is not planned |
 | sipi | `2d` components through its adapter, which keeps sipi's overlap refusals (`packages/sipi/src/sipi/crosssection.py:216-239`) | — |
 | Wavebit RCWA and FDTD | defined by the stage 3 amendment | — |
 

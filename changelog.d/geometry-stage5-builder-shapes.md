@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- `simcase`: **cylinders and spheres of a `3d` component in meshloom's builder shapes** (stage 5, slice 3; experimental until meshloom's acceptance). A component that exactly matches `meshloom.builder.via_in_slab` (one cylinder through the whole slab), `sphere_in_box`, `sphere` or `nested_spheres` (concentric spheres, outermost first) is meshed by that builder at `mesh.element_size`, bit for bit the builder's mesh, with its tags renamed to the document's provenance names (`<id>.side`, `<id>.bottom`, `<id>.top`, `<id>.surface`, `domain.*`). Each sampled surface is reported as the new info diagnostic `I-SURFACE-SAMPLED` (exact parameters, builder and meshloom versions, sampling, sagitta bound, measured V5 deviation). The contract's stems refuse a cylinder crossing or touching a domain side and spheres touching a face or each other; every other cylinder or sphere configuration is refused with the updated staging message. Validated: bitwise identity with the builders (G7), cylinder and sphere volume convergence (G8 slope 1.99, G9 slope 1.87) and V5 at most 1.9e-16 (G10). [Cylinders and spheres in builder shapes](docs/packages/simcase/geometry_engine3d.md#cylinders-and-spheres-in-builder-shapes-slice-3).
+
+## 한국어
+
+- `simcase`: **meshloom builder 모양의 `3d` 구성 요소 원통과 구**(5단계 슬라이스 3, meshloom 수용 전까지 실험 단계). `meshloom.builder.via_in_slab`(판 전체를 지나는 원통 하나), `sphere_in_box`, `sphere`, `nested_spheres`(가장 바깥 것부터 적은 동심 구)와 정확히 맞는 구성 요소는 그 builder가 `mesh.element_size`로 메시하며, 메시는 비트까지 builder의 것이고 태그는 문서의 출처 이름(`<id>.side`, `<id>.bottom`, `<id>.top`, `<id>.surface`, `domain.*`)으로 바꿉니다. 표본화한 곡면마다 새 정보 진단 `I-SURFACE-SAMPLED`(정확한 매개변수, builder와 meshloom 버전, 표본화, 시상 한계, V5 측정값)로 알립니다. 계약의 줄기로 도메인 옆면을 가로지르거나 닿는 원통, 면이나 서로 닿는 구를 거부하고, 그 밖의 원통·구 구성은 고친 단계 메시지로 거부합니다. 검증: builder와 비트 일치(G7), 원통과 구 부피 수렴(G8 기울기 1.99, G9 기울기 1.87), V5 최대 1.9e-16(G10). [builder 모양의 원통과 구](packages/simcase/geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3).
