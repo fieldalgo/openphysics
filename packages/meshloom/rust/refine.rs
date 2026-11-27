@@ -1096,17 +1096,29 @@ impl State<'_> {
         }
         // the ring polygon in cyclic order: each tetrahedron joins two consecutive vertices
         let mut pairs: Vec<(u32, u32)> = Vec::with_capacity(n);
-        let mut bad = false;
+        // the faces through ab: a face without a tetrahedron on its other side, or a
+        // subfacet, refuses the removal. The tetrahedron across such a face holds a and b,
+        // so it is in the ring: a face has one there exactly when it occurs twice among the
+        // ring's faces (no lookup in the face table)
+        let mut through: Vec<[u32; 3]> = Vec::with_capacity(2 * n);
         for &t in &ring {
             let v = self.cx.tets[t as usize];
             let o: Vec<u32> = v.iter().copied().filter(|&x| x != a && x != b).collect();
             pairs.push((o[0], o[1]));
             for i in 0..4 {
                 let k = key(face(&v, i));
-                if k.contains(&a) && k.contains(&b) && (self.sub.contains_key(&k) || self.cx.neighbor(t, &k) == NONE) {
-                    bad = true;
+                if k.contains(&a) && k.contains(&b) {
+                    through.push(k);
                 }
             }
+        }
+        through.sort_unstable();
+        let mut bad = through.len() != 2 * n;
+        let mut i = 0;
+        while !bad && i < through.len() {
+            bad = i + 1 >= through.len() || through[i + 1] != through[i] || (i + 2 < through.len() && through[i + 2] == through[i])
+                || self.sub.contains_key(&through[i]);
+            i += 2;
         }
         if bad {
             return false;
@@ -1135,7 +1147,8 @@ impl State<'_> {
             return false;
         }
         // best[i][j]: (worst q, split k) of the polygon chain i..j, triangles (i, k, j)
-        let mut tri_q: HashMap<(usize, usize, usize), f64> = HashMap::new();
+        // tri_q[(i * n + k) * n + j]: the q of triangle (i, k, j)'s two tetrahedra, once each
+        let mut tri_q: Vec<Option<f64>> = vec![None; n * n * n];
         let mut best = vec![vec![(f64::NEG_INFINITY, usize::MAX); n]; n];
         for i in 0..n - 1 {
             best[i][i + 1] = (f64::INFINITY, usize::MAX);
@@ -1144,7 +1157,7 @@ impl State<'_> {
             for i in 0..n - len {
                 let j = i + len;
                 for k in i + 1..j {
-                    let q = *tri_q.entry((i, k, j)).or_insert_with(|| {
+                    let q = *tri_q[(i * n + k) * n + j].get_or_insert_with(|| {
                         let tr = [poly[i], poly[k], poly[j]];
                         if self.g.orient3d([tr[0], tr[1], tr[2], a]) != sa || self.g.orient3d([tr[0], tr[1], tr[2], b]) != -sa {
                             return f64::NEG_INFINITY;
