@@ -1,0 +1,105 @@
+{
+ "finding": "T-junction fuzz seed 42: meshloom RefineError 'refinement: no frame for facet 7' (C.top); a derived intersection 0.8 pm from C's apex gives a cap of 2.7e-17 m^2 (below the contract's relative tolerance: to be refused before hand-off)",
+ "recorded_on": "claude/geometry-stage5-extrude 7bd1865 (simcase.build_mesh3d)",
+ "reproduce": "simcase.build_mesh3d(document)",
+ "document": {
+  "openphysics": "0.3",
+  "geometry": {
+   "version": 1,
+   "components": {
+    "c": {
+     "dimension": "3d",
+     "length_unit": "pm",
+     "domain": {
+      "xmin": 0,
+      "xmax": 4000000000,
+      "ymin": 0,
+      "ymax": 3000000000,
+      "zmin": 0,
+      "zmax": 2000000000
+     },
+     "background": {
+      "material": "bg"
+     },
+     "features": [
+      {
+       "name": "A",
+       "type": "extrude",
+       "profile": {
+        "type": "polygon",
+        "points": [
+         [
+          1898671368,
+          1634464700
+         ],
+         [
+          2100284943,
+          1365646600
+         ],
+         [
+          2214532635,
+          1661346510
+         ]
+        ]
+       },
+       "zmin": 0,
+       "zmax": 1500000000,
+       "material": "a"
+      },
+      {
+       "name": "B",
+       "type": "extrude",
+       "profile": {
+        "type": "polygon",
+        "points": [
+         [
+          1938994083,
+          1580701080
+         ],
+         [
+          1683616888,
+          1473173840
+         ],
+         [
+          1764262318,
+          1365646600
+         ]
+        ]
+       },
+       "zmin": 500000000,
+       "zmax": 2000000000,
+       "material": "b"
+      },
+      {
+       "name": "C",
+       "type": "extrude",
+       "profile": {
+        "type": "polygon",
+        "points": [
+         [
+          1938994083,
+          1580701080
+         ],
+         [
+          1979316798,
+          1526937460
+         ],
+         [
+          1851628200,
+          1473173840
+         ]
+        ]
+       },
+       "zmin": 500000000,
+       "zmax": 1500000000,
+       "material": "c"
+      }
+     ]
+    }
+   }
+  },
+  "mesh": {
+   "element_size": "0.25 mm"
+  }
+ }
+}

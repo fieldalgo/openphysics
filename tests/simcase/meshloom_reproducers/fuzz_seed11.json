@@ -1,0 +1,105 @@
+{
+ "finding": "T-junction fuzz seed 11: meshloom.generate3d does not return (over 15 min in mesh_plc, meshloom/_core.py:371; other sets take 2-7 s); shortest fine curve 40 um, h = 0.25 mm",
+ "recorded_on": "claude/geometry-stage5-extrude 7bd1865 (simcase.build_mesh3d)",
+ "reproduce": "simcase.build_mesh3d(document)",
+ "document": {
+  "openphysics": "0.3",
+  "geometry": {
+   "version": 1,
+   "components": {
+    "c": {
+     "dimension": "3d",
+     "length_unit": "pm",
+     "domain": {
+      "xmin": 0,
+      "xmax": 4000000000,
+      "ymin": 0,
+      "ymax": 3000000000,
+      "zmin": 0,
+      "zmax": 2000000000
+     },
+     "background": {
+      "material": "bg"
+     },
+     "features": [
+      {
+       "name": "A",
+       "type": "extrude",
+       "profile": {
+        "type": "polygon",
+        "points": [
+         [
+          2030222613,
+          1574776230
+         ],
+         [
+          1971136925,
+          1427062010
+         ],
+         [
+          2111465434,
+          1456604854
+         ]
+        ]
+       },
+       "zmin": 0,
+       "zmax": 2000000000,
+       "material": "a"
+      },
+      {
+       "name": "B",
+       "type": "extrude",
+       "profile": {
+        "type": "polygon",
+        "points": [
+         [
+          2000679769,
+          1500919120
+         ],
+         [
+          1941594081,
+          1567390519
+         ],
+         [
+          1912051237,
+          1493533409
+         ]
+        ]
+       },
+       "zmin": 500000000,
+       "zmax": 2000000000,
+       "material": "b"
+      },
+      {
+       "name": "C",
+       "type": "extrude",
+       "profile": {
+        "type": "polygon",
+        "points": [
+         [
+          1985908347,
+          1463990565
+         ],
+         [
+          1971136925,
+          1427062010
+         ],
+         [
+          1867736971,
+          1489840553
+         ]
+        ]
+       },
+       "zmin": 0,
+       "zmax": 1500000000,
+       "material": "c"
+      }
+     ]
+    }
+   }
+  },
+  "mesh": {
+   "element_size": "0.25 mm"
+  }
+ }
+}
