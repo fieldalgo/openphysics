@@ -17,6 +17,7 @@ import numpy as np
 from .electric import ElementConductivity, solve_steady_electric_outward
 from .joule_heating import solve_steady_joule_heat_outward, SteadyJouleHeatResult
 from .materials import region_index, region_property
+from .core.materials import evaluate_conductivity as _sigma
 from .core import forms, kernels
 from .core import solve as core_solve
 from .core.backend import is_live
@@ -178,14 +179,6 @@ def _models(mesh, value):
     if set(value) != set(names) or not all(isinstance(v, ConductivityModel) for v in value.values()):
         raise ValueError("electrical_conductivity models must match mesh region names exactly")
     return [(name, np.flatnonzero(regions == i), value[name]) for i, name in enumerate(names)]
-
-
-def _sigma(model, mean, name):
-    """Checked ``model.evaluate`` at element-mean temperatures."""
-    result = real_array(model.evaluate(readonly_copy(mean)), f"sigma in material {name!r}")
-    if result.shape != mean.shape or np.any(result <= 0):
-        raise ValueError(f"sigma in material {name!r} must have shape {mean.shape} and be > 0")
-    return result
 
 
 def _conductivity(mesh, models, temperature):

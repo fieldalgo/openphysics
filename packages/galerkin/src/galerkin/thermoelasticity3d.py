@@ -7,7 +7,8 @@ import numpy as np
 
 from ._public import refuse_tagged_text, refuse_text
 from .core.checks import finite_scalar, real_array
-from .elasticity3d import _solve_elasticity_3d
+from . import _elasticity3d
+from .elasticity3d import Elasticity3DResult
 from .mesh3d import Mesh3D
 
 __all__ = ["solve_thermoelasticity_3d"]
@@ -59,8 +60,9 @@ def solve_thermoelasticity_3d(
     if not np.all(np.isfinite(thermal_strain)):
         raise ValueError("thermal expansion strain exceeds floating-point range")
 
-    return _solve_elasticity_3d(
+    fields = _elasticity3d.solve_fields(
         mesh, youngs_modulus=youngs_modulus, poisson_ratio=poisson_ratio,
         prescribed_displacement=prescribed_displacement, body_force_density=body_force_density,
         traction=traction, thermal_strain=thermal_strain,
     )
+    return Elasticity3DResult(**fields)

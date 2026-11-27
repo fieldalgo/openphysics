@@ -19,11 +19,12 @@ import scipy.sparse as sp
 from scipy.sparse.csgraph import connected_components
 
 from .assembly3d import assemble_stiffness_3d as _assemble_stiffness_3d
-from .core.checks import finite_scalar
 from .core.tets import tet_gradients as _tet_gradients
 from .mesh3d import Mesh3D
 from .solver import solve_dirichlet as _solve_dirichlet
-from ._heat_kernels import refuse_live_3d as _refuse_live, source_load_3d as _source_load_3d
+from ._heat_kernels import source_load_3d as _source_load_3d
+from ._thermal3d import boundary_system, element_source, natural_faces, prescribed_nodes
+from ._tetra_materials import region_property
 from ._public import ResultSurface, refuse_text
 
 # Public names. The source load and face-tag map are internal: galerkin.kernels re-exports them.
@@ -65,133 +66,6 @@ class SteadyHeat3DResult(ResultSurface):
                               "thermal_conductivity": "W/(m K)", "heat_source_density": "W/m^3",
                               "relative_conservation_residual": "1", "outward_prescribed_heat_rate": "W",
                               "outward_convective_heat_rate": "W"})
-
-
-def _per_region(mesh, value, label, *, positive):
-    """(T,) float array from a scalar or {region name: scalar}."""
-    _refuse_live(value, label)
-    if isinstance(value, Mapping):
-        if mesh.regions is None or mesh.region_names is None:
-            raise ValueError(f"{label} per region needs mesh.regions and mesh.region_names")
-        names = list(mesh.region_names)
-        unknown = [k for k in value if k not in names]
-        missing = [n for n in names if n not in value]
-        if unknown or missing:
-            raise ValueError(f"{label} regions must match mesh.region_names exactly; "
-                             f"missing {missing}, unknown {unknown}")
-        table = [finite_scalar(value[n], f"{label}[{n!r}]") for n in names]
-        if positive and any(v <= 0 for v in table):
-            raise ValueError(f"{label} must be > 0 in every region")
-        return mesh.by_region(np.asarray(table, dtype=float))
-    scalar = finite_scalar(value, label)
-    if positive and scalar <= 0:
-        raise ValueError(f"{label} must be a finite scalar > 0")
-    return np.full(mesh.num_tets, scalar)
-
-
-def _source(mesh, heat_source):
-    """(T,) W/m^3: scalar, region table, element array or centroid callback."""
-    if callable(heat_source) and not isinstance(heat_source, Mapping):
-        centroids = mesh.nodes[mesh.tets].mean(axis=1)
-        centroids.flags.writeable = False
-        values = heat_source(centroids)
-        _refuse_live(values, "heat_source_density")
-        values = np.asarray(values, dtype=float)
-        if values.shape != (mesh.num_tets,) or not np.all(np.isfinite(values)):
-            raise ValueError("heat_source_density callback must return finite (T,) W/m^3 at the centroids")
-        return values
-    _refuse_live(heat_source, "heat_source_density")
-    if not isinstance(heat_source, Mapping) and np.ndim(heat_source) != 0:
-        values = np.asarray(heat_source)
-        if values.dtype.kind in "fiu" and values.shape == (mesh.num_tets,):
-            values = values.astype(float)
-            if np.all(np.isfinite(values)):
-                return values
-        raise ValueError("heat_source_density must contain one finite value per tetrahedron")
-    return _per_region(mesh, heat_source, "heat_source_density", positive=False)
-
-
-def _prescribed_nodes(mesh, exterior_faces, dirichlet):
-    if not isinstance(dirichlet, Mapping):
-        raise ValueError("prescribed_temperature must map exterior node indices to temperatures in K")
-    boundary = set(np.unique(exterior_faces).tolist())
-    prescribed = {}
-    for node, value in dirichlet.items():
-        if isinstance(node, (bool, np.bool_)) or not isinstance(node, (int, np.integer)):
-            raise ValueError("Dirichlet node indices must be integers")
-        if not 0 <= node < mesh.num_nodes or int(node) not in boundary:
-            raise ValueError(f"Dirichlet node {node} must lie on the exterior mesh boundary")
-        _refuse_live(value, "Dirichlet temperature")
-        prescribed[int(node)] = finite_scalar(value, "Dirichlet temperature")
-    return prescribed
-
-
-def _natural_faces(mesh, exterior_faces, prescribed, inward_heat_flux, convection):
-    """Yield validated triangles, areas and constant data for each natural tag."""
-    for name, data in (("inward_heat_flux", inward_heat_flux), ("convection", convection)):
-        if data is not None and not isinstance(data, Mapping):
-            raise ValueError(f"{name} must map exterior face tags to boundary values")
-    if not inward_heat_flux and not convection:
-        return
-    exterior = {tuple(face) for face in exterior_faces}
-    for kind, data in (("inward_heat_flux", inward_heat_flux), ("convection", convection)):
-        used = set()
-        for tag, value in (data or {}).items():
-            label = f"{kind} on {tag!r}"
-            if tag not in mesh.tagged_faces or not len(mesh.tagged_faces[tag]):
-                raise ValueError(f"{label} needs a nonempty exterior face tag")
-            faces = mesh.tagged_faces[tag]
-            for face in np.sort(faces, axis=1):
-                key = tuple(face)
-                if key not in exterior:
-                    raise ValueError(f"{label} includes a non-exterior face")
-                if key in used:
-                    raise ValueError(f"{label} includes a duplicate face")
-                if all(node in prescribed for node in key):
-                    raise ValueError(f"{label} overlaps a fully prescribed temperature face")
-                used.add(key)
-            _refuse_live(value, label)
-            if kind == "inward_heat_flux":
-                value = finite_scalar(value, label)
-            else:
-                if isinstance(value, (str, bytes, Mapping)):
-                    raise ValueError(f"{label} must be a (h, ambient_temperature) pair")
-                try:
-                    h, ambient = value
-                except (TypeError, ValueError) as exc:
-                    raise ValueError(f"{label} must be a (h, ambient_temperature) pair") from exc
-                h = finite_scalar(h, f"{label} coefficient")
-                if h < 0:
-                    raise ValueError(f"{label} coefficient must be >= 0")
-                value = h, finite_scalar(ambient, f"{label} ambient temperature")
-            points = mesh.nodes[faces]
-            area = 0.5 * np.linalg.norm(np.cross(points[:, 1] - points[:, 0],
-                                                points[:, 2] - points[:, 0]), axis=1)
-            if not np.all(np.isfinite(area) & (area > 0)):
-                raise ValueError(f"{label} requires finite, positive face areas")
-            yield kind, faces, area, value
-
-
-def _boundary_system(samples, labels, offsets):
-    """Exact P1 triangle integrals for constant prescribed flux and convection."""
-    n = len(labels)
-    outward = np.zeros(n)
-    ambient = np.zeros(n)
-    robin = sp.csr_matrix((n, n))
-    for kind, faces, area, value in samples:
-        if kind == "inward_heat_flux":
-            np.add.at(outward, faces, (-value * area / 3)[:, None])
-            continue
-        h, temperature = value
-        if h == 0:
-            continue
-        weighted_area = h * area
-        np.add.at(ambient, faces,
-                  (weighted_area * (temperature - offsets[labels[faces[:, 0]]]) / 3)[:, None])
-        entries = weighted_area[:, None, None] / 12 * (np.ones((3, 3)) + np.eye(3))
-        robin += sp.coo_matrix((entries.ravel(), (np.repeat(faces, 3, axis=1).ravel(),
-                                                   np.tile(faces, (1, 3)).ravel())), shape=(n, n))
-    return robin, outward, ambient
 
 
 def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_temperature,
@@ -239,17 +113,17 @@ def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_tempe
         return solve_steady_heat_3d_moving(mesh, motion, thermal_conductivity=thermal_conductivity,
                                            prescribed_temperature=prescribed_temperature,
                                            heat_source_density=heat_source_density)
-    k = _per_region(mesh, thermal_conductivity, "thermal_conductivity", positive=True)
-    source = _source(mesh, 0.0 if heat_source_density is None else heat_source_density)
+    k = region_property(mesh, thermal_conductivity, "thermal_conductivity", positive=True)
+    source = element_source(mesh, 0.0 if heat_source_density is None else heat_source_density)
     exterior_faces = mesh.boundary_faces()
-    prescribed = _prescribed_nodes(mesh, exterior_faces, prescribed_temperature)
+    prescribed = prescribed_nodes(mesh, exterior_faces, prescribed_temperature)
     fixed = np.array(sorted(prescribed), dtype=int)
     pairs = mesh.tets[:, [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]].reshape(-1, 2)
     graph = sp.coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])),
                           shape=(mesh.num_nodes,) * 2)
     count, labels = connected_components(graph, directed=False)
     anchored = np.zeros(count, dtype=bool)
-    samples = list(_natural_faces(mesh, exterior_faces, prescribed, inward_heat_flux, convection))
+    samples = list(natural_faces(mesh, exterior_faces, prescribed, inward_heat_flux, convection))
     offsets = np.zeros(count)
     if samples:
         # Conduction annihilates constants. Use a component reference temperature
@@ -273,7 +147,7 @@ def solve_steady_heat_3d(mesh: Mesh3D, *, thermal_conductivity, prescribed_tempe
 
     stiffness = _assemble_stiffness_3d(mesh, k).tocsr()
     load = _source_load_3d(mesh, source)
-    robin, outward, ambient = _boundary_system(samples, labels, offsets)
+    robin, outward, ambient = boundary_system(samples, labels, offsets)
     node_offsets = offsets[labels]
     rhs = load
     if samples:

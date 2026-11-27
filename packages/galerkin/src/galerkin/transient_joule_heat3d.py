@@ -9,8 +9,10 @@ import numpy as np
 
 from ._public import ResultSurface, refuse_text
 from .core.checks import positive_integer, positive_real
-from .electric3d import SteadyElectric3DResult, _conductivity_at_temperature_3d, solve_steady_electric_3d
-from .transient_heat3d import TransientHeat3DResult, _solve_transient_heat_3d
+from .electric3d import SteadyElectric3DResult, solve_steady_electric_3d
+from .transient_heat3d import TransientHeat3DResult
+from ._thermal3d import solve_transient_fields
+from ._tetra_materials import conductivity_at_temperature
 
 __all__ = ["TransientJouleHeat3DResult", "solve_transient_joule_heat_3d"]
 
@@ -65,7 +67,7 @@ def solve_transient_joule_heat_3d(
     counts = []
 
     def conductivity(temperature):
-        return _conductivity_at_temperature_3d(mesh, electrical_conductivity, temperature)
+        return conductivity_at_temperature(mesh, electrical_conductivity, temperature)
 
     def coupled_step(index, midpoint, previous_temperature, trial):
         try:
@@ -99,7 +101,7 @@ def solve_transient_joule_heat_3d(
                          f"after {iterations} iterations (temperature change {temp_change:.6g} K, "
                          f"relative conductivity change {sigma_change:.6g})")
 
-    heat = _solve_transient_heat_3d(
+    fields = solve_transient_fields(
         mesh, time=time, initial_temperature=initial_temperature, thermal_conductivity=thermal_conductivity,
         volumetric_heat_capacity=volumetric_heat_capacity, prescribed_temperature=prescribed_temperature,
         inward_heat_flux=inward_heat_flux, convection=convection, heat_source_density=None,
@@ -107,4 +109,4 @@ def solve_transient_joule_heat_3d(
     )
     iteration_count = np.asarray(counts, dtype=int)
     iteration_count.flags.writeable = False
-    return TransientJouleHeat3DResult(heat, tuple(electric), iteration_count)
+    return TransientJouleHeat3DResult(TransientHeat3DResult(**fields), tuple(electric), iteration_count)

@@ -19,7 +19,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from .backend import is_live, lift, live_namespace, namespace, require_float64, to_numpy
-from .checks import finite_scalar
+from .checks import finite_scalar, readonly_copy, real_array
 
 
 def region_index(mesh):
@@ -90,3 +90,11 @@ def element_values(mesh, value):
     if is_live(value):
         return namespace(value).broadcast_to(value, (len(mesh.triangles),))
     return np.broadcast_to(np.asarray(value, dtype=float), (len(mesh.triangles),))
+
+
+def evaluate_conductivity(model, mean, name):
+    """Checked ``model.evaluate`` at element-mean temperatures."""
+    result = real_array(model.evaluate(readonly_copy(mean)), f"sigma in material {name!r}")
+    if result.shape != mean.shape or np.any(result <= 0):
+        raise ValueError(f"sigma in material {name!r} must have shape {mean.shape} and be > 0")
+    return result

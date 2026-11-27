@@ -4,7 +4,8 @@
 import numpy as np
 import pytest
 
-from galerkin.elasticity3d import _solve_elasticity_3d, solve_elasticity_3d
+from galerkin.elasticity3d import solve_elasticity_3d
+from galerkin.thermoelasticity3d import solve_thermoelasticity_3d
 from galerkin.mesh3d import Mesh3D, box_mesh
 
 
@@ -45,14 +46,15 @@ def test_simple_shear_and_force_moment_balance():
 
 def test_thermal_expansion_and_blocked_reaction():
     mesh = box_mesh(1, 1, 1, 2, 2, 2)
-    kw = dict(youngs_modulus=100., poisson_ratio=.25, thermal_strain=np.full(mesh.num_tets, .001))
+    kw = dict(youngs_modulus=100., poisson_ratio=.25, temperature=np.full(mesh.num_nodes, 310.),
+              stress_free_temperature=300., linear_expansion_coefficient=.0001)
     anchors = {}
     for axis in range(3):
         anchors.update(fixed(np.flatnonzero(mesh.nodes[:, axis] == 0), (axis,)))
-    free = _solve_elasticity_3d(mesh, prescribed_displacement=anchors, **kw)
+    free = solve_thermoelasticity_3d(mesh, prescribed_displacement=anchors, **kw)
     np.testing.assert_allclose(free.displacement, .001 * mesh.nodes, atol=1e-15)
     np.testing.assert_allclose(free.stress, 0., atol=1e-13)
-    blocked = _solve_elasticity_3d(mesh, prescribed_displacement=fixed(range(mesh.num_nodes)), **kw)
+    blocked = solve_thermoelasticity_3d(mesh, prescribed_displacement=fixed(range(mesh.num_nodes)), **kw)
     expected = -.2 * np.eye(3)
     np.testing.assert_allclose(blocked.stress, np.broadcast_to(expected, blocked.stress.shape))
     np.testing.assert_allclose(blocked.reaction_force[mesh.boundary["x1"], 0].sum(), -.2)
