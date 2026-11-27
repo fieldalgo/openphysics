@@ -159,6 +159,19 @@ def _thermoelasticity():
                                         traction={"right": (1e5, 0.0)})
 
 
+def _thermoelasticity3d():
+    import numpy as np
+    from galerkin import box_mesh
+    from galerkin.thermoelasticity3d import solve_thermoelasticity_3d
+    mesh = box_mesh(1, 1, 1, 1, 1, 1)
+    return solve_thermoelasticity_3d, dict(
+        mesh=mesh, temperature=np.full(mesh.num_nodes, 310.0), stress_free_temperature=300.0,
+        linear_expansion_coefficient=2e-5, youngs_modulus=3e9, poisson_ratio=0.25,
+        prescribed_displacement=dict.fromkeys(np.ndindex(mesh.num_nodes, 3), 0.0),
+        body_force_density=(0.0, 0.0, 0.0), traction={"x1": (0.0, 0.0, 0.0)},
+    )
+
+
 def _steady_thermoelasticity():
     from galerkin.thermal_mechanical import solve_steady_thermoelasticity
     mesh = _square()
@@ -338,6 +351,7 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.thermoelasticity:TemperatureSnapshot": _snapshot,
                 "galerkin.thermoelasticity:freeze_temperature": _freeze,
                 "galerkin.thermoelasticity:solve_thermoelasticity": _thermoelasticity,
+                "galerkin.thermoelasticity3d:solve_thermoelasticity_3d": _thermoelasticity3d,
                 "galerkin.thermal_mechanical:solve_steady_thermoelasticity": _steady_thermoelasticity,
                 "galerkin.transient_thermal_mechanical:solve_transient_thermoelasticity": _transient_thermoelasticity,
                 "galerkin.transient_thermal_mechanical:TransientThermoelasticError": _transient_thermoelastic_error,

@@ -15,6 +15,7 @@
       "galerkin.elasticity",
       "galerkin.elasticity3d",
       "galerkin.thermoelasticity",
+      "galerkin.thermoelasticity3d",
       "galerkin.thermal_mechanical",
       "galerkin.transient_thermal_mechanical",
       "galerkin.shape",
