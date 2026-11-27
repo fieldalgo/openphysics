@@ -168,13 +168,21 @@ names may change before the mesher's public API.
   the output coordinates, each rounded once to the nearest double.
 - **Segment recovery.** `recover_segments(points, segments, max_depth=60)` turns every
   elementary segment (the `subsegments` of `check_plc`) into a union of edges of the
-  Delaunay tetrahedralization, adding S points only on the segments. Where a missing
-  piece ends at a vertex whose segments meet at less than 90 degrees, every segment at
-  that vertex is first split at one common distance from it (a protecting sphere);
-  every other missing piece is halved until it is an edge. The result is the Delaunay
-  tetrahedralization of the input and S points under the index-ordered perturbation,
-  with each segment as a chain of edges through its own S points. A piece that would
-  need more than `max_depth` halvings raises `RuntimeError` instead of looping.
+  Delaunay tetrahedralization, adding S points only on the segments, and only on
+  pieces that are missing (Si and Gärtner's rules, as in Diazzi et al. 2023). A
+  missing piece is split once per round where its reference point says: the mesh
+  neighbour of its ends inside its diametral ball that sees it under the largest
+  angle. A piece of a segment with an end where segments meet at less than 90 degrees
+  is split on a sphere about that end through the reference point (rules 2 and 3, so
+  points about one vertex build its protecting spheres lazily); another piece at the
+  distance of the reference point from its nearer end (rule 1); a segment with two
+  such ends, or a piece without a reference point, at its middle. The parameter is a
+  short dyadic near the target, and a target outside the middle 62/64 of the piece
+  falls back to the middle. The result is the Delaunay tetrahedralization of the input
+  and S points under the index-ordered perturbation, with each segment as a chain of
+  edges through its own S points. A piece shorter than 2^-`max_depth` of its segment
+  raises `RuntimeError` instead of looping (termination after rounding the parameter
+  is not proven, as for Diazzi et al.).
 - **Facet recovery.** `recover_plc(points, segments, facets)` runs the PLC check and
   segment recovery, then triangulates every facet again with the S points on its
   segments (its subfacets, with the same exact predicates and tie-breaking) and lists
