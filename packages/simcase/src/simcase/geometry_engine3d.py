@@ -1112,12 +1112,10 @@ def build_mesh3d(document, component: str | None = None) -> Mesh3DResult:
 def _build(document, component=None, *, through_meshloom: bool = False) -> Mesh3DResult:
     """``build_mesh3d``; ``through_meshloom`` (tests only) sends a lone slab ``layers`` feature through
     meshloom instead of refusing it for the extrude route."""
-    data = getattr(document, "data", document)
-    comp = _pick(parse(data), component)
-    from . import geometry_builders3d as builders
-    if comp.dimension == "3d" and builders.has_curved(comp):
-        return builders.build(data, comp, _mesh_options(data, comp))
     cx, comp, ho, info = _prepare(document, component, through_meshloom=through_meshloom)
+    if cx is None:                                  # cylinders and spheres in a meshloom builder shape
+        from . import geometry_builders3d as builders
+        return builders.mesh(comp, ho, info)
     result = _mesh(cx, comp, ho)
     result.diagnostics.append(info)
     return result
@@ -1125,11 +1123,17 @@ def _build(document, component=None, *, through_meshloom: bool = False) -> Mesh3
 
 def _prepare(document, component=None, *, through_meshloom: bool = False):
     """Everything ``build_mesh3d`` does before meshloom: the complex, its checks and the hand-off.
-    Returns ``(complex, component, hand-off, I-MESH-ESTIMATE diagnostic)``."""
+    Returns ``(complex, component, hand-off, I-MESH-ESTIMATE diagnostic)``. For cylinders and spheres
+    in a meshloom builder shape the complex is None and the hand-off is the builder's
+    (``geometry_builders3d.Handoff``); the estimate and the limit refusal come before any meshing."""
     data = getattr(document, "data", document)
     model = parse(data)
     comp = _pick(model, component)
     opts = _mesh_options(data, comp)
+    from . import geometry_builders3d as builders
+    if comp.dimension == "3d" and builders.has_curved(comp):
+        ho, info = builders.prepare(data, comp, opts)
+        return None, comp, ho, info
     cx = _evaluate(comp, through_meshloom=through_meshloom)
     if all(c.void for c in cx.cells):
         raise GeometryError(f"component {comp.name!r} has nothing to mesh: every cell is void (material null)",
