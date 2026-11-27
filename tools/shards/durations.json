@@ -1,5 +1,5 @@
 {
- "source": "Validate packages run 45536602993 (branch claude/compassionate-rubin-bypei0-landing d73c387f, 2026-11-25), linux-py312 source-tests-1..12.xml; files added on main after that run take main's times (Validate packages run 45409971229 (PR #349 head 7a3fb38, 2026-11-24), linux-py31); test_api_units_scan_galerkin.py (with the nine panel string-refusal cases) and test_panel_electrostatics.py: one local Linux run on 2026-11-26, before any CI run",
+ "source": "Validate packages run 45536602993 (branch claude/compassionate-rubin-bypei0-landing d73c387f, 2026-11-25), linux-py312 source-tests-1..12.xml; files added on main after that run take main's times (Validate packages run 45409971229 (PR #349 head 7a3fb38, 2026-11-24), linux-py31); test_api_units_scan_galerkin.py (with the nine panel string-refusal cases) and test_panel_electrostatics.py: one local Linux run on 2026-11-26, before any CI run; tests/meshloom/test_determinism.py and test_graded.py take their times in Validate packages run 45880541788 (main 1d9f9b63, 2026-11-26), linux-py312 source-tests-4 and -8",
  "seconds": {
   "tests/galerkin/test_api_units_scan_galerkin.py": 100.0,
   "tests/galerkin/test_arpack_rng.py": 0.6,
@@ -201,9 +201,11 @@
   "tests/meshloom/test_adversarial.py": 1.6,
   "tests/meshloom/test_builder.py": 62.2,
   "tests/meshloom/test_delaunay.py": 48.4,
+  "tests/meshloom/test_determinism.py": 608.8,
   "tests/meshloom/test_facet.py": 0.2,
   "tests/meshloom/test_fuzz.py": 0.7,
   "tests/meshloom/test_generate3d.py": 33.1,
+  "tests/meshloom/test_graded.py": 6.3,
   "tests/meshloom/test_kernel.py": 0.2,
   "tests/meshloom/test_mixed.py": 13.7,
   "tests/meshloom/test_plc.py": 0.1,
