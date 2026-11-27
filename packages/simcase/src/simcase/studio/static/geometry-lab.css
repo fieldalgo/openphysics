@@ -39,4 +39,18 @@ li small{margin-left:auto;color:var(--muted);text-align:right}
 pre{font-size:11px;max-height:240px;overflow:auto;background:#f3f5f8;padding:6px;margin:0;white-space:pre}
 footer{padding:0 18px 18px;color:var(--muted)}
 footer a{color:var(--accent)}
+[hidden]{display:none!important}
+#view3d .toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+#view3d .toolbar button{padding:2px 8px}
+#view3d .toolbar input[type=range]{width:160px;max-width:100%}
+#canvas3d{display:block;width:100%;aspect-ratio:10/7;height:auto;background:#fbfcfd;border:1px solid var(--line);border-radius:4px;touch-action:none}
+#canvas3d:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#canvas3d.stale{opacity:.35}
+@media (min-width:1300px){#canvas3d{width:720px;height:504px;aspect-ratio:auto}}
+#keys3d{font-size:12px;margin:6px 0}
+#names{border-top:1px solid var(--line);margin-top:6px;padding-top:4px}
+#names p{margin:2px 0}
+#face-names li{cursor:default}
+#faces{max-height:320px;overflow:auto}
+li input[type=checkbox]{margin:0 0 0 auto;align-self:center}
 @media (max-width:900px){main{grid-template-columns:1fr}}

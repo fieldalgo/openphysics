@@ -36,7 +36,8 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
   선택 또는 파라미터 이름을 밝힙니다(예: `feature 'bow': its boundary crosses itself …`,
   `component 'xs': selection 'gold' selects nothing`).
 - **Component**로 여러 구성 요소 중 하나를 고릅니다. 고르지 않으면 첫 `2d`·`axisymmetric` 구성 요소를 보입니다.
-  `3d` 구성 요소는 이름을 밝혀 거부합니다.
+  `3d` 구성 요소(상자와 슬래브 층)는 그림 대신 자체 경로를 거쳐 [3D 보기](studio_3d.md)에 보입니다.
+  `POST /api/geometry-lab/evaluate`는 여전히 이름을 밝혀 거부합니다.
 - **Save JSON**은 편집한 문서를 그대로(2칸 들여쓰기 JSON) 내려받습니다. 서버에는 아무것도 저장하지 않습니다.
 
 실험실은 물리 계산을 하지 않습니다. 저장한 문서는 `python -m simcase run`이나 각 물리 페이지의 경로로 실행합니다.
@@ -77,7 +78,8 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 
 ## 한계
 
-- 엔진 범위인 2D·축대칭 구성 요소만 다룹니다. 아직 피처나 선택은 편집하지 못하고 파라미터만 바꿉니다.
+- 그림은 엔진 범위인 2D·축대칭 구성 요소만 다루고, `3d` 구성 요소는 읽기 전용 [3D 보기](studio_3d.md)로 갑니다.
+  아직 피처나 선택은 편집하지 못하고 파라미터만 바꿉니다.
 - 편집할 때마다 서버가 구성 요소 전체를 다시 평가합니다. 엔진 측정 시간은 [엔진 검증](geometry_engine.md#검증)에
   있습니다.
 - 파일럿 페이지에서 링크하지 않으며, 설치한 wheel의 브라우저 검사에 들어 있지 않습니다.

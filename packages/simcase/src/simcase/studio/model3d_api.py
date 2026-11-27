@@ -36,7 +36,8 @@ router = APIRouter()
 NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 # The view's own files; a request only selects one of these fixed paths by name.
 ASSETS = {name: (STATIC / name, mime) for name, mime in (
-    ("model3d-via-stack.json", "application/json"),)}
+    ("model3d-view.mjs", "text/javascript"), ("model3d-model.mjs", "text/javascript"),
+    ("model3d-via-stack.json", "application/json"))}
 
 
 def install(app) -> None:

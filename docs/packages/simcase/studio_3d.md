@@ -4,19 +4,54 @@
 
 [Documentation home](../../README.md)
 
-Status: **experimental.** This page describes the server side of the coming
-read-only 3D view of a `3d` component of a version 1 geometry document
-([contract](geometry_document.md)): display triangles and section outlines. It
-takes what the stage 5 engine takes: boxes and the slab layers of `layers`
-features (`simcase.geometry_engine3d`). The view itself, on the
-[geometry lab](geometry_lab.md) page, comes with the next change. These HTTP
-answers may change in any release.
+Status: **experimental.** The 3D view shows a `3d` component of a version 1
+geometry document ([contract](geometry_document.md)) on the
+[geometry lab](geometry_lab.md) page at `/geometry-lab`. It is read-only and takes
+what the stage 5 engine takes: boxes and the slab layers of `layers` features
+(`simcase.geometry_engine3d`). The model workspace does not show it yet. Its page,
+its controls and its HTTP answers may change in any release.
 
-The card document (`simcase/studio/static/model3d-via-stack.json`, in µm,
-served at `/model3d-assets/model3d-via-stack.json`) is a 10 × 10 domain with
+## Use
+
+Start Studio and open the geometry lab:
+
+```sh
+python -m simcase.studio            # then open http://127.0.0.1:8765/geometry-lab
+```
+
+Choose **Via in a layer stack (3D example)** under **Start from**, or open a
+document whose shown component is `3d`. A document with a 2D component shows that
+one first, as before; choose the `3d` one under **Component**. The card document
+(`simcase/studio/static/model3d-via-stack.json`, in µm) is a 10 × 10 domain with
 three slab layers (substrate 0–2, oxide 2–3 and top silicon 3–4, one `layers`
 feature `stack`) and a copper box `via` with x and y in [4, 6] through the oxide
 (z in [2, 3]).
+
+| Action | Pointer | Keyboard (focus on the view) |
+|---|---|---|
+| Rotate | drag | arrow keys (15° per press) |
+| Pan | Shift-drag or right-drag | Shift + arrow keys |
+| Zoom | wheel | `+` and `−` |
+| Fit the whole domain | **Fit** | `F` |
+| Axis views +X, −X, +Y, −Y, +Z, −Z | buttons | `1` to `6` |
+| Isometric view | **Iso** | `0` or `I` |
+| Pick a face | click | the **Faces** list: Tab to an entry, Enter |
+
+- **Names** shows the picked face: its plane, exact area, the regions on its two
+  sides, its tag and every provenance name it carries, sorted (for example
+  `stack.oxide.top`, `stack.top.bottom`, `via.z1`).
+- **Faces** lists every face of the complex with its names; it is the keyboard way
+  to every face, including the interior ones.
+- **Regions** has a box per region to hide or show it. A face is drawn when a
+  non-void region on one of its sides is shown.
+- **Section** keeps the part with x, y or z at most the slider's value, and the
+  server draws the exact outline of the cut faces in red. Picking ignores the
+  removed part.
+- Refusals are the engine's own words; a feature the stage 5 engine does not take
+  yet is named (`E-3D-COMBINATION`, for example `cylinder 'pin' is not taken yet in
+  a 3d component; boxes and slab layers are`).
+
+Mesh edges are not drawn: the view shows the exact geometry, not the mesh.
 
 ## What it sends and answers
 
@@ -46,10 +81,13 @@ feature `stack`) and a copper box `via` with x and y in [4, 6] through the oxide
   the regions met. A plane outside the domain is refused by name.
 - The answer is deterministic (W15): nothing unordered reaches it.
 
+The page loads three.js 0.186.1 from Studio itself
+([browser-served files](../../third-party.md#browser-served-files)) and the view's
+own modules from `/model3d-assets/`; the page policy stays `script-src 'self'`.
+
 ### Camera
 
-The view's first camera will be the isometric one, and picking (W3) is checked
-against it:
+The first camera is the isometric one, and picking (W3) is checked against it:
 
 - the frame is metres from the domain centre, and R is half the domain diagonal;
 - an orthographic camera looks at the target from target + 4 R e, with
@@ -61,6 +99,9 @@ against it:
 - a canvas point (px, py) in CSS pixels is at ndc (2 px/W − 1, 1 − 2 py/H);
 - the axis views look along ±x, ±y (up +z) and ±z (up +y).
 
+Picking is a CPU ray cast against the display triangles (float32), nearest hit on
+a shown face, on the kept side of the section.
+
 ## Checks
 
 Pre-registered (fixed before measuring; never loosened):
@@ -69,18 +110,35 @@ Pre-registered (fixed before measuring; never loosened):
 |---|---|---|---|---|
 | W1 | every display triangle carries an exact surface's provenance, on E1, the card and 50 seeded G1 sets: (a) face id missing or name set different from the face's; (b) vertex off the face's plane or outside its polygon, or centroid not inside (exact, on pm values before float32) | (a) 0; (b) 0 | 0; 0 (52 documents, 1458 faces, 3066 triangles) | `tests/simcase/test_studio_model3d.py` |
 | W2 | per face, area of its float32 triangles against the exact face area | ≤ 1e-6 relative | 9.5e-8 worst (G1 seed 0, face 7) | same |
-| W3 (expected values) | the expected picks at 40 fixed points, 1440 × 900 window (canvas 720 × 504), isometric camera, card: face id and first name by an independent ray cast on the exact complex, written before the view (`tests/simcase/model3d_pick_oracle.py`, `studio_model3d_pick_points.json`; 26 raster points within 3 px of an edge excluded). The browser check comes with the view | — | 24 face hits, 16 background points | `tests/simcase/test_studio_model3d.py` (stored file equals a fresh run) |
+| W3 | picking at 40 fixed points, 1440 × 900 window, isometric camera, card: face id and first name, against an independent ray cast on the exact complex written before the view (`tests/simcase/model3d_pick_oracle.py`, `studio_model3d_pick_points.json`; 26 raster points within 3 px of an edge excluded) | 40/40 | 40/40 | `tools/studio_browser/model3d_view_browser.mjs` |
+| W12 | first view at 1440 × 900 and 390 × 844: no console error, no CSP violation, canvas visible and not empty, no horizontal scroll at 390, faces list reachable by Tab; screenshots kept | all hold | all hold (faces list after 17 Tabs) | same |
+| W13 | keyboard only: rotate, an axis view, select `via.z1` from the faces list, with no pointer event | complete | complete, 0 pointer events | same |
 | W15 | SHA-256 of the display answer over 3 fresh server processes | identical | identical | `tests/simcase/test_studio_model3d.py` |
 
 Also tested: section outlines lie on their plane and have the exact cut length of
 each face (four planes of the card, one along an edge of the via's hole);
-refusals carry the engine's words; the asset route serves only its files.
+refusals carry the engine's words; the asset route serves only its files; the pure
+helpers (`tests/simcase/studio_model3d.cjs`: camera contract, controls, picking,
+visibility).
+
+The browser checks are local (Playwright with a Chromium it can launch, not in
+CI); run them against a running Studio:
+
+```sh
+python -m simcase.studio --no-browser --port 8765 &
+node tools/studio_browser/model3d_view_browser.mjs http://127.0.0.1:8765 out-dir
+```
 
 ## Limits
 
+- Boxes and slab layers only, as stage 5 slice 1; read-only (no feature editing in
+  3D); no mesh view yet.
 - A component holding one `layers` feature (E1) is meshed through
   `meshine.extrude`, and `evaluate3d` refuses it; the view takes its complex from
   the public `simcase.display_complex3d`, which builds for it the complex the
   meshloom route would build.
-- Each request evaluates the whole component on the server.
-- A section answers outlines only; cut regions are not capped.
+- Each request evaluates the whole component on the server; the CPU pick visits
+  every shown triangle (fine for the few hundred of these documents).
+- A section removes one side and draws the outline; cut regions are not capped.
+- The canvas is 720 × 504 CSS px from a 1300 px wide window, otherwise the column
+  width at 10:7. The checks ran in headless Chromium on Linux only.
