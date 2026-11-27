@@ -517,6 +517,13 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
    … sent to your browser's Downloads*; after the save dialog's write it reports *Saved to …*.
    When no run has the current inputs, the notice says so: *Current inputs (650 × 300 nm) have no
    run yet.*
+   Opening a project or session file and restoring from this browser make current the inputs the
+   file or record kept, which are often those of the last run saved, not of the first. Since round
+   33 (M1) the Messages line of such an open or restore (for a project, the optical model's part)
+   ends with one sentence that names them: *Current inputs are Run 2 · Design B's.* when they are a
+   run's inputs (the newest such run, as for *has the results of the current inputs*; *Current
+   inputs are Run 3's.* for a run without a name), else *Current inputs (650 × 300 nm) have no run
+   yet.*; nothing is added when the model has no runs. The heated model's messages are unchanged.
    The header holds the one save indicator, and the footer repeats it word for word: the
    current file's name and its state, *design-a.json · downloaded 03:42* (or *design-a.json
    · saved 03:42* after the save dialog's write) until the next edit or run, then *design-a.json ·

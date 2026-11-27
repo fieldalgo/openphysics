@@ -824,7 +824,8 @@ after Open project the run list, the drop line and **Pin Run 2**, *No need to ru
 Compare picker read the same numbers as before, no numbering sentence is said, and the next run is
 Run 22. The browser is closed again and **Restore newest from this browser** restores both models:
 the same optical and heated numbers, *Restored Optical waveguide (20 runs) and Heated silicon
-waveguide (1 run) from this browser, not recomputed.* and the header *both-models · recovered from
+waveguide (1 run) from this browser, not recomputed. Current inputs are Run 5's.* (round 33, M1: the
+sentence naming the current inputs; the inputs are Run 5's, 560 nm) and the header *both-models · recovered from
 this browser · changed since both-models.json, not saved · kept for recovery in this browser*
 (round 23, E5; *… · not saved to a file · …* before, read once recovery has kept the restored
 session). After the next change it reads *both-models · changed since both-models.json, not saved ·

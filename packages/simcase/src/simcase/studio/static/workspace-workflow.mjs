@@ -284,6 +284,16 @@ export function opticalSequenceHeading({state,run,name='',origin,...other}){
  return 'Nothing is computed until you press Run';
 }
 export const HAS_RESULTS_INPUTS='has the results of the current inputs';
+// Round 33 (M1): the sentence after an optical model is opened from a file or restored from this
+// browser: the newest run whose study signature is that of the current inputs (the comparison behind
+// HAS_RESULTS_INPUTS), as "Current inputs are Run 2 · Design B's.", else the save message's words
+// "Current inputs (650 × 300 nm) have no run yet."; nothing without runs, as the save says nothing then.
+export function currentInputsText(runs,signature,geometry){
+ if(!runs.length)return '';
+ const own=runs.findLastIndex(r=>r.signature===signature);
+ if(own<0)return `Current inputs (${geometry}) have no run yet.`;
+ const r=runs[own];return `Current inputs are ${runTitle(Number.isInteger(r.number)?r.number:own+1,r.label||'')}'s.`;
+}
 // Round 20 (Z1): an edit that leaves the inputs equal to a run's says only that no run is needed:
 // the edit's own sentence stays and its request to run ("Run explicitly to compute new results.",
 // or the line that the inputs changed since the last result) is taken off before the "No need to

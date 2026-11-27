@@ -4,7 +4,7 @@ import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restor
 import {NotebookAutosave,indexedNotebookStore,readNotebookRecovery,distinctRecords,restorePage} from './workspace-notebook-recovery.mjs';
 import {lineProfile,profileCsv,drawProfile} from './workspace-profile.mjs';
 import {OpticalPreflight} from './workspace-preflight.mjs';
-import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,runTime as runTimeMs,shortcutRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText,GROUP_CARRY_TITLE,GROUP_CARRY_BUTTONS,groupCarryText,groupCarryMemory} from './workspace-workflow.mjs';
+import {opticalWorkflow,opticalFreshness,opticalSequenceHeading,opticalReadyStatus,inputsDifferText,runInputsLine,opticalInputParts,studyInputParts,runTitle,SAME_INPUTS,nextRunText,numberRuns,droppedRunText,runPlanText,lastComparableRun,groupIndexEstimate,runTime as runTimeMs,shortcutRun,nextDropped,dropWarningText,matchingRunMessage,importNumbersText,inNumberOrder,droppedBy,dropWhileRunningText,droppedAfterText,keepInsteadLabel,keptInsteadText,swapCandidate,swapDropped,pinnedDropText,droppedNoSwapText,GROUP_CARRY_TITLE,GROUP_CARRY_BUTTONS,groupCarryText,groupCarryMemory,currentInputsText} from './workspace-workflow.mjs';
 import {MeshPreview,drawMesh} from './workspace-mesh.mjs';
 import {probeField} from './workspace-probe.mjs';
 import {OpticalJobMonitor,readPending,storePending,validatePending} from './workspace-job.mjs';
@@ -744,6 +744,12 @@ function closedTargetNow(){
  return state.searchTarget;
 }
 const signature = () => studySignature(current(), state.modeCount, state.groupIndex, pmlNow(), closedTargetNow());
+// Round 33 (M1): which run the current optical inputs are, said after an open or a browser restore;
+// the inputs that become current are those the file or record kept. While the multiphysics model is
+// shown, state holds its all-physics placeholder: the optical model's own physics are used then.
+const opticalInputsNow=()=>mpFlags&&workspacePhysics?snapshot({...state,...workspacePhysics},setup):current();
+const currentInputsNow=()=>{const input=opticalInputsNow();return currentInputsText(runs,studySignature(input,state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()),geometryWords(input.model));};
+function appendCurrentInputs(){const text=currentInputsNow();if(text)$('file-status').append(' '+text);}
 const inputSignature = () => JSON.stringify(current());
 const edits=new WorkspaceStore(inputsFile());
 // The title and the footer show one save indicator (persistenceTitle), so they never disagree.
@@ -891,7 +897,7 @@ function completeLoad(pending){
   // the runs keep the numbers the session stored (version 12), else are numbered by their place in
   // the file, which Studio writes only when that numbering is exact: nothing is said about numbering
   // (HQ decision 2026-11-24-openphysics-studio-session-v12-k10-amended)
-  notice((pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.')));
+  notice((pending.source==='file'?`Opened ${pending.label}. Its results were read from the file, not recomputed; input undo starts here.`:`Recovered from this browser (${pending.label}), not recomputed. `+(file?`Last session file ${file.name}${matched?'':'; changed since'}. Input undo starts here.`:'File › Save keeps it in a file; input undo starts here.')));appendCurrentInputs();
   // round 23 (E2): a browser restore names the runs that came back without fields
   if(pending.source!=='file'&&pending.session){const missing=fieldsNotKeptText(runs);if(missing)$('file-status').append(missing);}
   // run retention: the session's fields have arrived (a file or record within 16 MiB may still be over
@@ -1187,7 +1193,7 @@ function restorePair(index,opener){
   const again=recoveryList().find(e=>e.recovered.session.application===record.application&&e.recovered.savedAt===record.savedAt&&entryFile(e)===record.file);
   if(!again){notice(`${other.model} was not restored: its browser record is no longer stored.`);return;}
   const done=()=>{chooseTemplate(card);notice(`Restored ${pairLine(entry,{model:other.model,runs:record.runs})} from this browser, not recomputed.`);};
-  const options={then:done,failed:message=>notice(`${other.model} was not restored: ${message}`),projectMatched:firstFile?.current===true&&firstFile.name===record.file};
+  const options={then:()=>{done();appendCurrentInputs();},failed:message=>notice(`${other.model} was not restored: ${message}`),projectMatched:firstFile?.current===true&&firstFile.name===record.file};
   if(again.kind==='latest')recoverLatest(opener,options);else recoverEarlier(again.index,opener,options);
  };
  own({then});
@@ -2293,7 +2299,7 @@ async function applyOpenedProject(read,fileName){
   project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});if(project.file)project.file.models=modelList();project.stamp=projectStamp();
   refreshPersistence();
   const words=read.models.map(m=>({title:m.title,parts:m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
-  notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);
+  notice(`Opened project ${read.name} (${fileName}): ${modelsText(words)}. Results were read from the file, not recomputed; nothing was run.`);if(ws)appendCurrentInputs();
  }finally{openingModel=false;}
 }
 $('open-session').onclick=()=>{if(solverBusy){notice('Wait for the current calculation before opening a session.');return;}try{rejectInvalidInput();$('session-file').click();}catch(e){notice(e.message);}};
