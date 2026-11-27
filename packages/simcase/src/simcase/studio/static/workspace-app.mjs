@@ -1335,8 +1335,9 @@ const bindBoundaryField=()=>{
 // Round 29 (L1): the slab shortcut's Modes to find 4 is for the closed window's search: when the
 // shortcut last changed the count, Open boundary sets back the count it replaced, said in the same
 // message. The boundary change is recorded first, so Undo gives back 4 with Open boundary chosen.
+// Round 35 (L4): the reason also stays under Modes to find (modeCountField) until the boundary changes again.
 function setOuterBoundary(open){
-  state.openBoundary=open?openChoice():null;
+  state.openBoundary=open?openChoice():null;shortcutModes.clearNote();
   const back=open?shortcutModes.onOpen(state.modeCount):null;if(back){trackEdit();edits.endGroup();state.modeCount=back.modeCount;}
   render();notice(open?'Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries.':'Closed window: four PEC edges; loss counts material absorption only.');
   if(back)$('file-status').append(' '+back.text);
@@ -1469,7 +1470,9 @@ function refreshEdgeWarning(){
  const text=edgeSlabShortText(risk),key=text+'\n'+defaultTarget(state.shapes);if(host.dataset.key===key)return;host.dataset.key=key;
  $('run-edge-text').textContent=text;$('run-edge-text').title=edgeSlabWarningText(risk);host.querySelectorAll('button').forEach(b=>b.remove());host.append(...edgeWarningButtons('run-edge'));
 }
-const modeCountField=()=>{const f=INPUT_FIELDS.modeCount;return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"></label>`;};
+// round 35 (L4): under the field, why Open boundary set the count back (shortcutModes.note(), the
+// Messages sentence's reason), kept until the next run starts or the count or the boundary changes again
+const modeCountField=()=>{const f=INPUT_FIELDS.modeCount,note=shortcutModes.note();return `<label>${f.label}<input id="${f.id}" type="number" min="${f.min}" max="${f.max}" step="1" value="${state.modeCount}"${note?' aria-describedby="mode-count-back-note"':''}></label>${note?`<p class="input-note" id="mode-count-back-note">${escapeHtml(note)}</p>`:''}`;};
 // round 20 (Z6): the scope names both boundaries, as the Open boundary choice sits beside it
 const OPTICAL_SCOPE_BOUNDARY='3 × 2.4 µm window, closed (PEC edges) or with an open boundary (PML 1 µm outside the open edges, PEC on the closed ones)';
 function solverPanel(){document.querySelector('main').classList.toggle('comparing',ui.page==='Compare');document.querySelector('main').classList.toggle('choosing',ui.page==='Applications');
@@ -2496,7 +2499,7 @@ $('run-optical').onclick=async()=>{
  try{rejectInvalidInput();}catch(e){notice(e.message);return;}
  // round 21 (W2): no question before the run; a swap offered after the last drop ends here
  dropSwap=null;
- const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();groupCarry.started(state.groupIndex);solverBusy=true;jobPhase='validating';render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
+ const operation=++jobOperation;edits.record(inputsFile());const capture=edits.capture(),serverVersion=connection.version,serverInstance=connection.instance,doc=opticalDocument();groupCarry.started(state.groupIndex);solverBusy=true;jobPhase='validating';shortcutModes.clearNote();render();refreshJobControls();notice('Validating optical input…');$('job-message').textContent='Validating optical input…';
  try{
   // a closed-window search names capabilities v10 (slice C1)
   const em=doc.physics.em1,closedTarget=!em.pml&&em.target_effective_index!==undefined?em.target_effective_index:null,query=closedTarget===null?'':'&'+CLOSED_TARGET_QUERY;

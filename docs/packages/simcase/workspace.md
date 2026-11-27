@@ -1811,7 +1811,13 @@ Since slice C2 the page offers the [closed-window search](#closed-window-search-
   shortcut's 4 modes are for the closed window's search (round 29, L1): when the shortcut was the last
   change of Modes to find and the outer boundary then turns to Open boundary, Modes to find goes back
   to the count it had before the shortcut, and Messages says so after the boundary's sentence: *Modes
-  to find back to 2: 4 was for the closed window's search near 2.46.* This is an edit of its own, so
+  to find back to 2: 4 was for the closed window's search near 2.46.* Since round 35 (L4) the same
+  reason stays under the **Modes to find** field in Physics › Optical modes, because the next notice
+  replaces the Messages line: *Back to 2 with Open boundary: 4 was for the closed window's search near
+  2.46.* It is kept until the next run starts, or Modes to find or the outer boundary changes again
+  (typed, Undo, Redo, Use this run's inputs, a new model or file). The dialog's **Set search near 2.46
+  · 4 modes and run** behaves the same: the closed run it makes keeps the shortcut's count in memory,
+  so Open boundary after it sets 2 back with the sentence and the note. This is an edit of its own, so
   Undo gives back 4 with Open boundary still chosen. Nothing changes when Modes to find was changed by
   hand after the shortcut, was 4 already, or after Undo, Redo or new inputs; turning back to the
   closed window changes nothing either. The warning goes with Nearest to n_eff or Open boundary. While it is shown, **Run study** asks once before it
