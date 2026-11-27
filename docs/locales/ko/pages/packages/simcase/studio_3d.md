@@ -25,6 +25,9 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 세 개(기판 0–2, 산화막 2–3, 위 실리콘 3–4, `layers` 기능 `stack` 하나)와 산화막을
 관통하는 구리 상자 `via`(x, y는 [4, 6], z는 [2, 3])로 되어 있습니다.
 
+같은 보기가 작업 공간 3D 모델의 Model 페이지이며, 거기서 문서를 편집하고 고른 면으로 선택을
+만듭니다: [3D 모델](workspace.md#3d-모델실험적)을 보십시오.
+
 | 동작 | 포인터 | 키보드(보기에 초점) |
 |---|---|---|
 | 회전 | 끌기 | 화살표 키(한 번에 15°) |
@@ -71,7 +74,26 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
   요소 길이 단위의 수, pm으로 한 번 반올림)을 더해 받습니다. 평면이 닫힌 면과 만나는
   선분(`segments`, float32, 선분마다 끝점 두 개, 같은 좌표계, `segment_faces`), 잘린
   면, 만나는 영역을 답합니다. 영역 밖의 평면은 이름을 들어 거부합니다.
-- 응답은 결정적입니다(W15). 순서 없는 것은 응답에 들어가지 않습니다.
+- 응답은 결정적입니다(W15). 순서 없는 것은 응답에 들어가지 않습니다. 면마다 `alone`에
+  그 면만 고르는 이름을 나열합니다.
+- `POST /api/model3d/check`는 3D 빌더의 검사입니다(같은 봉투). `{"ok": true, ...}`로
+  답합니다.
+  - `features`: 기능마다 `index`, `id`, `type`, 영역 안의 `volume`과 자기 셀이 남긴
+    부피(`owned`, 둘 다 구성 요소 길이 단위의 세제곱), `coverage`. coverage는 `full`,
+    `partial`("covered in part by N (id)"), `none`("covered by N (id); adds no region"),
+    `outside`("outside the domain; adds no region")입니다. N은 그 상자와 겹치고 자기
+    부피가 남은 뒤쪽 기능 번호(1부터)입니다. 모두 복합체로 pm 단위에서 정확히
+    계산합니다.
+  - `parameters`: SI 값, 단위, 적은 값, 그 파라미터 이름을 쓰는 구성 요소 필드
+    `used_by`.
+  - `regions`, `selections`, 그리고 `display` 아래의 표시 응답.
+- 거부는 `{"ok": false, "refused": <엔진 메시지 그대로>, "code", "path",
+  "feature_index"}`입니다. index는 경로가 가리키는 `features[i]`이거나 null이며, 빌더는
+  그 기능을 표시합니다.
+- `POST /api/model3d/selection`은 봉투에 `"face"`(면 id)와 `"name"`을 더해 받습니다.
+  `selections[name] = {"boundary": <이름>}`을 넣은 문서로 답하며, `<이름>`은 그 면만
+  고르는 이름 가운데 정렬해 첫 번째입니다("Use for → New selection"). 한 이름으로 고를
+  수 없는 면, 이미 있는 이름, 기능 id는 이름을 밝혀 거부합니다.
 
 페이지는 three.js 0.186.1을 Studio 자신에게서 읽고
 ([브라우저로 보내는 파일](../../third-party.md#브라우저로-보내는-파일)), 보기 모듈은

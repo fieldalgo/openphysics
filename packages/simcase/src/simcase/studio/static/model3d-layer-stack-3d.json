@@ -1,0 +1,73 @@
+{
+  "openphysics": "0.3",
+  "name": "Via in a layer stack (3D heat)",
+  "materials": {
+    "Si": {
+      "thermal_conductivity": "130 W/(m K)"
+    },
+    "SiO2": {
+      "thermal_conductivity": "1.4 W/(m K)"
+    },
+    "Cu": {
+      "thermal_conductivity": "400 W/(m K)"
+    }
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "stack3d": {
+        "dimension": "3d",
+        "length_unit": "um",
+        "domain": {
+          "xmin": 0,
+          "xmax": 200,
+          "ymin": 0,
+          "ymax": 200,
+          "zmin": 0,
+          "zmax": 610
+        },
+        "background": {
+          "material": null
+        },
+        "features": [
+          {
+            "name": "stack",
+            "type": "layers",
+            "z0": 0,
+            "layers": [
+              {
+                "name": "sub",
+                "thickness": 500,
+                "material": "Si"
+              },
+              {
+                "name": "oxide",
+                "thickness": 10,
+                "material": "SiO2"
+              },
+              {
+                "name": "top",
+                "thickness": 100,
+                "material": "Si"
+              }
+            ]
+          },
+          {
+            "name": "via",
+            "type": "box",
+            "xmin": 90,
+            "xmax": 110,
+            "ymin": 90,
+            "ymax": 110,
+            "zmin": 500,
+            "zmax": 510,
+            "material": "Cu"
+          }
+        ]
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "40 um"
+  }
+}
