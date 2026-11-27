@@ -39,6 +39,15 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 (`E-MESH-ESTIMATE`). 경계 선택에 거는 크기, 거리 등급(`near`, `far`, `refinement_distance`),
 `z_divisions`는 3D 구성 요소에서 이름을 밝혀 거부합니다.
 
+`simcase.estimate_mesh3d(document, component=None)`는 메시하지 않고 추정만 줍니다.
+`component`, `tetrahedra`(정수로 반올림한 T), `limit`(적용되는 `mesh.element_count_limit`),
+`seconds`(사면체당 0.6 ms, 엔진의 0.4–0.6 ms 가운데 느린 끝으로 본 T의 시간),
+`diagnostics`(`build_mesh3d`가 더하는 것과 같은 `I-MESH-ESTIMATE`)를 가진
+`Mesh3DEstimate`입니다. `build_mesh3d`가 meshloom 전에 돌리는 것을 그대로 돌리므로, 메시를
+막는 거부는 모두 같은 문구로 추정도 막습니다: 한도를 넘으면 `E-MESH-ESTIMATE`, 메셔 허용
+오차보다 작은 조각은 `E-CONTRACT`, 그리고 `E-3D-COMBINATION` 등. Studio는 한도를 넘는 문서를 메시 프로세스를
+시작하기 전에 거부하려고 이것을 부릅니다([3D 보기](studio_3d.md#메시)).
+
 `simcase.geometry_engine3d.evaluate3d(model, component=None)`은 `simcase.geometry_document.parse`로 읽은
 모델의 영역 구성만 돌려줍니다. 압출 경로로 메시되는, `layers` 피처 하나만 가진 구성 요소는 거부합니다. 표시용(Studio)
 `simcase.display_complex3d(model, component=None)`은 그런 구성 요소를 포함해 슬라이스 1이 받는 모든
