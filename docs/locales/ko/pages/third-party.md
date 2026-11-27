@@ -22,6 +22,7 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
 | external process | 따로 설치한 프로그램을 별도 프로세스로 실행하고 출력 파일만 읽음. 그 프로그램에 Python 모듈이 있어도 패키지 코드는 import하지 않음 |
 | bundled | 제3자 휠을 올린 쪽이 그 휠 안에 넣어 배포하는 네이티브 라이브러리, 정적으로 링크된 코드, 글꼴, 런타임 파일 |
 | data | 저장소에 옮겨 적거나 내려받는 수치·기록 |
+| browser-served | 자체 패키지에 수정 없이 복사해 넣어 그 wheel·sdist에 담기고, Studio가 브라우저로 보내는 제3자 파일. [브라우저로 보내는 파일](#브라우저로-보내는-파일) 참고 |
 
 ## 라이선스 정책
 
@@ -31,8 +32,9 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
    sdist·wheel(패키지 코드, README, LICENSE, NOTICE, 빌드 파일만 담고 시험·문서·예제는
    배포하지 않음), CI 산출물. [데이터와 출판 수치](#데이터와-출판-수치)에 적은 제3자 데이터(physmat에
    넣은 CC0-1.0 굴절률 표, galerkin-refsol의 출판 benchmark 수치)는 자기 조건을 따르고, 그 밖은
-   Apache-2.0인 자체 저작물입니다. 저장소에 복사해 넣은 제3자 소스 코드는 없고, 배포판은 의존성을
-   선언만 하고 담지 않습니다. 컴파일된 코드를 담은 패키지는 `meshloom` 하나입니다. 그 wheel에는
+   Apache-2.0인 자체 저작물입니다. [브라우저로 보내는 파일](#브라우저로-보내는-파일)에 적은 수정하지
+   않은 three.js 파일은 MIT 라이선스를 따릅니다. 그 밖에 저장소에 복사해 넣은 제3자 소스 코드는
+   없고, 배포판은 의존성을 선언만 하고 담지 않습니다. 컴파일된 코드를 담은 패키지는 `meshloom` 하나입니다. 그 wheel에는
    Rust 확장 모듈 하나가 있고, 여기에 PyO3와 그 작은 의존성, Rust 표준 라이브러리가 정적으로
    링크됩니다. 모두 허용형 라이선스이며 제3자 C·C++ 코드는 없습니다. 이들의 라이선스 전문은
    `THIRD_PARTY_NOTICES`에 담겨 배포되고, `tools/build_meshloom_notices.py`가 Cargo와 도구 모음의
@@ -76,7 +78,10 @@ OpenPhysics의 코드와 문서는 Apache-2.0입니다([LICENSE](../../../../LIC
    프로세스로 돌리는 도구뿐입니다.
 
 서버에서 소프트웨어를 실행하는 것은 배포가 아니지만, 브라우저로 보내는 JavaScript, CSS, 글꼴,
-WebAssembly는 배포입니다. OpenPhysics는 제3자 바이너리를 배포하지 않습니다. 제3자 바이너리를
+WebAssembly는 배포입니다. Studio가 브라우저로 보내는 제3자 파일은
+[브라우저로 보내는 파일](#브라우저로-보내는-파일)에 적은, 수정하지 않은 허용형 라이선스 파일과 그
+라이선스 전문뿐이며 Studio 자신의 서버에서 보냅니다(CDN 없음). OpenPhysics는 제3자 바이너리를
+배포하지 않습니다. 제3자 바이너리를
 담은 것(컨테이너·가상 머신 이미지, 설치본, frozen 앱, wheelhouse나 휠 미러, 브라우저 기반
 Python 사이트, 고객 납품물)을 배포하기 전에는 재배포 체크리스트와 법률 검토가 필요합니다.
 라이선스 전문과 고지, LGPL·GPL 구성 요소의 대응 소스나 서면 제공 약속, 바꿔 끼울 수 있는 LGPL
@@ -230,6 +235,34 @@ OpenPhysics의 의무를 만들지 않습니다. 이 휠들을 재배포하는 �
 컴파일된 코드가 생길 때, OpenPhysics 코드가 묶인 라이브러리를 직접 로드하려 할 때는 이 절을 CI
 세 플랫폼에서 다시 확인합니다.
 
+## 브라우저로 보내는 파일
+
+자체 패키지가 담아 배포하고 Studio가 브라우저로 보내는 제3자 파일입니다. 배포된 패키지에서
+바이트 그대로 복사하며, 고치거나 OpenPhysics 코드와 한 파일로 합치지 않고, upstream 라이선스
+전문과 함께 버전이 붙은 자기 폴더에 둡니다. Studio는 기록된 이름만
+`/vendor/<name>-<version>/<file>`에서 자기 origin으로, `Cache-Control: no-store`와
+`X-Content-Type-Options: nosniff`를 붙여 보냅니다. 페이지 정책은 그대로 `script-src 'self'`이고
+CDN도 import map도 쓰지 않습니다. Git은 이 폴더를 줄바꿈 변환 없이 저장하므로(`.gitattributes`)
+어느 OS에서나 해시가 같습니다.
+
+| 이름 | 버전 | 라이선스 | 파일(`simcase/studio/static/vendor/three-0.186.1/` 안)과 SHA-256 | 출처 | 상태 |
+|---|---|---|---|---|---|
+| `three` (three.js) | 0.186.1 | MIT | `three.module.js`(662,772바이트) `9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea`; `three.core.js`(1,458,113바이트) `9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6`; `LICENSE`(1,081바이트) `8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc` | npm 레지스트리 tarball <https://registry.npmjs.org/three/-/three-0.186.1.tgz>(`build/three.module.js`, `build/three.core.js`, `LICENSE`), 프로젝트 <https://github.com/mrdoob/three.js> | 수정 없음 |
+
+`three.module.js`는 `./three.core.js`만 import합니다. `OrbitControls` 같은 부가 모듈은 bare
+specifier `three`를 import하므로 import map이 필요해 함께 넣지 않았고, Studio가 자체 조작
+코드를 씁니다. MIT 고지는 저장소 [NOTICE](../../../../NOTICE)와 wheel에 담기는
+[simcase NOTICE](../../../../packages/simcase/NOTICE)에 있습니다. `tools/check_licenses.py`가 이
+폴더를 목록의 `browser_served` 기록과 대조하고, `tests/simcase/test_studio_vendor_three.py`가
+Studio가 보내는 바이트를 확인합니다(검사 W16).
+`tools/studio_browser/studio_vendor_three_browser.mjs`(로컬, Playwright 필요, CI 밖)는 Studio
+페이지에서 `three.module.js`를 읽어 상자 하나를 그리고, 받은 파일의 해시와 그 페이지가 다른
+origin에 요청하지 않았음을 확인합니다.
+
+파일을 더 넣을 때: 배포된 패키지에서 가져와 출처·크기·SHA-256을 `browser_served`에 기록하고,
+그 배포판의 package data, Studio의 명시적 경로, 이 문서와 영어 원문의 행, 두 NOTICE 파일의 고지를
+추가합니다. 허용형 라이선스나 자기 파일에만 있는 MPL-2.0만 받으며, 파일은 수정하지 않습니다.
+
 ## 외부 프로그램
 
 | 프로그램 | 라이선스 | 쓰는 방식 |
@@ -292,6 +325,8 @@ python tools/check_licenses.py --report .validation/licenses.json
   조건) `bundled_files` 기록에 검토 문구가 없거나, 배포판에 검사할 RECORD 파일 목록이 없을 때
 - external process가 아닌 배포판의 `bundled_files` 기록에, 정책에 적힌 런타임 예외가 없는 GPL
   조건만 남을 때(그런 라이브러리는 OpenPhysics 프로세스에 로드됨)
+- `browser_served` 항목이 허용형(또는 MPL-2.0 단독)이 아니거나, 수정 없음으로 기록되지 않았거나,
+  라이선스 파일이 없거나, 그 폴더에 기록된 크기와 SHA-256의 기록된 파일만 정확히 있지 않을 때
 - 이 문서나 영어 원문이 목록의 항목을 모두 나열하지 않을 때
 
 CI는 고정된 Linux 환경, 설치한 휠만 담은 새 환경(배포 검사와 설치 시험), 그리고

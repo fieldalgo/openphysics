@@ -50,7 +50,8 @@ OpenPhysics는 개발 중입니다. 보안 수정은 `main`에서 진행하며 �
   origin으로만 보냅니다. 인라인 스타일은 계속 허용합니다(`style-src 'unsafe-inline'`).
   고전 편집기는 문서의 글자(이름, 재료, 매개변수)를 글자로만 쓰므로 조작한 모델
   파일이 마크업을 끼워 넣을 수 없습니다. CDN에서 Swagger UI를 읽던 대화형 API
-  페이지 `/docs`, `/redoc`은 껐습니다.
+  페이지 `/docs`, `/redoc`은 껐습니다. 유일한 제3자 스크립트인 three.js도 서버 자신에서
+  보내며, SHA-256을 기록한 수정 없는 파일입니다([브라우저로 보내는 파일](third-party.md#브라우저로-보내는-파일)).
 
 이 검사는 FastAPI 버전이나 브라우저의 Local Network Access 규칙에 기대지 않습니다.
 공유 네트워크나 신뢰할 수 없는 네트워크에서 Studio를 안전하게 만들지는 않습니다.

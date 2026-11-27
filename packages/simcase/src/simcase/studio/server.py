@@ -115,6 +115,23 @@ def workspace_asset(filename: str):
                         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
 
+# Third-party files sent to the browser, unmodified (docs/third-party.md, tools/third_party_licenses.json
+# "browser_served"). Only these names are served; three.module.js imports ./three.core.js, so both sit
+# under one path and need no import map. The page's script-src stays 'self'.
+THREE = "three-0.186.1"
+_VENDOR_THREE = {"three.module.js": "text/javascript", "three.core.js": "text/javascript",
+                 "LICENSE": "text/plain; charset=utf-8"}
+
+
+@app.get(f"/vendor/{THREE}/{{filename}}")
+def vendor_three(filename: str):
+    mime = _VENDOR_THREE.get(filename)
+    if mime is None:
+        raise HTTPException(404, "Unknown vendored file")
+    return FileResponse(STATIC / "vendor" / THREE / filename, media_type=mime,
+                        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+
+
 # The optical adapters write format 0.3 documents and read the section 5.3.4 result names, so each
 # capability names its family's next adapter version (optical-fixed-v1 -> v2, optical-rectangle-v2
 # and -v3 -> v4 and v5, optical-shapes-v4 and -v5 -> v6 and v7), and its values are quantity

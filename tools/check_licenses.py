@@ -42,6 +42,12 @@ not visible this way and is reviewed by hand. First-party distributions must
 contain no native files, except the extension modules listed under
 ``first_party_compiled``, which must also ship their ``THIRD_PARTY_NOTICES``.
 
+Browser-served files (``browser_served``): third-party files that a first-party
+package ships and Studio sends to a browser. They do not depend on the installed
+environment. Each entry must be permissive, or MPL-2.0 alone, and unmodified; its
+directory must hold exactly the recorded files, with the recorded sizes and SHA-256
+values, one of them its license text; and the docs must list it.
+
 Use ``--python`` to inspect another interpreter's environment, e.g. a fresh
 venv holding the installed wheels.
 """
@@ -343,6 +349,44 @@ def reference_docs_errors(text, entries, where):
     return errors
 
 
+def browser_served_errors(entries, policy, root=None):
+    """Third-party files sent to a browser: permissive (or MPL-2.0 alone), unmodified, byte-exact."""
+    import hashlib
+    root = ROOT if root is None else root
+    permissive = set(policy["permissive"])
+    never = never_pattern(policy["never_families"])
+    errors = []
+    for name, entry in sorted(entries.items()):
+        where = f"browser_served {name}"
+        try:
+            tree = parse_expression(entry["spdx"])
+        except (ValueError, IndexError) as error:
+            errors.append(f"{where}: {error}")
+            continue
+        if bad := never_ids(identifiers(tree), never):
+            errors.append(f"{where}: {bad} is never allowed")
+        elif not (satisfies(tree, permissive) or entry["spdx"].strip() == "MPL-2.0"):
+            errors.append(f"{where}: {entry['spdx']} is not allowed for files sent to a browser")
+        if entry.get("modified") is not False:
+            errors.append(f"{where}: browser-served files must be recorded as unmodified (modified: false)")
+        files = entry.get("files", {})
+        if not any(re.match(r"(LICEN[CS]E|COPYING)", f, re.IGNORECASE) for f in files):
+            errors.append(f"{where}: the recorded files must include the license text")
+        directory = root / entry["directory"]
+        present = {p.name for p in directory.iterdir()} if directory.is_dir() else set()
+        if unrecorded := sorted(present - set(files)):
+            errors.append(f"{where}: {entry['directory']} holds unrecorded files {unrecorded}")
+        for filename, record in sorted(files.items()):
+            path = directory / filename
+            if not path.is_file():
+                errors.append(f"{where}: {entry['directory']}/{filename} is missing")
+                continue
+            data = path.read_bytes()
+            if len(data) != record["bytes"] or hashlib.sha256(data).hexdigest() != record["sha256"]:
+                errors.append(f"{where}: {filename} differs from its recorded size or SHA-256")
+    return errors
+
+
 def check(paths, inventory, check_docs=True, platform=None):
     policy = inventory["policy"]
     permissive = set(policy["permissive"])
@@ -361,6 +405,8 @@ def check(paths, inventory, check_docs=True, platform=None):
     errors, report = [], {}
     for name, entry in sorted(entries.items()):
         errors += bundled_entry_errors(name, entry, policy)
+    served = {canonicalize_name(k): v for k, v in inventory.get("browser_served", {}).items()}
+    errors += browser_served_errors(served, policy)
     for name, dist in sorted(dists.items()):
         expression, short, classifiers = declared_license(dist)
         record = {"version": dist.version, "license_expression": expression, "license": short or None,
@@ -447,7 +493,7 @@ def check(paths, inventory, check_docs=True, platform=None):
         for doc in DOCS:
             text = doc.read_text(encoding="utf-8")
             listed = {canonicalize_name(m) for m in re.findall(r"`([A-Za-z0-9._-]+)`", text)}
-            documented = {**inventory.get("external_tools", {}), **entries}
+            documented = {**inventory.get("external_tools", {}), **served, **entries}
             errors += reference_docs_errors(text, documented, doc.relative_to(ROOT).as_posix())
             if missing := sorted(set(documented) - listed):
                 errors.append(f"{doc.relative_to(ROOT).as_posix()} does not list {missing}")
