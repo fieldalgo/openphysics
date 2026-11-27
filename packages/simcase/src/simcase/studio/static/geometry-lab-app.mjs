@@ -7,11 +7,15 @@ import {areaLabel,cellPath,copyDocument,curvePath,highlightOf,isVersion1,newDocu
 import {STARTERS} from './geometry-lab-starters.mjs';
 import {View3D} from '/model3d-assets/model3d-view.mjs';
 import {faceLines,regionColor as regionColor3d,sectionRange} from '/model3d-assets/model3d-model.mjs';
+import {MeshView3D} from '/model3d-assets/model3d-mesh-view.mjs';
+import {CANCELLED,estimateText,longer,meshBlocked,progressText,statsRows,stepList} from '/model3d-assets/model3d-mesh-model.mjs';
 
 const $=id=>document.getElementById(id);
 const SVG='http://www.w3.org/2000/svg';
 const state={doc:null,component:null,view:null,highlight:null,request:0,mode:'2d',view3d:null,face:null,hidden:new Set(),section:0};
 let viewer=null;
+// the mesh job (experimental): its estimate, the running job and the mesh view
+const mesh={estimate:null,refused:null,key:null,job:null,timer:null,view:null,viewer:null,request:0,shownFace:null,shownHidden:''};
 
 function el(tag,attrs={},text){
  const e=tag.startsWith('svg:')?document.createElementNS(SVG,tag.slice(4)):document.createElement(tag);
@@ -195,8 +199,125 @@ async function evaluate3d(){
  viewer.select(state.face);
  sectionControls(same);
  render3d();
+ estimate3d();
  status(`Shown ${body.component} (3d): ${body.regions.length} regions, ${body.faces.length} faces, ${body.counts.triangles} triangles.`);
 }
+
+// ---- the mesh job (experimental): /api/model3d/mesh/estimate, /api/model3d/mesh, /api/model3d/jobs/…
+
+async function estimate3d(){
+ const id=++mesh.request;
+ let response,body;
+ try{
+  response=await fetch('/api/model3d/mesh/estimate',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({doc:state.doc,component:state.component})});
+  body=await response.json().catch(()=>null);
+ }catch(error){if(id===mesh.request){mesh.estimate=null;mesh.refused='The Studio server could not be reached: '+error.message;renderMesh();}return;}
+ if(id!==mesh.request)return;
+ if(response.ok&&body?.ok===true){mesh.estimate=body.estimate;mesh.refused=null;mesh.key=body.key;}
+ else{mesh.estimate=null;mesh.refused=refusalText(response.status,body);mesh.key=null;}
+ renderMesh();
+}
+
+function renderMesh(){
+ const blocked=meshBlocked({estimate:mesh.estimate,refused:mesh.refused,running:!!mesh.job});
+ const start=$('mesh-start');start.disabled=!!blocked;start.title=blocked||'Mesh this component in a separate process';
+ $('mesh-estimate').textContent=mesh.refused?'Mesh is not available: '+mesh.refused:mesh.estimate?estimateText(mesh.estimate):'Show a 3d component first.';
+ $('mesh-cancel').hidden=!mesh.job;
+ const stale=!!(mesh.view&&mesh.key!==mesh.view.key);
+ $('canvas-mesh').classList.toggle('stale',stale);
+ const note=$('mesh-note');note.hidden=!stale;
+ note.textContent=stale?'The mesh view shows an earlier geometry or mesh block; mesh again to update it.':'';
+}
+
+function renderSteps(s){
+ const ol=$('mesh-steps');ol.hidden=false;
+ ol.replaceChildren(...stepList(s).map(step=>{const li=el('li',{class:step.state},step.label);if(step.state==='current')li.setAttribute('aria-current','step');return li;}));
+ const p=$('mesh-progress');p.textContent=progressText(s);p.classList.toggle('longer',longer(s));
+}
+
+async function startMesh(){
+ let response,body;
+ $('mesh-start').disabled=true;
+ try{
+  response=await fetch('/api/model3d/mesh',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({doc:state.doc,component:state.component})});
+  body=await response.json().catch(()=>null);
+ }catch(error){$('mesh-progress').textContent='The Studio server could not be reached: '+error.message;renderMesh();return;}
+ if(!response.ok||!body?.job){$('mesh-progress').textContent=body?.detail||refusalText(response.status,body);renderMesh();return;}
+ mesh.job=body.job;
+ if(body.status==='done'){await meshDone(body.job,{status:'done',step:'ready',reused:true,expected_s:body.estimate.seconds,elapsed_s:0});return;}
+ renderSteps({status:'running',step:'forming',expected_s:body.estimate.seconds,elapsed_s:0});
+ renderMesh();
+ poll(body.job);
+}
+
+function poll(job){
+ clearTimeout(mesh.timer);
+ mesh.timer=setTimeout(async()=>{
+  if(mesh.job!==job)return;
+  let s;
+  try{const r=await fetch(`/api/model3d/jobs/${encodeURIComponent(job)}`);s=await r.json();if(!r.ok)throw new Error(s?.detail||r.status);}
+  catch(error){if(mesh.job===job){$('mesh-progress').textContent='Lost the mesh job: '+error.message;mesh.job=null;renderMesh();}return;}
+  if(mesh.job!==job)return;
+  if(s.status==='running'){renderSteps(s);poll(job);return;}
+  if(s.status==='done'){await meshDone(job,s);return;}
+  renderSteps(s);mesh.job=null;renderMesh();
+ },400);
+}
+
+async function meshDone(job,s){
+ let view;
+ try{const r=await fetch(`/api/model3d/jobs/${encodeURIComponent(job)}/result`);view=await r.json();if(!r.ok)throw new Error(view?.detail||r.status);}
+ catch(error){$('mesh-progress').textContent='The mesh could not be read: '+error.message;mesh.job=null;renderMesh();return;}
+ if(mesh.job!==job)return;
+ mesh.job=null;
+ renderSteps(s);
+ showMesh(view);
+ renderMesh();
+}
+
+function showMesh(view){
+ mesh.view=view;
+ const canvas=$('canvas-mesh');canvas.hidden=false;
+ if(!mesh.viewer)mesh.viewer=new MeshView3D(canvas,{onPick:face=>{if(mesh.view?.component!==state.view3d?.component)return;state.face=face;viewer?.select(face);render3d();},
+  onCamera:what=>{canvas.dataset.camera=what;}});
+ mesh.viewer.setHidden([...state.hidden]);
+ mesh.viewer.load(view);
+ mesh.viewer.select(state.face);mesh.shownFace=state.face;mesh.shownHidden=[...state.hidden].sort().join('\n');
+ const dl=$('mesh-stats');dl.hidden=false;
+ dl.replaceChildren(...statsRows(view).flatMap(([k,v])=>[el('dt',{},k),el('dd',{},v)]));
+ status(`Meshed ${view.component}: ${view.stats.nodes} nodes, ${view.stats.tetrahedra} tetrahedra, ${view.stats.regions} regions.`);
+}
+
+/** Keep the mesh view's selection and hidden regions with the 3D view's. */
+function syncMesh(){
+ if(!mesh.viewer||!mesh.view||mesh.view.component!==state.view3d?.component)return;
+ const hidden=[...state.hidden].sort().join('\n');
+ if(hidden!==mesh.shownHidden){mesh.shownHidden=hidden;mesh.viewer.setHidden([...state.hidden]);}
+ if(state.face!==mesh.shownFace||mesh.viewer.selected!==state.face){mesh.shownFace=state.face;mesh.viewer.select(state.face);}
+}
+
+async function cancelMesh(){
+ const job=mesh.job;if(!job)return;
+ clearTimeout(mesh.timer);
+ let response,body=null;
+ try{
+  response=await fetch(`/api/model3d/jobs/${encodeURIComponent(job)}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  body=await response.json().catch(()=>null);
+ }catch(error){$('mesh-progress').textContent='Cancel did not reach the server: '+error.message;poll(job);return;}
+ if(mesh.job!==job)return;
+ if(!response.ok||!body){$('mesh-progress').textContent='Cancel was refused: '+refusalText(response.status,body);poll(job);return;}
+ if(body.cancelled===false&&body.status==='done'){await meshDone(job,{status:'done',step:'ready',expected_s:0,elapsed_s:0});return;}
+ if(body.cancelled===false){poll(job);return;}            // it had already ended: its status says how
+ mesh.job=null;
+ $('mesh-steps').hidden=true;
+ const p=$('mesh-progress');p.textContent=CANCELLED;p.classList.remove('longer');
+ renderMesh();
+}
+
+$('mesh-start').addEventListener('click',()=>startMesh());
+$('mesh-cancel').addEventListener('click',()=>cancelMesh());
 
 function render3d(){
  const v=state.view3d;
@@ -233,6 +354,7 @@ function render3d(){
  plain('tags',v.tags.map(t=>({label:t.tag,detail:`${t.faces.length} face${t.faces.length===1?'':'s'}`})));
  $('summary').textContent=v.summary;
  names();
+ syncMesh();
 }
 
 function plain(id,rows,empty='None.'){
@@ -255,7 +377,7 @@ function names(){
 
 function sectionControls(keep=false){
  const axis=$('section-axis').value,range=$('section-at');
- if(!axis||!state.view3d){range.disabled=true;$('section-value').textContent='';if(viewer&&state.view3d)viewer.setSection(null);return;}
+ if(!axis||!state.view3d){range.disabled=true;$('section-value').textContent='';if(viewer&&state.view3d)viewer.setSection(null);if(mesh.viewer&&mesh.view)mesh.viewer.setSection(null);return;}
  const r=sectionRange(state.view3d,axis);
  if(!keep||range.disabled||range.dataset.axis!==axis){
   range.min=String(r.min);range.max=String(r.max);range.step=String(r.step);range.value=String(r.start);range.dataset.axis=axis;
@@ -269,6 +391,7 @@ async function applySection(){
  if(!axis||!state.view3d||!viewer)return;
  $('section-value').textContent=`${axis} = ${Number(at.toPrecision(6))} ${state.view3d.unit}`;
  viewer.setSection({axis,at});
+ if(mesh.viewer&&mesh.view)mesh.viewer.setSection({axis,at});
  try{
   const response=await fetch('/api/model3d/section',{method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({doc:state.doc,component:state.component,axis,at})});
@@ -276,6 +399,7 @@ async function applySection(){
   if(id!==state.section)return;
   if(!response.ok||!body||body.ok!==true){status('Section refused: '+refusalText(response.status,body));return;}
   viewer.setSection({axis,at},body);
+  if(mesh.viewer&&mesh.view)mesh.viewer.setSection({axis,at},body);
   status(`Section ${axis} = ${Number(at.toPrecision(6))} ${state.view3d.unit}: cuts ${body.faces.length} faces of ${body.regions.join(', ')||'no region'}.`);
  }catch(error){if(id===state.section)status('Section not shown: '+error.message);}
 }
