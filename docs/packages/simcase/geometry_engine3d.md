@@ -42,6 +42,16 @@ per tetrahedron; above the limit, the document is refused with the estimate
 grading (`near`, `far`, `refinement_distance`) and `z_divisions` are refused by name for
 3D components.
 
+`simcase.estimate_mesh3d(document, component=None)` gives the estimate without meshing:
+a `Mesh3DEstimate` with `component`, `tetrahedra` (T rounded to an integer), `limit` (the
+`mesh.element_count_limit` in effect), `seconds` (T at 0.6 ms per tetrahedron, the slow end
+of the engine's 0.4–0.6 ms) and `diagnostics` (the same `I-MESH-ESTIMATE` that
+`build_mesh3d` adds). It runs exactly what `build_mesh3d` runs before meshloom, so every
+refusal that blocks meshing blocks the estimate too, in the same words:
+`E-MESH-ESTIMATE` above the limit, `E-CONTRACT` (a piece below the mesher tolerance),
+`E-3D-COMBINATION` and the others. Studio calls it to refuse an
+over-limit document before it starts a meshing process ([3D view](studio_3d.md#mesh)).
+
 `simcase.geometry_engine3d.evaluate3d(model, component=None)` returns the complex alone,
 for a model from `simcase.geometry_document.parse`. It refuses a component holding one
 `layers` feature, which is meshed on the extrude route. For display (Studio),
