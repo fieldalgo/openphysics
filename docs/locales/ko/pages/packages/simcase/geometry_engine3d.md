@@ -111,6 +111,14 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 - `mesh.controls`의 `circle_segment_count`: `mesh.controls: circle_segments on '<select>' is not taken for
   3d surfaces yet; use size`(`mesh.controls[i]`에서)
 
+넘기기 전에, 메시 생성기 허용 오차(구성 요소 경계 상자 대각선의 `MESHER_RELATIVE_TOLERANCE` = 3e-8, 계약의
+[격자가 해결하지 않는 것](geometry_document.md#내부-격자-1-pm동결)) 아래인 배열 조각은 파서가 피처 전체를 거부하듯
+`geometry.components.<name>`에서 `E-CONTRACT`와 같은 문장으로 거부합니다: `feature '<name>' is <size> pm
+across, <ratio> of the component's diagonal, below the mesher tolerance 3e-08; it would vanish in the mesh. …`.
+조각은 2D 꼭짓점에서 그 점에서 끝나지 않는 2D 곡선까지의 거리(짧은 곡선, 또는 두 곡선 사이의 얇은 목),
+메시되는 수직면이 걸친 판 구간의 높이, 메시되는 수평면의 폭(2 넓이 / 둘레)입니다. 조각을 이루는 부분의
+나중 피처 이름을 밝힙니다. 이 검사는 반올림 검사 뒤에 돕니다.
+
 `layers` 피처 하나만 가진 구성 요소는 `meshine.extrude` 경로(`simcase.geometry_document.layer_stack`,
 그대로)를 유지하며 `build_mesh3d`는 이를 거부합니다(`E-CONTRACT`). `em.cavity3d` 문서는 자기 경로와 결과를
 유지합니다.
@@ -153,6 +161,10 @@ P1 측정값:
   거부합니다.
   원통과 구는 슬라이스 3에서 옵니다.
 - 영역마다 크기 하나입니다. 등급 크기나 표면 크기는 아직 없습니다.
+- 허용 오차보다는 크지만 대각선의 약 1e-7보다 얇은 조각은 meshloom이 돌아오지 않게 할 수 있습니다. 면을
+  862 pm(대각선 14.4 mm의 6e-8) 어긋나게 둔 상자 둘을 h = 0.8 mm로 메시하면 600 s 안에 끝나지 않았고, 어긋남이
+  없는 같은 상자는 약 1초에 메시됩니다(2026-11-27, meshloom 백로그 항목). Studio는 따로 취소할 수 있는
+  프로세스에서 메시합니다.
 - 면과 셀은 2D 셀과 판 구간마다 나열합니다. 구성은 메모리 안의 진단 구조이며 저장 형식이 아닙니다.
 - Python: 구성은 정확한 정수로 순수 Python에서 만듭니다. 상자가 많은 구성 요소는 서로 다른 평면 수에
   따라 커지는 배열을 만듭니다.

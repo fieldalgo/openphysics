@@ -1009,9 +1009,17 @@ def _check_small_features(comp: Component, path: str) -> None:
             continue
         ratio = size / diag2 ** 0.5
         if ratio < MESHER_RELATIVE_TOLERANCE:
-            raise GeometryError(f"{path}: feature {f.name!r} is {size} pm across, {ratio:.2e} of the component's "
-                                f"diagonal, below the mesher tolerance {MESHER_RELATIVE_TOLERANCE:g}; it would "
-                                "vanish in the mesh. Meshing such multi-scale geometry is not supported yet.")
+            raise small_feature_error(path, f.name, size, ratio)
+
+
+def small_feature_error(path: str, name: str, size, ratio: float, *, located: bool = False) -> GeometryError:
+    """The refusal of a feature (or a piece of its arrangement, ``geometry_engine3d``) of ``size`` pm,
+    ``ratio`` of its component's diagonal, below ``MESHER_RELATIVE_TOLERANCE``. ``located`` also sets
+    the refusal's ``path`` (the parser's refusal names it in the message only)."""
+    return GeometryError(f"{path}: feature {name!r} is {size} pm across, {ratio:.2e} of the component's "
+                         f"diagonal, below the mesher tolerance {MESHER_RELATIVE_TOLERANCE:g}; it would "
+                         "vanish in the mesh. Meshing such multi-scale geometry is not supported yet.",
+                         path=path if located else None)
 
 
 def _check_footprints(cname: str, f: Feature, comp: Component, components: dict) -> None:

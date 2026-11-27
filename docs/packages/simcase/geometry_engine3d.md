@@ -131,6 +131,17 @@ Code `E-3D-COMBINATION` at the feature's `features[i]`, with the contract's mess
 - `circle_segment_count` in `mesh.controls`: `mesh.controls: circle_segments on '<select>'
   is not taken for 3d surfaces yet; use size` (at `mesh.controls[i]`).
 
+Before the hand-off, a piece of the arrangement below the mesher tolerance
+(`MESHER_RELATIVE_TOLERANCE` = 3e-8 of the component's bounding-box diagonal, the contract's
+[What the grid does not fix](geometry_document.md#internal-grid-1-pm-frozen)) is refused as the
+parser refuses a whole feature, with `E-CONTRACT` at `geometry.components.<name>` and the same
+sentence: `feature '<name>' is <size> pm across, <ratio> of the component's diagonal, below the
+mesher tolerance 3e-08; it would vanish in the mesh. …`. The pieces are the distance from a 2D
+vertex to a fine curve that does not end there (a short curve, or a thin neck between two
+curves), the height of a slab that a meshed vertical face spans, and the width (2 area /
+perimeter) of a meshed horizontal face; the later feature whose part bounds the piece is named.
+The check runs after the rounding check.
+
 A component that holds only one `layers` feature keeps the `meshine.extrude` route
 (`simcase.geometry_document.layer_stack`, unchanged) and is refused by `build_mesh3d`
 (`E-CONTRACT`), and `em.cavity3d` documents keep their own route and results.
@@ -172,6 +183,10 @@ pushes and manual dispatch ([what CI runs](../../development.md#what-ci-runs)).
 - Boxes and slab layers only. Footprint layers alone take the extrude route; with other
   features they are refused until a later slice. Cylinders and spheres come with slice 3.
 - One size per region; no graded sizes or sizes on surfaces yet.
+- Pieces thinner than about 1e-7 of the diagonal, though above the tolerance, can make meshloom
+  not return: two boxes with a face offset by 862 pm (6e-8 of a 14.4 mm diagonal) at h = 0.8 mm
+  did not mesh in 600 s, where the same boxes without the offset mesh in about a second
+  (2026-11-27; a meshloom backlog item). Studio meshes in a separate, cancellable process.
 - Faces and cells are listed per fine 2D cell and slab; the complex is an in-memory
   diagnostic structure, not a persisted format.
 - Python: the complex is built in pure Python with exact integers. A component with many
