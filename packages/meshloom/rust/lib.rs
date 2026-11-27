@@ -179,7 +179,7 @@ fn mixed_signs<'py>(py: Python<'py>, kind: &str, coords: &Bound<'py, PyBytes>, s
     }
     let kind = kind.to_owned();
     let (out, n) = py.detach(move || {
-        let m = mixed::Mixed { input: &input, s: &s };
+        let m = mixed::Mixed::new(&input, &s);
         let mut n = mixed::MixedCounters::default();
         let out: Vec<u8> = q.chunks_exact(k).map(|g| {
             let p: Vec<mixed::Pt> = g.iter().map(|&i| m.from_id(i)).collect();
@@ -218,7 +218,7 @@ fn spoint_coords<'py>(py: Python<'py>, coords: &Bound<'py, PyBytes>, seg: &Bound
     let s: Vec<mixed::SPoint> = ts.iter().enumerate()
         .map(|(j, &t)| mixed::SPoint::seg(ends[2 * j], ends[2 * j + 1], t)).collect();
     mixed::check_spoints(&input, &s).map_err(PyValueError::new_err)?;
-    let m = mixed::Mixed { input: &input, s: &s };
+    let m = mixed::Mixed::new(&input, &s);
     let out: Vec<f64> = (0..s.len() as u32).flat_map(|j| m.rounded(mixed::Pt::S(j))).collect();
     Ok(PyBytes::new(py, &out.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<u8>>()))
 }

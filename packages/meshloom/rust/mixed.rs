@@ -98,6 +98,35 @@ pub struct MixedCounters {
 pub struct Mixed<'a> {
     pub input: &'a [P3],
     pub s: &'a [SPoint],
+    /// the intervals of the first S points (MixedPoints keeps one per S point; empty: none
+    /// cached), each equal to what `interval` computes from the S point
+    iv: &'a [[Iv; 3]],
+}
+
+impl<'a> Mixed<'a> {
+    pub fn new(input: &'a [P3], s: &'a [SPoint]) -> Mixed<'a> {
+        Mixed { input, s, iv: &[] }
+    }
+}
+
+/// The interval coordinates of an S point (exact for a volume point), from its input points.
+fn s_interval(input: &[P3], sp: &SPoint) -> [Iv; 3] {
+    if sp.kind() == Kind::Volume {
+        return sp.p.map(Iv::point);
+    }
+    let (a, b) = (&input[sp.a as usize], &input[sp.b as usize]);
+    let t = Iv::point(sp.t);
+    let mut x: [Iv; 3] = std::array::from_fn(|c| {
+        let (ac, bc) = (Iv::point(a[c]), Iv::point(b[c]));
+        ac.add(&t.mul(&bc.sub(&ac)))
+    });
+    if sp.kind() == Kind::Facet {
+        let (cc, u) = (&input[sp.c as usize], Iv::point(sp.u));
+        for k in 0..3 {
+            x[k] = x[k].add(&u.mul(&Iv::point(cc[k]).sub(&Iv::point(a[k]))));
+        }
+    }
+    x
 }
 
 /// Checks an S table against the input points: existing, distinct ends and t a double
@@ -164,25 +193,10 @@ impl<'a> Mixed<'a> {
     fn interval(&self, p: Pt) -> [Iv; 3] {
         match p {
             Pt::In(i) => self.input[i as usize].map(Iv::point),
-            Pt::S(k) => {
-                let sp = self.s[k as usize];
-                if sp.kind() == Kind::Volume {
-                    return sp.p.map(Iv::point);
-                }
-                let (a, b) = (&self.input[sp.a as usize], &self.input[sp.b as usize]);
-                let t = Iv::point(sp.t);
-                let mut x: [Iv; 3] = std::array::from_fn(|c| {
-                    let (ac, bc) = (Iv::point(a[c]), Iv::point(b[c]));
-                    ac.add(&t.mul(&bc.sub(&ac)))
-                });
-                if sp.kind() == Kind::Facet {
-                    let (cc, u) = (&self.input[sp.c as usize], Iv::point(sp.u));
-                    for k in 0..3 {
-                        x[k] = x[k].add(&u.mul(&Iv::point(cc[k]).sub(&Iv::point(a[k]))));
-                    }
-                }
-                x
-            }
+            Pt::S(k) => match self.iv.get(k as usize) {
+                Some(x) => *x,
+                None => s_interval(self.input, &self.s[k as usize]),
+            },
         }
     }
 
@@ -560,23 +574,41 @@ impl Num for Dy {
 /// after the input points.
 pub struct MixedPoints {
     pub input: Vec<P3>,
+    /// the S points; change them only through push, set_s and pop_s, which keep `siv`
     pub s: Vec<SPoint>,
     pub n: MixedCounters,
+    /// the interval coordinates of each S point, computed once (the interval filter's
+    /// inputs; the same values as computing them at each predicate call)
+    siv: Vec<[Iv; 3]>,
 }
 
 impl MixedPoints {
     pub fn new(input: Vec<P3>) -> MixedPoints {
-        MixedPoints { input, s: Vec::new(), n: MixedCounters::default() }
+        MixedPoints { input, s: Vec::new(), n: MixedCounters::default(), siv: Vec::new() }
     }
 
     pub fn view(&self) -> Mixed<'_> {
-        Mixed { input: &self.input, s: &self.s }
+        debug_assert_eq!(self.siv.len(), self.s.len());
+        Mixed { input: &self.input, s: &self.s, iv: &self.siv }
     }
 
     /// Adds an S point; returns its global index.
     pub fn push(&mut self, sp: SPoint) -> u32 {
+        self.siv.push(s_interval(&self.input, &sp));
         self.s.push(sp);
         (self.input.len() + self.s.len() - 1) as u32
+    }
+
+    /// Replaces S point k (an index into the S table).
+    pub fn set_s(&mut self, k: usize, sp: SPoint) {
+        self.siv[k] = s_interval(&self.input, &sp);
+        self.s[k] = sp;
+    }
+
+    /// Removes the last S point and returns it.
+    pub fn pop_s(&mut self) -> Option<SPoint> {
+        self.siv.pop();
+        self.s.pop()
     }
 }
 
@@ -586,12 +618,12 @@ impl crate::delaunay::Geom for MixedPoints {
     }
 
     fn orient3d(&mut self, v: [u32; 4]) -> i8 {
-        let m = Mixed { input: &self.input, s: &self.s };
+        let m = Mixed { input: &self.input, s: &self.s, iv: &self.siv };
         m.orient3d(v.map(|i| m.from_id(i)), &mut self.n)
     }
 
     fn insphere_sos(&mut self, v: [u32; 5]) -> i8 {
-        let m = Mixed { input: &self.input, s: &self.s };
+        let m = Mixed { input: &self.input, s: &self.s, iv: &self.siv };
         m.insphere_sos(v.map(|i| m.from_id(i)), &mut self.n)
     }
 
@@ -712,7 +744,7 @@ mod tests {
             let pts = [SPoint::fac(0, 1, 2, t, u), SPoint::seg(3, 4, dyadic(&mut s)),
                        SPoint::vol([lcg(&mut s), lcg(&mut s), lcg(&mut s)])];
             check_spoints(&input, &pts).unwrap();
-            let m = Mixed { input: &input, s: &pts };
+            let m = Mixed::new(&input, &pts);
             let f = Pt::S(0);
             assert_eq!(m.orient3d([Pt::In(0), Pt::In(1), Pt::In(2), f], &mut n), 0, "in the plane");
             // any four of {inputs, F, S, V}: the filtered sign equals the exact sign
@@ -728,7 +760,7 @@ mod tests {
             // a volume point behaves exactly as an input point with the same doubles
             let mut input2 = input.clone();
             input2.push(pts[2].p);
-            let m2 = Mixed { input: &input2, s: &[] };
+            let m2 = Mixed::new(&input2, &[]);
             assert_eq!(m.orient3d([Pt::In(0), Pt::In(3), Pt::In(4), Pt::S(2)], &mut n),
                        m2.orient3d([Pt::In(0), Pt::In(3), Pt::In(4), Pt::In(5)], &mut n));
             // the rounded F point is within a few ulps of the plane's exact point
@@ -745,7 +777,7 @@ mod tests {
     fn diametral_and_equatorial_balls() {
         let input: Vec<P3> = vec![[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [0.0, 2.0, 0.0], [1.0, 1.0, 1.4142], [1.0, 1.0, 1.4143],
                                   [2.0, 2.0, 0.0], [1.0, 0.0, 0.5], [1.0, 0.0, 1.0], [3.0, 0.0, 0.0]];
-        let m = Mixed { input: &input, s: &[] };
+        let m = Mixed::new(&input, &[]);
         let p = Pt::In;
         // equatorial ball of (0,0,0), (2,0,0), (0,2,0): centre (1,1,0), radius^2 = 2
         assert_eq!(m.equatorial_sign(p(3), p(0), p(1), p(2)), -1);
@@ -765,7 +797,7 @@ mod tests {
             let tri: Vec<P3> = (0..3).map(|_| [lcg(&mut s) * 4.0, lcg(&mut s) * 4.0, lcg(&mut s) * 4.0]).collect();
             let q = [lcg(&mut s) * 4.0, lcg(&mut s) * 4.0, lcg(&mut s) * 4.0];
             let input: Vec<P3> = vec![tri[0], tri[1], tri[2], q];
-            let m = Mixed { input: &input, s: &[] };
+            let m = Mixed::new(&input, &[]);
             let sub = |x: P3, y: P3| [x[0] - y[0], x[1] - y[1], x[2] - y[2]];
             let dot = |x: P3, y: P3| x[0] * y[0] + x[1] * y[1] + x[2] * y[2];
             let cr = |x: P3, y: P3| [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];

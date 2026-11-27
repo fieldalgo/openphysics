@@ -405,7 +405,7 @@ fn relocate_one(g: &mut MixedPoints, m: &mut Mesh, subfacets: &mut [Vec<[u32; 3]
                 }
                 let apex = g.push(SPoint::vol(p));
                 let ok = bnd.iter().all(|f| g.orient3d([f[0], f[1], f[2], apex]) > 0);
-                let sp = g.s.pop().unwrap();
+                let sp = g.pop_s().unwrap();
                 if ok {
                     found = Some(sp);
                     break 'search;
@@ -424,7 +424,7 @@ fn relocate_one(g: &mut MixedPoints, m: &mut Mesh, subfacets: &mut [Vec<[u32; 3]
             for p in cands {
                 let apex = g.push(SPoint::vol(p));
                 let ok = bnd.iter().all(|f| g.orient3d([f[0], f[1], f[2], apex]) > 0);
-                let sp = g.s.pop().unwrap();
+                let sp = g.pop_s().unwrap();
                 if ok {
                     found = Some(sp);
                     break;
@@ -471,7 +471,7 @@ fn relocate_one(g: &mut MixedPoints, m: &mut Mesh, subfacets: &mut [Vec<[u32; 3]
                 for p in cands {
                     let apex = g.push(SPoint::vol(p));
                     let ok = gb.iter().all(|f| g.orient3d([f[0], f[1], f[2], apex]) > 0);
-                    let sp = g.s.pop().unwrap();
+                    let sp = g.pop_s().unwrap();
                     if ok {
                         found = Some(sp);
                         break;

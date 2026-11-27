@@ -77,16 +77,51 @@ pub(crate) fn face(t: &[u32; 4], i: usize) -> [u32; 3] {
     INWARD[i].map(|j| t[j])
 }
 
+/// A fast hasher for small integer keys (vertex indices): the tables of the mesh complex
+/// hold millions of entries, where SipHash costs as much as the lookups. No output depends
+/// on a table's iteration order (the default hasher already varies it between processes).
+#[derive(Clone, Copy, Default)]
+pub(crate) struct FastKey;
+
+impl std::hash::BuildHasher for FastKey {
+    type Hasher = FastHasher;
+    fn build_hasher(&self) -> FastHasher {
+        FastHasher(0)
+    }
+}
+
+pub(crate) struct FastHasher(u64);
+
+impl std::hash::Hasher for FastHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(b as u64);
+        }
+    }
+    fn write_u32(&mut self, x: u32) {
+        self.write_u64(x as u64);
+    }
+    fn write_u64(&mut self, x: u64) {
+        self.0 = (self.0.rotate_left(5) ^ x).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
+    fn write_usize(&mut self, x: usize) {
+        self.write_u64(x as u64);
+    }
+}
+
 pub(crate) struct Complex {
     pub(crate) tets: Vec<[u32; 4]>,
     pub(crate) alive: Vec<bool>,
-    pub(crate) faces: HashMap<[u32; 3], [u32; 2]>,
+    pub(crate) faces: HashMap<[u32; 3], [u32; 2], FastKey>,
     pub(crate) star: Vec<Vec<u32>>,
 }
 
 impl Complex {
     pub(crate) fn new(n: usize, tets: &[[u32; 4]]) -> Complex {
-        let mut c = Complex { tets: Vec::new(), alive: Vec::new(), faces: HashMap::new(), star: vec![Vec::new(); n] };
+        let mut c = Complex { tets: Vec::new(), alive: Vec::new(), faces: HashMap::with_hasher(FastKey), star: vec![Vec::new(); n] };
         for t in tets {
             c.add(*t);
         }

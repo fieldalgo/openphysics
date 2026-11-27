@@ -587,7 +587,7 @@ mod mixed_tests {
         }
 
         fn mixed(&self) -> Mixed<'_> {
-            Mixed { input: &self.input, s: &self.s }
+            Mixed::new(&self.input, &self.s)
         }
 
         fn ids<const N: usize>(&self) -> [u32; N] {
@@ -812,7 +812,7 @@ mod mixed_tests {
     fn rounded_s_points_are_the_nearest_doubles_and_bad_tables_are_refused() {
         let input = [[0.0, 0.0, 0.0], [1.0, 3.0, 0.1]];
         let s = [SPoint::seg(0, 1, 1.0 / 3.0)];
-        let m = Mixed { input: &input, s: &s };
+        let m = Mixed::new(&input, &s);
         let x = m.rounded(Pt::S(0));
         // a is the origin, so the exact point is t * b: one correctly rounded product
         // per coordinate is the nearest double
@@ -821,7 +821,7 @@ mod mixed_tests {
         // a sum that rounds: the nearest double of a + t (b - a), against the reference
         let input2 = [[1.0, -0.1, 7.0], [3.0, 0.3, -2.0]];
         let s2 = [SPoint::seg(0, 1, 0.1)];
-        let m2 = Mixed { input: &input2, s: &s2 };
+        let m2 = Mixed::new(&input2, &s2);
         let y = m2.rounded(Pt::S(0));
         for k in 0..3 {
             // |exact - y| <= half an ulp of y: compare against the neighbours

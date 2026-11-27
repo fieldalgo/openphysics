@@ -27,7 +27,7 @@
 use std::collections::{BinaryHeap, HashMap, VecDeque};
 
 use crate::delaunay::Geom;
-use crate::facetrec::{face, key, Boundary, Complex, NONE};
+use crate::facetrec::{face, key, Boundary, Complex, FastKey, NONE};
 use crate::mixed::{MixedCounters, MixedPoints, Pt, SPoint};
 use crate::predicates::P3;
 
@@ -81,9 +81,9 @@ struct State<'a> {
     /// refined for quality or size)
     hsz: Vec<f64>,
     /// subfacet -> its facets (two where touching shells share it)
-    sub: HashMap<[u32; 3], Vec<u32>>,
+    sub: HashMap<[u32; 3], Vec<u32>, FastKey>,
     /// subsegment -> chain index
-    seg: HashMap<(u32, u32), u32>,
+    seg: HashMap<(u32, u32), u32, FastKey>,
     chains: Vec<Vec<u32>>,
     /// input segment (its end points, as ekey) -> its chains: the pieces an S point of that
     /// segment may split, found without scanning every subsegment
@@ -177,38 +177,6 @@ fn ratio_cos(b: f64) -> f64 {
 const SUB_RATIO: f64 = 1.5;
 /// A fast hasher for small integer keys (the shape memo), in place of the default SipHash:
 /// the keys are vertex indices, not untrusted input.
-#[derive(Clone, Copy, Default)]
-struct FastKey;
-
-impl std::hash::BuildHasher for FastKey {
-    type Hasher = FastHasher;
-    fn build_hasher(&self) -> FastHasher {
-        FastHasher(0)
-    }
-}
-
-struct FastHasher(u64);
-
-impl std::hash::Hasher for FastHasher {
-    fn finish(&self) -> u64 {
-        self.0
-    }
-    fn write(&mut self, bytes: &[u8]) {
-        for &b in bytes {
-            self.write_u64(b as u64);
-        }
-    }
-    fn write_u32(&mut self, x: u32) {
-        self.write_u64(x as u64);
-    }
-    fn write_u64(&mut self, x: u64) {
-        self.0 = (self.0.rotate_left(5) ^ x).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
-    }
-    fn write_usize(&mut self, x: usize) {
-        self.write_u64(x as u64);
-    }
-}
-
 /// Edge removal: the largest ring of tetrahedra around an edge it considers.
 const EDGE_RING_MAX: usize = 7;
 
@@ -243,6 +211,15 @@ fn circumcentre(p: [P3; 4]) -> Option<P3> {
 
 /// The vertex pairs (i, j) of the six edges of a tetrahedron with the other two (k, l).
 const DIHEDRAL_PAIRS: [(usize, usize, usize, usize); 6] = [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)];
+
+/// The smallest of the angles (degrees, at most 180) whose cosines have maximum `c`
+/// (NEG_INFINITY: none, 180). One arc cosine for six: acos is decreasing and
+/// to_degrees increasing, so this is min over the six of acos(c_i) in degrees, as
+/// computed one by one before 2026-11-27, with a monotone libm acos (glibc's is
+/// correctly rounded).
+fn smallest_angle(c: f64) -> f64 {
+    if c == f64::NEG_INFINITY { 180.0 } else { 180.0f64.min(c.acos().to_degrees()) }
+}
 
 /// q = 3 r_in / R of a tetrahedron with no degenerate face pair (shape's q, doubles).
 fn shape_q(x: &[P3; 4]) -> f64 {
@@ -508,10 +485,13 @@ impl State<'_> {
                 if star.is_empty() || star.iter().any(|&u| !self.inside[u as usize]) {
                     continue;
                 }
-                let worst = |st: &Self| star.iter().map(|&u| st.tet_q(u)).fold(1.0f64, f64::min);
-                let mean = |st: &Self| star.iter().map(|&u| st.tet_q(u)).sum::<f64>();
-                let base = worst(self);
-                let mbase = mean(self);
+                // q of each tetrahedron of the star, once per position: worst and mean from it
+                let qs = |st: &Self| star.iter().map(|&u| st.tet_q(u)).collect::<Vec<f64>>();
+                let worst = |q: &[f64]| q.iter().copied().fold(1.0f64, f64::min);
+                let mean = |q: &[f64]| q.iter().sum::<f64>();
+                let q0 = qs(self);
+                let base = worst(&q0);
+                let mbase = mean(&q0);
                 let dmin = |st: &Self| star.iter().map(|&u| st.min_dihedral(u)).fold(180.0f64, f64::min);
                 let dbase = dmin(self).min(DIHEDRAL_MIN);
                 let rcap = self.rho_cap(&star);
@@ -537,8 +517,9 @@ impl State<'_> {
                         self.orient(w) > 0
                     });
                     // a better worst tetrahedron, or the same worst and a better star on average
-                    let w = if ok { worst(self) } else { 0.0 };
-                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(self) > mbase + 1e-9)) && dmin(self) >= dbase
+                    let q1 = if ok { qs(self) } else { Vec::new() };
+                    let w = if ok { worst(&q1) } else { 0.0 };
+                    if ok && (w > base + 1e-12 || (w >= base.min(SMOOTH_FLOOR) && mean(&q1) > mbase + 1e-9)) && dmin(self) >= dbase
                         && star.iter().all(|&u| self.tet_rho(u) <= rcap) {
                         moved += 1;
                         break;
@@ -627,7 +608,7 @@ impl State<'_> {
     /// a + s (b - a) + r (c - a) on v's own three input points, least squares in doubles.
     fn set_facet_point(&mut self, v: u32, sp: SPoint) {
         let n = self.g.input.len();
-        self.g.s[v as usize - n] = sp;
+        self.g.set_s(v as usize - n, sp);
         let m = self.g.view();
         self.xyz[v as usize] = m.rounded(m.from_id(v));
     }
@@ -783,7 +764,7 @@ impl State<'_> {
 
     fn set_volume_point(&mut self, v: u32, p: P3) {
         let n = self.g.input.len();
-        self.g.s[v as usize - n] = SPoint::vol(p);
+        self.g.set_s(v as usize - n, SPoint::vol(p));
         self.xyz[v as usize] = p;
     }
 
@@ -798,7 +779,7 @@ impl State<'_> {
 
     fn shape_of(&self, v: [u32; 4]) -> (f64, f64) {
         let x = v.map(|i| self.xyz[i as usize]);
-        let mut m = 180.0f64;
+        let mut c = f64::NEG_INFINITY;
         for (i, j, k, l) in DIHEDRAL_PAIRS {
             let e = sub3(&x[j], &x[i]);
             let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
@@ -806,9 +787,9 @@ impl State<'_> {
             if !(d > 0.0) {
                 return (0.0, 0.0);
             }
-            m = m.min((dot(&n1, &n2) / d).clamp(-1.0, 1.0).acos().to_degrees());
+            c = c.max((dot(&n1, &n2) / d).clamp(-1.0, 1.0));
         }
-        (m, shape_q(&x))
+        (smallest_angle(c), shape_q(&x))
     }
 
     /// shape(v).1 alone, bit for bit: the same degeneracy test without the six arc cosines.
@@ -825,26 +806,34 @@ impl State<'_> {
         shape_q(&x)
     }
 
+    /// The (dihedral, q) of each tetrahedron, computed once for worst_of and badness_of.
+    fn shapes(&self, ts: &[[u32; 4]]) -> Vec<(f64, f64)> {
+        ts.iter().map(|t| self.shape(*t)).collect()
+    }
+
     /// The worst (dihedral, q) of a set of tetrahedra, compared dihedral first (below 15
     /// degrees), then q.
-    fn worst_shape(&self, ts: &[[u32; 4]]) -> (f64, f64) {
-        ts.iter().map(|t| self.shape(*t)).fold((180.0, 1.0), |a, b| (a.0.min(b.0), a.1.min(b.1)))
+    fn worst_of(s: &[(f64, f64)]) -> (f64, f64) {
+        s.iter().fold((180.0, 1.0), |a, b| (a.0.min(b.0), a.1.min(b.1)))
     }
 
     /// The sum of badness 1/q - 1 over tetrahedra (0 for regular ones): the energy that
     /// flips lower when they keep the worst shape at least min(before, SMOOTH_FLOOR).
-    fn badness(&self, ts: &[[u32; 4]]) -> f64 {
-        ts.iter().map(|t| { let q = self.q_of(*t); if q > 0.0 { 1.0 / q - 1.0 } else { f64::INFINITY } }).sum()
+    fn badness_of(s: &[(f64, f64)]) -> f64 {
+        s.iter().map(|&(_, q)| if q > 0.0 { 1.0 / q - 1.0 } else { f64::INFINITY }).sum()
     }
 
     /// A replacement is taken when it raises the worst (dihedral, q), or keeps the worst at
-    /// least the floors and lowers the total badness.
-    fn accept(&self, old: &[[u32; 4]], new: &[[u32; 4]]) -> bool {
-        let (wn, wo) = (self.worst_shape(new), self.worst_shape(old));
+    /// least the floors and lowers the total badness. `old` holds the replaced
+    /// tetrahedra's shapes; each shape is computed once (shape is a function of the
+    /// vertex set, so this decides as computing them again would).
+    fn accept(&self, old: &[(f64, f64)], new: &[[u32; 4]]) -> bool {
+        let ns = self.shapes(new);
+        let (wn, wo) = (Self::worst_of(&ns), Self::worst_of(old));
         if Self::better(wn, wo) {
             return true;
         }
-        wn.0 >= wo.0.min(DIHEDRAL_MIN) && wn.1 >= wo.1.min(SMOOTH_FLOOR) && self.badness(new) < self.badness(old) - 1e-9
+        wn.0 >= wo.0.min(DIHEDRAL_MIN) && wn.1 >= wo.1.min(SMOOTH_FLOOR) && Self::badness_of(&ns) < Self::badness_of(old) - 1e-9
     }
 
     fn better(new: (f64, f64), old: (f64, f64)) -> bool {
@@ -975,14 +964,15 @@ impl State<'_> {
         let (v1, v2) = (self.cx.tets[t1 as usize], self.cx.tets[t2 as usize]);
         let d = *v1.iter().find(|x| !k.contains(x)).unwrap();
         let e = *v2.iter().find(|x| !k.contains(x)).unwrap();
-        let old = self.worst_shape(&[v1, v2]);
+        let os = self.shapes(&[v1, v2]);
+        let old = Self::worst_of(&os);
         if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
             return false; // not worth a flip
         }
         // the cheap test first: shape (and so accept) does not depend on vertex order;
         // then each exact orientation once (convex_23 asks the same three)
         let cand: [[u32; 4]; 3] = std::array::from_fn(|j| [k[j], k[(j + 1) % 3], d, e]);
-        if !self.accept(&[v1, v2], &cand) {
+        if !self.accept(&os, &cand) {
             return false;
         }
         let o: [i8; 3] = std::array::from_fn(|j| self.orient(cand[j]));
@@ -1026,7 +1016,8 @@ impl State<'_> {
             return false;
         }
         let oldv: Vec<[u32; 4]> = ring.iter().map(|&t| self.cx.tets[t as usize]).collect();
-        let old = self.worst_shape(&oldv);
+        let os = self.shapes(&oldv);
+        let old = Self::worst_of(&os);
         if old.0 >= DIHEDRAL_MIN && old.1 > 0.9 {
             return false;
         }
@@ -1034,7 +1025,7 @@ impl State<'_> {
         // the cheap test first (shape does not depend on vertex order), then each exact
         // orientation once
         let (c1, c2) = ([tri[0], tri[1], tri[2], a], [tri[0], tri[1], tri[2], b]);
-        if !self.accept(&oldv, &[c1, c2]) {
+        if !self.accept(&os, &[c1, c2]) {
             return false;
         }
         // a and b on opposite sides of the triangle: the two new tetrahedra fill the ring
@@ -1196,7 +1187,7 @@ impl State<'_> {
         if new.iter().any(|t| self.orient(*t) <= 0) {
             return false;
         }
-        if self.accept(&old, &new) && self.rho_ok(&old, &new) {
+        if self.accept(&self.shapes(&old), &new) && self.rho_ok(&old, &new) {
             self.replace(&ring, &new);
             return true;
         }
@@ -1364,18 +1355,18 @@ impl State<'_> {
     /// The smallest dihedral angle of tetrahedron t, in degrees (doubles).
     fn min_dihedral(&self, t: u32) -> f64 {
         let x = self.cx.tets[t as usize].map(|v| self.xyz[v as usize]);
-        let mut m = 180.0f64;
-        for (i, j, k, l) in [(0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1)] {
+        let mut c = f64::NEG_INFINITY;
+        for (i, j, k, l) in DIHEDRAL_PAIRS {
             let e = sub3(&x[j], &x[i]);
             let (n1, n2) = (cross(&e, &sub3(&x[k], &x[i])), cross(&e, &sub3(&x[l], &x[i])));
             let d = (dot(&n1, &n1) * dot(&n2, &n2)).sqrt();
             if d > 0.0 {
-                m = m.min((dot(&n1, &n2) / d).clamp(-1.0, 1.0).acos().to_degrees());
+                c = c.max((dot(&n1, &n2) / d).clamp(-1.0, 1.0));
             } else {
                 return 0.0;
             }
         }
-        m
+        smallest_angle(c)
     }
 
     /// The size at a boundary simplex: the smallest positive size of the tetrahedra (inside
@@ -1710,7 +1701,7 @@ impl State<'_> {
 
     fn drop_point(&mut self, id: u32) {
         debug_assert_eq!(id as usize, self.xyz.len() - 1);
-        self.g.s.pop();
+        self.g.pop_s();
         self.xyz.pop();
         self.rins.pop();
         self.cx.star.pop();
@@ -2581,13 +2572,13 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
     let cx = Complex::new(total, &b.tets);
     let m = g.view();
     let xyz: Vec<P3> = (0..total as u32).map(|v| m.rounded(m.from_id(v))).collect();
-    let mut sub = HashMap::new();
+    let mut sub = HashMap::with_hasher(FastKey);
     for (fi, tris) in b.plc.subfacets.iter().enumerate() {
         for t in tris {
             sub.entry(key(*t)).or_insert_with(Vec::new).push(fi as u32);
         }
     }
-    let mut seg = HashMap::new();
+    let mut seg = HashMap::with_hasher(FastKey);
     for (c, chain) in b.plc.rec.chains.iter().enumerate() {
         for w in chain.windows(2) {
             seg.insert(ekey(w[0], w[1]), c as u32);
