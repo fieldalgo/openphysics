@@ -4,7 +4,7 @@ import {formatIndex} from './workspace-compare.mjs';
 import {isOpenRun,NO_WINDOW_TITLE} from './workspace-open-run.mjs';
 import {WINDOW_NM,shapeBounds} from './workspace-shapes.mjs';
 import {physicalBounds} from './workspace-field.mjs';
-import {INDEX_1550} from './workspace-open-boundary.mjs';
+import {INDEX_1550,defaultTarget} from './workspace-open-boundary.mjs';
 
 // The modes table of one run: | Mode | n_eff | Polarization | Absorption loss (dB/cm) | A_eff (µm²) |. Every number is
 // defined on the saved centroid field unnormalized_electric_field, so Studio and the engine
@@ -378,6 +378,10 @@ export function corePlacement(run){
 export const firstModeEdgeShape=run=>edgeNotes(run).find(n=>n.mode===0)?.shape??null;
 /** The reason sentence of one side. */
 export const noMatchEdgeText=(side,title,shape)=>`${side} · ${title}: its modes are mostly in ${shape}, which touches the window edge; the core mode was not found.`;
+/** Round 37 (D3): the closed search Compare offers beside that sentence, for a closed run whose mode 1
+ * is an edge mode and which has no core mode: the edge warning's and the slab question's target
+ * estimate for the run's geometry (defaultTarget); null for any other run. */
+export const noMatchCoreSearch=run=>!isOpenRun(run)&&firstModeEdgeShape(run)&&!coreNotes(run).length?defaultTarget(run.input?.model?.shapes??[]):null;
 /** "Mode 2 is the core mode: 64 % of |E|² is in Core, which does not touch the window edge." */
 export function coreNoteText(mode,p){
  return `Mode ${mode+1} is the core mode: ${Math.round(p.share*100)} % of |E|² is in ${p.shape}, which does not touch the window edge.`;

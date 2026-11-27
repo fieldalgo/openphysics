@@ -2830,6 +2830,18 @@ overtakes the TM-like one). Matching is on for two closed runs (with an open run
   core-only Design A/B runs, where no shape touches the window edge. The matching, the mode
   numbers and their order, the pair the picker shows first, the other words, the values, the
   files and the run records are unchanged.
+- **Closed core search (round 37, D3).** When Compare matches no modes and a closed run's note reads
+  *A · Run 2: its modes are mostly in Substrate, which touches the window edge; the core mode was not
+  found.* and that run has no core mode (the T18 closed run as set), a button beside the note's
+  *Open Run 2 in Results* link reads the shortcut for that run's geometry, *Set search near 2.46 · 4
+  modes* (the same target estimate as the slab warning and the *Slab modes first* dialog). Pressing
+  it runs nothing: it makes that run's inputs current, as *Use this run's inputs* does, sets the
+  shortcut (Modes to return nearest to n_eff 2.46, Modes to find 4), and opens Model. The Messages
+  line is the shortcut's, followed by *No need to run: Run 3 already has these results … Show Run
+  3* when such a run exists. Undo takes back Modes to find first (the shortcut's step), then the
+  run's inputs (the *Use this run's inputs* step); Modes to return is not part of Undo. There is no
+  button for a run with a core mode, an open run, or when Compare matched the modes. The matching,
+  Compare's other text, the values, the files, the run records and the dialog are unchanged.
 - **Older files.** Matching uses only the stored samples, so it works on every optical run of
   version 6 and 7 session files, and nothing is added to the files.
 - **Limitations.** η is computed from piecewise-constant centroid samples, so it carries a
