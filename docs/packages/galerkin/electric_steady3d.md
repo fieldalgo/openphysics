@@ -5,9 +5,9 @@
 `galerkin.electric3d.solve_steady_electric_3d` solves
 ∇·J = 0, J = σE, and E = −∇V on conforming linear tetrahedra in SI units.
 Pass a [Mesh3D](mesh3d_format.md) with metre coordinates and tagged exterior
-faces. Conductivity is a finite positive scalar in S/m or a mapping with
-one finite positive scalar for each `mesh.region_names` entry. Conductivity
-is constant within each element.
+faces. Conductivity is in S/m and must be finite and positive. Pass a scalar,
+a mapping with one scalar per `mesh.region_names` entry, or a (T,) array in
+the exact order of `mesh.tets`. Conductivity is constant within each element.
 
 Prescribe scalar voltages with `{exterior_face_tag: voltage}`. Terminal node
 sets must be disjoint, and every connected component must contain a terminal.
@@ -50,6 +50,20 @@ For a complete run with a convection-cooled terminal, see the
 [3D Joule heating example](../../../examples/galerkin/joule_heating_3d.py).
 The transfer is one-way and the electrical conductivity is independent of temperature.
 
+## Temperature-dependent material evaluation
+
+The coupled solver can use the existing
+`galerkin.temperature_joule_heating.ConductivityModel`, alone or mixed with
+constant conductivities in a named-region mapping. For each material law, all
+nodes of its tetrahedra must lie inside the model's inclusive Kelvin range.
+The callback receives the arithmetic mean of the four nodal temperatures of
+each tetrahedron and returns one finite positive S/m value per mean.
+The steady DC solve uses the resulting conductivity array for one voltage
+state. The transient coupling determines when to sample voltage and temperature.
+For an isolated conductor at fixed voltage, greater resistance means lower
+total Joule power. Terminal current is positive into the conductor, and the
+element source J·E in W/m³ is nonnegative.
+
 ## Validation
 
 - The [3D coupling regression](../../../tests/galerkin/test_joule_heating_3d_coupling.py)
@@ -79,3 +93,5 @@ The transfer is one-way and the electrical conductivity is independent of temper
   It independently selects the regions and terminal nodes from coordinates.
   The gate is 10⁻¹⁰ global relative difference for V, E, J, J·E, both
   terminal currents and both integrated powers.
+
+- A fixed-voltage two-layer resistor with a temperature-dependent heater and a constant lead is checked at three temperatures and three spatial refinements against the series resistance, piecewise voltage, and local J·E.

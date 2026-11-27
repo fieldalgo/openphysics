@@ -11,7 +11,7 @@ from scipy.sparse.csgraph import connected_components
 
 from ._public import ResultSurface, refuse_text
 from .assembly3d import assemble_stiffness_3d as _assemble_stiffness_3d
-from .core.checks import positive_real, readonly_copy, real_scalar
+from .core.checks import positive_real, readonly_copy, real_array, real_scalar
 from .core.solve import scipy_solve_dirichlet
 from .core.tets import tet_gradients as _tet_gradients
 from .mesh3d import Mesh3D
@@ -45,17 +45,60 @@ class SteadyElectric3DResult(ResultSurface):
     })
 
 
+def _region_names(mesh, values):
+    names = mesh.region_names
+    if names is None or mesh.regions is None:
+        raise ValueError("electrical_conductivity by region requires named tetrahedral regions")
+    if set(values) != set(names):
+        raise ValueError("electrical_conductivity keys must match mesh.region_names exactly")
+    return names
+
+
 def _conductivity(mesh, values):
     name = "electrical_conductivity"
     if isinstance(values, Mapping):
-        names = mesh.region_names
-        if names is None or mesh.regions is None:
-            raise ValueError(f"{name} by region requires named tetrahedral regions")
-        if set(values) != set(names):
-            raise ValueError(f"{name} keys must match mesh.region_names exactly")
-        return mesh.by_region({key: positive_real(value, f"{name}[{key!r}]")
-                               for key, value in values.items()})
+        names = _region_names(mesh, values)
+        return mesh.by_region([positive_real(values[key], f"{name}[{key!r}]") for key in names])
+    if isinstance(values, (list, tuple, np.ndarray)):
+        sigma = real_array(values, name)
+        if sigma.shape != (mesh.num_tets,) or np.any(sigma <= 0):
+            raise ValueError(f"{name} must have shape (T,) and contain positive values")
+        return sigma
     return np.full(mesh.num_tets, positive_real(values, name))
+
+
+def _conductivity_at_temperature_3d(mesh, electrical_conductivity, temperature):
+    """Evaluate the DC material law on the tetrahedral means of nodal Kelvin values."""
+    from .temperature_joule_heating import ConductivityModel, _sigma
+
+    refuse_text("electrical_conductivity", electrical_conductivity)
+    refuse_text("temperature", temperature)
+    if not isinstance(mesh, Mesh3D):
+        raise TypeError("conductivity evaluation takes a galerkin.Mesh3D")
+    nodal = real_array(temperature, "temperature")
+    if nodal.shape != (mesh.num_nodes,) or np.any(nodal < 0):
+        raise ValueError("temperature must have shape (N,) and contain nonnegative Kelvin values")
+    material = electrical_conductivity
+    if isinstance(material, Mapping):
+        names = _region_names(mesh, material)
+        groups = ((name, mesh.regions == i, material[name]) for i, name in enumerate(names))
+    else:
+        groups = (("all", slice(None), material),)
+
+    sigma = np.empty(mesh.num_tets)
+    for name, cells, law in groups:
+        if not isinstance(law, ConductivityModel):
+            sigma[cells] = positive_real(law, f"electrical_conductivity[{name!r}]")
+            continue
+        values = nodal[mesh.tets[cells]]
+        if not values.size:
+            continue
+        lo, hi = law.temperature_range
+        if np.any((values < lo) | (values > hi)):
+            raise ValueError(f"material {name!r}: temperature [{values.min()}, {values.max()}] K "
+                             f"outside [{lo}, {hi}] K")
+        sigma[cells] = _sigma(law, np.sum(values / 4., axis=1), name)
+    return sigma
 
 
 def _terminals(mesh, values):
@@ -80,7 +123,8 @@ def solve_steady_electric_3d(mesh: Mesh3D, *, electrical_conductivity,
                              prescribed_electric_potential) -> SteadyElectric3DResult:
     """Solve div(-sigma grad V)=0 with P1 tetrahedra and metre coordinates.
 
-    Set a positive scalar conductivity in S/m or a table keyed by region name.
+    Set positive conductivity in S/m as a scalar, a table keyed by region
+    name, or an array of shape (T,) in tetrahedron order.
     Prescribe scalar volts by nonempty exterior face tag. Terminal node sets
     must be disjoint and every connected component needs a terminal. The
     remaining faces are insulated through the natural boundary condition.
