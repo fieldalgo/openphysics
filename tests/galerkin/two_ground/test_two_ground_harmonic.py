@@ -36,3 +36,35 @@ def test_integrated_boundary_current_invariants(operation):
     np.testing.assert_allclose(q,before['parts'],rtol=1e-10,atol=0)
     np.testing.assert_allclose(ground,before['ground_parts'],rtol=1e-10,atol=0)
     np.testing.assert_allclose(integrated,np.vstack((np.eye(2),-np.ones(2))),rtol=0,atol=1e-10)
+
+
+def fourier_gram(a, b, charges, w, h, modes, order):
+    """The plane Gram as a cosine (Parseval) sum: the independent reference for the physical-space one."""
+    coeff = ground_coefficients(a, b, charges, w, h, modes=modes, order=order)
+    return w * (np.einsum('bi,bj->bij', coeff[:, 0], coeff[:, 0]) + .5 * np.einsum('bni,bnj->bij', coeff[:, 1:], coeff[:, 1:]))
+
+
+@pytest.mark.parametrize('w,h', [(1., 1.), (1., .25), (.5, 1.)])
+def test_physical_space_ground_gram_equals_the_cosine_parseval_sum(w, h):
+    from galerkin.laplace_two_ground import _ground_gram as ground_gram
+    rng = np.random.default_rng(5)
+    a = np.column_stack((rng.uniform(.25, .7, 6) * w, rng.uniform(.3, .7, 6) * h))
+    b = a + np.column_stack((rng.uniform(.02, .06, 6) * w, rng.uniform(-.05, .05, 6) * h))
+    charges = rng.normal(size=(6, 3))
+    actual = ground_gram(a, b, charges, w, h, order=16)
+    expected = fourier_gram(a, b, charges, w, h, 4096, 16)
+    np.testing.assert_allclose(actual, actual.swapaxes(1, 2), rtol=1e-13, atol=0)
+    assert np.max(abs(actual - expected)) <= 1e-12 * np.max(abs(expected))
+
+
+def test_ground_intervals_follow_the_distance_to_the_nearest_singularity():
+    from galerkin.laplace_two_ground import _ground_intervals as intervals, GROUND_INTERVAL_FRACTION as fraction
+    xs = np.array([.3, .31, .7]); distance = np.array([.02, .05, .01])
+    edges = intervals(xs, distance, 1.)
+    assert edges[0] == 0 and edges[-1] == 1 and np.all(np.diff(edges) > 0)
+    for left, right in zip(edges[:-1], edges[1:]):
+        x = np.linspace(left, right, 7)
+        r = np.min(np.hypot(x[:, None] - xs, distance), axis=1)
+        assert right - left <= fraction / (1 - fraction) * r.min() * (1 + 1e-12)
+    # Fine only near the sources: the widest interval is far wider than the narrowest.
+    assert np.max(np.diff(edges)) > 10 * np.min(np.diff(edges))

@@ -40,11 +40,35 @@ establish numerical convergence everywhere within them.
 The method is a constant Galerkin boundary discretization of the homogeneous
 Laplace Green function: a two-Dirichlet-plane strip plus reflected lateral
 images for Neumann sides. Exact singular half-space integrals are combined with
-a smooth tensor interpolant. Ground normal flux uses an independent harmonic
-expansion and cosine orthogonality. Interpolation degree is explicitly 10,12,14
-or 16 (default12), compared with degree−2. Ground modes are explicitly 64–4096
-(default128), compared with twice that count and higher quadrature. The solver
-never silently changes a requested setting.
+a smooth tensor interpolant. Interpolation degree is explicitly 10,12,14 or 16
+(default12), compared with degree−2. The solver never silently changes a
+requested setting.
+
+The grounded planes' current Gram, ∫σᵢσⱼ dx over each plane, is integrated in
+physical space. The plane charge density σ of each unit conductor current uses
+the closed-form strip Poisson kernel sin(c)E/(H((1−E)²+4E sin²(c/2))), with
+E = exp(−π|Δx|/H) and c = πd/H for a panel point at distance d from the plane,
+plus every lateral side-wall image whose factor can exceed 1e-30. Panels and x
+use Gauss rules of 12 points, compared with 16 points on the same intervals,
+under the same 1e-10 entrywise gate as before. Each x interval is 0.75 times
+the distance from its start to the nearest singularity of the density
+(xs ± i·d over all panel points), so it is at most three times that distance
+anywhere in it: intervals are fine only near conductors. Plane totals are the
+closed-form zero cosine mode, (1−y/H) and y/H. `ground_modes` is still
+admitted (64–4096) but no longer changes the Gram.
+
+A cosine (Parseval) sum, used before, leaves a small entry between two
+conductors that hardly overlap on a plane by cancellation, so rounding set its
+relative error: the top-plane ground-to-ground entry of a layered coupled
+coplanar stripline, about 3e-6 of its Cauchy–Schwarz bound √(GᵢᵢGⱼⱼ), differed
+by 1.1e-10 between the two refinements and failed the check. Exact or
+compensated sums of the same float64 coefficients reached only 2–3e-11. In
+physical space the integrand of that entry is small where it lives, so the
+three SIPI layered coplanar striplines now pass at 6–7e-14. The physical-space
+Gram agrees with the cosine sum to 1e-12 of its largest entry in the tests, and
+on those three sections with an 80-bit extended-precision cosine sum to 8e-14
+entrywise; it changed their Gram by at most 9e-16 of the largest entry. It
+costs about 2–4 s per section against 0.2 s for the cosine sum.
 
 Lateral side-wall images are summed up to a fixed image count, but an image
 is skipped when it cannot change any entry: over a whole target–source block,
