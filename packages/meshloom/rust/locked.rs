@@ -125,8 +125,12 @@ pub fn relocate(points: &[P3], b: &mut Boundary, locked: &[u32]) -> Result<Locke
     if bad.is_empty() {
         return Ok(stats);
     }
+    // through push, so that the interval coordinates of each S point are kept with it
+    // (assigning `g.s` left them empty, and the next push gave S point 0 another point's)
     let mut g = MixedPoints::new(points.to_vec());
-    g.s = b.plc.rec.s.clone();
+    for sp in &b.plc.rec.s {
+        g.push(*sp);
+    }
 
     // subfacets and their facets
     let mut sub_of: HashMap<[u32; 3], Vec<u32>> = HashMap::new();
