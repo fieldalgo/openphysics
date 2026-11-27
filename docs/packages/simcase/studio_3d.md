@@ -139,7 +139,13 @@ mesh's surface. It runs no physics and changes no file.
   - `parameters`: SI value, unit, the written value, and `used_by`, the fields of
     the component that name the parameter.
   - `regions`, `selections`, and the display answer under `display`.
-- A refusal is `{"ok": false, "refused": <the engine's message as written>,
+  - `mesh`: the estimate of meshing the component, `{"ok": true, "estimate": ..., "key": ...}`
+    in the words of `/api/model3d/mesh/estimate` (`simcase.estimate_mesh3d`, the mesh job's
+    reuse key), or the refusal that blocks meshing in the form below: E-MESH-ESTIMATE above the
+    element count limit, a below-tolerance E-CONTRACT, or two values that round to one
+    coordinate (E-3D-COMBINATION at `features[i]`). The shape is formed either way, so the
+    answer stays `"ok": true`; on the card it adds about 7 ms to the check's 8 ms.
+- A refusal while forming is `{"ok": false, "refused": <the engine's message as written>,
   "code", "path", "feature_index"}`. The index is the `features[i]` the path names,
   or null, and the builder marks that feature.
 - `POST /api/model3d/selection` takes the envelope plus `"face"` (a face id) and

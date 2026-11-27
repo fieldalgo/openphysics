@@ -314,15 +314,22 @@ def _parameters(doc: dict, model, comp_name: str) -> list:
 
 def check_view(doc: dict, component: str | None = None) -> dict:
     """The builder's check of one ``3d`` component: features with their coverage, parameters,
-    selections and the display answer; raises ``GeometryError`` on a refusal."""
+    selections, the display answer and ``mesh``; raises ``GeometryError`` on a refusal while forming.
+
+    ``mesh`` is the estimate of meshing this component (``simcase.estimate_mesh3d``, in the words of
+    ``/api/model3d/mesh/estimate``) with the mesh job's reuse key, or the refusal that blocks
+    meshing (E-MESH-ESTIMATE, a below-tolerance E-CONTRACT, two values rounding to one coordinate):
+    the shape is formed either way, so the view is not greyed for it."""
     model, comp, cx = complex_of(doc, component)
     display = _display(model, comp, cx)
-    # Seam for the mesh estimate: when the public ``simcase.estimate_mesh3d`` lands, call it here so
-    # every check also raises the pre-mesh refusals and answers with its estimate line.
+    try:
+        mesh = {"ok": True, "estimate": mesh3d_jobs.estimate(doc, cx.component), "key": mesh3d_jobs.reuse_key(doc)}
+    except GeometryError as exc:
+        mesh = _refusal(exc)
     return {"ok": True, "component": cx.component, "unit": str(comp.length_unit),
             "features": _coverage(comp, cx), "regions": display["regions"],
             "parameters": _parameters(doc, model, cx.component),
-            "selections": display["selections"], "display": display}
+            "selections": display["selections"], "display": display, "mesh": mesh}
 
 
 def _refusal(exc: GeometryError) -> dict:

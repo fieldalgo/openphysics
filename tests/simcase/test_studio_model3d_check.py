@@ -12,8 +12,8 @@ Pre-registered checks (fixed before measuring; never loosened):
 - W5 (server part): one document per E-3D-COMBINATION stem the check can raise (footprint layers
   alone, footprint layers beside other features, a feature type not taken yet: extrude, cylinder,
   sphere): the refusal carries the engine's message as written, its code and features[i]: 100%.
-  The stems "... round to the same coordinate" and circle_segments come from ``build_mesh3d`` when
-  meshing (slice C), not from the check.
+  The stem "... round to the same coordinate" is raised before meshing: the check answers it under
+  ``mesh`` (test_studio_model3d_check_mesh.py); circle_segments is not applicable.
 """
 import json
 

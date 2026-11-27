@@ -127,7 +127,13 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
   - `parameters`: SI 값, 단위, 적은 값, 그 파라미터 이름을 쓰는 구성 요소 필드
     `used_by`.
   - `regions`, `selections`, 그리고 `display` 아래의 표시 응답.
-- 거부는 `{"ok": false, "refused": <엔진 메시지 그대로>, "code", "path",
+  - `mesh`: 구성 요소를 메시할 때의 추정, `{"ok": true, "estimate": ..., "key": ...}`
+    (`/api/model3d/mesh/estimate`와 같은 말, `simcase.estimate_mesh3d`, 메시 작업의 재사용
+    키), 또는 메시를 막는 거부(아래와 같은 형식): 요소 수 한도를 넘는 E-MESH-ESTIMATE,
+    허용 오차 아래의 E-CONTRACT, 한 좌표로 반올림되는 두 값(`features[i]`의
+    E-3D-COMBINATION). 어느 쪽이든 형상은 만들어지므로 응답은 `"ok": true`로 남습니다.
+    카드에서는 검사의 8 ms에 약 7 ms를 더합니다.
+- 형상을 만드는 중의 거부는 `{"ok": false, "refused": <엔진 메시지 그대로>, "code", "path",
   "feature_index"}`입니다. index는 경로가 가리키는 `features[i]`이거나 null이며, 빌더는
   그 기능을 표시합니다.
 - `POST /api/model3d/selection`은 봉투에 `"face"`(면 id)와 `"name"`을 더해 받습니다.
