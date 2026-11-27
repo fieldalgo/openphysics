@@ -806,7 +806,8 @@ class _Walker:
         if len(model.components) == 1:
             comp = _pick(model, None)
             homogeneous = not comp.features and "material" not in comp.background
-            if comp.dimension == "3d" or homogeneous:
+            reads_3d = self.r.kind is not None and getattr(self.r.kind, "geometry_3d", False)
+            if (comp.dimension == "3d" and not reads_3d) or homogeneous:
                 try:
                     self.r.geometry_flat = to_flat(model, validation=True)
                 except GeometryError as exc:

@@ -95,6 +95,7 @@ See the complete [transient export commands](../packages/simcase/overview.md#vie
 | Electric conduction and Joule heating (`electric-joule2d-p1-v2`; regions `electric2d-p1-node-cell-regions-v2`, `electric-joule2d-p1-node-cell-regions-v2`, `electric-joule2d-temperature-p1-node-cell-regions-v2`) | VTU |
 | Rectangular elasticity and thermoelasticity (`mechanics2d-p1-v2`, `thermoelastic2d-p1-v2`), strain and stress as named component scalars | VTU |
 | Region elasticity and thermoelasticity (`mechanics2d-p1-regions-v2`, `thermoelastic2d-p1-regions-v2`) | Not exported yet (refused as an unsupported layout); read `fields.npz` |
+| Steady heat on a 3D component (`thermal.steady3d`, `thermal3d-p1-node-tet-regions-v1`) | Not exported yet (refused as an unsupported layout); read `fields.npz` ([its arrays](../packages/simcase/thermal_steady3d.md#results)) |
 | Cavity with materials and lossy walls (`cavity3d-edge-complex-v2`) | VTU, complex fields as `_real`/`_imag` pairs under exp(−iωt) |
 | Waveguide modes (`em.modes2d`, `em-modes2d-p1-node-centroid-v2`) | VTU for a single point, PVD for a sweep (`export_sweep`); `node_coordinates` in metres, complex modes as `_real`/`_imag` pairs under exp(−iωt); subspace sweeps (`em-modes2d-subspace-raw-v2`) and results saved without `field_layout` refused |
 

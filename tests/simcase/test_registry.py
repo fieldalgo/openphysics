@@ -16,6 +16,7 @@ BUILTIN = {
     "mechanics": {"mechanics.elasticity2d", "mechanics.thermoelastic2d"},
     "thermal.transient2d": {"thermal.transient2d"},
     "thermal.steady2d": {"thermal.steady2d"},
+    "thermal.steady3d": {"thermal.steady3d"},
     "em.cavity3d": {"em.cavity3d"},
     "em.modes2d": {"em.modes2d"},
 }
@@ -37,11 +38,12 @@ def test_stage_refusals_keep_their_messages():
         "mechanics": "{stage} is an EM stage; use run(document) for mechanics physics",
         "thermal.transient2d": "{stage} is an EM 2D stage; use run(document) for thermal.transient2d",
         "thermal.steady2d": "{stage} is an EM 2D stage; use run(document) for thermal.steady2d",
+        "thermal.steady3d": "{stage} is an EM 2D stage; use run(document) for thermal.steady3d",
         "em.cavity3d": "{stage} is a 2D stage; use run(document) for em.cavity3d",
         "em.modes2d": None,
     }
     assert [k.name for k in registry.kinds() if k.fresh_output] == [
-        "electric_joule", "mechanics", "thermal.transient2d", "thermal.steady2d"]
+        "electric_joule", "mechanics", "thermal.transient2d", "thermal.steady2d", "thermal.steady3d"]
 
 
 @pytest.mark.parametrize("types, kind", [
@@ -98,12 +100,12 @@ CAVITY_BOX_02 = {
 
 
 def test_unknown_type_error_lists_every_registered_type():
-    # a type no kind claims is refused at its own path, naming the nine types this release reads
+    # a type no kind claims is refused at its own path, naming the ten types this release reads
     # (until units batch C11a the format 0.2 reader named them; a 0.2 document is refused by name now)
     data = copy.deepcopy(examples.EXAMPLES["cavity_box"])
     data["physics"]["em1"]["type"] = "no.such.type"
     listed = sorted(registry.physics_types())
-    assert len(listed) == 9
+    assert len(listed) == 10
     with pytest.raises(DocumentError) as error:
         Document.from_dict(data)
     assert [(d.code, d.path) for d in error.value.diagnostics] == [("E-VALUE-FORM", "physics.em1.type")]

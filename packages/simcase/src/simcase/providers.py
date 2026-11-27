@@ -262,6 +262,8 @@ _BUILTIN_MANIFEST = {
     "thermal.steady2d": {"field": "heat", "engine": "galerkin", "process": "in_process",
                          "ports": [*_THERMAL_PORTS,
                                    _in("heat_source_density", "joule_power_density", "W/m^3", "element")]},
+    "thermal.steady3d": {"field": "heat", "engine": "galerkin", "process": "in_process",
+                         "ports": [_out("temperature", "temperature", "K", "node")]},
     "em.cavity3d": {"field": "electromagnetics", "engine": "galerkin", "process": "in_process",
                     "ports": [_out("resonant_frequency", "resonant_frequency", "Hz", "scalar")]},
     "em.modes2d": {"field": "electromagnetics", "engine": "galerkin", "process": "in_process",
