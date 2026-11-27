@@ -67,6 +67,14 @@ def _steady_electric():
     return solve_steady_electric, _electric_inputs()[1]
 
 
+def _steady_electric_3d():
+    from galerkin import box_mesh
+    from galerkin.electric3d import solve_steady_electric_3d
+    return solve_steady_electric_3d, dict(mesh=box_mesh(1., 1., 1., 1, 1, 1),
+                                         electrical_conductivity=2.,
+                                         prescribed_electric_potential={"x0": 0., "x1": 1.})
+
+
 def _steady_joule_heat():
     from galerkin.electric import solve_steady_electric
     from galerkin.joule_heating import solve_steady_joule_heat
@@ -308,6 +316,7 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 "galerkin.transient_heat:TransientHeatStepError": _step_error,
                 # L2 commit 7 emptied electric, joule_heating and temperature_joule_heating
                 "galerkin.electric:solve_steady_electric": _steady_electric,
+                "galerkin.electric3d:solve_steady_electric_3d": _steady_electric_3d,
                 "galerkin.joule_heating:solve_steady_joule_heat": _steady_joule_heat,
                 "galerkin.temperature_joule_heating:solve_temperature_joule_heat": _temperature_joule_heat,
                 "galerkin.temperature_joule_heating:JouleConvergenceError": _convergence_error,

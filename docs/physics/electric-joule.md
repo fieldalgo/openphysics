@@ -8,6 +8,8 @@ Distinguish a DC electric solve, one-way electric-to-heat transfer and temperatu
 
 ## First Python calculations
 
+- [3D DC conduction and Joule heating in a convection-cooled solid](../packages/galerkin/electric_steady3d.md)
+
 - [First Joule calculation: electric power becomes heat](../packages/galerkin/joule_tutorial.md)
 
 - [Temperature-dependent Joule tutorial: feedback and convergence](../packages/galerkin/temperature_joule_tutorial.md)

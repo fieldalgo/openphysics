@@ -10,10 +10,10 @@ import numpy as np
 from scipy.sparse.csgraph import connected_components
 
 from ._public import ResultSurface, refuse_text
-from .assembly3d import assemble_stiffness_3d
+from .assembly3d import assemble_stiffness_3d as _assemble_stiffness_3d
 from .core.checks import positive_real, readonly_copy, real_scalar
 from .core.solve import scipy_solve_dirichlet
-from .core.tets import tet_gradients
+from .core.tets import tet_gradients as _tet_gradients
 from .mesh3d import Mesh3D
 
 __all__ = ["SteadyElectric3DResult", "solve_steady_electric_3d"]
@@ -33,7 +33,7 @@ class SteadyElectric3DResult(ResultSurface):
     current_density: np.ndarray
     electrical_conductivity: np.ndarray
     joule_power_density: np.ndarray
-    terminal_current: Mapping[str, float]
+    inward_current: Mapping[str, float]
     joule_power: float
     inward_electric_power: float
 
@@ -41,7 +41,7 @@ class SteadyElectric3DResult(ResultSurface):
     UNITS = MappingProxyType({
         "electric_potential": "V", "electric_field": "V/m", "current_density": "A/m^2",
         "electrical_conductivity": "S/m", "joule_power_density": "W/m^3",
-        "terminal_current": "A", "joule_power": "W", "inward_electric_power": "W",
+        "inward_current": "A", "joule_power": "W", "inward_electric_power": "W",
     })
 
 
@@ -86,7 +86,7 @@ def solve_steady_electric_3d(mesh: Mesh3D, *, electrical_conductivity,
     remaining faces are insulated through the natural boundary condition.
 
     Element arrays follow mesh.tets exactly. Pass joule_power_density (W/m^3)
-    through the heat solver's source callback on the same mesh. This solver uses NumPy/SciPy.
+    directly to the heat solver on the same mesh. This solver uses NumPy/SciPy.
     """
     refuse_text("electrical_conductivity", electrical_conductivity)
     refuse_text("prescribed_electric_potential", prescribed_electric_potential)
@@ -99,12 +99,12 @@ def solve_steady_electric_3d(mesh: Mesh3D, *, electrical_conductivity,
     sigma = _conductivity(mesh, electrical_conductivity)
 
     try:
-        gradients, volumes = tet_gradients(mesh)
+        gradients, volumes = _tet_gradients(mesh)
     except np.linalg.LinAlgError as exc:
         raise ValueError("electric mesh has a singular tetrahedron") from exc
     if np.any(volumes <= 0) or not np.all(np.isfinite(volumes)):
         raise ValueError("electric mesh must have positive finite tetrahedron volumes")
-    stiffness = assemble_stiffness_3d(mesh, sigma)
+    stiffness = _assemble_stiffness_3d(mesh, sigma)
     if not np.all(np.isfinite(stiffness.data)):
         raise ValueError("assembled electric stiffness exceeds floating-point range")
 

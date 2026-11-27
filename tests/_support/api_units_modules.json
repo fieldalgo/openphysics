@@ -8,6 +8,7 @@
       "galerkin.thermal3d",
       "galerkin.transient_heat",
       "galerkin.electric",
+      "galerkin.electric3d",
       "galerkin.electrostatics",
       "galerkin.joule_heating",
       "galerkin.temperature_joule_heating",

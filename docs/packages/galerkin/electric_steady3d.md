@@ -27,7 +27,7 @@ electric = solve_steady_electric_3d(
 thermal = solve_steady_heat_3d(
     mesh, thermal_conductivity=4.0,
     prescribed_temperature={int(i): 300.0 for i in mesh.boundary["x0"]},
-    heat_source_density=lambda centroids: electric.joule_power_density,
+    heat_source_density=electric.joule_power_density,
 )
 ```
 
@@ -36,7 +36,7 @@ thermal = solve_steady_heat_3d(
 | `electric_potential` | (N,) V in node order |
 | `electric_field`, `current_density` | (T, 3) V/m and A/m² |
 | `electrical_conductivity`, `joule_power_density` | (T,) S/m and W/m³ |
-| `terminal_current` | Face tag → A, positive into the body |
+| `inward_current` | Face tag → A, positive into the body |
 | `joule_power`, `inward_electric_power` | W integrated over the volume and W supplied by the terminals |
 
 The solver sums reactions from the assembled stiffness matrix at each terminal.
@@ -44,11 +44,25 @@ The supplied power is Σ Vₖ Iₖ, computed relative to a voltage datum per con
 component to avoid cancellation under a common voltage shift. For each
 tetrahedron the dissipated power density is J·E. All element values follow
 `mesh.tets` in its original order, and their volume-weighted sum is
-`joule_power`. The heat callback above returns this array on the same mesh
-without interpolation. Re-solve before using the array on changed geometry or
-after reordering elements.
+`joule_power`. The heat solver accepts that array directly on the same mesh.
+Re-solve the electric problem after changing the geometry or reordering elements.
+For a complete run with a convection-cooled terminal, see the
+[3D Joule heating example](../../../examples/galerkin/joule_heating_3d.py).
+The transfer is one-way and the electrical conductivity is independent of temperature.
 
 ## Validation
+
+- The [3D coupling regression](../../../tests/galerkin/test_joule_heating_3d_coupling.py)
+  uses a 20 mm bar with two equally long layers, conductivities 1 and 3 S/m,
+  thermal conductivities 1 and 2 W/(m K), and a 10 × 10 mm cross-section.
+  A 2 V drop gives 15 mA and 0.030 W. One end rejects heat to 300 K with
+  h = 100 W/(m² K), giving an analytical peak of 305.4375 K at the insulated end.
+  The test checks local source values in both materials, independent integration
+  at the cooled face, and temperature at nodes and element centroids across three meshes.
+- The [scikit-fem coupling comparison](../../../tests/galerkin/test_crosscheck_skfem_joule_heating_3d.py)
+  uses an electrode covering half an end face. Each solver independently computes the
+  voltage, the heat source and the temperature rise. The relative tolerance for those
+  fields, terminal power, volume heating and convective cooling is 10⁻⁹.
 
 - A 0.4 m × 0.2 m × 0.3 m bar with σ = 8 S/m and ΔV = 5 V has
   R = L/(σA) = 5/6 Ω, 6 A through the bar, and 30 W dissipated. Three
