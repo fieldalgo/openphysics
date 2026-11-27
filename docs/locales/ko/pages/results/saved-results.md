@@ -92,6 +92,7 @@ PVD 모음을 만듭니다. 보간하거나 다시 해석하지 않습니다. Pa
 | 전기 전도·Joule 가열 (`electric-joule2d-p1-v2`; 영역 `electric2d-p1-node-cell-regions-v2`, `electric-joule2d-p1-node-cell-regions-v2`, `electric-joule2d-temperature-p1-node-cell-regions-v2`) | VTU |
 | 직사각형 탄성·열탄성 (`mechanics2d-p1-v2`, `thermoelastic2d-p1-v2`), 변형률·응력은 이름 있는 성분 스칼라 | VTU |
 | 영역 탄성·열탄성 (`mechanics2d-p1-regions-v2`, `thermoelastic2d-p1-regions-v2`) | 아직 내보내지 않음(지원하지 않는 layout으로 거절); `fields.npz`를 읽음 |
+| 3D 구성 요소의 정상 열 (`thermal.steady3d`, `thermal3d-p1-node-tet-regions-v1`) | 아직 내보내지 않음(지원하지 않는 layout으로 거절); `fields.npz`를 읽음([배열](../packages/simcase/thermal_steady3d.md#결과)) |
 | 재료·손실 벽이 있는 공동 (`cavity3d-edge-complex-v2`) | VTU, 복소 장은 exp(−iωt)의 `_real`/`_imag` 쌍 |
 | 도파관 모드 (`em.modes2d`, `em-modes2d-p1-node-centroid-v2`) | 단일 지점은 VTU, sweep은 PVD(`export_sweep`); `node_coordinates`는 미터, 복소 모드는 exp(−iωt)의 `_real`/`_imag` 쌍; subspace sweep(`em-modes2d-subspace-raw-v2`)과 `field_layout` 없이 저장된 결과는 거절 |
 

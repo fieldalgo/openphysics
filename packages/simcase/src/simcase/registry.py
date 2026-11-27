@@ -29,7 +29,7 @@ from typing import Any, Callable
 #: Modules that register the built-in kinds when imported. Imported on first
 #: lookup, not here: they import ``schema``, which uses this module. The built-in
 #: provider ``openphysics-fem`` (``simcase.providers``) is these modules' kinds.
-BUILTIN_MODULES = ("electric_joule", "mechanics", "transient_thermal", "thermal", "cavity", "runner")
+BUILTIN_MODULES = ("electric_joule", "mechanics", "transient_thermal", "thermal", "thermal3d", "cavity", "runner")
 
 
 @dataclass(frozen=True)
@@ -78,6 +78,9 @@ class PhysicsKind:
     #: how the kind takes part in a multiphysics document (``simcase.multiphysics.CouplingHook``);
     #: internal to simcase in this release. None for a kind a multiphysics document refuses
     coupling: Any = None
+    #: the kind meshes ``3d`` geometry components itself (``simcase.geometry_engine3d``): the reader
+    #: does not compile its 3d component to the flat box form ``em.cavity3d`` reads
+    geometry_3d: bool = False
 
 
 _KINDS: dict[str, PhysicsKind] = {}

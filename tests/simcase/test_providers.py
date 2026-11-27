@@ -184,7 +184,8 @@ def test_a_fake_provider_adds_a_kind_a_document_runs_on(fresh):
     assert (echo.status, echo.version, echo.distribution, echo.kinds) == ("available", "1.0", "test-echo-dist",
                                                                           ("test.echo",))
     assert [k.name for k in registry.kinds()] == ["electric_joule", "mechanics", "thermal.transient2d",
-                                                  "thermal.steady2d", "em.cavity3d", "test.echo", "em.modes2d"]
+                                                  "thermal.steady2d", "thermal.steady3d", "em.cavity3d", "test.echo",
+                                                  "em.modes2d"]
     doc = Document.from_dict(_echo_document())
     assert doc.summary() == "echo count 2"
     assert isinstance(run(doc, verbose=False), _EchoResult)
