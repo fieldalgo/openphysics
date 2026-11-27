@@ -30,12 +30,13 @@ mesh arrays after meshing.
 from __future__ import annotations
 
 import bisect
+import math
 import re
 from dataclasses import dataclass, field
 from fractions import Fraction
 
-from .geometry_document import (_MISSING, PM_PER_M, Component, Feature, GeometryError, GeometryModel, _keys,
-                                _pick, _Reader, parse)
+from .geometry_document import (_MISSING, MESHER_RELATIVE_TOLERANCE, PM_PER_M, Component, Feature, GeometryError,
+                                GeometryModel, _keys, _pick, _Reader, parse, small_feature_error)
 
 __all__ = ["Complex3D", "Cell3D", "Face3D", "Mesh3DResult", "Mesh3DError", "evaluate3d", "display_complex3d",
            "build_mesh3d",
@@ -791,6 +792,70 @@ def _check_rounding(cx: Complex3D, comp: Component) -> None:
                 _refuse(f"{na} and {nb} round to the same coordinate {_metres(u)!r} m", path)
 
 
+def _check_small_pieces(cx: Complex3D, comp: Component) -> None:
+    """Refuse a piece of the arrangement below the mesher tolerance (the contract's "What the grid does
+    not fix": ``MESHER_RELATIVE_TOLERANCE`` of the component's bounding-box diagonal), as the parser
+    refuses a whole feature: the distance from a 2D vertex to a fine curve that does not end there
+    (a short curve, or a thin neck between two curves), the height of a slab between two z levels
+    that a meshed face spans, and the width (2 area / perimeter) of a meshed horizontal face. The
+    later feature whose part bounds the piece is named. Runs after ``_check_rounding``."""
+    dom = cx.domain
+    diag2 = sum((dom[f"{a}max"] - dom[f"{a}min"]) ** 2 for a in "xyz")
+    limit2 = Fraction(MESHER_RELATIVE_TOLERANCE) ** 2 * diag2
+    index = {f.id: i for i, f in enumerate(comp.features)}
+
+    def later(ids) -> str | None:
+        ids = sorted(set(ids) - {"domain"}, key=lambda i: index.get(i, -1))
+        return comp.features[index[ids[-1]]].name if ids else None
+
+    def plan_ids(engine_names):         # the 2D plan names its curves p<k>.<part>, k a prism index
+        out = set()
+        for n in engine_names:
+            fid = n.split(".", 1)[0]
+            out.add("domain" if fid == "domain" else cx.prisms[int(fid[1:])].feature_id)
+        return out
+
+    found = []                                  # (size^2, name)
+    rc = cx._plan
+    V = [(int(x.a), int(y.a)) for x, y in rc.vertices]
+    names_at = [set() for _ in V]
+    for k in rc.curves:
+        for v in (k.a, k.b):
+            names_at[v] |= set(k.provenance)
+    for k in rc.curves:
+        (ax, ay), (bx, by) = V[k.a], V[k.b]
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy
+        for v, (px, py) in enumerate(V):
+            if v in (k.a, k.b):
+                continue
+            t = Fraction((px - ax) * dx + (py - ay) * dy, L2)
+            t = min(max(t, Fraction(0)), Fraction(1))
+            ex, ey = ax + t * dx - px, ay + t * dy - py
+            d2 = ex * ex + ey * ey
+            if d2 < limit2:
+                found.append((d2, later(plan_ids(set(k.provenance) | names_at[v]))))
+    meshed = [f for f in cx.faces if _meshed(cx, f)]
+    for za, zb in zip(cx.levels, cx.levels[1:]):
+        if (zb - za) ** 2 < limit2 and any(f.axis != 2 and f.loops[0][0][2] <= za and
+                                           max(p[2] for p in f.loops[0]) >= zb for f in meshed):
+            prisms = [p for p in cx.prisms if za in p.bounds[4:] or zb in p.bounds[4:]]
+            found.append(((zb - za) ** 2, later({p.feature_id for p in prisms})))
+    for f in meshed:
+        if f.axis == 2:
+            perimeter = sum(math.dist(lp[i][:2], lp[(i + 1) % len(lp)][:2]) for lp in f.loops for i in range(len(lp)))
+            width = 2 * float(f.area) / perimeter
+            if width * width < limit2:
+                found.append((Fraction(width) ** 2, later({n.split(".", 1)[0] for n in f.provenance})))
+    if not found:
+        return
+    d2, name = min(found, key=lambda e: e[0])
+    size = math.sqrt(d2)
+    size = int(round(size)) if abs(size - round(size)) < 1e-9 * max(1.0, size) else float(f"{size:.4g}")
+    raise small_feature_error(f"geometry.components.{comp.name}", name or "domain", size, size / math.sqrt(diag2),
+                              located=True)
+
+
 @dataclass
 class _Handoff:
     points: list                    # (x, y, z) pm
@@ -1040,6 +1105,15 @@ def build_mesh3d(document, component: str | None = None) -> Mesh3DResult:
 def _build(document, component=None, *, through_meshloom: bool = False) -> Mesh3DResult:
     """``build_mesh3d``; ``through_meshloom`` (tests only) sends a lone slab ``layers`` feature through
     meshloom instead of refusing it for the extrude route."""
+    cx, comp, ho, info = _prepare(document, component, through_meshloom=through_meshloom)
+    result = _mesh(cx, comp, ho)
+    result.diagnostics.append(info)
+    return result
+
+
+def _prepare(document, component=None, *, through_meshloom: bool = False):
+    """Everything ``build_mesh3d`` does before meshloom: the complex, its checks and the hand-off.
+    Returns ``(complex, component, hand-off, I-MESH-ESTIMATE diagnostic)``."""
     data = getattr(document, "data", document)
     model = parse(data)
     comp = _pick(model, component)
@@ -1049,6 +1123,7 @@ def _build(document, component=None, *, through_meshloom: bool = False) -> Mesh3
         raise GeometryError(f"component {comp.name!r} has nothing to mesh: every cell is void (material null)",
                             path=f"geometry.components.{comp.name}")
     _check_rounding(cx, comp)
+    _check_small_pieces(cx, comp)
     ho = _handoff(cx, comp, opts)
     from physmat.units import Diagnostic
     low, high = ho.estimate * 4e-4, ho.estimate * 6e-4
@@ -1059,9 +1134,7 @@ def _build(document, component=None, *, through_meshloom: bool = False) -> Mesh3
         raise GeometryError(f"component {comp.name!r}: about {ho.estimate:.0f} tetrahedra from the element sizes "
                             f"(T = 6.3 sum(V/h^3)); the limit is {opts['element_count_limit']} "
                             "(mesh.element_count_limit)", path="mesh.element_count_limit", code="E-MESH-ESTIMATE")
-    result = _mesh(cx, comp, ho)
-    result.diagnostics.append(info)
-    return result
+    return cx, comp, ho, info
 
 
 def _mesh(cx: Complex3D, comp: Component, ho: _Handoff) -> Mesh3DResult:
