@@ -63,6 +63,16 @@ def solve_transient_heat_3d(mesh, *, thermal_conductivity, volumetric_heat_capac
     in seconds and returns one of those forms. Include every switch time in
     the time grid. Unspecified boundaries are insulated.
     """
+    return _solve_transient_heat_3d(
+        mesh, thermal_conductivity=thermal_conductivity, volumetric_heat_capacity=volumetric_heat_capacity,
+        time=time, initial_temperature=initial_temperature, prescribed_temperature=prescribed_temperature,
+        heat_source_density=heat_source_density, inward_heat_flux=inward_heat_flux, convection=convection,
+    )
+
+
+def _solve_transient_heat_3d(mesh, *, thermal_conductivity, volumetric_heat_capacity, time,
+                             initial_temperature, prescribed_temperature, heat_source_density,
+                             inward_heat_flux, convection, coupled_step=None):
     for name, value in (("thermal_conductivity", thermal_conductivity),
                         ("volumetric_heat_capacity", volumetric_heat_capacity), ("time", time),
                         ("initial_temperature", initial_temperature),
@@ -107,7 +117,8 @@ def solve_transient_heat_3d(mesh, *, thermal_conductivity, volumetric_heat_capac
     if not all(np.all(np.isfinite(a)) for a in (stiffness.data, mass.data, outward, ambient)):
         raise ValueError("assembled heat system exceeds floating-point range")
     return _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffness,
-                      robin, outward, ambient, 0.0 if heat_source_density is None else heat_source_density)
+                      robin, outward, ambient, 0.0 if heat_source_density is None else heat_source_density,
+                      coupled_step)
 
 
 def _source_load(mesh, value):
@@ -118,7 +129,7 @@ def _source_load(mesh, value):
 
 
 def _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffness,
-               robin, outward, ambient, source):
+               robin, outward, ambient, source, coupled_step):
     @lru_cache(maxsize=8)
     def factor(dt):
         matrix = (mass_free / dt + stiffness_free).tocsc()
@@ -132,7 +143,7 @@ def _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffn
     mass_free, stiffness_free = mass[free][:, free], stiffness[free][:, free]
     absolute_mass, absolute_stiffness = abs(mass), abs(stiffness)
     dynamic = callable(source)
-    load = None if dynamic else _source_load(mesh, source)
+    load = None if dynamic or coupled_step is not None else _source_load(mesh, source)
     temperature = np.empty((len(times), mesh.num_nodes))
     temperature[0] = initial
     stored = np.empty(len(times))
@@ -141,15 +152,32 @@ def _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffn
         raise ValueError("initial stored heat exceeds floating-point range")
     histories = {name: np.empty((len(steps), mesh.num_nodes)) for name in _RATES}
     shifted = initial - reference
-    delta = np.zeros(mesh.num_nodes)
     for i, dt in enumerate(steps):
-        if dynamic:
-            load = _source_load(mesh, source(float(times[i] + dt / 2)))
-        rhs = load - outward + ambient - stiffness @ shifted
-        if not np.all(np.isfinite(rhs)):
-            raise ValueError(f"nonfinite heat load on interval {i}")
-        if free.size:
-            delta[free] = factor(float(dt)).solve(rhs[free])
+        midpoint = float(times[i] + dt / 2)
+        conducted = stiffness @ shifted
+
+        def solve_increment(load):
+            rhs = load - outward + ambient - conducted
+            if not np.all(np.isfinite(rhs)):
+                raise ValueError(f"nonfinite heat load on interval {i}")
+            delta = np.zeros(mesh.num_nodes)
+            if free.size:
+                delta[free] = factor(float(dt)).solve(rhs[free])
+            return delta, rhs
+
+        if coupled_step is None:
+            if dynamic:
+                load = _source_load(mesh, source(midpoint))
+            delta, rhs = solve_increment(load)
+        else:
+            def trial(density):
+                trial_load = _source_load(mesh, density)
+                trial_delta, trial_rhs = solve_increment(trial_load)
+                next_temperature = shifted + trial_delta + reference
+                next_temperature[fixed] = initial[fixed]
+                return next_temperature, (trial_load, trial_delta, trial_rhs)
+
+            load, delta, rhs = coupled_step(i, midpoint, temperature[i], trial)
         storage = (mass @ delta) / dt
         residual = storage + stiffness @ delta - rhs
         shifted += delta

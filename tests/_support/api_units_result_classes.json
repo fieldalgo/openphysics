@@ -7,6 +7,7 @@
     {"module": "galerkin.thermal", "class": "AxisymmetricSteadyHeatResult", "reason": "returned by solve_steady_heat (axisymmetric)"},
     {"module": "galerkin.thermal3d", "class": "SteadyHeat3DResult", "reason": "returned by solve_steady_heat_3d"},
     {"module": "galerkin.transient_heat3d", "class": "TransientHeat3DResult", "reason": "returned by solve_transient_heat_3d"},
+    {"module": "galerkin.transient_joule_heat3d", "class": "TransientJouleHeat3DResult", "reason": "returned by solve_transient_joule_heat_3d"},
     {"module": "galerkin.transient_heat", "class": "TransientHeatResult", "reason": "the common base of the two transient heat results (no constructor of its own)"},
     {"module": "galerkin.transient_heat", "class": "PlanarTransientHeatResult", "reason": "returned by solve_transient_heat (cartesian)"},
     {"module": "galerkin.transient_heat", "class": "AxisymmetricTransientHeatResult", "reason": "returned by solve_transient_heat (axisymmetric)"},
