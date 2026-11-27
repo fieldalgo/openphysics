@@ -3447,7 +3447,7 @@ try {
     // field says why; it stays after another notice (group index ticked) and goes with the closed window
     const openRadio = 'document.querySelector(\'input[name="outer-boundary"][value="open"]\')';
     const l4Read = async () => ({modes: await r.eval("document.getElementById('mode-count-number')?.value??null"), open: await r.eval(openRadio + '?.checked??null'),
-      message: await rText('#file-status'), note: await r.eval("document.getElementById('mode-count-back-note')?.textContent??null"), items: (await runItems()).length});
+      message: await rText('#file-status'), note: await r.eval("document.getElementById('mode-count-back-note')?.textContent??null")});
     await rTree('Optical modes', '!!' + openRadio);
     const l4 = {before: await l4Read()};
     await r.click('input[name="outer-boundary"][value="open"]');
@@ -3460,6 +3460,8 @@ try {
     await r.click('input[name="outer-boundary"][value="closed"]');
     await r.until("document.querySelector('input[name=\"outer-boundary\"][value=closed]').checked&&document.getElementById('file-status').textContent.startsWith('Closed window: ')", 'L4 closed window');
     l4.closed = await l4Read();
+    // nothing runs: the run list (shown on Results) still holds the three runs
+    await r.click('nav [data-page=Results]'); await r.until("!!document.getElementById('modes-table')", 'L4 Results'); l4.items = (await runItems()).length;
     stage('R35 L4 dialog path then Open boundary', l4);
     const L4_OPEN = "Open boundary: a PML of 1 µm outside every edge; loss includes leakage. Close single edges in Geometry › Boundaries. Modes to find back to 2: 4 was for the closed window's search near 2.46.";
     const L4_NOTE = "Back to 2 with Open boundary: 4 was for the closed window's search near 2.46.";
@@ -3469,7 +3471,7 @@ try {
     assert.deepEqual([l4.group.modes, l4.group.open, l4.group.note], ['2', true, L4_NOTE]);
     assert.ok(!l4.group.message.includes('Modes to find back to'), l4.group.message);
     assert.deepEqual([l4.closed.modes, l4.closed.open, l4.closed.note], ['2', false, null]);
-    for (const v of Object.values(l4)) assert.equal(v.items, d2.after.items, 'L4: nothing runs');
+    assert.equal(l4.items, d2.after.items, 'L4: nothing runs');
     // round 28 (G3): Run 3 has the shortcut's results. Run 1 shown, Highest n_eff and Modes to find 2
     // again (P02's T22): asked again, the first button names Run 3; it sets the shortcut and shows
     // Run 3 under Results, running nothing (the panel button's "No need to run"); the dialog's role,
