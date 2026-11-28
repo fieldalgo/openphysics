@@ -367,7 +367,9 @@ tetrahedra, 4 regions.*라고 말하고, 페이지가 메시 통계를 나열하
 `selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은
 선택으로 만들지 않고 그렇게 말합니다. **Use for → Fixed temperature**는 서버 검사를 거친 뒤 면의 이름(가장 나중 특징의 단독
 이름, 예: `via.z1`, `stack.top.top`)에 300 K를 씁니다: 열 종류가 거부하는 면(안쪽 면)은 쓰지 않고, Messages가 종류의 말(*Fixed
-temperature needs an outer face; via.z1 is inside*)을 보이며 문서는 그대로입니다.
+temperature needs an outer face; via.z1 is inside*)을 보이며 문서는 그대로입니다. 쓴 고정 온도는 Settings에서 제 노드를
+**Temperature**에 초점을 둔 채 열고, Messages는 나중 값을 따라갑니다(*Fixed temperature 310 K on stack.top.top.*). select 옆의
+칸에는 **Selection name** 또는 **Boundary name** 이름표가 붙습니다.
 
 **Heat transfer (3D).** 그 페이지는 문서의 `physics.heat` 블록(종류 `thermal.steady3d`, [그 종류](thermal_steady3d.md))을
 편집합니다: 경계 이름에 **Add fixed temperature**(1–2000 K, `"300 K"`로 씀), 메시 영역에 **Add heat source**(−1e15 ~ 1e15
