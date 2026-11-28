@@ -172,8 +172,10 @@ vertex normals.
   at ±√(r² − d²); a sphere cut at d < r a circle of ρ = √(r² − d²).
 - The check (`check_view_shapes`) answers the features' coverage from exact volumes (a via is
   `full`; in C11 each sphere but the innermost is `partial`, "covered in part by" the inner ones),
-  the regions with exact volumes, no selections, and slice 3's estimate under `mesh`
-  (route `builder`).
+  the regions with exact volumes, no selections, slice 3's estimate under `mesh`
+  (route `builder`), and `run` as for boxes and layers (below): on card 2, `{"ok": true}`; a fixed
+  temperature on `via.side` gives *Fixed temperature needs an outer face; via.side is inside*
+  (E-CONTRACT).
 - **Mesh** and **Run** take these components: the mesh job's child maps each boundary or interface
   triangle of the builder's mesh to the display face whose name set equals the set of provenance
   names that hold that triangle (`route: "builder"`).

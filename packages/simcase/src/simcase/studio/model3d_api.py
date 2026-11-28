@@ -361,16 +361,20 @@ def check_view(doc: dict, component: str | None = None) -> dict:
         mesh = {"ok": True, "estimate": mesh3d_jobs.estimate(doc, cx.component), "key": mesh3d_jobs.reuse_key(doc)}
     except GeometryError as exc:
         mesh = _refusal(exc)
-    # whether Run would take the document: the run route's own reading, in the reader's words
-    try:
-        heat3d_runs.read_document(doc)
-        run = {"ok": True}
-    except heat3d_runs.Refused as exc:
-        run = {"ok": False, "refused": exc.message, "code": exc.extra.get("code")}
     return {"ok": True, "component": cx.component, "unit": str(comp.length_unit),
             "features": _coverage(comp, cx), "regions": display["regions"],
             "parameters": _parameters(doc, model, cx.component),
-            "selections": display["selections"], "display": display, "mesh": mesh, "run": run}
+            "selections": display["selections"], "display": display, "mesh": mesh, "run": _run_part(doc)}
+
+
+def _run_part(doc: dict) -> dict:
+    """Whether Run would take the document: the run route's own reading (``heat3d_runs.read_document``),
+    ``{"ok": true}`` or the reader's refusal in its own words and code. It starts nothing."""
+    try:
+        heat3d_runs.read_document(doc)
+        return {"ok": True}
+    except heat3d_runs.Refused as exc:
+        return {"ok": False, "refused": exc.message, "code": exc.extra.get("code")}
 
 
 def _refusal(exc: GeometryError) -> dict:
@@ -589,8 +593,9 @@ def _coverage_shapes(comp, shapes) -> list:
 def check_view_shapes(doc: dict, component: str | None = None) -> dict:
     """``check_view`` of a component whose cylinders or spheres are in a meshloom builder shape: features
     with their coverage from the exact volumes, regions with exact volumes, parameters, the display
-    answer (``display_shapes3d``) and ``mesh``: slice 3's estimate (``simcase.estimate_mesh3d``, route
-    ``builder``) with the reuse key, or the refusal that blocks meshing."""
+    answer (``display_shapes3d``), ``mesh``: slice 3's estimate (``simcase.estimate_mesh3d``, route
+    ``builder``) with the reuse key, or the refusal that blocks meshing, and ``run`` as ``check_view``
+    answers it."""
     model, comp, shapes = shapes_of(doc, component)
     display = _display_shapes(model, comp, shapes)
     try:
@@ -600,7 +605,7 @@ def check_view_shapes(doc: dict, component: str | None = None) -> dict:
     return {"ok": True, "component": shapes.component, "unit": str(comp.length_unit),
             "features": _coverage_shapes(comp, shapes), "regions": display["regions"],
             "parameters": _parameters(doc, model, shapes.component),
-            "selections": [], "display": display, "mesh": mesh}
+            "selections": [], "display": display, "mesh": mesh, "run": _run_part(doc)}
 
 
 # ----------------------------------------------------------------------------- the routes
