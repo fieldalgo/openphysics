@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,cutColor} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 import {NEEDS_TWO,SAME_INPUTS,compareRows,heatRateNote,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
@@ -307,9 +307,9 @@ export function createModel3dView(ctx){
    `<input id="m3-section-at" aria-label="section position" inputmode="decimal" value="${esc(section?.at??'')}"><span class="m3-unit" id="m3-section-unit">${esc(shownUnit(comp.length_unit))}</span><button type="button" id="m3-section-go">Apply</button>${cutShown?cutLink('m3-section-csv'):''}</span>`+
    `<span class="m3-pane" role="group" aria-label="Shown"><button type="button" data-m3-pane="geometry" aria-pressed="${!onMesh&&!onResult}">Geometry</button><button type="button" data-m3-pane="mesh" aria-pressed="${onMesh}"${mesh.view?'':' disabled title="Mesh first"'}>Mesh view</button>`+
    `<button type="button" data-m3-pane="result" aria-pressed="${onResult}"${heat.records.length?'':' disabled title="Run first"'}>Result</button></span></div>`+
+   (onResult?colourBar(heat.records[heat.shown]):'')+(cutShown?cutBar():'')+      // V8: the legends above the view, in sight
    `<div class="m3-stage${refused&&!onMesh&&!onResult?' stale':''}${(onMesh&&stale)||resultStale?' stale':''}"><div id="m3-canvas-slot"></div>${refused&&lastGood&&!onMesh&&!onResult?'<p class="m3-last">Last shape that could be formed</p>':''}`+
    `${onMesh&&stale?'<p class="m3-last">Mesh of an earlier geometry; mesh again to update it</p>':''}${resultStale?`<p class="m3-last">Run ${heat.shown+1}: inputs changed since this run</p>`:''}</div>`+
-   (onResult?colourBar(heat.records[heat.shown]):'')+(cutShown?cutBar():'')+
    `<section class="m3-faces"><h3 id="m3-faces-heading">Faces</h3><ul id="m3-faces" aria-labelledby="m3-faces-heading"></ul></section>`+
    `<section class="m3-names" id="m3-names" aria-live="polite"></section>`+
    `<p class="muted">Lengths in ${esc(shownUnit(comp.length_unit))}. A face's names say which surface of which feature it lies on.</p>`;
@@ -364,12 +364,12 @@ export function createModel3dView(ctx){
   for(const k of ['temperature_min','temperature_max'])if(ext[k]?.node===values[k]?.node)out[k]={...values[k],regions:ext[k].regions};
   return out;
  }
- function ramp(lo,hi){const mid=(lo+hi)/2;
-  return [lo,mid,hi].map(t=>`rgb(${temperatureColor(t,lo,hi).map(c=>Math.round(c*255)).join(',')})`).join(',');}
+ function ramp(lo,hi,color=temperatureColor){
+  return [0,0.25,0.5,0.75,1].map(u=>lo+(hi-lo)*u).map(t=>`rgb(${color(t,lo,hi).map(c=>Math.round(c*255)).join(',')})`).join(',');}
  /** U5: the cut's legend, over its own colour range. */
  function cutBar(){
   const c=heat.cut.answer,lo=c.temperature_min.value,hi=c.temperature_max.value,text=cutLegend({...c,axis:heat.cut.axis,at:heat.cut.at},heat.records[heat.cut.run].surface.unit);
-  return `<div class="m3-colourbar m3-cut-bar" id="m3-cut-bar" role="img" aria-label="${esc(text)} (blue to red)"><span class="m3-cb-title">${esc(text.slice(0,text.indexOf(':')))}</span><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${ramp(lo,hi)})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`;
+  return `<div class="m3-colourbar m3-cut-bar" id="m3-cut-bar" role="img" aria-label="${esc(text)} (blue to red)"><span class="m3-cb-title">${esc(text.slice(0,text.indexOf(':')))}</span><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${ramp(lo,hi,cutColor)})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`;
  }
  /** U5: the shown cut as CSV (the server's export, columns in metres), saved under the model's and the plane's name. */
  function cutLink(id){const live=heat.live[heat.cut.run];

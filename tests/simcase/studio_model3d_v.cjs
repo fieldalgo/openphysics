@@ -92,3 +92,15 @@ test('V3: the estimate refusal gives the smallest accepted size and a size that 
  const rows=M.treeRows(card,{features:[{text:''},{text:''}],regions:[1],display:{faces:[]},mesh:OFF},null,null);
  assert.equal(rows.find(r=>r.key==='mesh').note,'too fine');
 });
+
+test('V8: the cut has a saturated map with the surface\'s ends; colours are converted from sRGB for the renderer',()=>{
+ assert.deepEqual(M.cutColor(0,0,1),M.temperatureColor(0,0,1),'the cold end is the surface map\'s');
+ assert.deepEqual(M.cutColor(1,0,1),M.temperatureColor(1,0,1),'the hot end is the surface map\'s');
+ const sat=c=>{const mx=Math.max(...c),mn=Math.min(...c);return mx?(mx-mn)/mx:0;};
+ for(let i=0;i<=20;i++)assert.ok(sat(M.cutColor(i/20,0,1))>=0.5,`saturated at ${i/20}: ${M.cutColor(i/20,0,1)}`);
+ assert.ok(sat(M.temperatureColor(0.5,0,1))<0.05,'the surface map keeps its light centre');
+ // sRGB → linear (the renderer converts linear vertex colours back to sRGB on output)
+ assert.equal(M.srgbToLinear(0),0);assert.equal(M.srgbToLinear(1),1);
+ assert.ok(Math.abs(M.srgbToLinear(0.5)-0.21404)<1e-5);
+ assert.ok(Math.abs(M.srgbToLinear(0.04)-0.04/12.92)<1e-12);
+});

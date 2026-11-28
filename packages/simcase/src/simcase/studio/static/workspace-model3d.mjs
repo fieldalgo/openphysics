@@ -585,6 +585,15 @@ export function temperatureColor(t,tmin,tmax){
  return STOPS[i].map((c,k)=>Number((c+(STOPS[i+1][k]-c)*f).toFixed(3)));
 }
 const sig=(v,n=6)=>Number(Number(v).toPrecision(n));
+/** V8: the cut's map: the surface map's blue and red ends through cyan, green, amber and orange, saturated all the way
+ * (a cut's temperatures often cluster mid-range, where the surface map's light centre reads as white). */
+const CUT_STOPS=[STOPS[0],[0.100,0.600,0.850],[0.200,0.720,0.400],[0.950,0.800,0.200],[0.920,0.450,0.120],STOPS[2]];
+export function cutColor(t,tmin,tmax){
+ const u=tmax>tmin?Math.min(1,Math.max(0,(t-tmin)/(tmax-tmin))):0.5,n=CUT_STOPS.length-1,x=u*n,i=Math.min(n-1,Math.floor(x)),f=x-i;
+ return CUT_STOPS[i].map((c,k)=>Number((c+(CUT_STOPS[i+1][k]-c)*f).toFixed(3)));
+}
+/** V8: an sRGB component (0–1) as linear light: three.js treats vertex colours as linear and converts to sRGB on output. */
+export const srgbToLinear=c=>c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4;
 const sci=v=>Math.abs(v)<1e-3&&v!==0?Number(v).toPrecision(3):String(sig(v));
 /** The values table of a run: [label, text] rows. */
 export function valuesRows(values,unit,{expected=null}={}){

@@ -532,7 +532,11 @@ surface temperature, blue at the minimum and red at the maximum, with its colour
 temperature* (its range is the surface's, which can be narrower than the whole model's in the table); the toolbar's
 **Section** (x, y or z = a position in the component's unit, shown beside the box) clips the geometry view and, on a result,
 draws the exact cut of the run's field (*Cut z = 505 µm: 833.653–939.105 K.*), coloured over the cut's
-own range with a legend of its own under the surface's (*Cut z = 505 µm*, its minimum and maximum).
+own range in a saturated map of its own (blue, cyan, green, amber, red: a cut's temperatures often sit
+mid-range, where the surface map's light centre reads as white), with its legend (*Cut z = 505 µm*, its
+minimum and maximum) under the surface's; both legends sit above the view, in sight. The colours are
+handed to the renderer as linear light, so the drawn colours are the map's (before, they were lifted
+toward white).
 Beside **Apply**, **Cut (CSV)** saves that cut as *via-in-a-layer-stack-3d-heat-cut-z-505um.csv* (the
 model's name, the plane and the position; the columns stay in metres) and Messages says *Cut (CSV)
 saved as …*. A result whose inputs

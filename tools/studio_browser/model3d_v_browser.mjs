@@ -34,6 +34,9 @@
 //      (the smallest the limit takes, and one estimated at about a minute, each with its estimate);
 //      the check at the minute size answers the refusal's tetrahedra and at most 60 s; the tree's Mesh 1
 //      note reads "too fine": 3/3. All numbers are the server's at test time.
+//  V8  card 1 (300 K on z0 and z1), Run, Section z = 505, view +z zoomed (6 × +): the cut's pixels (every one) reach the colour
+//      map's blue and red ends within 12/255 per channel; their mean HSV saturation is ≥ 0.25; the cut's
+//      legend is in view without scrolling at 1440 × 900: 3/3. Screenshots: v8-surface.png, v8-cut.png.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -299,6 +302,41 @@ try {
     record('V3', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, shown,
       server: {suggested_size: mesh.suggested_size, suggested_tetrahedra: mesh.suggested_tetrahedra, suggested_seconds: mesh.suggested_seconds,
         suggested_minute: mesh.suggested_minute, minute_tetrahedra: mesh.minute_tetrahedra, minute_seconds: mesh.minute_seconds}, there: there.estimate});
+    await ctx.close();
+  }
+  // ---- V8: the cut drawn in its colour map (not near white); its legend beside the view ----
+  if (want('V8')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card]');
+    const doc = structuredClone(CARD); doc.physics.heat.prescribed_temperature = {z0: '300 K', z1: '300 K'};
+    await openFile(page, 'v8.json', session(doc)); await checked(page);
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    await page.screenshot({path: join(out, 'v8-surface.png')});
+    await page.selectOption('#m3-section-axis', 'z'); await page.fill('#m3-section-at', '505'); await page.click('#m3-section-go');
+    await page.waitForSelector('#m3-cut-bar', {timeout: 30000});
+    await page.click('[data-m3-view="+z"]'); await page.focus('#m3-result-canvas');
+    for (let i = 0; i < 6; i++) await page.keyboard.press('+');                 // zoom in: the cut fills the view
+    await page.waitForTimeout(400);
+    await page.screenshot({path: join(out, 'v8-cut.png')});
+    const px = await page.evaluate(async () => {
+      const M = await import('/workspace-assets/workspace-model3d.mjs');
+      const c = document.getElementById('m3-result-canvas'), w = c.width, h = c.height;
+      const t = document.createElement('canvas'); t.width = w; t.height = h; const g = t.getContext('2d'); g.drawImage(c, 0, 0);
+      const d = g.getImageData(0, 0, w, h).data, bg = [0xfb, 0xfc, 0xfd], pts = [];
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = 4 * (y * w + x), p = [d[i], d[i + 1], d[i + 2]];
+        if (Math.max(...p.map((v, k) => Math.abs(v - bg[k]))) > 6) pts.push(p); }
+      const sat = p => { const mx = Math.max(...p), mn = Math.min(...p); return mx ? (mx - mn) / mx : 0; };
+      const ends = [M.temperatureColor(0, 0, 1), M.temperatureColor(1, 0, 1)].map(c => c.map(v => Math.round(v * 255)));
+      const dist = (p, e) => Math.max(...p.map((v, k) => Math.abs(v - e[k])));
+      const near = e => pts.reduce((m, p) => Math.min(m, dist(p, e)), 255);
+      const best = e => pts.reduce((b, p) => dist(p, e) < dist(b, e) ? p : b, pts[0]);
+      const bar = document.getElementById('m3-cut-bar').getBoundingClientRect(), cv = c.getBoundingClientRect();
+      return {bestHot: best(ends[1]), bestCold: best(ends[0]), n: pts.length, meanSat: pts.reduce((s, p) => s + sat(p), 0) / Math.max(1, pts.length), ends, nearCold: near(ends[0]), nearHot: near(ends[1]),
+        legendInView: bar.top < innerHeight && bar.bottom <= innerHeight, legendBeside: bar.top < cv.bottom && bar.left >= cv.right - 1 || (bar.top >= cv.top && bar.top <= cv.bottom + 40),
+        bar: [bar.left, bar.top, bar.right, bar.bottom].map(Math.round), canvas: [cv.left, cv.top, cv.right, cv.bottom].map(Math.round), inner: innerHeight}; });
+    const rows = [px.n > 100 && px.nearCold <= 12 && px.nearHot <= 12, px.meanSat >= 0.25, px.legendInView];
+    record('V8', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, ...px});
     await ctx.close();
   }
 } finally {
