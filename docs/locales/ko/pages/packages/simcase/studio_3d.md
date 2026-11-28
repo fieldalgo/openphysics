@@ -7,7 +7,7 @@
 상태: **실험적.** 3D 보기는 버전 1 형상 문서([계약](geometry_document.md))의 `3d`
 구성 요소를 `/geometry-lab`의 [형상 실험실](geometry_lab.md) 페이지에서 보여 줍니다.
 읽기 전용이며, 5단계 엔진(`simcase.geometry_engine3d`)이 받는 것, 곧 상자와 `layers`
-기능의 슬래브 층만 받으며, 이를 메시할 수 있습니다([메시](#메시)). 모델 작업 공간에는
+기능의 슬래브 층만 받으며, 이를 메시하고([메시](#메시)) 서버에서 3D 정상 열을 풀 수 있습니다([실행](#실행)). 모델 작업 공간에는
 아직 나오지 않습니다. 페이지, 조작, HTTP 응답은 어느 릴리스에서든 바뀔 수 있습니다.
 
 ## 사용
@@ -91,6 +91,46 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
   1)의 최솟값과 중앙값입니다. 이 품질은 meshloom 검증이 쓰는 척도입니다
   ([meshloom](../meshloom/overview.md)). meshloom의 `stats`에는 사면체별 품질이 없어
   Studio가 메시에서 q를 계산합니다.
+- **경로**는 `thermal.steady3d` 종류의 것입니다(`simcase.build_thermal3d_mesh`). 판 `layers` 피처
+  하나만 가진 구성 요소(E1)는 `meshine.extrude`로, 그 밖에는 `simcase.build_mesh3d`로 메시합니다.
+  추정은 정확한 복합체의 T입니다(`estimate_mesh3d`).
+
+## 실행
+
+`POST /api/model3d/run`은 `thermal.steady3d` 문서([3D 정상 열](thermal_steady3d.md))를 서버에서 풀고
+값, 겉면 지도, 단면, 탐침을 응답합니다. 사면체와 해는 서버 밖으로 나가지 않습니다.
+
+- **프로세스 전에 거부**합니다. 읽기 또는 추정의 문구 그대로입니다: `thermal.steady3d` 항목 하나가 아닌
+  문서, 이 종류의 읽기가 거부하는 문서(그 코드와 함께), `mesh.element_count_limit`를 넘는 메시 추정.
+- **두 단계.** `mesh`: 구성 요소에 보관한 메시의 재사용 키가 같으면 바로 씁니다(`reused: true`, 프로세스
+  없음). 아니면 [메시](#메시) 작업 그 자체를 자식 프로세스에서 돌리고, **Mesh**처럼 그 구성 요소의 메시로
+  보관합니다. `solve`: 서버 스레드에서 `simcase.mesh3d_from_arrays`로 되읽은 보관 메시에
+  `simcase.solve_thermal3d`를 돌리므로([이미 있는 메시에서](thermal_steady3d.md#이미-있는-메시에서)) 결과가
+  `simcase.run`과 비트까지 같습니다. 상태는 메시 작업과 같은 필드입니다: `steps` `mesh`, `solve`, `done`
+  가운데 `step`, 경과·예상 시간, `longer_than_estimate`, `route`.
+- **한 번에 실행 하나**, 메시 작업이 도는 동안에도 실행하지 않습니다. 자식 프로세스 자리를 같이 씁니다(429,
+  "Studio is already running one 3D heat model; wait for it or cancel it." 또는 메시 작업의 문구).
+- **Cancel**은 mesh 단계에서 **Cancel meshing**처럼 자식 프로세스를 끝냅니다. 풀이는 중단할 수 없으므로
+  solve 단계의 Cancel은 실행을 취소로 표시하고("Run cancelled; nothing kept.") 풀이가 돌아오면 결과를
+  버립니다.
+- **고정 온도가 없는 연결된 영역 묶음**은 galerkin의 검사(사면체 모서리의 연결 성분)에서 영역 이름을 들어
+  거부합니다: "Fixed temperature is missing on the connected group of regions 'B': each connected group of
+  regions needs one (galerkin: each connected component of the mesh needs a Dirichlet node)". 내부 면의 고정
+  온도는 읽기가 거부합니다("Fixed temperature needs an outer face; …").
+
+응답(`/api/model3d/runs/{run}/…`; 위치는 보기의 `origin_m`에서 잰 float32, 요청의 길이는 단면처럼 구성
+요소의 단위):
+
+| 경로 | 응답 |
+|---|---|
+| `values` | `heat_rate_by_selection`(`prescribed_temperature` 이름마다 W: 그 노드의 `reaction_heat_rate` 합, 두 이름이 고정한 노드는 앞 이름에), `total_source`, `balance_residual`(바깥으로 나간 열에서 열원을 뺀 W)과 `relative_balance_residual`, 노드·위치·영역이 붙은 `temperature_min`과 `temperature_max`, 메시 통계, 경로, 재사용 키, `document_sha256`(정규화한 문서의 해시) |
+| `surface` | 메시 응답의 면, 영역, 위치, 삼각형과 면 id, 그 노드의 `temperature`(float32) |
+| `cut {axis, at}` | 평면에 의한 정확한 P1 절단: 사면체마다 평면 위 노드와 모서리 교점, 교점의 T는 그 모서리에서 보간; 평면에 놓인 면은 한 번만; 삼각형은 +축을 봅니다 |
+| `probe {point}` | 점을 담은 사면체에서 P1 보간 T, 영역, 무게중심 좌표; 메시한 영역 밖이면 거부 |
+| `export/cut.csv?axis=&at=` | `# cut plane: z = 1.2345 mm (0.0012345 m)`, `# run: …`, `# document_sha256: …` 다음에 `x_m,y_m,z_m,temperature_K`(float64, `repr`) |
+| `export/surface.csv` | 겉면 노드, `x_m,y_m,z_m,temperature_K,face`(노드의 첫 삼각형이 속한 면의 provenance 이름), 같은 머리 줄 |
+| `export/run.json` | `{values, document}` |
+| `record?maps=kept` | 실행 기록 `thermal-steady3d-run-v1`: `document`, `document_sha256`, `values`, `mesh`, `maps`(`kept`이면 `surface`, `not kept`이면 그 개수; [멀티피직스 실행의 maps](workspace.md)와 같음) |
 
 ## 보내는 것과 응답
 
@@ -194,6 +234,12 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 | W8 | 취소: 실제 서버 프로세스에서 추정 60초 이상인 메시 작업(카드를 0.28 µm로: 약 69초)을 시작 3초 뒤 취소 | 취소 2초 뒤 자식 프로세스가 끝남, 결과를 남기지 않음, 서버 RSS가 전과 50 MB 안 | 모두 성립 | 모두 성립, 3번 중 3번(RSS +0.2 MB, 남은 파일 없음) | `tests/simcase/test_studio_mesh3d_job.py`, CI job `studio-mesh3d-w8`(main push와 수동 dispatch) |
 | W9 | 추정: 한도의 0.5배, 0.99배, 1.5배인 카드 | 메시 전에 `I-MESH-ESTIMATE`로 답함, 1.5배 문서는 프로세스 시작 전에 거부 | 3/3 | 3/3 | `tests/simcase/test_studio_mesh3d_job.py` |
 | W12(메시 보기) | 1440 × 900과 390 × 844에서 카드의 첫 메시 보기: 콘솔 오류 없음, CSP 위반 없음, 메시 캔버스가 보이고 비어 있지 않음, 390에서 가로 스크롤 없음, Tab으로 면 목록에 닿음, 화면 저장 | 모두 성립 | 모두 성립(면 목록까지 Tab 5번) | `tools/studio_browser/model3d_mesh_browser.mjs` |
+| W6-E1 | E1(판 층 셋, 압출 경로)을 `POST /api/model3d/run`으로 푼 것과 `meshine.extrude` + `galerkin.solve_steady_heat_3d`를 직접 부른 것: 노드, 사면체, 온도, 반작용 열유량의 SHA-256 | 같음 | 같음 | `tests/simcase/test_studio_heat3d_run.py` |
+| W6-card | `layer-stack-3d` 카드(meshloom 경로, 비아 열원)를 경로로 푼 것과 `build_mesh3d` + `solve_steady_heat_3d`를 직접 부른 것: 같은 SHA-256 | 같음 | 같음 | 같은 곳 |
+| W7 | 경로로 푼 E1과 `refsol.thermal3d.layered_slab`(P1에서 정확): 노드 최대 \|T_h − T\|; 윗면 열유량(`heat_rate_by_selection.z1`)의 상대 오차 | ≤ 1e-10; ≤ 1e-9 | 1.4e-12 K; 2.5e-11 | 같은 곳 |
+| W17 | E1의 단면과 유리수 산술(`fractions.Fraction`)로 계산한 정확한 P1 절단: 같은 점, 최대 \|T − T_exact\|; 평면 여섯(1 mm 경계면의 z, z = 1.2345 mm, x = 3.3, y = 7.1, 면 x = 0과 z = 2.5 mm), 압출·meshloom 경로, 경로를 거친 z = 1.2345 mm의 `cut.csv` | ≤ 1e-12 K | 최악 2.8e-14 K(노드 평면에서 0) | `tests/simcase/test_studio_heat3d_slice.py`, `test_studio_heat3d_run.py` |
+| W8-run | 실행의 mesh 단계에서 Cancel: 11 µm의 열 카드(추정 약 69초)를 실제 서버 프로세스에서 실행 시작 3초 뒤 취소 | Cancel 2초 뒤 자식 종료; 실행은 취소, 남긴 것 없음; 파일 없음 | 모두 만족 | `tests/simcase/test_studio_heat3d_run.py`, CI 작업 `studio-mesh3d-w8` |
+| W14(실행) | 서버 쪽 겉면 지도와 z 단면의 시간과 크기 | 기록 | 아래 | `tests/simcase/test_studio_heat3d_run.py`(가장 큰 것은 `OPENPHYSICS_STUDIO_W14=1`) |
 | W14 | 사면체 약 48,000개인 카드와 겉면 삼각형 150,000개에서 성능: 메시 응답 시간, 메시 보기 프레임 시간(120 프레임 중앙값), 탭 JS 힙 | 기록, 하드웨어 GL Chromium에서 관문: 힙 300 MB 이하, 프레임 중앙값 33 ms 이하 | 아래 기록, 관문은 **돌리지 않음**(소프트웨어 GL만) | 같음 |
 
 W14는 2026-11-27에 Linux의 headless Chromium 158(Xeon 2.1 GHz, CPU 4개, GPU 없음)에서
@@ -228,6 +274,18 @@ node tools/studio_browser/model3d_view_browser.mjs http://127.0.0.1:8765 out-dir
 node tools/studio_browser/model3d_mesh_browser.mjs http://127.0.0.1:8765 out-dir-mesh
 ```
 
+W14(실행), 2026-11-28 Linux(Xeon 2.1 GHz, CPU 4개)에서 TestClient로 기록:
+
+| 경우 | 실행(메시와 풀이) | 겉면 지도 | z = 505 µm 단면 |
+|---|---|---|---|
+| 열 카드, 40 µm: 사면체 6,774 | 2.1초 | 3 ms, 0.10 MB | 24 ms, 0.05 MB |
+| 열 카드, 6.4 µm(추정 586,395, 한도 아래 가장 큼): 사면체 468,472 | 126초 | 13 ms, 1.77 MB | 123 ms, 0.30 MB |
+
+실행 테스트는 프로세스 전 거부(종류가 아님, 읽기의 거부, 추정 한도), 429, 프로세스 없는 보관 메시 재사용(E1의
+**Mesh** 뒤에도), 영역 이름으로 거부하는 고정 온도 없는 묶음, 정확한 판과 비교한 탐침(1e-10 K)과 영역 밖 탐침,
+값, 내보내기 머리 줄, 기록도 확인합니다. `tests/simcase/test_studio_heat3d_process.py`(platform-install, Linux,
+macOS, Windows)는 HTTP 없이 mesh 단계의 실행을 취소합니다.
+
 ## 한계
 
 - 5단계 slice 1처럼 상자와 슬래브 층만, 읽기 전용(3D에서 기능 편집 없음).
@@ -236,7 +294,11 @@ node tools/studio_browser/model3d_mesh_browser.mjs http://127.0.0.1:8765 out-dir
   것이고, meshloom 안의 진행은 보여 줄 수 없습니다.
 - 보관한 메시는 서버 메모리에 있고 서버와 함께 사라집니다. 모델 작업 공간은 아직 메시를
   보여 주지 않습니다.
-- `layers` 기능 하나만 가진 구성 요소(E1)는 `meshine.extrude`로 메시하고
+- 실행의 풀이는 중단할 수 없습니다. 풀이 중 Cancel은 풀이가 돌아오면 결과를 버립니다. 최근 실행 여덟 개의
+  메시, 해, 응답을 메모리에 둡니다.
+- meshloom builder 모양(원통, 구)의 구성 요소는 3D 보기가 보여 주지 않으므로 Mesh와 Run이 형성 단계에서 보기의
+  문구로 거부합니다.
+- `layers` 기능 하나만 가진 구성 요소(E1)는 (Mesh와 Run 모두) `meshine.extrude`로 메시하고
   `evaluate3d`는 거부합니다. 보기는 공개 함수 `simcase.display_complex3d`에서 복합체를
   받으며, 이 함수는 그런 구성 요소에 meshloom 경로가 만들 복합체를 만듭니다.
 - 요청마다 서버에서 구성 요소 전체를 평가하고, CPU 면 고르기는 보이는 삼각형을 모두

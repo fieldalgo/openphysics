@@ -40,8 +40,16 @@ def estimate_mesh3d(document, component: str | None = None) -> Mesh3DEstimate:
     """The estimate of ``build_mesh3d(document, component)`` without meshing (experimental).
 
     Raises the ``GeometryError`` ``build_mesh3d`` raises before meshing: ``E-MESH-ESTIMATE`` above
-    the limit, ``E-CONTRACT``, ``E-3D-COMBINATION`` and the others, in the same words."""
-    _, comp, handoff, info = _engine._prepare(document, component)
+    the limit, ``E-CONTRACT``, ``E-3D-COMBINATION`` and the others, in the same words.
+
+    A component holding only one slab ``layers`` feature, which ``build_mesh3d`` refuses for the
+    ``meshine.extrude`` route (``build_thermal3d_mesh``), gets the same T from its exact complex: the
+    extrude mesh's own count differs (E1 at 0.8 mm: T 3,076, 7,680 made)."""
+    from .geometry_document import _pick, parse
+    from .thermal3d import is_extrude_route
+    comp = _pick(parse(getattr(document, "data", document)), component)
+    lone_slab = comp.dimension == "3d" and is_extrude_route(comp)
+    _, comp, handoff, info = _engine._prepare(document, component, through_meshloom=lone_slab)
     estimate = float(handoff.estimate)
     return Mesh3DEstimate(comp.name, round(estimate), int(handoff.max_points),
                           estimate * SECONDS_PER_TETRAHEDRON, (info,))

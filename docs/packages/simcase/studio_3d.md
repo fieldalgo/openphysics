@@ -8,7 +8,8 @@ Status: **experimental.** The 3D view shows a `3d` component of a version 1
 geometry document ([contract](geometry_document.md)) on the
 [geometry lab](geometry_lab.md) page at `/geometry-lab`. It is read-only and takes
 what the stage 5 engine takes: boxes and the slab layers of `layers` features
-(`simcase.geometry_engine3d`), and it can mesh them ([Mesh](#mesh)). The model
+(`simcase.geometry_engine3d`), it can mesh them ([Mesh](#mesh)) and solve 3D steady heat on
+them on the server ([Run](#run)). The model
 workspace does not show it yet. Its page, its controls and its HTTP answers may change
 in any release.
 
@@ -98,6 +99,50 @@ mesh's surface. It runs no physics and changes no file.
   (1 for the regular tetrahedron), the measure meshloom's validation grades
   ([meshloom](../meshloom/overview.md)); meshloom's own `stats` carry no per-tetrahedron
   quality, so Studio computes q from the mesh.
+- **The route** is the `thermal.steady3d` kind's (`simcase.build_thermal3d_mesh`): a component
+  holding only one slab `layers` feature (E1) is meshed by `meshine.extrude`, everything else by
+  `simcase.build_mesh3d`. Its estimate is the T of its exact complex (`estimate_mesh3d`).
+
+## Run
+
+`POST /api/model3d/run` solves a `thermal.steady3d` document
+([3D steady heat](thermal_steady3d.md)) on the server and answers its values, its surface map, cuts
+and probes. The tetrahedra and the solution never leave the server.
+
+- **Refused before any process**, in the reader's or the estimate's words: a document that is not
+  one `thermal.steady3d` entry, a document the kind's reader refuses (with its code), and a mesh
+  estimate above `mesh.element_count_limit`.
+- **Two steps.** `mesh`: when the component's kept mesh has the same reuse key it is taken at once
+  (`reused: true`, no process); otherwise it is the [Mesh](#mesh) job itself, in its child process
+  and kept for the component afterwards as **Mesh** keeps it. `solve`: `simcase.solve_thermal3d` on
+  a server thread, on the kept mesh read back with `simcase.mesh3d_from_arrays`
+  ([on an existing mesh](thermal_steady3d.md#on-an-existing-mesh)), so the result is
+  `simcase.run`'s, bit for bit. The status has C's fields: `step` of `steps` `mesh`, `solve`,
+  `done`, the elapsed and expected times, `longer_than_estimate`, `route`.
+- **One run at a time**, and none while a mesh job runs: they share the child slot (429, "Studio is
+  already running one 3D heat model; wait for it or cancel it.", or the mesh job's words).
+- **Cancel** in the mesh step ends the child as **Cancel meshing** does. The solve cannot be
+  interrupted: Cancel in the solve step marks the run cancelled ("Run cancelled; nothing kept.")
+  and its result is discarded when the solve returns.
+- **A connected group of regions with no fixed temperature** is refused naming its regions, from
+  galerkin's own check (connected components of the tetrahedra's edges): "Fixed temperature is
+  missing on the connected group of regions 'B': each connected group of regions needs one
+  (galerkin: each connected component of the mesh needs a Dirichlet node)". A fixed temperature on
+  an interior face is refused by the reader ("Fixed temperature needs an outer face; …").
+
+Answers (`/api/model3d/runs/{run}/…`; positions are float32 from the view's `origin_m`, lengths in
+requests in the component's unit, as for sections):
+
+| Route | Answer |
+|---|---|
+| `values` | `heat_rate_by_selection` (W per `prescribed_temperature` name: the sum of `reaction_heat_rate` over its nodes, a node fixed by two names under the first), `total_source`, `balance_residual` (outward minus source, W) and `relative_balance_residual`, `temperature_min` and `temperature_max` with node, position and region, the mesh stats, route and reuse key, and `document_sha256` (of the canonical document) |
+| `surface` | the mesh answer's faces, regions, positions, triangles and face ids, and `temperature` (float32) at its nodes |
+| `cut {axis, at}` | the exact P1 slice by the plane: each tetrahedron's nodes on the plane and its edge crossings, T interpolated on the crossed edge; a face in the plane taken once; triangles facing +axis |
+| `probe {point}` | T of the P1 interpolant in the tetrahedron that holds the point, the region and the barycentric coordinates; outside the meshed regions a refusal |
+| `export/cut.csv?axis=&at=` | `x_m,y_m,z_m,temperature_K` (float64, `repr`) after `# cut plane: z = 1.2345 mm (0.0012345 m)`, `# run: …`, `# document_sha256: …` |
+| `export/surface.csv` | the surface nodes, `x_m,y_m,z_m,temperature_K,face` (the provenance names of the node's first triangle's face), with the same header lines |
+| `export/run.json` | `{values, document}` |
+| `record?maps=kept` | the run record `thermal-steady3d-run-v1`: `document`, `document_sha256`, `values`, `mesh`, `maps` (`kept` with `surface`, or `not kept` with its counts, as the [multiphysics runs' maps](workspace.md)) |
 
 ## What it sends and answers
 
@@ -212,6 +257,12 @@ Pre-registered (fixed before measuring; never loosened):
 | W8 | Cancel: a mesh job estimated ≥ 60 s (the card at 0.28 µm: about 69 s), cancelled 3 s after it starts, on a real server process | the child process has exited 2 s after Cancel; no result is kept; server RSS within 50 MB of before | all hold | all hold, 3 of 3 runs (RSS +0.2 MB; no file left) | `tests/simcase/test_studio_mesh3d_job.py`, CI job `studio-mesh3d-w8` (main pushes and manual dispatch) |
 | W9 | Estimate: the card at 0.5×, 0.99× and 1.5× the limit | `I-MESH-ESTIMATE` answered before meshing; the 1.5× document refused before a process starts | 3/3 | 3/3 | `tests/simcase/test_studio_mesh3d_job.py` |
 | W12 (mesh view) | first mesh view of the card at 1440 × 900 and 390 × 844: no console error, no CSP violation, mesh canvas visible and not empty, no horizontal scroll at 390, faces list reachable by Tab; screenshots kept | all hold | all hold (faces list after 5 Tabs) | `tools/studio_browser/model3d_mesh_browser.mjs` |
+| W6-E1 | E1 (three slab layers, the extrude route) through `POST /api/model3d/run` against `meshine.extrude` + `galerkin.solve_steady_heat_3d` called directly: SHA-256 of nodes, tetrahedra, temperature and reaction heat rate | identical | identical | `tests/simcase/test_studio_heat3d_run.py` |
+| W6-card | the `layer-stack-3d` card (meshloom route, a via source) through the route against `build_mesh3d` + `solve_steady_heat_3d` called directly: the same SHA-256 | identical | identical | same |
+| W7 | E1 through the route against `refsol.thermal3d.layered_slab` (exact for P1): max nodal \|T_h − T\|; relative error of the top heat rate (`heat_rate_by_selection.z1`) | ≤ 1e-10; ≤ 1e-9 | 1.4e-12 K; 2.5e-11 | same |
+| W17 | the cut of E1 against an exact P1 slice computed in rational arithmetic (`fractions.Fraction`): same points, max \|T − T_exact\|; six planes (z on the 1 mm interface, z = 1.2345 mm, x = 3.3, y = 7.1, the faces x = 0 and z = 2.5 mm), extrude and meshloom routes, and `cut.csv` through the route at z = 1.2345 mm | ≤ 1e-12 K | 2.8e-14 K worst (0 on node planes) | `tests/simcase/test_studio_heat3d_slice.py`, `test_studio_heat3d_run.py` |
+| W8-run | Cancel during a run's mesh step: the heat card at 11 µm (estimate about 69 s), cancelled 3 s after the run starts, on a real server process | the child has exited 2 s after Cancel; the run is cancelled and keeps nothing; no file left | all hold | `tests/simcase/test_studio_heat3d_run.py`, CI job `studio-mesh3d-w8` |
+| W14 (run) | time and size of the surface map and of a z cut, server side | recorded | below | `tests/simcase/test_studio_heat3d_run.py` (the largest with `OPENPHYSICS_STUDIO_W14=1`) |
 | W14 | performance at the card at about 48,000 tetrahedra and at 150,000 surface triangles: mesh answer time, mesh view frame time (median of 120 frames), tab JS heap | recorded; gate in Chromium with hardware GL: heap ≤ 300 MB, median frame ≤ 33 ms | recorded below; gate **not run** (software GL only) | same |
 
 W14, recorded on 2026-11-27 in headless Chromium 158 on Linux (Xeon at 2.1 GHz, 4 CPUs, no GPU: the
@@ -224,6 +275,19 @@ page in place of the server's, so that it measures the view at that size:
 |---|---|---|---|---|
 | card, 0.375 µm: 47,047 tetrahedra, 12,411 surface triangles | 10 ms, 0.73 MB | 11.5 s (meshing included) | 53 ms | 10.1 MB |
 | 150,002 surface triangles | 197 ms, 8.9 MB | 1.0 s | 392 ms | 41.1 MB |
+
+W14 (run), recorded on 2026-11-28 on Linux (Xeon at 2.1 GHz, 4 CPUs), through the TestClient:
+
+| Case | Run (mesh and solve) | Surface map | Cut at z = 505 µm |
+|---|---|---|---|
+| heat card, 40 µm: 6,774 tetrahedra | 2.1 s | 3 ms, 0.10 MB | 24 ms, 0.05 MB |
+| heat card, 6.4 µm (estimate 586,395, the largest under the limit): 468,472 tetrahedra | 126 s | 13 ms, 1.77 MB | 123 ms, 0.30 MB |
+
+The run's tests also check the refusals before any process (not the kind, the reader's refusal,
+the estimate limit), the 429s, the reuse of a kept mesh without a process (also after **Mesh** of
+E1), the unanchored group named by its regions, the probe against the exact slab (1e-10 K) and
+outside, the values, the exports' headers and the record; `tests/simcase/test_studio_heat3d_process.py`
+(platform-install, Linux, macOS and Windows) cancels a run in its mesh step without HTTP.
 
 The job's own tests also check the 429 answer, that a cancelled job keeps nothing (no
 mesh, no directory, a 409 result), that the reuse key changes with the geometry or mesh
@@ -257,8 +321,12 @@ node tools/studio_browser/model3d_mesh_browser.mjs http://127.0.0.1:8765 out-dir
   The steps are the ones Studio knows; inside meshloom there is no progress to show.
 - The kept meshes live in the server's memory and end with it; the model workspace does
   not show the mesh yet.
+- A run's solve cannot be interrupted; Cancel during it discards the result when it returns. The
+  solve holds the mesh, the solution and its answers in memory for the last eight runs.
+- Components in meshloom's builder shapes (cylinders, spheres) are not shown by the 3D view, so
+  Mesh and Run refuse them at the forming step in the view's words.
 - A component holding one `layers` feature (E1) is meshed through
-  `meshine.extrude`, and `evaluate3d` refuses it; the view takes its complex from
+  `meshine.extrude` (by Mesh and Run alike), and `evaluate3d` refuses it; the view takes its complex from
   the public `simcase.display_complex3d`, which builds for it the complex the
   meshloom route would build.
 - Each request evaluates the whole component on the server; the CPU pick visits

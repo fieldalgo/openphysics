@@ -1,6 +1,9 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""The experimental Studio 3D mesh job: ``simcase.build_mesh3d`` in a cancellable child process.
+"""The experimental Studio 3D mesh job: the ``thermal.steady3d`` kind's mesh (``simcase.build_thermal3d_mesh``:
+``meshine.extrude`` for a lone slab ``layers`` component, else ``simcase.build_mesh3d``) in a cancellable
+child process. The child also writes the whole mesh as ``simcase.mesh3d_to_arrays`` arrays
+(``mesh.npz``), which a later 3D heat run (``heat3d_runs``) solves on.
 
 meshloom cannot be interrupted, and on some thin inputs it does not return at all, so the mesh is
 made in a child process (``multiprocessing`` with the ``spawn`` context on every platform) that
@@ -35,7 +38,8 @@ from pathlib import Path
 
 import numpy as np
 
-from simcase import GeometryError, build_mesh3d, display_complex3d, estimate_mesh3d, parse_geometry, reader
+from simcase import (GeometryError, Mesh3DResult, build_thermal3d_mesh, display_complex3d, estimate_mesh3d,
+                     mesh3d_to_arrays, parse_geometry, reader)
 
 _log = logging.getLogger("simcase.studio")
 
@@ -54,6 +58,8 @@ MAX_KEPT = 4
 ARRAYS = ("nodes", "tetrahedra", "tetrahedron_regions", "surface_nodes", "surface_triangles",
           "surface_faces", "surface_regions", "quality")
 SUMMARY = "summary.json"
+#: the whole mesh as ``simcase.mesh3d_to_arrays`` arrays (a later Run solves on it)
+MESH = "mesh.npz"
 JOB_PREFIX = "m3d-"
 
 
@@ -91,11 +97,7 @@ def _quality(nodes: np.ndarray, tets: np.ndarray) -> np.ndarray:
     return 3.0 * inradius / circumradius
 
 
-def _surface(result):
-    """The mesh's exterior and interface triangles, sorted by complex face id: their nodes
-    (renumbered), triangles, face ids and the region index of each: the plus side's region, else
-    the minus side's (the side the 3D view colours a face by), never a void one."""
-    cx = result.complex
+def _side_regions(cx):
     names = list(cx.region_names())
     void = {c.region for c in cx.cells if c.void}
     side_region = []
@@ -103,10 +105,52 @@ def _surface(result):
         sides = [sorted({cx.cells[c].region for c in side} - void) for side in face.sides]
         region = (sides[1] or sides[0] or [None])[0]
         side_region.append(-1 if region is None else names.index(region))
+    return names, side_region
+
+
+def _surface(result):
+    """The mesh's exterior and interface triangles, sorted by complex face id: their nodes
+    (renumbered), triangles, face ids and the region index of each: the plus side's region, else
+    the minus side's (the side the 3D view colours a face by), never a void one."""
+    names, side_region = _side_regions(result.complex)
     order = sorted(range(len(result.face_of_facet)), key=lambda fi: (result.face_of_facet[fi], fi))
     parts = [np.asarray(result.facet_faces[fi], dtype=np.int64).reshape(-1, 3) for fi in order]
     faces = np.concatenate([np.full(len(t), result.face_of_facet[fi], dtype=np.int64) for fi, t in zip(order, parts)])
     triangles = np.concatenate(parts)
+    used, local = np.unique(triangles, return_inverse=True)
+    regions = np.array([side_region[f] for f in faces.tolist()], dtype=np.int64)
+    return used, local.reshape(-1, 3), faces, regions, names
+
+
+def _surface_extrude(mesh, cx):
+    """``_surface`` of a ``meshine.extrude`` mesh (a lone slab component): its exterior and interface
+    triangles, each given the complex face (``display_complex3d``'s, all axis-aligned) whose plane
+    holds it and whose polygon holds its centroid, sorted by face id (stable)."""
+    from .model3d_api import _rectangles
+    names, side_region = _side_regions(cx)
+    parts = [np.asarray(t, dtype=np.int64).reshape(-1, 3) for _, t in sorted(mesh.tagged_faces.items())]
+    parts += [np.asarray(t, dtype=np.int64).reshape(-1, 3) for _, t in sorted(mesh.interfaces.items())]
+    triangles = np.concatenate(parts)
+    p = np.asarray(mesh.nodes, dtype=np.float64)[triangles]
+    flat = np.array([[np.all(p[i, :, a] == p[i, 0, a]) for a in range(3)] for i in range(len(p))])
+    centre = p.mean(axis=1) * 1e12                          # pm
+    plane = {}
+    for face in cx.faces:
+        plane.setdefault((face.axis, face.coord), []).append((face.index, _rectangles(face)))
+    faces = np.full(len(triangles), -1, dtype=np.int64)
+    for i in range(len(triangles)):
+        axis = int(np.flatnonzero(flat[i])[0])
+        coord = round(float(p[i, 0, axis]) * 1e12)
+        ua, va = (k for k in range(3) if k != axis)
+        cu, cv = centre[i, ua], centre[i, va]
+        for index, rects in plane.get((axis, coord), []):
+            if any(u0 <= cu <= u1 and v0 <= cv <= v1 for u0, u1, v0, v1 in rects):
+                faces[i] = index
+                break
+    if (faces < 0).any():
+        raise GeometryError(f"internal: {int((faces < 0).sum())} extrude mesh triangles lie on no face of the complex")
+    order = np.argsort(faces, kind="stable")
+    faces, triangles = faces[order], triangles[order]
     used, local = np.unique(triangles, return_inverse=True)
     regions = np.array([side_region[f] for f in faces.tolist()], dtype=np.int64)
     return used, local.reshape(-1, 3), faces, regions, names
@@ -123,17 +167,24 @@ def child(doc: dict, component: str | None, outdir: str, conn) -> None:
     out = Path(outdir)
     try:
         conn.send(("step", "forming"))
-        display_complex3d(parse_geometry(doc), component)
+        cx = display_complex3d(parse_geometry(doc), component)
         conn.send(("step", "meshing"))
-        result = build_mesh3d(doc, component)
+        built = build_thermal3d_mesh(doc, component)       # the thermal.steady3d kind's route choice
         conn.send(("step", "checking"))
-        mesh = result.mesh
+        if isinstance(built, Mesh3DResult):
+            mesh, route = built.mesh, ("meshloom" if built.complex is not None else "builder")
+            used, triangles, faces, regions, names = _surface(built)
+            component_name, estimate, notes = built.complex.component, float(built.estimate), built.diagnostics
+        else:
+            mesh, route = built, "extrude"
+            used, triangles, faces, regions, names = _surface_extrude(mesh, cx)
+            found = estimate_mesh3d(doc, component)
+            component_name, estimate, notes = cx.component, float(found.tetrahedra), list(found.diagnostics)
         nodes, tets = np.asarray(mesh.nodes, dtype=np.float64), np.asarray(mesh.tets, dtype=np.int64)
         quality = _quality(nodes, tets)
-        used, triangles, faces, regions, names = _surface(result)
-        summary = {"component": result.complex.component, "region_names": names,
-                   "mesh_region_names": list(mesh.region_names), "estimate": float(result.estimate),
-                   "diagnostics": [d.message for d in result.diagnostics],
+        summary = {"component": component_name, "region_names": names, "route": route,
+                   "mesh_region_names": list(mesh.region_names), "estimate": estimate,
+                   "diagnostics": [d.message for d in notes],
                    "stats": {"nodes": int(len(nodes)), "tetrahedra": int(len(tets)),
                              "regions": int(len(mesh.region_names)),
                              "quality_min": float(quality.min()), "quality_median": float(np.median(quality)),
@@ -141,6 +192,7 @@ def child(doc: dict, component: str | None, outdir: str, conn) -> None:
         _write(out, {"nodes": nodes, "tetrahedra": tets, "tetrahedron_regions": np.asarray(mesh.regions, dtype=np.int64),
                      "surface_nodes": used, "surface_triangles": triangles, "surface_faces": faces,
                      "surface_regions": regions, "quality": quality}, summary)
+        np.savez(out / MESH, **mesh3d_to_arrays(built))
         conn.send(("done", None))
     except GeometryError as exc:
         conn.send(("error", {"message": str(exc), "code": getattr(exc, "code", None)}))
@@ -168,6 +220,10 @@ class Kept:
     tetrahedron_regions: np.ndarray
     region_names: list
     answer: dict
+    mesh_arrays: dict = field(default=None, repr=False)     # simcase.mesh3d_to_arrays (server only)
+    route: str | None = None
+    surface: dict = field(default=None, repr=False)         # surface_nodes, _triangles, _faces, _regions
+    stats: dict = field(default=None)
 
 
 @dataclass
@@ -343,9 +399,13 @@ class Mesh3DJobs:
         out = Path(job.tmpdir)
         arrays = {name: np.load(out / f"{name}.npy", allow_pickle=False) for name in ARRAYS}
         summary = json.loads((out / SUMMARY).read_text(encoding="utf-8"))
+        with np.load(out / MESH, allow_pickle=False) as f:
+            mesh_arrays = {k: f[k] for k in f.files}
         answer = surface_answer(job.doc, job.component, arrays, summary, job.key)
         return Kept(job.key, job.component, arrays["nodes"], arrays["tetrahedra"], arrays["tetrahedron_regions"],
-                    summary["mesh_region_names"], answer)
+                    summary["mesh_region_names"], answer, mesh_arrays, summary["route"],
+                    {k: arrays[k] for k in ("surface_nodes", "surface_triangles", "surface_faces", "surface_regions")},
+                    summary["stats"])
 
     # -- status, cancel, result
     def get(self, job_id: str) -> Job:
