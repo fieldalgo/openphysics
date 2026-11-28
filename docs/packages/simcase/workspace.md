@@ -314,7 +314,8 @@ tab unchanged (V-P3). With `--old-python`, it also opens the file in an older St
 
 Status: **experimental.** The Library's group **3D models (experimental)** holds the card **Via in a
 layer stack (3D heat)** (`layer-stack-3d`), beside the application cards, not among them. It is a 3d
-component in µm over a 200 × 200 µm domain (z from 0 to 610 µm): one `layers` feature `stack`
+component in µm over a 200 × 200 µm domain (z from 0 to `500 + t_ox + 100`, 610 µm, so its top
+follows the stack and `z1` stays the top face when `t_ox` changes): one `layers` feature `stack`
 (substrate 500 µm of Si, k = 130 W/(m K); oxide 10 µm of SiO2, k = 1.4 W/(m K); top silicon 100 µm of
 `Si (top)`, k = 130 W/(m K)) and a later box `via` (x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through
 the oxide. Its geometry holds the design's two parameters: `t_ox` = 10 µm, the oxide's thickness and
