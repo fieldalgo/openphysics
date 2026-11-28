@@ -149,8 +149,12 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
     let acute: Vec<bool> = (0..n).map(|v| is_acute(points, segments, &incident[v], v)).collect();
     let mut centres = vec![false; n];
     let mut hub_radius = vec![0.0f64; n];
-    // each protected hub's window exponent: its shells hold to 2^-e of the radius
-    let mut hub_w = vec![30i32; n];
+    // each acute vertex's shell window: points of one shell on two of its segments at
+    // angle θ must lie within about θ² of one radius (else each encroaches the other's
+    // pieces), and the window is as wide as that allows, so that exact double points
+    // fall in it (rounded points on needle facets' long edges move their sub-areas
+    // past V3(a)'s bound): 2^-e of the radius, e = ceil(log2(1/θ²)) + 1 in 24..=30
+    let shell_w: Vec<i32> = (0..n).map(|v| if acute[v] { shell_exponent(points, segments, &incident[v], v) } else { 24 }).collect();
     for (k, s) in segments.iter().enumerate() {
         pieces[k][0].toward = match (acute[s[0] as usize], acute[s[1] as usize]) {
             (true, true) => BOTH,
@@ -240,18 +244,6 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                 rc = rc.min(len / 3.0).min(first * len / 2.0);
             }
             hub_radius[c as usize] = rc;
-            // the window: points of one shell on two of its segments at angle θ must lie
-            // within about θ² of one radius (else each encroaches the other's pieces), and
-            // as wide as that allows, so that exact double points fall in it
-            let dirs: Vec<P3> = incident[c as usize].iter().map(|&j| {
-                let sj = segments[j as usize];
-                let o = &points[if sj[0] == c { sj[1] } else { sj[0] } as usize];
-                let d = sub(o, &xc);
-                let l = dot(&d, &d).sqrt();
-                [d[0] / l, d[1] / l, d[2] / l]
-            }).collect();
-            let th = min_chord(&dirs);
-            hub_w[c as usize] = if th > 0.0 { ((-(th * th).log2()).ceil() as i32 + 1).clamp(24, 30) } else { 30 };
             for &j in &incident[c as usize] {
                 let sj = segments[j as usize];
                 let (a, b) = (&points[sj[0] as usize], &points[sj[1] as usize]);
@@ -275,7 +267,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                 let exact = |t: f64| exact_point(a, b, t);
                 for d in radii {
                     let tr = d / len;
-                    let w = tr * 2f64.powi(-hub_w[c as usize]);
+                    let w = tr * 2f64.powi(-shell_w[c as usize]);
                     let t = if sj[0] == c { pick_t(tr - w, tr, exact) } else { pick_t(1.0 - tr, 1.0 - tr + w, exact) };
                     plans.push((j as usize, t, Rule::Centre(c)));
                 }
@@ -305,7 +297,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
                 if edge(&mut mesh, p.u, p.v) {
                     continue;
                 }
-                let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)], &hub_radius, &hub_w);
+                let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)], &hub_radius, &shell_w);
                 if !(t > p.t0 && t < p.t1) {
                     return Err(Error::Internal(format!(
                         "segment {}: a piece is too short to split (do segments cross?)", p.seg)));
@@ -504,8 +496,8 @@ enum Rule {
 /// target, preferring an exact double point (so points of one centre lie on a common
 /// sphere up to that).
 fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool],
-                   degree: [usize; 2], hub_radius: &[f64], hub_w: &[i32]) -> (f64, Rule) {
-    let (t, rule) = split_parameter_si(mesh, points, s, p, acute, degree, hub_radius, hub_w);
+                   degree: [usize; 2], hub_radius: &[f64], shell_w: &[i32]) -> (f64, Rule) {
+    let (t, rule) = split_parameter_si(mesh, points, s, p, acute, degree, hub_radius, shell_w);
     // on a segment at a protected hub, every split point lies on the hub's grid of radii
     // (see `grid_floor`), whichever rule chose it: a midpoint at a distance set by the
     // segment's length (float32 rim points make those differ by a rounding) would
@@ -534,13 +526,13 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
     if !(target >= lo && target <= hi) {
         return (t, rule);
     }
-    let w = (if from_a { target } else { 1.0 - target }) * 2f64.powi(-hub_w[c as usize]);
+    let w = (if from_a { target } else { 1.0 - target }) * 2f64.powi(-shell_w[c as usize]);
     let exact = |t: f64| exact_point(pa, pb, t);
     (pick_t((target - w).max(lo), (target + w).min(hi), exact), Rule::Centre(c))
 }
 
 fn split_parameter_si(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool],
-                      degree: [usize; 2], hub_radius: &[f64], hub_w: &[i32]) -> (f64, Rule) {
+                      degree: [usize; 2], hub_radius: &[f64], shell_w: &[i32]) -> (f64, Rule) {
     let _ = acute;
     let mid = (p.t0 + (p.t1 - p.t0) / 2.0, Rule::Midpoint);
     if p.toward == BOTH {
@@ -641,18 +633,23 @@ fn split_parameter_si(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], 
     if !(target >= lo && target <= hi) {
         return mid;
     }
-    // the parameter: within 2^-24 of the piece; about a protected hub within 2^-30 of
-    // the distance from it, so that points of one shell lie at one distance up to that
-    // (a thin fan's next segments are as close as its angle). A narrower window than
-    // needed leaves few exact doubles: the rounded points of needle facets' long edges
-    // then move their sub-areas past V3(a)'s bound
+    // the parameter: within 2^-24 of the piece; about an acute end within its shell
+    // window of the distance from it, so that points of one shell lie at one distance
+    // up to that (see `shell_exponent`)
     let w = match rule {
-        Rule::Centre(c) if hub_radius.get(c as usize).is_some_and(|&r| r > 0.0) =>
-            (if c == s[0] { target } else { 1.0 - target }) * 2f64.powi(-hub_w[c as usize]),
+        Rule::Centre(c) => ((if c == s[0] { target } else { 1.0 - target }) * 2f64.powi(-shell_w[c as usize]))
+            .max(if hub_radius.get(c as usize).is_some_and(|&r| r > 0.0) { 0.0 } else { span * 2f64.powi(-24) }),
         _ => span * 2f64.powi(-24),
     };
     let exact = |t: f64| exact_point(pa, pb, t);
-    (pick_t((target - w).max(lo), (target + w).min(hi), exact), rule)
+    let t = pick_t((target - w).max(lo), (target + w).min(hi), exact);
+    if exact(t) {
+        return (t, rule);
+    }
+    // no exact double point in the window: one in a window 16 times as wide, if any
+    // (a rounded point on a needle facet's long edge moves its sub-areas past V3(a))
+    let t16 = pick_t((target - 16.0 * w).max(lo), (target + 16.0 * w).min(hi), exact);
+    (if exact(t16) { t16 } else { t }, rule)
 }
 
 /// The largest point at most `d` and at least `lo` of the coarsest dyadic grid
@@ -671,6 +668,18 @@ fn grid_floor(rc: f64, d: f64, lo: f64) -> Option<f64> {
 /// The smallest distance between two of the unit vectors `u` (about the smallest angle
 /// between them): a hash grid of cell 1/sqrt(n) and the 27 cells about each; 0 for fewer
 /// than two.
+fn shell_exponent(points: &[P3], segments: &[[u32; 2]], inc: &[u32], v: usize) -> i32 {
+    let xv = &points[v];
+    let dirs: Vec<P3> = inc.iter().map(|&j| {
+        let s = segments[j as usize];
+        let d = sub(&points[if s[0] as usize == v { s[1] } else { s[0] } as usize], xv);
+        let l = dot(&d, &d).sqrt();
+        [d[0] / l, d[1] / l, d[2] / l]
+    }).collect();
+    let th = min_chord(&dirs);
+    if th > 0.0 { ((-(th * th).log2()).ceil() as i32 + 1).clamp(24, 30) } else { 30 }
+}
+
 fn min_chord(u: &[P3]) -> f64 {
     if u.len() < 2 {
         return 0.0;
