@@ -526,7 +526,9 @@ export CSV.* with **Recompute**, which runs its own inputs again into the same r
 **Run A** and **Run B** (the two newest at first; one run reads *Compare needs two runs of this 3D
 model.*). The table gives each run's values as its Results page writes them (Tmax, Tmin, each fixed
 temperature's heat rate, the total source, the balance residual) and its mesh (nodes, tetrahedra,
-route, element size), with **B − A** beside each number. **Inputs that differ** lists the document's
+route, element size), with **B − A** beside each number. Tmax and Tmin read *in <region>* there, not
+*at the A / B interface*: a run record keeps no region list for them (only a live run's Results page
+asks the server). **Inputs that differ** lists the document's
 fields in the tree's words (*Fixed temperature z1: 301 K → 311 K*, *Parameter t_ox: 10 µm → 5 µm*,
 *Mesh element size: 0.1 m → 0.12 m*; *Same inputs.* when none). Two runs share a mesh when their
 records have the same mesh key (the digest of the document's geometry and mesh blocks; a boundary or

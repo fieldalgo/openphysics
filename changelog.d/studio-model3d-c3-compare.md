@@ -8,7 +8,7 @@
   - On a shared mesh the view colours the surface temperature difference B − A, with its own legend. Runs share a mesh when their records have the same geometry+mesh digest and the same node and tetrahedron counts.
   - On different meshes a notice says the values are compared but the surface temperature is not compared point by point.
 
-  Everything is read from the two run records. The pair is view state, and the project and session formats are unchanged. As an analytical reference, raising every fixed temperature of card 2 by 10 K shifts the field by 10 K to 9.1e-13 K.
+  Tmax and Tmin read *in <region>* there, because a run record keeps no region list. Everything is read from the two run records. The pair is view state, and the project and session formats are unchanged. As an analytical reference, raising every fixed temperature of card 2 by 10 K shifts the field by 10 K to 9.1e-13 K.
 
   [3D models](docs/packages/simcase/workspace.md#3d-models-experimental).
 
@@ -20,6 +20,6 @@
   - 메시를 공유하면 보기는 면 온도 차 B − A를 자기 범례와 함께 칠합니다. 두 실행은 기록의 geometry+mesh 다이제스트와 노드·사면체 수가 같으면 메시를 공유합니다.
   - 메시가 다르면 값은 비교하지만 면 온도는 점마다 비교하지 않는다는 알림이 보입니다.
 
-  모든 것은 두 실행 기록에서 읽습니다. 짝은 보기 상태이며, 프로젝트와 세션 형식은 바뀌지 않습니다. 해석적 기준으로, 카드 2의 모든 고정 온도를 10 K 올리면 장이 9.1e-13 K 안에서 10 K 이동합니다.
+  여기서 Tmax와 Tmin은 *in <영역>*으로 읽힙니다. 실행 기록에는 영역 목록이 없기 때문입니다. 모든 것은 두 실행 기록에서 읽습니다. 짝은 보기 상태이며, 프로젝트와 세션 형식은 바뀌지 않습니다. 해석적 기준으로, 카드 2의 모든 고정 온도를 10 K 올리면 장이 9.1e-13 K 안에서 10 K 이동합니다.
 
   [3D 모델](packages/simcase/workspace.md#3d-모델실험적).
