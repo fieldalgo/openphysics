@@ -11,7 +11,7 @@ from scipy.sparse.csgraph import connected_components
 
 from .core.checks import finite_scalar
 from .core.solve import scipy_solve_dirichlet
-from .mesh3d import _face_keys
+from .mesh3d import face_keys_and_parity
 
 
 def _surface(mesh, tag, coord_ids, exterior, used):
@@ -19,7 +19,7 @@ def _surface(mesh, tag, coord_ids, exterior, used):
     faces = mesh.tagged_faces.get(tag)
     if faces is None or not len(faces):
         raise ValueError(f"thermal contact needs a nonempty exterior face tag, got {tag!r}")
-    node_keys, parity = _face_keys(faces)
+    node_keys, parity = face_keys_and_parity(faces)
     for face, winding in zip(node_keys, parity):
         key = tuple(face)
         if exterior.get(key) != winding:
@@ -31,7 +31,7 @@ def _surface(mesh, tag, coord_ids, exterior, used):
     if np.unique(coord_ids[nodes]).size != nodes.size:
         raise ValueError(f"thermal contact tag {tag!r} has ambiguous coincident nodes")
     coordinates = coord_ids[faces]
-    keys, winding = _face_keys(coordinates)
+    keys, winding = face_keys_and_parity(coordinates)
     order = np.lexsort(keys.T[::-1])
     ordered_nodes = np.take_along_axis(faces, np.argsort(coordinates, axis=1), axis=1)
     return keys[order], ordered_nodes[order], winding[order]
@@ -48,7 +48,7 @@ def contact_faces(mesh, values, natural):
     if not np.all(np.isfinite(mesh.nodes)) or not np.all(np.isfinite(volumes) & (volumes > 0)):
         raise ValueError("thermal contact requires finite coordinates and positive tetrahedron volumes")
     boundary = mesh.outward_boundary_faces()
-    node_keys, parity = _face_keys(boundary)
+    node_keys, parity = face_keys_and_parity(boundary)
     exterior = dict(zip(map(tuple, node_keys), parity))
     nodes = np.unique(boundary)
     coord_ids = np.full(mesh.num_nodes, -1, dtype=int)

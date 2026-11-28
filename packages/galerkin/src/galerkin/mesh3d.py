@@ -50,7 +50,7 @@ class MeshCheckError(ValueError):
         super().__init__("tetrahedral mesh contract violated:\n- " + "\n- ".join(self.problems))
 
 
-def _face_keys(faces):
+def face_keys_and_parity(faces):
     """Sorted node triples (F, 3) and the winding parity (F,) of each face (0 even, 1 odd)."""
     f = np.asarray(faces, dtype=np.int64).reshape(-1, 3)
     a, b, c = f[:, 0], f[:, 1], f[:, 2]
@@ -233,11 +233,11 @@ class Mesh3D:
         if problems:
             return problems
         exterior = self.outward_boundary_faces()
-        ext_key, ext_parity = _face_keys(exterior)
+        ext_key, ext_parity = face_keys_and_parity(exterior)
         tags = list(self.tagged_faces)
         given = np.concatenate([self.tagged_faces[t] for t in tags]) if tags else np.zeros((0, 3), int)
         owner = np.repeat(np.arange(len(tags)), [len(self.tagged_faces[t]) for t in tags])
-        giv_key, giv_parity = _face_keys(given)
+        giv_key, giv_parity = face_keys_and_parity(given)
         both = np.concatenate([ext_key, giv_key])
         _, inverse = np.unique(both, axis=0, return_inverse=True)
         inverse = inverse.reshape(-1)
