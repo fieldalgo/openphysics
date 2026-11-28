@@ -566,6 +566,11 @@ export function valuesRows(values,unit,{expected=null}={}){
  rows.push(['Energy balance residual',`${sci(values.balance_residual.value)} ${values.balance_residual.unit} (${sci(values.relative_balance_residual.value)} of the summed heat rates)`]);
  return rows;
 }
+/** V5: where an extreme is, in the Settings table's words without coordinates: "at the A / B interface" or "in A". */
+export const placeWords=t=>Array.isArray(t.regions)&&t.regions.length>1?`at the ${t.regions.join(' / ')} interface`:`in ${t.region}`;
+/** V5: the Messages line after a run: "Run 1 complete: maximum 336.05 K at the SiO2 / Si (top) interface. …". */
+export const runCompleteText=(i,values)=>{const t=values.temperature_max;
+ return `Run ${i+1} complete: maximum ${sig(t.value)} ${t.unit||'K'} ${placeWords(t)}. Its results belong to that run; editing the model does not change them.`;};
 /** The sign of a heat rate (galerkin: a reaction heat rate is positive when it injects heat). */
 export const HEAT_RATE_SIGN='Heat rate: positive into the model, negative out of it (a fixed temperature that removes heat shows a negative rate).';
 /** The colour bar's title: it spans the surface temperatures; the table's Tmax and Tmin are the whole model's. */

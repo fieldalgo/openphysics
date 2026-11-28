@@ -399,7 +399,8 @@ connected group of regions 'via': …*). 편집하면 마지막 것은 지워집
 같은 결과 형식 `thermal-steady3d-run-v1`) 머리말이 **Show Run 1**과 함께 *No need to run: Run 1 already has these results.*라고
 말하고, Run은 다시 계산하지 않고 그 실행을 보입니다. 실행 직후부터 다음 편집 전까지는 같은 자리가 대신 *Run 1 is up to date with
 these inputs.*라고 말합니다. 끝나면 Messages가 *Run 1 complete: maximum 1127.33 K in Si (top). Its
-results belong to that run; editing the model does not change them.*라고 말합니다.
+results belong to that run; editing the model does not change them.*라고 말하며, 위치는 값 표의 말을 씁니다: 두 영역이
+나누는 노드의 최대는 *… K at the SiO2 / Si (top) interface.*로 읽힙니다.
 
 **Results.** 트리에서 Mesh 1 다음에 **Study 1 · Steady**와 **Results**가 오고, 보관한 실행마다 **Run N · Temperature (surfaces)**
 행이 있습니다(최대 10개; 가장 오래된 것이 먼저 빠짐). 실행의 페이지에는 값(영역과 위치를 가진 *Temperature, max (whole model)*,
