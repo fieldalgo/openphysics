@@ -19,7 +19,8 @@
 
 use crate::facet::{self, At, CellRef, Detail, InputError};
 use crate::predicates::{self as pr, Counters, P3};
-use std::collections::{HashMap, HashSet};
+// the standard tables with the fast hasher (no result depends on their order)
+use crate::facet::{FxMap as HashMap, FxSet as HashSet};
 
 pub struct Plc {
     pub points: Vec<P3>,
@@ -101,7 +102,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         return Err(bad(0, "the PLC has no facets".into()).with(Detail::NoFacets));
     }
     let mut out = Checked::default();
-    let mut seen = HashSet::new();
+    let mut seen = HashSet::default();
     let mut add_segment = |a: u32, b: u32, facet: Option<usize>| -> Result<(), InputError> {
         let what = facet.map_or("segment".to_string(), |f| format!("facet {f} edge"));
         if a as usize >= pts.len() || b as usize >= pts.len() {
@@ -122,7 +123,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     for s in &plc.segments {
         add_segment(s[0], s[1], None)?;
     }
-    let mut vertex_sets: HashMap<Vec<u32>, usize> = HashMap::new();
+    let mut vertex_sets: HashMap<Vec<u32>, usize> = HashMap::default();
     for (f, loops) in plc.facets.iter().enumerate() {
         for lp in loops {
             for k in 0..lp.len() {
@@ -183,7 +184,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     }
     clock.lap("PLC check, 1 points on edges");
     let mut edge_subs: Vec<HashSet<(u32, u32)>> = Vec::with_capacity(edges.len());
-    let mut sub_edges: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
+    let mut sub_edges: HashMap<(u32, u32), Vec<u32>> = HashMap::default();
     for (e, &[p, q]) in edges.iter().enumerate() {
         let (pp, pq) = (&pts[p as usize], &pts[q as usize]);
         let k = (0..3).find(|&k| pp[k] != pq[k]).unwrap();
@@ -192,7 +193,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         if pq[k] < pp[k] {
             on.reverse();
         }
-        let mut set = HashSet::new();
+        let mut set = HashSet::default();
         let mut prev = p;
         for v in on.into_iter().chain(std::iter::once(q)) {
             let key = (prev.min(v), prev.max(v));
@@ -296,7 +297,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     let mut point_cells: Vec<(u64, u32)> = (0..pts.len() as u32).map(|v| (grid.cells(&[pts[v as usize]])[0], v)).collect();
     // the cells of each one-triangle facet, by its sorted vertices, kept for step 5 (a
     // thin triangle across many cells, such as a fan's, costs much to cover twice)
-    let mut tri_grid_cells: HashMap<[u32; 3], Vec<u64>> = HashMap::new();
+    let mut tri_grid_cells: HashMap<[u32; 3], Vec<u64>> = HashMap::default();
     point_cells.sort_unstable();
     // the sub-segments at each point, so that a facet visits only those at its members
     let sub_index: HashMap<(u32, u32), u32> = subs.iter().enumerate().map(|(i, &k)| (k, i as u32)).collect();
@@ -389,8 +390,8 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
                 _ => named,
             }
         })?;
-        let mut tris = HashSet::new();
-        let mut eds = HashSet::new();
+        let mut tris = HashSet::default();
+        let mut eds = HashSet::default();
         for tri in &t.triangles {
             let mut k = *tri;
             k.sort_unstable();
@@ -419,7 +420,7 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
     // of facets; a facet's boundary is its loop edges, each split into sub-segments
     {
         let index: HashMap<(u32, u32), usize> = edges.iter().enumerate().map(|(e, &[a, b])| ((a, b), e)).collect();
-        let mut count: HashMap<(u32, u32), u32> = HashMap::new();
+        let mut count: HashMap<(u32, u32), u32> = HashMap::default();
         for loops in &plc.facets {
             for lp in loops {
                 for k in 0..lp.len() {
@@ -484,11 +485,11 @@ fn check_inner(plc: &Plc) -> Result<Checked, InputError> {
         let cells = pick(&facets_of(s), &facets_of(t), as_ref(s), as_ref(t));
         Err(e.with(Detail::Point { cells, at: At::Centroid(piece) }))
     };
-    let mut sub_cells: HashMap<(u32, u32), Vec<Cell>> = HashMap::new();
+    let mut sub_cells: HashMap<(u32, u32), Vec<Cell>> = HashMap::default();
     for (k, es) in &sub_edges {
         sub_cells.entry(*k).or_default().extend(es.iter().map(|&e| Cell::Edge(e)));
     }
-    let mut tri_cells: HashMap<[u32; 3], Vec<Cell>> = HashMap::new();
+    let mut tri_cells: HashMap<[u32; 3], Vec<Cell>> = HashMap::default();
     for (f, (tris, eds)) in facet_tris.iter().zip(&facet_edges).enumerate() {
         for k in eds {
             sub_cells.entry(*k).or_default().push(Cell::Facet(f as u32));
@@ -1022,7 +1023,7 @@ fn cell_pairs(items: &[u32], verts: &[Verts], emit: &mut impl FnMut(u32, u32) ->
     if items.len() <= 32 {
         return all(emit);
     }
-    let mut count: HashMap<u32, u32> = HashMap::new();
+    let mut count: HashMap<u32, u32> = HashMap::default();
     for &i in items {
         for &v in &verts[i as usize] {
             if v != u32::MAX {
@@ -1153,7 +1154,7 @@ fn planar_star_ok(pts: &[P3], v: u32, axis: usize, items: &[(u32, u32)]) -> bool
     };
     let mut keyed: Vec<(u8, u32)> = rays.iter().map(|&r| (class(r), r)).collect();
     keyed.sort_by(cmp);
-    let mut rank: HashMap<u32, usize> = HashMap::new();
+    let mut rank: HashMap<u32, usize> = HashMap::default();
     let mut owner: Vec<u32> = Vec::new(); // the vertex on each rank (two different: overlap)
     for (i, x) in keyed.iter().enumerate() {
         if i > 0 && cmp(&keyed[i - 1], x) == std::cmp::Ordering::Equal {
@@ -1271,8 +1272,8 @@ mod tests {
                 let cells: Vec<Vec<u64>> = items.iter().map(|vs| grid.cells(&at(vs))).collect();
                 let boxes: Vec<_> = items.iter()
                     .map(|vs| bbox(&pts, &vs.iter().copied().filter(|&v| v != u32::MAX).collect::<Vec<_>>())).collect();
-                let mut want_disjoint = HashSet::new();
-                let mut want_shared = HashSet::new();
+                let mut want_disjoint = HashSet::default();
+                let mut want_shared = HashSet::default();
                 for_overlapping(&boxes, |x, y| {
                     let p = (x.min(y), x.max(y));
                     if share_vertex(&items[x], &items[y]) { want_shared.insert(p) } else { want_disjoint.insert(p) };
