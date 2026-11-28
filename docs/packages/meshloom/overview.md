@@ -191,7 +191,10 @@ names may change before the mesher's public API.
   segments are rounded down to that grid too. The points of a thin fan's segments then
   lie on common spheres, so float32 rim points, whose radii differ by a rounding, do
   not make the segments encroach each other without end (a 36,000-segment fan
-  converges in 90 rounds, with e = 26). The result is the Delaunay tetrahedralization of the input
+  converges in 90 rounds, with e = 26). A round's split points are put in order by their
+  segment's ends (by coordinates) and parameter before the BRIO order of insertion, so the
+  round does not depend on how the input numbers its points and segments; the perturbation
+  below still does. The result is the Delaunay tetrahedralization of the input
   and S points under the index-ordered perturbation, with each segment as a chain of
   edges through its own S points. A piece shorter than 2^-`max_depth` of its segment
   raises `RuntimeError` instead of looping (termination after rounding the parameter
