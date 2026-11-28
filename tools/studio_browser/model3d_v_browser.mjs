@@ -8,6 +8,10 @@
 //      Si (top) interface." with the same place words as the Settings row (whole model): 1/1.
 //  V4  card 1, every face picked in the Faces list in turn: no "um" in the visible text of the Names
 //      box or the Faces list ("z = 510 µm", "area 400 µm²"): 1/1.
+//  V7  card 1: Mesh, Run, size 30 µm, Mesh, then size 2 µm (refused): the Mesh 1 page labels the
+//      earlier stats "Kept mesh (before the last change)"; the run status line is gone after the new
+//      mesh; Messages reads "Meshed Component 1 …" (no "stack3d"); the line gives the elapsed time
+//      ("… in 1.2 s: …"): 4/4.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -101,6 +105,33 @@ try {
     const sample = await page.evaluate(() => document.getElementById('m3-names')?.innerText.split('\n').slice(0, 3).join(' | '));
     const rows = [ids.length > 0 && um.length === 0];
     record('V4', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, faces: ids.length, um: um.slice(0, 6), sample});
+    await ctx.close();
+  }
+  // ---- V7: mesh status: Component 1 with the elapsed time; the run line cleared; kept stats labelled ----
+  if (want('V7')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    const meshed = () => page.waitForFunction(() => /Meshed Component 1/.test(document.getElementById('mp-messages')?.textContent || ''), null, {timeout: 180000});
+    const message = () => page.evaluate(() => [...document.querySelectorAll('#mp-messages .mp-message p')].map(p => p.textContent).find(t => t.startsWith('Meshed')) || '');
+    await page.click('#m3-mesh'); await meshed(); const first = await message();
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    const runLine = await page.evaluate(() => !!document.getElementById('m3-run-progress'));
+    await page.click('[data-m3-node="mesh"]'); await setField(page, 'mesh.element_size', '30');
+    await page.click('#m3-mesh'); await meshed(); await page.waitForTimeout(300);
+    const second = await message();
+    const afterMesh = await page.evaluate(() => !!document.getElementById('m3-run-progress'));
+    await page.click('[data-m3-node="mesh"]'); await setField(page, 'mesh.element_size', '2');
+    await page.click('[data-m3-node="mesh"]'); await page.waitForTimeout(200);
+    const kept = await page.evaluate(() => ({label: document.getElementById('m3-kept-mesh')?.textContent || '',
+      stats: !!document.querySelector('#m3-kept-mesh + .m3-mesh-stats')}));
+    const rows = [
+      kept.label === 'Kept mesh (before the last change)' && kept.stats,
+      runLine && !afterMesh,
+      /^Meshed Component 1\b/.test(first) && /^Meshed Component 1\b/.test(second) && !/stack3d/.test(first + second),
+      /^Meshed Component 1 in (\d+(\.\d)? s|\d+ min \d+ s): /.test(second),
+    ];
+    record('V7', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, first, second, runLine, afterMesh, kept});
     await ctx.close();
   }
 } finally {

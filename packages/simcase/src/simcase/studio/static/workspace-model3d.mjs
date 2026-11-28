@@ -566,6 +566,20 @@ export function valuesRows(values,unit,{expected=null}={}){
  rows.push(['Energy balance residual',`${sci(values.balance_residual.value)} ${values.balance_residual.unit} (${sci(values.relative_balance_residual.value)} of the summed heat rates)`]);
  return rows;
 }
+/** V7: a duration as people read it: "1.2 s", "1 min 24 s". */
+export function durationText(seconds){
+ const s=Math.max(0,Number(seconds)||0);
+ if(s<60)return `${Number(s.toFixed(s<10?1:0))} s`;
+ const r=Math.round(s);return `${Math.floor(r/60)} min ${r%60} s`;
+}
+/** V7: the Messages line when a mesh is ready: "Meshed Component 1 in 1.2 s: 1,551 nodes, …". */
+export function meshDoneText(view,status){
+ const s=view.stats,n=x=>Number(x).toLocaleString('en-US');
+ const how=status?.reused?' (the kept mesh of this geometry and mesh block)':` in ${durationText(status?.elapsed_s)}`;
+ return `Meshed Component 1${how}: ${n(s.nodes)} nodes, ${n(s.tetrahedra)} tetrahedra, ${s.regions} regions.`;
+}
+/** V7: the label over the Mesh 1 page's stats when they are no longer the document's mesh, or null. */
+export const keptMeshLabel=(view,check)=>!view||!check?.mesh?null:check.mesh.ok&&check.mesh.key===view.key?null:'Kept mesh (before the last change)';
 /** V5: where an extreme is, in the Settings table's words without coordinates: "at the A / B interface" or "in A". */
 export const placeWords=t=>Array.isArray(t.regions)&&t.regions.length>1?`at the ${t.regions.join(' / ')} interface`:`in ${t.region}`;
 /** V5: the Messages line after a run: "Run 1 complete: maximum 336.05 K at the SiO2 / Si (top) interface. …". */
