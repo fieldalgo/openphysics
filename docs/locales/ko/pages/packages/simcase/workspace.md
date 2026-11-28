@@ -312,8 +312,10 @@ tetrahedra · about 1 s*, 서버의 추정), **Study 1 · Steady**, 보관한 �
 4분의 1이고, 새 구는 중심에 있으며 r은 가장 작은 범위의 4분의 1입니다. 원기둥과 구는 meshloom의 builder 형상(슬래브를 지나는
 원기둥 하나, 구 하나, 동심 구)에서만 받으며, builder가 모델을 받는지는 엔진의 말로 된 검사의 답입니다
 ([builder 형상](geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3)). 원기둥 행은 *r 0.3 m · z 0–1 m*, 구 행은
-*r 0.3 m*로 읽힙니다. 영역에 대한 중심이나 반지름은 조합이라 서버만 검사하므로, 범위 문장이 아니라 엔진의 줄기(*cylinder 'via'
-crosses the side domain.x1 …*)가 보입니다. 특징 설정에는 **Move up**, **Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**(*via
+*r 0.3 m*로 읽힙니다. 영역에 대한 중심이나 반지름은 조합이라 서버만 검사하며, 그 거부는 범위 문장이 아닙니다. 영역 옆면을 가로지르는 원기둥은
+옆면과 r에서 계산한 Studio의 제안으로 읽힙니다: *Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or
+r ≤ 0.2 m.*(안쪽만: 영역 옆면 너머로 가면 원기둥이 모델을 떠남). 엔진의 문장(*cylinder 'via' crosses the side domain.x1 …*)과
+코드는 Details 아래에 있습니다. 특징 설정에는 **Move up**, **Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**(*via
 deleted; Undo restores it.*)가 있고, layers 특징에는 **Add layer**와 **Remove layer**(층 1–32개)도 있습니다. 끌어 옮기기는
 없습니다. **Form result**는 영역과 선택을 나열하고, 면은 보기 아래에 나열됩니다.
 

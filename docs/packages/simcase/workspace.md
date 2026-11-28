@@ -378,8 +378,11 @@ smallest extent. Cylinders and spheres are taken in meshloom's builder shapes on
 through the slab, one sphere, concentric spheres); whether a builder takes the model is the check's
 answer, in the engine's words ([builder shapes](geometry_engine3d.md#cylinders-and-spheres-in-builder-shapes-slice-3)).
 A cylinder row reads *r 0.3 m · z 0–1 m*, a sphere row *r 0.3 m*. A centre or radius against the
-domain is a combination: only the server checks it, so the engine's stem is shown (*cylinder 'via'
-crosses the side domain.x1 …*), not a range sentence. A feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its
+domain is a combination: only the server checks it, and its refusal is not a range sentence. A
+cylinder across a domain side reads Studio's suggestion, computed from the side and r: *Cylinder via
+crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or r ≤ 0.2 m.* (inside only: beyond a
+domain side the cylinder would leave the model), with the engine's sentence (*cylinder 'via' crosses
+the side domain.x1 …*) and its code under Details. A feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its
 tree row), **Duplicate** and **Delete** (*via deleted; Undo restores it.*); a layers feature also has
 **Add layer** and **Remove layer** (1 to 32 layers). There is no drag. **Form result** lists the
 regions and the selections, and the faces are listed under the view.

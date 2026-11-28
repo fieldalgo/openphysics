@@ -28,6 +28,8 @@
 //      own reason for -5) by aria-describedby; 330 + Apply: the node reads "stack.top.top · 330 K" and
 //      one Undo removes it; Messages "Fixed temperature 330 K on stack.top.top." (no 300 K); the node is
 //      selected with its Temperature 330: 5/5.
+//  V10 card 2, cx = 0.8: Messages reads "Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m
+//      (cx + r ≤ 1 m), or r ≤ 0.2 m.", with the engine's sentence and code under Details: 1/1.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -252,6 +254,23 @@ try {
       after.selected === 'heat:fixed:stack.top.top' && /^330( K)?$/.test(after.input),
     ];
     record('V1', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 5, box, empty, bad, good, after: {...after, messages: after.messages.slice(0, 200)}, undone});
+    await ctx.close();
+  }
+  // ---- V10: a cylinder across a domain side: Studio's suggestion, the engine's words under Details ----
+  if (want('V10')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="via-slab-3d"]');
+    await page.click('[data-model3d-card="via-slab-3d"]'); await checked(page);
+    await page.click('[data-m3-node="feature:0"]');
+    const sel = '[data-m3-field="features[0].cx"]';
+    await page.fill(sel, '0.8'); await page.press(sel, 'Enter');
+    await page.waitForSelector('[data-m3-refusal]', {timeout: 30000});
+    await page.waitForFunction(() => document.getElementById('mp-messages').dataset.m3State === 'checked');
+    const shown = await page.evaluate(() => ({text: document.querySelector('[data-m3-refusal] > p')?.textContent || '',
+      details: document.querySelector('[data-m3-refusal] details')?.textContent || ''}));
+    const rows = [shown.text === 'Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or r ≤ 0.2 m.'
+      && shown.details.includes('E-3D-COMBINATION') && shown.details.includes("cylinder 'via' crosses the side domain.x1")];
+    record('V10', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, shown});
     await ctx.close();
   }
 } finally {

@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 import {NEEDS_TWO,SAME_INPUTS,compareRows,heatRateNote,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
@@ -35,7 +35,7 @@ export function createModel3dView(ctx){
  const {$}=ctx;
  let doc=null,title=CARD3D.title,history=null,shown=false,inProject=false;
  let card=null;                 // the Library card the model came from (its id), or null
- let check=null,refused=null,lastGood=null,request=0,checking=false;
+ let check=null,refused=null,lastGood=null,lastDomain=null,request=0,checking=false;
  let selection='geometry',face=null,hidden=new Set();
  const drafts=new Map();          // field key → {raw, problem}
  const treeView=treeState();
@@ -60,7 +60,7 @@ export function createModel3dView(ctx){
   catch(e){reply={ok:false,refused:'The Studio server could not check the model: '+e.message,code:null,path:null,feature_index:null};}
   if(id!==request)return;
   checking=false;
-  if(reply.ok){check=reply;refused=null;lastGood=reply.display;}else refused=reply;
+  if(reply.ok){check=reply;refused=null;lastGood=reply.display;lastDomain=reply.domain||lastDomain;}else refused=reply;
   if(shown)ctx.render();
   pendingFocus=null;
  }
@@ -650,8 +650,10 @@ export function createModel3dView(ctx){
   box.dataset.m3State=checking?'checking':'checked';
   const parts=[];
   if(refused){const m=refusalMessage(refused);
-   parts.push(`<div class="mp-message error" data-m3-refusal><p>${esc(m.text)}</p><div class="mp-message-actions">${m.feature!==null?`<button type="button" data-m3-show="feature:${m.feature}">Show</button>`:''}</div>`+
-    (m.details?`<details><summary>Details</summary><code>${esc(refused.code||'')}</code>${refused.path?` at <code>${esc(refused.path)}</code>`:''}</details>`:'')+`</div>`);}
+   // V10: a cylinder across a domain side: the plain suggestion first, the engine's sentence and key under Details
+   const advice=crossingAdvice(refused,doc,lastDomain);
+   parts.push(`<div class="mp-message error" data-m3-refusal><p>${esc(advice||m.text)}</p><div class="mp-message-actions">${m.feature!==null?`<button type="button" data-m3-show="feature:${m.feature}">Show</button>`:''}</div>`+
+    (m.details||advice?`<details><summary>Details</summary><code>${esc(refused.code||'')}</code>${refused.path?` at <code>${esc(refused.path)}</code>`:''}${advice?`<p>${esc(refused.refused)}</p>`:''}</details>`:'')+`</div>`);}
   const off=refused?null:meshRefusal(check);
   if(off){const m=refusalMessage(off),at=m.feature!==null?`feature:${m.feature}`:'mesh';
    // an estimate refusal in plain words; the engine's sentence (with its formula) and key under Details
