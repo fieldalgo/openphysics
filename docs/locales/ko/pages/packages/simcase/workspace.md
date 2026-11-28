@@ -373,7 +373,9 @@ nodes, 9,238 tetrahedra, 4 regions.*(보관한 메시면 *Meshed Component 1 (th
 
 **보기와 선택.** 보기는 [3D 보기](studio_3d.md)와 그 조작입니다(보기에서 화살표는 회전, Shift+화살표는 이동, +와 −는
 확대·축소, F는 맞춤, 1–6은 축 방향 보기, 0은 등각). 보기에서 고르거나 **Faces** 목록에서 고른(Tab, Enter) 면은 그
-이름들을 *Any of these names selects this face.* 줄과 함께 보입니다(어떤 이름은 다른 면도 고름). 보기 도구 막대의
+이름들을 보입니다. 이름마다 *only this face* 또는 *also face 3*을 붙이고(검사의 면에서), *Any of these names selects this face.*
+줄을 둡니다. 안쪽 면은 *Interior face: hide Si (top), the region above it, with Regions in the view toolbar to see it.*를 덧붙입니다(x나
+y를 가로지르는 면은 +x나 +y 쪽 영역). 보기 도구 막대의
 **Regions**에는 영역마다 확인란이 있습니다. 해제한 영역은 형상, 메시, 결과 보기에서 숨겨지므로 안쪽 면을 고를 수 있습니다:
 +z 보기에서 `via.z1`은 그 위의 영역 *Si (top)*을 숨기면 골라집니다. 엔진의 이름은 바뀌지 않습니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
 `selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은

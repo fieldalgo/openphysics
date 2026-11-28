@@ -35,3 +35,18 @@ test('V7: the mesh line names Component 1 with the elapsed time; old stats are t
  assert.equal(M.keptMeshLabel(view,{mesh:{ok:false,code:'E-MESH-ESTIMATE'}}),'Kept mesh (before the last change)');
  assert.equal(M.keptMeshLabel(null,{mesh:{ok:true,key:'k1'}}),null);
 });
+
+test('V9: each name says whether it selects only this face or also others; an interior face says how to see it',()=>{
+ const view={faces:[
+  {id:4,axis:'z',names:['stack.oxide.top','stack.top.bottom','via.z1'],alone:['via.z1'],minus:['via'],plus:['Si (top)'],exterior:false},
+  {id:5,axis:'z',names:['domain.z1','stack.top.top'],alone:['domain.z1','stack.top.top'],minus:['Si (top)'],plus:[],exterior:true},
+  {id:6,axis:'x',names:['domain.x0','stack.sub.domain.x0'],alone:['stack.sub.domain.x0'],minus:[],plus:['Si'],exterior:true},
+  {id:7,axis:'x',names:['domain.x0','stack.oxide.domain.x0'],alone:['stack.oxide.domain.x0'],minus:[],plus:['SiO2'],exterior:true},
+  {id:9,axis:'z',names:['stack.oxide.top','stack.top.bottom'],alone:[],minus:['SiO2'],plus:['Si (top)'],exterior:false},
+  {id:12,axis:'x',names:['via.x0'],alone:['via.x0'],minus:['SiO2'],plus:['via'],exterior:false}]};
+ assert.deepEqual(M.nameScopes(view,view.faces[0]),[['stack.oxide.top','also face 9'],['stack.top.bottom','also face 9'],['via.z1','only this face']]);
+ assert.deepEqual(M.nameScopes(view,view.faces[2]),[['domain.x0','also face 7'],['stack.sub.domain.x0','only this face']]);
+ assert.equal(M.interiorHint(view.faces[0]),'Interior face: hide Si (top), the region above it, with Regions in the view toolbar to see it.');
+ assert.equal(M.interiorHint(view.faces[5]),'Interior face: hide via, the region on its +x side, with Regions in the view toolbar to see it.');
+ assert.equal(M.interiorHint(view.faces[1]),null,'an exterior face needs no hint');
+});

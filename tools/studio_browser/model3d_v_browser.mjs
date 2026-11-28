@@ -19,6 +19,10 @@
 //  V6  card 2: Run 1, z1 302 K, Run 2, Compare: right under the table one line reads "Heat rates keep
 //      the run table's sign … B − A is run B minus run A, so −… W through z0 means more heat leaves
 //      through z0 in run B."; it equals the helper on the two runs' /values: 2/2.
+//  V9  card 1: via.z1's names each say "only this face" or "also face N" exactly as the server's check
+//      display gives them (one of each kind), with "Interior face: hide Si (top), the region above
+//      it, with Regions in the view toolbar to see it."; stack.top.top (exterior): its scopes equal
+//      the check's and no interior line: 3/3.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -190,6 +194,27 @@ try {
       const v = async id => (await fetch(`/api/model3d/runs/${id}/values`)).json(); return C.heatRateNote(await v(ids[0]), await v(ids[1])); }, ids);
     const rows = [under === 'm3-compare-sign' && /means more heat leaves through z0 in run B\.$/.test(line), line === direct];
     record('V6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 2, line, direct, under});
+    await ctx.close();
+  }
+  // ---- V9: names marked "only this face" or "also face N"; an interior face says how to see it ----
+  if (want('V9')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    const answer = await serverCheck(page, CARD);
+    const expect = id => { const f = answer.display.faces[id];
+      return f.names.map(n => { const o = answer.display.faces.filter(g => g.id !== id && g.names.includes(n)).map(g => `face ${g.id}`); return [n, o.length ? `also ${o.join(', ')}` : 'only this face']; }); };
+    const shown = async id => { await page.click(`#m3-faces li[data-face="${id}"]`); await page.waitForTimeout(80);
+      return page.evaluate(() => ({scopes: [...document.querySelectorAll('#m3-names li')].map(li => [li.querySelector('code').textContent, li.querySelector('.m3-name-scope')?.textContent || '']),
+        hint: document.getElementById('m3-names-interior')?.textContent ?? null})); };
+    const z1 = answer.display.faces.find(f => f.alone.includes('via.z1')).id, top = answer.display.faces.find(f => f.alone.includes('stack.top.top')).id;
+    const a = await shown(z1), b = await shown(top);
+    const rows = [
+      JSON.stringify(a.scopes) === JSON.stringify(expect(z1)) && a.scopes.some(s => s[1] === 'only this face') && a.scopes.some(s => s[1].startsWith('also face')),
+      a.hint === 'Interior face: hide Si (top), the region above it, with Regions in the view toolbar to see it.',
+      JSON.stringify(b.scopes) === JSON.stringify(expect(top)) && b.hint === null,
+    ];
+    record('V9', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, z1: a, top: b});
     await ctx.close();
   }
 } finally {
