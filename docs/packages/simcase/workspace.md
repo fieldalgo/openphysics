@@ -357,8 +357,10 @@ as it is. The project file names the card (`layer-stack-3d` or
 (`copper-via-through-a-slab-3d.json`).
 
 **The tree** (design §5.2, for this step). The group **Component 1 · 3D · µm** holds **Parameters**
-(beside it the parameters as written, *t_ox = 10 um · via_w = 20 um*), **Geometry 1** with **Domain**
-(*200 × 200 × 610 µm*, or *200 × 200 µm, z from the features*), the features numbered in order (later
+(beside it the parameters, *t_ox = 10 µm · via_w = 20 µm*; every note and label shows µm, while an
+input keeps what was written, *10 um*), **Geometry 1** with **Domain** (each axis's range, *x 0–200 · y
+0–200 · z 0–610 µm*; card 2 *x −1–1 · y −1–1 · z 0–1 m*; or *x 0–200 · y 0–200 µm, z from the
+features*), the features numbered in order (later
 wins: *1 Layers stack* · *sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2
 (via))*, each layer's z range as written or, for a parameter such as `t_ox`, as the check evaluated it; *2 Box via* · *20 × 20 × 10
 µm*) and **Form result** (*4 regions · 22 faces*, from the server's check), **Materials** (*Si ·
@@ -433,6 +435,8 @@ under **Details**. Mesh and Run say *Fix 1 problem in Messages to mesh* (*… to
 
 **Mesh 1.** Its page shows the estimate and the `element_size` of the document's mesh block (a
 quantity; a bare number is in the component's unit; diagonal/400 to diagonal/4 as for a feature).
+The ribbon's **Mesh** opens Mesh 1 and meshes, as the header's **Mesh** does, when meshing is allowed;
+otherwise Messages gives the header's reason (a 2D model's ribbon Mesh is unchanged).
 **Mesh** in the graphics header runs Studio's mesh job (the [3D view's mesh routes](studio_3d.md#what-it-sends-and-answers))
 in a separate process: the steps (*Forming geometry → Meshing (expected about 1 s) → Checking the
 mesh → Ready*), the elapsed time and *taking longer than the estimate* past twice the estimate. While

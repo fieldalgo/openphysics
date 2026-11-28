@@ -36,6 +36,11 @@
 //      all checked; in the +z view a click at via.z1's projected centroid does not pick via.z1 with
 //      every region shown, and picks it once Si (top) (the region above it) is unchecked; Names then
 //      reads "Any of these names selects this face." under its names, via.z1 among them: 3/3.
+//  U8  card 1: no "um" in the rendered text of any tree node's page, the Parameters row reads "t_ox =
+//      10 µm · via_w = 20 µm" and its input keeps "10 um"; the Domain row reads "x 0–200 · y 0–200 ·
+//      z 0–610 µm" (card 2: "x −1–1 · y −1–1 · z 0–1 m"); the ribbon's Mesh starts a mesh job at 40 µm
+//      and, at 2 µm, puts the header's reason in Messages with no job; in the optical model the
+//      ribbon's Mesh selects Mesh and starts nothing, as before: 4/4.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -315,6 +320,59 @@ try {
     ];
     record('U7', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, boxes, target, shown, withoutSiSiO2, withoutTop, names});
     await ctx.close();
+  }
+  // ---- U8: µm in every note and label; Domain ranges; the ribbon's Mesh; a 2D model's ribbon as before ----
+  {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    // every tree node's page: the rendered text (inputs' values are not in it) has no "um" left
+    const keys = await page.evaluate(() => [...document.querySelectorAll('#tree [data-m3-node]')].map(b => b.dataset.m3Node));
+    const um = [];
+    for (const key of keys) {
+      await page.click(`#tree [data-m3-node="${key}"]`); await page.waitForTimeout(120);
+      const text = await page.evaluate(() => document.querySelector('main').innerText);
+      for (const m of text.matchAll(/.{0,30}\bum\b.{0,30}/g)) um.push([key, m[0]]);
+    }
+    await page.click('#tree [data-m3-node="parameters"]'); await page.waitForTimeout(120);
+    const notes = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#tree [data-m3-node]')].map(b => [b.dataset.m3Node, b.querySelector('.m3-note')?.textContent || ''])));
+    const written = await page.evaluate(() => document.querySelector('input[data-m3-param="t_ox"]')?.value);
+    // the ribbon's Mesh: allowed (the card's 40 µm) → Mesh 1 and a job; refused (2 µm) → the header's reason in Messages
+    await page.click('#tree [data-m3-node="geometry"]'); await page.waitForTimeout(120);
+    await page.click('[data-command-node="Mesh"]');
+    const started = await page.waitForFunction(() => document.getElementById('m3-mesh-cancel') || document.getElementById('m3-mesh-progress'), null, {timeout: 15000}).then(() => true, () => false);
+    const onMesh = await page.evaluate(() => document.querySelector('#tree [data-m3-node="mesh"]')?.getAttribute('aria-current') || document.querySelector('#tree [data-m3-node="mesh"]')?.getAttribute('aria-selected') || '');
+    await page.locator('#m3-mesh-cancel').click({timeout: 2000}).catch(() => {});
+    await page.waitForFunction(() => !document.getElementById('m3-mesh-cancel'), null, {timeout: 60000}).catch(() => {});
+    await setField(page, 'mesh.element_size', '2');
+    await page.click('#tree [data-m3-node="geometry"]'); await page.waitForTimeout(120);
+    await page.click('[data-command-node="Mesh"]'); await page.waitForTimeout(300);
+    const refusedMesh = await page.evaluate(() => ({block: document.getElementById('m3-block')?.textContent || '', messages: document.getElementById('mp-messages')?.textContent || '',
+      job: !!document.getElementById('m3-mesh-cancel')}));
+    await ctx.close();
+    // card 2's Domain row
+    const c2 = await open(browser);
+    await c2.page.waitForSelector('[data-model3d-card="via-slab-3d"]');
+    await c2.page.click('[data-model3d-card="via-slab-3d"]'); await checked(c2.page);
+    const domain2 = await c2.page.evaluate(() => document.querySelector('#tree [data-m3-node="domain"] .m3-note')?.textContent || '');
+    await c2.ctx.close();
+    // a 2D model: the ribbon's Mesh selects Mesh and starts nothing, as before
+    const d2 = await open(browser);
+    await d2.page.waitForFunction(() => /^Connected/.test(document.getElementById('connection-status').textContent) && !!document.querySelector('[data-template=optical]'));
+    await d2.page.click('[data-template=optical]'); await d2.page.waitForFunction(() => !document.getElementById('run-optical').disabled, null, {timeout: 30000});
+    const job0 = await d2.page.evaluate(() => document.getElementById('job-message').textContent);
+    await d2.page.click('[data-command-node="Mesh"]'); await d2.page.waitForTimeout(500);
+    const flat = await d2.page.evaluate(() => ({crumb: document.getElementById('breadcrumb').textContent, job: document.getElementById('job-message').textContent,
+      run: document.getElementById('run-optical').textContent}));
+    await d2.ctx.close();
+    const rows = [
+      um.length === 0 && notes.parameters === 't_ox = 10 µm · via_w = 20 µm' && written === '10 um',
+      notes.domain === 'x 0–200 · y 0–200 · z 0–610 µm' && domain2 === 'x −1–1 · y −1–1 · z 0–1 m',
+      started && refusedMesh.block === 'Fix 1 problem in Messages to mesh' && refusedMesh.messages.includes(refusedMesh.block) && !refusedMesh.job,
+      flat.crumb === 'Model / Mesh' && flat.job === job0 && flat.run === 'Run study',
+    ];
+    record('U8', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, um, notes: {parameters: notes.parameters, domain: notes.domain},
+      written, domain2, started, onMesh, refusedMesh: {...refusedMesh, messages: refusedMesh.messages.slice(0, 300)}, flat});
   }
 } finally {
   await writeFile(join(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');

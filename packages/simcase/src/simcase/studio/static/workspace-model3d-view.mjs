@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 
@@ -213,7 +213,7 @@ export function createModel3dView(ctx){
   const rowProblem=n=>refused&&new RegExp(`^geometry\\.parameters\\.${n}\\b`).test(refused.path||'')?refused.refused:'';
   const rowsHtml=Object.entries(params).map(([n,p])=>{const i=info.get(n),used=i?.used_by||[],problem=rowProblem(n);
    return `<tr${problem?' class="has-problem"':''}><th scope="row"><code>${esc(n)}</code></th><td><input data-m3-param="${esc(n)}" value="${esc(p.value)}" aria-label="value of ${esc(n)}"${problem?' aria-invalid="true"':''}>${problem?`<small class="m3-si">${esc(problem)}</small>`:''}</td>`+
-    `<td>${esc(i?.kind||'')}</td><td>${esc(p.range?JSON.stringify(p.range):'')}</td><td>${i?esc(`= ${Number(i.value.toPrecision(6))} ${i.unit}`):''}</td><td>${used.length?esc(`used by ${used.length}`):'unused'}</td>`+
+    `<td>${esc(i?.kind||'')}</td><td>${esc(p.range?shownText(JSON.stringify(p.range)):'')}</td><td>${i?esc(`= ${Number(i.value.toPrecision(6))} ${i.unit}`):''}</td><td>${used.length?esc(`used by ${used.length}`):'unused'}</td>`+
     `<td><button type="button" data-m3-unparam="${esc(n)}">Delete</button></td></tr>`;}).join('');
   return `<h3>Parameters</h3><table class="m3-params"><thead><tr><th>Name</th><th>Value</th><th>Kind</th><th>Range</th><th>SI value</th><th>Use</th><th></th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="7" class="muted">No parameters.</td></tr>'}</tbody></table>`+
    `<form class="m3-param-add"><label>Name <input name="name" spellcheck="false"></label><label>Value <input name="value" spellcheck="false" placeholder="20 um"></label><button type="submit">Add parameter</button></form>`;
@@ -512,6 +512,12 @@ export function createModel3dView(ctx){
   const job=mesh.job;mesh.job=null;
   if(job)ctx.request(`/api/model3d/jobs/${encodeURIComponent(job)}/cancel`,{}).catch(()=>{});
  }
+ /** U8: the ribbon's Mesh in a 3D model meshes when Mesh is allowed; otherwise Messages gives the header's reason. */
+ function meshFromRibbon(){
+  const why=meshReason({drafts:drafts.size,refused,check,running:!!mesh.job||!!heat.run},WORDS);
+  if(!why){startMesh();return;}
+  lastNotice={text:why,undo:false};renderDock();
+ }
  async function startMesh(){
   if(mesh.job||meshReason({drafts:drafts.size,refused,check},WORDS))return;
   let body;
@@ -652,7 +658,7 @@ export function createModel3dView(ctx){
   $('view-title').textContent=page==='Applications'?'Model library':'Graphics';
   $('view-detail').textContent=page==='Applications'?(ctx.projectLine?.()||'Choose a model'):'Interactive 3D view';
   markPageTabs(document.querySelector('.page-tabs'),page==='Applications'?'Applications':'Model');
-  document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>choose(({Geometry:'geometry',Materials:'materials',Mesh:'mesh',Study:'study'})[b.dataset.commandNode]);});
+  document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>{const key=({Geometry:'geometry',Materials:'materials',Mesh:'mesh',Study:'study'})[b.dataset.commandNode];choose(key);if(key==='mesh')meshFromRibbon();};});
   document.querySelectorAll('[data-view]').forEach(b=>b.hidden=true);
   const toolbar=document.querySelector('.workspace > .toolbar');if(toolbar)toolbar.style.display=page==='Model'?'flex':'none';
   $('breadcrumb').textContent='Model / '+(rows().find(r=>r.key===selection)?.label||'Geometry 1');

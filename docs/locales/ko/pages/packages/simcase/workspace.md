@@ -295,9 +295,10 @@ browser recovery and keeps none.*), 그래서 그 탭을 연 탭의 복구는 �
 (`layer-stack-3d` 또는 `via-slab-3d`)를 밝히고, Export › Model with runs는 카드의 파일 이름(`copper-via-through-a-slab-3d.json`)을
 제안합니다.
 
-**트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 적힌 그대로의 매개변수,
-*t_ox = 10 um · via_w = 20 um*), **Geometry 1**과 그 아래 **Domain**(*200 × 200 × 610 µm*, 또는 *200 × 200 µm, z from the
-features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2 (via))*,
+**트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 매개변수,
+*t_ox = 10 µm · via_w = 20 µm*; 모든 설명과 이름표는 µm로 보이고 입력 칸은 쓴 그대로 *10 um*), **Geometry 1**과 그 아래
+**Domain**(축마다의 범위, *x 0–200 · y 0–200 · z 0–610 µm*; 카드 2는 *x −1–1 · y −1–1 · z 0–1 m*; 또는 *x 0–200 · y 0–200 µm,
+z from the features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2 (via))*,
 각 층의 z 범위는 쓴 그대로, `t_ox` 같은 매개변수면 검사가 평가한 값;
 *2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*4 regions · 22 faces*, 서버 검사에서), **Materials**(*Si · Si (top) · SiO2 ·
 Cu*), **Heat transfer (3D)**와 그 아래 **Thermal conductivity**(*from Materials*), **Fixed temperature N**마다(*z0 · 300 K*),
@@ -356,7 +357,8 @@ the limit is 600,000. Use an element size of at least 6.36 µm.* 크기는 같�
 말합니다. 크기 칸의 이름은 **Element size**입니다.
 
 **Mesh 1.** 그 페이지는 추정과 문서 mesh 블록의 `element_size`(물리량; 수만 쓰면 구성 요소 단위; 특징처럼 대각선/400 ~
-대각선/4)를 보입니다. 그래픽 머리말의 **Mesh**는 Studio의 메시 작업([3D 보기의 메시 경로](studio_3d.md#보내는-것과-응답))을
+대각선/4)를 보입니다. 리본의 **Mesh**는 메시할 수 있으면 머리말의 **Mesh**처럼 Mesh 1을 열고 메시하며, 아니면
+Messages가 머리말의 이유를 말합니다(2D 모델의 리본 Mesh는 그대로). 그래픽 머리말의 **Mesh**는 Studio의 메시 작업([3D 보기의 메시 경로](studio_3d.md#보내는-것과-응답))을
 별도 프로세스로 실행합니다: 단계(*Forming geometry → Meshing (expected about 1 s) → Checking the mesh → Ready*), 경과 시간,
 추정의 두 배를 넘으면 *taking longer than the estimate*. 실행 중에는 버튼이 **Cancel meshing**이며, 취소는 프로세스를 끝내고
 아무것도 남기지 않습니다(Messages에 *Meshing cancelled; nothing kept.*). 끝나면 Messages가 *Meshed stack3d: 1551 nodes, 6774
