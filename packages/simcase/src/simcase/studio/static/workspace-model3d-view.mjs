@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 import {NEEDS_TWO,SAME_INPUTS,compareRows,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
@@ -157,6 +157,7 @@ export function createModel3dView(ctx){
    return `<h3>Mesh 1</h3><p id="m3-estimate">${esc(off?(meshRefusalText(off,'')!==off.refused?'Mesh is not available: see Messages.':'Mesh is not available: '+off.refused):est?estimateText(est):refused?'The geometry cannot be formed: fix the problem shown in Messages.':'Checking…')}</p>`+
     `<p class="muted">The mesh runs in a separate process on the Studio server; Cancel meshing ends it and keeps nothing. The mesh is not saved in the project file: mesh again after opening it.</p>`+
     fieldsOf(doc,'mesh').map(fieldInput).join('')+
+    (mesh.view&&keptMeshLabel(mesh.view,check)?`<h4 id="m3-kept-mesh">${esc(keptMeshLabel(mesh.view,check))}</h4>`:'')+
     (mesh.view?`<dl class="m3-mesh-stats">${statsRows(mesh.view).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:'');
   }
   if(selection==='materials'||selection==='heat:k')return conductivityTable();
@@ -557,7 +558,8 @@ export function createModel3dView(ctx){
   catch(e){mesh.job=null;lastNotice={text:'The mesh could not be read: '+e.message,undo:false};ctx.render();return;}
   if(mesh.job!==job)return;
   mesh.job=null;mesh.status=s;mesh.view=view;mesh.pane='mesh';
-  lastNotice={text:`Meshed ${view.component}: ${view.stats.nodes} nodes, ${view.stats.tetrahedra} tetrahedra, ${view.stats.regions} regions.`,undo:false};
+  heat.status=null;      // V7: the last run's status line belongs to the earlier mesh
+  lastNotice={text:meshDoneText(view,s),undo:false};
   ctx.render();
  }
  async function cancelMesh(){

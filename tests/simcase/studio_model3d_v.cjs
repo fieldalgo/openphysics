@@ -23,3 +23,15 @@ test('V4: document text shown in the Names box reads µm (faces\' coordinates an
  assert.equal(M.shownText('area 400 um² · interior'),'area 400 µm² · interior');
  assert.equal(M.shownText('sum of drums'),'sum of drums','only the unit word');
 });
+
+test('V7: the mesh line names Component 1 with the elapsed time; old stats are the kept mesh\'s',()=>{
+ const view={component:'stack3d',key:'k1',stats:{nodes:1551,tetrahedra:6774,regions:4}};
+ assert.equal(M.meshDoneText(view,{status:'done',elapsed_s:1.234,reused:false}),'Meshed Component 1 in 1.2 s: 1,551 nodes, 6,774 tetrahedra, 4 regions.');
+ assert.equal(M.meshDoneText(view,{status:'done',elapsed_s:0,reused:true}),'Meshed Component 1 (the kept mesh of this geometry and mesh block): 1,551 nodes, 6,774 tetrahedra, 4 regions.');
+ assert.equal(M.meshDoneText({...view,stats:{nodes:153720,tetrahedra:812345,regions:4}},{status:'done',elapsed_s:83.6}),'Meshed Component 1 in 1 min 24 s: 153,720 nodes, 812,345 tetrahedra, 4 regions.');
+ // the kept stats are labelled when the document's mesh no longer matches (another key, or a refusal)
+ assert.equal(M.keptMeshLabel(view,{mesh:{ok:true,key:'k1'}}),null);
+ assert.equal(M.keptMeshLabel(view,{mesh:{ok:true,key:'k2'}}),'Kept mesh (before the last change)');
+ assert.equal(M.keptMeshLabel(view,{mesh:{ok:false,code:'E-MESH-ESTIMATE'}}),'Kept mesh (before the last change)');
+ assert.equal(M.keptMeshLabel(null,{mesh:{ok:true,key:'k1'}}),null);
+});

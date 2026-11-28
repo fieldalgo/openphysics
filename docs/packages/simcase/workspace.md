@@ -442,8 +442,11 @@ otherwise Messages gives the header's reason (a 2D model's ribbon Mesh is unchan
 in a separate process: the steps (*Forming geometry → Meshing (expected about 1 s) → Checking the
 mesh → Ready*), the elapsed time and *taking longer than the estimate* past twice the estimate. While
 it runs, the button is **Cancel meshing**; a cancel ends the process and keeps nothing (*Meshing
-cancelled; nothing kept.* in Messages). Done, Messages says *Meshed stack3d: 1551 nodes, 6774
-tetrahedra, 4 regions.*, the page lists the mesh's statistics, and the view switches to **Mesh view**
+cancelled; nothing kept.* in Messages). Done, Messages says *Meshed Component 1 in 2.8 s: 2,176
+nodes, 9,238 tetrahedra, 4 regions.* (a kept mesh: *Meshed Component 1 (the kept mesh of this geometry and
+mesh block): …*), the last run's status line is cleared, the page lists the mesh's statistics (headed
+*Kept mesh (before the last change)* once the document's mesh no longer matches them, a refusal
+included), and the view switches to **Mesh view**
 (coloured by region, with mesh edges; the same controls and face picking); **Geometry** switches back.
 A mesh of an unchanged geometry and mesh block is reused at once. After an edit the mesh view is
 greyed and labelled *Mesh of an earlier geometry; mesh again to update it*. The mesh is view state:

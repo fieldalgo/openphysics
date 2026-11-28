@@ -362,8 +362,10 @@ the limit is 600,000. Use an element size of at least 6.36 µm.* 크기는 같�
 Messages가 머리말의 이유를 말합니다(2D 모델의 리본 Mesh는 그대로). 그래픽 머리말의 **Mesh**는 Studio의 메시 작업([3D 보기의 메시 경로](studio_3d.md#보내는-것과-응답))을
 별도 프로세스로 실행합니다: 단계(*Forming geometry → Meshing (expected about 1 s) → Checking the mesh → Ready*), 경과 시간,
 추정의 두 배를 넘으면 *taking longer than the estimate*. 실행 중에는 버튼이 **Cancel meshing**이며, 취소는 프로세스를 끝내고
-아무것도 남기지 않습니다(Messages에 *Meshing cancelled; nothing kept.*). 끝나면 Messages가 *Meshed stack3d: 1551 nodes, 6774
-tetrahedra, 4 regions.*라고 말하고, 페이지가 메시 통계를 나열하며, 보기가 **Mesh view**(영역별 색, 메시 모서리; 같은 조작과
+아무것도 남기지 않습니다(Messages에 *Meshing cancelled; nothing kept.*). 끝나면 Messages가 *Meshed Component 1 in 2.8 s: 2,176
+nodes, 9,238 tetrahedra, 4 regions.*(보관한 메시면 *Meshed Component 1 (the kept mesh of this geometry and mesh block): …*)라고
+말하고, 지난 실행의 상태 줄을 지우며, 페이지가 메시 통계를 나열하고(문서의 메시가 더는 맞지 않으면, 거절도 포함해 *Kept mesh
+(before the last change)*라는 제목 아래), 보기가 **Mesh view**(영역별 색, 메시 모서리; 같은 조작과
 면 고르기)로 바뀝니다. **Geometry**로 돌아갑니다. 형상과 mesh 블록이 바뀌지 않은 메시는 바로 재사용합니다. 편집한 뒤에는 메시
 보기가 흐려지고 *Mesh of an earlier geometry; mesh again to update it*라는 이름이 붙습니다. 메시는 보기 상태입니다: Undo에도,
 프로젝트나 세션 파일에도 없으며, 3D 모델을 떠나거나 닫으면 실행 중인 작업을 취소합니다.
