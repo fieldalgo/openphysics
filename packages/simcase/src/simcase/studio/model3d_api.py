@@ -326,10 +326,16 @@ def check_view(doc: dict, component: str | None = None) -> dict:
         mesh = {"ok": True, "estimate": mesh3d_jobs.estimate(doc, cx.component), "key": mesh3d_jobs.reuse_key(doc)}
     except GeometryError as exc:
         mesh = _refusal(exc)
+    # whether Run would take the document: the run route's own reading, in the reader's words
+    try:
+        heat3d_runs.read_document(doc)
+        run = {"ok": True}
+    except heat3d_runs.Refused as exc:
+        run = {"ok": False, "refused": exc.message, "code": exc.extra.get("code")}
     return {"ok": True, "component": cx.component, "unit": str(comp.length_unit),
             "features": _coverage(comp, cx), "regions": display["regions"],
             "parameters": _parameters(doc, model, cx.component),
-            "selections": display["selections"], "display": display, "mesh": mesh}
+            "selections": display["selections"], "display": display, "mesh": mesh, "run": run}
 
 
 def _refusal(exc: GeometryError) -> dict:

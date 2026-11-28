@@ -116,6 +116,20 @@ def _unanchored(mesh, message: str) -> str | None:
     return "; ".join(groups)
 
 
+def read_document(doc: dict) -> None:
+    """Read ``doc`` as Run does before it starts anything: one ``thermal.steady3d`` physics entry,
+    then the document as the kind reads it; ``Refused`` (400) in the reader's words. The builder's
+    check calls this too, so Run's reason is known on every edit."""
+    physics = doc.get("physics") if isinstance(doc, dict) else None
+    kinds = [p.get("type") for p in physics.values() if isinstance(p, dict)] if isinstance(physics, dict) else []
+    if kinds != [PHYSICS]:
+        raise Refused(400, f"Run takes a {PHYSICS} document (one physics entry of type {PHYSICS!r})")
+    try:
+        Document.from_dict(copy.deepcopy(doc))
+    except DocumentError as exc:
+        raise Refused(400, str(exc), code=getattr(exc, "code", None)) from exc
+
+
 class Heat3DRuns:
     """The 3D heat runs of one server: at most one running, a few finished."""
 
@@ -128,14 +142,7 @@ class Heat3DRuns:
 
     # -- start
     def start(self, doc: dict, component: str | None = None) -> dict:
-        physics = doc.get("physics") if isinstance(doc, dict) else None
-        kinds = [p.get("type") for p in physics.values() if isinstance(p, dict)] if isinstance(physics, dict) else []
-        if kinds != [PHYSICS]:
-            raise Refused(400, f"Run takes a {PHYSICS} document (one physics entry of type {PHYSICS!r})")
-        try:
-            Document.from_dict(copy.deepcopy(doc))
-        except DocumentError as exc:
-            raise Refused(400, str(exc), code=getattr(exc, "code", None)) from exc
+        read_document(doc)
         try:
             est = mesh3d_jobs.estimate(doc, component)
         except GeometryError as exc:

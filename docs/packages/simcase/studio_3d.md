@@ -193,6 +193,12 @@ requests in the component's unit, as for sections):
     element count limit, a below-tolerance E-CONTRACT, or two values that round to one
     coordinate (E-3D-COMBINATION at `features[i]`). The shape is formed either way, so the
     answer stays `"ok": true`; on the card it adds about 7 ms to the check's 8 ms.
+  - `run`: whether Run would take the document, read as `POST /api/model3d/run` reads it before it
+    starts anything (one `thermal.steady3d` physics entry, then the kind's reader): `{"ok": true}` or
+    `{"ok": false, "refused": <the reader's words>, "code"}`, for example *Fixed temperature needs an
+    outer face; via.z1 is inside* (`E-CONTRACT`). It starts no run, mesh job or process (about 10 ms
+    on the card). A connected group of regions without a fixed temperature is found only on the
+    mesh, so that refusal comes from a run.
 - A refusal while forming is `{"ok": false, "refused": <the engine's message as written>,
   "code", "path", "feature_index"}`. The index is the `features[i]` the path names,
   or null, and the builder marks that feature.
