@@ -282,18 +282,33 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
             plans.push((k, f64::NAN, Rule::Midpoint));
             mids.push(p.t0 + (p.t1 - p.t0) / 2.0);
         }
-        let at: Vec<P3> = plans.iter().enumerate().map(|(o, &(k, t, _))| {
-            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
-            let t = if t.is_nan() { mids[o - (plans.len() - mids.len())] } else { t };
-            std::array::from_fn(|c| a[c] + t * (b[c] - a[c]))
-        }).collect();
+        // each plan with its middle (NaN for a fixed point), ordered by its point's
+        // coordinates before the BRIO order, which draws its rounds and breaks its ties
+        // by position in the array: the output must not depend on how the input's
+        // points and segments are numbered
         let fixed = plans.len() - mids.len();
+        let mut plans: Vec<(usize, f64, Rule, f64, P3)> = plans.into_iter().enumerate().map(|(o, (k, t, rule))| {
+            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
+            let mid = if t.is_nan() { mids[o - fixed] } else { f64::NAN };
+            let u = if t.is_nan() { mid } else { t };
+            (k, t, rule, mid, std::array::from_fn(|c| a[c] + u * (b[c] - a[c])))
+        }).collect();
+        // a segment's ends in coordinate order (its direction is the input's)
+        let ends = |k: usize| {
+            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
+            if crate::predicates::lex_cmp(a, b).is_le() { [a, b] } else { [b, a] }
+        };
+        plans.sort_by(|x, y| crate::predicates::lex_cmp(&x.4, &y.4)
+            .then_with(|| x.1.is_nan().cmp(&y.1.is_nan()))
+            .then_with(|| { let (ex, ey) = (ends(x.0), ends(y.0));
+                crate::predicates::lex_cmp(ex[0], ey[0]).then_with(|| crate::predicates::lex_cmp(ex[1], ey[1])) }));
+        let at: Vec<P3> = plans.iter().map(|p| p.4).collect();
         for o in delaunay::brio_order(&at) {
             let o = o as usize;
-            let (k, t, rule) = plans[o];
+            let (k, t, rule, mid, _) = plans[o];
             let s = segments[k];
             let (t, rule, i) = if t.is_nan() {
-                let i = pieces[k].partition_point(|q| q.t1 <= mids[o - fixed]);
+                let i = pieces[k].partition_point(|q| q.t1 <= mid);
                 let p = pieces[k][i];
                 if edge(&mut mesh, p.u, p.v) {
                     continue;
