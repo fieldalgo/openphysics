@@ -191,7 +191,7 @@ display; the mesh follows it to within its size"가 붙고, 곡면은 꼭짓점 
   답합니다.
   - `features`: 기능마다 `index`, `id`, `type`, 영역 안의 `volume`과 자기 셀이 남긴
     부피(`owned`, 둘 다 구성 요소 길이 단위의 세제곱), `coverage`; 상자는 계산된 `size`(구성 요소 길이 단위의 x, y, z,
-    매개변수와 식을 계산한 값)도 가집니다. coverage는 `full`,
+    매개변수와 식을 계산한 값)도, 층 기능은 `layers`(아래부터 각 층의 계산된 `[z0, z1]`, 같은 단위)도 가집니다. coverage는 `full`,
     `partial`("covered in part by N (id)"), `none`("covered by N (id); adds no region"),
     `outside`("outside the domain; adds no region")입니다. N은 그 상자와 겹치고 자기
     부피가 남은 뒤쪽 기능 번호(1부터)입니다. 모두 복합체로 pm 단위에서 정확히

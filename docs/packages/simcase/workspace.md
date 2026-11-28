@@ -355,7 +355,8 @@ browser tab.* (and the other way round). The project file names the card (`layer
 **The tree** (design §5.2, for this step). The group **Component 1 · 3D · µm** holds **Parameters**
 (beside it the parameters as written, *t_ox = 10 um · via_w = 20 um*), **Geometry 1** with **Domain**
 (*200 × 200 × 610 µm*, or *200 × 200 µm, z from the features*), the features numbered in order (later
-wins: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*, *2 Box via* · *20 × 20 × 10
+wins: *1 Layers stack* · *sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2
+(via))*, each layer's z range as written or, for a parameter such as `t_ox`, as the check evaluated it; *2 Box via* · *20 × 20 × 10
 µm*) and **Form result** (*4 regions · 22 faces*, from the server's check), **Materials** (*Si ·
 Si (top) · SiO2 · Cu*), **Heat transfer (3D)** with **Thermal conductivity** (*from Materials*), each
 **Fixed temperature N** (*z0 · 300 K*), each **Heat source N** (*Si (top) · 1e12 W/m³*) and **Insulated**
@@ -499,8 +500,12 @@ at a node shared by two regions reads *336.05 K at the SiO2 / Si (top) interface
 until it is recomputed. The **Result** view shows the run's
 surface temperature, blue at the minimum and red at the maximum, with its colour bar titled *Surface
 temperature* (its range is the surface's, which can be narrower than the whole model's in the table); the toolbar's
-**Section** (x, y or z = a position in the component's unit) clips the geometry view and, on a result,
-draws the exact cut of the run's field (*Cut z = 505 µm: 833.653–939.105 K.*). A result whose inputs
+**Section** (x, y or z = a position in the component's unit, shown beside the box) clips the geometry view and, on a result,
+draws the exact cut of the run's field (*Cut z = 505 µm: 833.653–939.105 K.*), coloured over the cut's
+own range with a legend of its own under the surface's (*Cut z = 505 µm*, its minimum and maximum).
+Beside **Apply**, **Cut (CSV)** saves that cut as *via-in-a-layer-stack-3d-heat-cut-z-505um.csv* (the
+model's name, the plane and the position; the columns stay in metres) and Messages says *Cut (CSV)
+saved as …*. A result whose inputs
 have changed is greyed (*Run 1: inputs changed since this run*). Cut, probe and CSV need the run on
 the server: a run opened from a file has its record only and says *Recompute this run to cut, probe or
 export CSV.* with **Recompute**, which runs its own inputs again into the same row.

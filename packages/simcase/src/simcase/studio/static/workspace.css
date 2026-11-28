@@ -572,6 +572,7 @@ dialog::backdrop{background:#162a4b66}
 .m3-mesh-stats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px}.m3-mesh-stats dd{margin:0}
 .m3-section{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px}
 .m3-section label{display:inline-flex;gap:4px;align-items:center}.m3-section select{width:auto}.m3-section input{width:6em}
+.m3-section .m3-unit{color:#5b6573}
 .m3-colourbar{display:flex;gap:8px;align-items:center;max-width:720px;margin:6px 0;font-size:12px}
 .m3-colourbar .m3-ramp{flex:1;height:12px;border:1px solid #d4d9e1;border-radius:2px}
 .m3-values{border-collapse:collapse;font-size:12px;margin:6px 0}.m3-values th,.m3-values td{padding:2px 6px;text-align:left;vertical-align:top}

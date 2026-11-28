@@ -48,3 +48,23 @@ test('U3: the sign of a heat rate in one line; Tmax at an interface; whole model
  assert.equal(r2[1][1],'300 K in Si at (0, 0, 0) µm','one region: in it');
  assert.equal(M.colourBarTitle,'Surface temperature');
 });
+
+test('U5: the Layers row shows each layer\'s z range, as written or as the check evaluated it',()=>{
+ const row=(doc,check)=>M.treeRows(doc,check,null,null).find(r=>r.key==='feature:0').note;
+ // t_ox is a parameter: before the check answers, the names only
+ assert.equal(row(card(),null),'sub · oxide · top');
+ const check={features:[{index:0,type:'layers',text:'',layers:[[0,500],[500,510],[510,610]]},{index:1,type:'box',text:'',size:[20,20,10]}],regions:[],display:{faces:[]}};
+ assert.equal(row(card(),check),'sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm');
+ // every thickness a number: from the document itself
+ const d=card();d.geometry.components.stack3d.features[0].layers[1].thickness=10;
+ assert.equal(row(d,null),'sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm');
+});
+
+test('U5: the cut has its own legend and a file name with the model and the plane',()=>{
+ const cut={axis:'z',at:505,temperature_min:{value:300.000001},temperature_max:{value:336.0512}};
+ assert.equal(M.cutLegend(cut,'um'),'Cut z = 505 µm: 300–336.051 K');
+ assert.equal(M.cutLegend({...cut,axis:'x',at:0},'m'),'Cut x = 0 m: 300–336.051 K');
+ assert.equal(M.cutFileName('Via in a layer stack (3D heat)','z',505,'um'),'via-in-a-layer-stack-3d-heat-cut-z-505um.csv');
+ assert.equal(M.cutFileName('Copper via through a slab (3D heat)','x',-0.25,'m'),'copper-via-through-a-slab-3d-heat-cut-x--0.25m.csv');
+ assert.equal(M.cutFileName('',"y",1,'mm'),'model-cut-y-1mm.csv');
+});

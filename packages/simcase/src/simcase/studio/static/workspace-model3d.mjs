@@ -214,7 +214,12 @@ export const featureLabel=(f,i)=>`${i+1} ${TYPE_LABEL[f.type]||f.type} ${f.name}
 /** What a feature's row says beside its label: its layers, or a box's size (from its numbers, else
  * the size the server's check evaluated, for extents that are parameters or expressions). */
 function featureSummary(comp,f,checked=null){
- if(f.type==='layers')return f.layers.map(l=>l.name).join(' · ');
+ if(f.type==='layers'){const u=shownUnit(comp.length_unit);
+  // each layer's z range: from the document's numbers, else (a parameter or an expression) as the check evaluated it
+  let z=inUnit(f.z0,comp.length_unit),ranges=f.layers.map(l=>{const t=inUnit(l.thickness,comp.length_unit);
+   if(z===null||t===null){z=null;return null;}const r=[z,z+t];z+=t;return r;});
+  if(ranges.includes(null))ranges=Array.isArray(checked?.layers)&&checked.layers.length===f.layers.length?checked.layers:null;
+  return f.layers.map((l,j)=>ranges?`${l.name} · ${num(ranges[j][0])}–${num(ranges[j][1])} ${u}`:l.name).join(' · ');}
  if(f.type==='box'){let size=AXES.map(a=>{const lo=inUnit(f[a+'min'],comp.length_unit),hi=inUnit(f[a+'max'],comp.length_unit);return lo===null||hi===null?null:num(hi-lo);});
   if(size.includes(null)&&Array.isArray(checked?.size))size=checked.size.map(num);
   return size.includes(null)?'':`${size.join(' × ')} ${shownUnit(comp.length_unit)}`;}
@@ -554,6 +559,15 @@ export function valuesRows(values,unit,{expected=null}={}){
 export const HEAT_RATE_SIGN='Heat rate: positive into the model, negative out of it (a fixed temperature that removes heat shows a negative rate).';
 /** The colour bar's title: it spans the surface temperatures; the table's Tmax and Tmin are the whole model's. */
 export const colourBarTitle='Surface temperature';
+const sig6=x=>Number(Number(x).toPrecision(6));
+/** U5: the cut's own legend, for its own colour range: "Cut z = 505 µm: 300–336.051 K". */
+export const cutLegend=(cut,unit)=>`Cut ${cut.axis} = ${cut.at} ${shownUnit(unit)}: ${sig6(cut.temperature_min.value)}–${sig6(cut.temperature_max.value)} K`;
+/** U5: a saved cut's file name, with the model and the plane: "via-in-a-layer-stack-3d-heat-cut-z-505um.csv"
+ * (the unit as the document writes it, in ASCII). The CSV's columns stay in metres (F7). */
+export function cutFileName(model,axis,at,unit){
+ const slug=String(model||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'model';
+ return `${slug}-cut-${axis}-${at}${unit}.csv`;
+}
 
 // ---- card 2's expected heat rate (the parallel formula) ------------------------------------------
 /** A quantity "<number> <unit>" with exactly that unit (spaces aside), or null. */
