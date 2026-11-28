@@ -14,6 +14,13 @@
 //      (≥ 20 near-black pixels): 5/5.
 //  X2b Si (top) hidden with Regions: "Hidden: Si (top). Faces shown where it was are interior." above
 //      the view and "Regions (1 hidden)"; shown again: neither: 2/2.
+//  X3  card 1 with a run, then the Library: card 2's action reads "Open model", with no reason line and
+//      no separate Replace button; a click opens the question: its title "Open Copper via through a slab
+//      (3D heat)?", its lines equal openOtherQuestion for the unsaved state, its buttons Save and replace /
+//      Replace without saving / Open in a new tab / Cancel; Cancel changes nothing; Open in a new tab opens
+//      /workspace?card=via-slab-3d&fresh=1 with card 2 while this tab keeps card 1; Save and replace saves
+//      the project file (holding card 1) and only then shows card 2, and Messages' Undo brings card 1
+//      back; Replace without saving shows card 2 with no download: 6/6.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -162,6 +169,60 @@ try {
     const rowsB = [hiddenNote.line === 'Hidden: Si (top). Faces shown where it was are interior.' && hiddenNote.summary === 'Regions (1 hidden)',
       shownNote.line === null && shownNote.summary === 'Regions'];
     record('X2b', rowsB.every(Boolean) && !seen.pageErrors.length, {passed: rowsB.filter(Boolean).length, of: 2, hiddenNote, shownNote});
+    await ctx.close();
+  }
+  if (want('X3')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    const held = () => page.evaluate(() => document.querySelector('.m3-head h2')?.textContent || '');
+    await page.click('[data-page="Applications"]');
+    const card = await page.evaluate(() => { const b = document.querySelector('[data-model3d-card="via-slab-3d"]');
+      return {action: b?.querySelector('.card-action')?.textContent || '', why: !!b?.querySelector('.card-why'), replace: !!document.querySelector('[data-m3-replace]')}; });
+    const ask = async () => { await page.click('[data-page="Applications"]').catch(() => {}); await page.click('[data-model3d-card="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]'); };
+    await ask();
+    const q = await page.evaluate(() => ({title: document.querySelector('#m3-replace-dialog h2')?.textContent || '',
+      lines: [...document.querySelectorAll('#m3-replace-dialog p')].map(p => p.textContent),
+      buttons: [...document.querySelectorAll('#m3-replace-dialog .dialog-actions button')].map(b => b.textContent)}));
+    const want = await page.evaluate(async () => (await import('/workspace-assets/workspace-model3d.mjs'))
+      .openOtherQuestion({from: 'Via in a layer stack (3D heat)', to: 'Copper via through a slab (3D heat)', runs: 1, saved: 'none'}));
+    await page.click('#m3-replace-dialog [data-act="cancel"]'); await page.waitForTimeout(200);
+    const afterCancel = {dialog: await page.evaluate(() => !!document.getElementById('m3-replace-dialog')), held: (await page.click('[data-page="Model"]').catch(() => {}), await held())};
+    // Open in a new tab
+    await ask();
+    const popup = ctx.waitForEvent('page', {timeout: 30000});
+    await page.click('#m3-replace-dialog [data-act="tab"]');
+    const tab = await popup; await tab.waitForLoadState();
+    await tab.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
+    const fresh = await tab.evaluate(() => ({url: location.pathname + location.search, title: document.querySelector('.m3-head h2')?.textContent || ''}));
+    await tab.close();
+    await page.click('[data-page="Model"]').catch(() => {});
+    const keptAfterTab = await held();
+    // Save and replace: the file is written (holding card 1), then card 2 shows; Undo brings card 1 back
+    await ask();
+    const file = await download(page, () => page.click('#m3-replace-dialog [data-act="save"]'));
+    await page.waitForFunction(() => document.querySelector('.m3-head h2')?.textContent === 'Copper via through a slab (3D heat)', null, {timeout: 30000});
+    await checked(page);
+    const saved = JSON.parse(file), m3 = saved.models.find(m => m.kind === 'model3d');
+    await page.click('#file-status button[data-m3-undo-replace]');
+    await page.waitForFunction(() => document.querySelector('.m3-head h2')?.textContent === 'Via in a layer stack (3D heat)', null, {timeout: 30000});
+    await checked(page);
+    // Replace without saving: no download
+    let downloads = 0; page.on('download', () => downloads++);
+    await ask();
+    await page.click('#m3-replace-dialog [data-act="replace"]');
+    await page.waitForFunction(() => document.querySelector('.m3-head h2')?.textContent === 'Copper via through a slab (3D heat)', null, {timeout: 30000});
+    await checked(page); await page.waitForTimeout(500);
+    const rows = [
+      card.action === 'Open model' && !card.why && !card.replace,
+      q.title === want.title && JSON.stringify(q.lines) === JSON.stringify(want.lines),
+      JSON.stringify(q.buttons) === JSON.stringify(want.buttons.map(b => b.label)) && !afterCancel.dialog && afterCancel.held === 'Via in a layer stack (3D heat)',
+      fresh.url === '/workspace?card=via-slab-3d&fresh=1' && fresh.title === 'Copper via through a slab (3D heat)' && keptAfterTab === 'Via in a layer stack (3D heat)',
+      m3?.card === 'layer-stack-3d',
+      downloads === 0,
+    ];
+    record('X3', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 6, card, q, afterCancel, fresh, keptAfterTab, savedCard: m3?.card, downloads, errors: seen.pageErrors});
     await ctx.close();
   }
 } finally {

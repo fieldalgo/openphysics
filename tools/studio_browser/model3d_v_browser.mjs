@@ -37,13 +37,13 @@
 //  V8  card 1 (300 K on z0 and z1), Run, Section z = 505, view +z zoomed (6 × +): the cut's pixels (every one) reach the colour
 //      map's blue and red ends within 12/255 per channel; their mean HSV saturation is ≥ 0.25; the cut's
 //      legend is in view without scrolling at 1440 × 900: 3/3. Screenshots: v8-surface.png, v8-cut.png.
-//  V2a an optical run (a recovery record), then card 1 with a run; in the Library card 2 reads "Open in
-//      a new tab" with "This project holds Via in a layer stack (3D heat); a project holds one 3D
-//      model."; one click opens /workspace?card=via-slab-3d&fresh=1 with card 2 (no Messages step);
+//  V2a an optical run (a recovery record), then card 1 with a run; in the Library card 2 reads "Open
+//      model" (X3) with no reason line; its question's Open in a new tab opens
+//      /workspace?card=via-slab-3d&fresh=1 with card 2 (no Messages step);
 //      the first tab keeps both models and the recovery record (session) unchanged; in the new tab,
-//      card 1 reads the same with card 2's title: 4/4.
-//  V2b "Replace the 3D model…": the dialog's lines equal replaceLines for the unsaved state, and after
-//      its File › Save for the saved state (that file's name); Cancel changes nothing; Replace opens
+//      card 1 reads the same: 4/4.
+//  V2b card 2's question (X3): its lines equal openOtherQuestion for the unsaved state, and after
+//      File › Save for the saved state (that file's name); Cancel changes nothing; Replace without saving opens
 //      card 2 and leaves the recovery record's session as it was; Messages' Undo brings card 1 back:
 //      a new File › Save has the same model3d digest (document and runs) and the same workspace digest
 //      as the save before Replace, with the recovery session unchanged; the save holds card 1 and the
@@ -366,41 +366,43 @@ try {
       o.onsuccess = () => { const r = o.result.transaction('snapshots', 'readonly').objectStore('snapshots').get('latest');
         r.onsuccess = () => { o.result.close(); resolve(r.result?.session ?? null); }; r.onerror = () => reject(r.error); }; o.onerror = () => reject(o.error); }));
     const recBefore = await session(page);
-    // (a) card 2 reads "Open in a new tab" with the reason, and one click opens it
+    // (a) card 2 reads "Open model" with no reason line (X3); its question's Open in a new tab opens it
     await page.click('[data-page="Applications"]');
     const cardA = await page.evaluate(() => { const b = document.querySelector('[data-model3d-card="via-slab-3d"]');
-      return {action: b?.querySelector('.card-action')?.textContent || '', why: b?.querySelector('.card-why')?.textContent || '', status: document.getElementById('file-status')?.textContent || ''}; });
+      return {action: b?.querySelector('.card-action')?.textContent || '', why: b?.querySelector('.card-why')?.textContent ?? null, status: document.getElementById('file-status')?.textContent || ''}; });
     const popup = ctx.waitForEvent('page', {timeout: 30000});
-    await page.click('[data-model3d-card="via-slab-3d"]');
+    await page.click('[data-model3d-card="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]');
+    await page.click('#m3-replace-dialog [data-act="tab"]');
     const tab = await popup; await tab.waitForLoadState();
     await tab.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
     const fresh = await tab.evaluate(() => ({url: location.pathname + location.search, title: document.querySelector('.m3-head h2')?.textContent || ''}));
     const statusAfter = await page.evaluate(() => document.getElementById('file-status')?.textContent || '');
-    // the reverse: in the new tab (card 2 held), card 1 reads the same with card 2's title
+    // the reverse: in the new tab (card 2 held), card 1 reads the same
     await tab.click('[data-page="Applications"]');
     const reverse = await tab.evaluate(() => { const b = document.querySelector('[data-model3d-card="layer-stack-3d"]');
-      return {action: b?.querySelector('.card-action')?.textContent || '', why: b?.querySelector('.card-why')?.textContent || ''}; });
+      return {action: b?.querySelector('.card-action')?.textContent || '', why: b?.querySelector('.card-why')?.textContent ?? null}; });
     await tab.close();
     const recAfterTab = await session(page);
     const rowsA = [
-      cardA.action === 'Open in a new tab' && cardA.why === 'This project holds Via in a layer stack (3D heat); a project holds one 3D model.',
+      cardA.action === 'Open model' && cardA.why === null,
       fresh.url === '/workspace?card=via-slab-3d&fresh=1' && fresh.title === 'Copper via through a slab (3D heat)' && statusAfter === cardA.status,
       recBefore !== null && recAfterTab === recBefore && await page.evaluate(() => document.querySelectorAll('[data-model3d-card]').length) === 2,
-      reverse.action === 'Open in a new tab' && reverse.why === 'This project holds Copper via through a slab (3D heat); a project holds one 3D model.',
+      reverse.action === 'Open model' && reverse.why === null,
     ];
     record('V2a', rowsA.every(Boolean) && !seen.pageErrors.length, {passed: rowsA.filter(Boolean).length, of: 4, cardA, fresh, reverse, sameRecord: recAfterTab === recBefore});
-    // (b) Replace: the question, Cancel, File › Save, Replace, Undo
+    // (b) Replace: the question, Cancel, File › Save, Replace without saving, Undo
     const dialogText = () => page.evaluate(() => [...document.querySelectorAll('#m3-replace-dialog p')].map(p => p.textContent));
     const expected = (saved, file) => page.evaluate(async ([s, f]) => (await import('/workspace-assets/workspace-model3d.mjs'))
-      .replaceLines({from: 'Via in a layer stack (3D heat)', to: 'Copper via through a slab (3D heat)', runs: 1, saved: s, file: f}), [saved, file]);
-    await page.click('[data-m3-replace="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]');
+      .openOtherQuestion({from: 'Via in a layer stack (3D heat)', to: 'Copper via through a slab (3D heat)', runs: 1, saved: s, file: f}).lines, [saved, file]);
+    const ask = async () => { await page.click('[data-page="Applications"]').catch(() => {}); await page.click('[data-model3d-card="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]'); };
+    await ask();
     const unsaved = await dialogText();
     await page.click('#m3-replace-dialog [data-act="cancel"]'); await page.waitForTimeout(200);
     const afterCancel = await page.evaluate(() => ({dialog: !!document.getElementById('m3-replace-dialog'), card1: document.querySelector('[data-model3d-card="layer-stack-3d"] .card-action')?.textContent}));
-    await page.click('[data-m3-replace="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]');
-    const file1 = await download(page, () => page.click('#m3-replace-dialog [data-act="save"]'));
+    const file1 = await save(page);
     await page.waitForTimeout(300);
-    const savedName = await page.evaluate(() => document.querySelector('#m3-replace-dialog p:nth-of-type(2)')?.textContent.match(/saved in (.+) with no changes since\./)?.[1] || '');
+    await ask();
+    const savedName = await page.evaluate(() => document.querySelector('#m3-replace-dialog p:nth-of-type(3)')?.textContent.match(/saved in (.+) with no changes since\./)?.[1] || '');
     const saved = await dialogText();
     const p1 = JSON.parse(file1), entry = (p, kind) => p.models.find(m => m.kind === kind);
     await page.click('#m3-replace-dialog [data-act="replace"]');

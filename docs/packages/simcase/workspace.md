@@ -347,17 +347,20 @@ The line is shown only where the formula applies (one cylinder through the whole
 temperatures on exactly `z0` and `z1`, no heat source, every value a number or a quantity); otherwise
 there is no line. The run's 31.75 W is below it because the drawn and meshed cylinder is an inscribed
 polygon. A project holds one 3D model: while it holds one from
-card 1, the Library's card 2 reads **Open in a new tab** with *This project holds Via in a layer stack (3D
-heat); a project holds one 3D model.* (and the other way round), and one click opens
-`/workspace?card=via-slab-3d&fresh=1`: a new tab whose own project starts with that card. Nothing is
-restored into it: it offers no browser recovery and writes none (*This tab was opened for one 3D
-model: it offers no browser recovery and keeps none.*), so the recovery of the tab it came from stays
-as it is. Below the card, **Replace the 3D model…** asks first and names what is dropped, from the
+card 1, the Library's card 2 reads **Open model** (and the other way round), and a click asks first:
+*Open Copper via through a slab (3D heat)?* names the held model (*This project holds Via in a layer
+stack (3D heat); a project holds one 3D model.*) and what is dropped, from the
 state Studio holds: *Replacing drops Via in a layer stack (3D heat) from this project: its document and
 its 1 run.*, then *It is not saved to any file, so all of it is lost unless you save first.* (or *It has
 changes since the last File › Save to study.json; …*, or *It is saved in study.json with no changes
-since.*), that 3D models are not kept in browser recovery, and that the other models stay as they are;
-it offers **File › Save**, **Replace with …** and **Cancel**. After Replace, Messages' **Undo** brings
+since.*), that 3D models are not kept in browser recovery, and that the other models stay as they are.
+It offers **Save and replace** (File › Save, then Replace once the 3D model reads saved in the file;
+otherwise *Not replaced: the project file was not saved.*), **Replace without saving**, **Open in a new
+tab** and **Cancel**. Open in a new tab opens
+`/workspace?card=via-slab-3d&fresh=1`: a new tab whose own project starts with that card. Nothing is
+restored into it: it offers no browser recovery and writes none (*This tab was opened for one 3D
+model: it offers no browser recovery and keeps none.*), so the recovery of the tab it came from stays
+as it is. After Replace, Messages' **Undo** brings
 the earlier 3D model back with its run records in one step (recompute a run to cut or probe it); the
 project's other models, their runs and the browser recovery record are not touched. The project file names the card (`layer-stack-3d` or
 `via-slab-3d`), and Export › Model with runs suggests the card's file name

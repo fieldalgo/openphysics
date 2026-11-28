@@ -595,6 +595,4 @@ dialog::backdrop{background:#162a4b66}
 
 .card-3d-cell{display:flex;flex-direction:column;gap:6px}
 .card-3d-cell>button[data-model3d-card]{flex:1}
-.cards-3d .card-why{color:#8a5a00;margin-top:6px}
-.card-replace{align-self:flex-start;font-size:12px}
 #m3-replace-dialog .dialog-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}

@@ -37,3 +37,13 @@ test('X1: strict bounds and grid values one step inside, for each side; the r bo
  assert.deepEqual(M.gridInside(-0.7,1),[-0.69,-0.68,-0.67]);assert.deepEqual(M.gridInside(120,-1),[110,100,99]);
  assert.equal(M.crossingAdvice({...off('x1'),refused:'something else'},at('cx',0.8)),null);
 });
+
+test('X3: the other 3D card opens a question naming the held model, what is lost, and four ways on',()=>{
+ const q=M.openOtherQuestion({from:'Via in a layer stack (3D heat)',to:'Copper via through a slab (3D heat)',runs:1,saved:'none'});
+ assert.equal(q.title,'Open Copper via through a slab (3D heat)?');
+ assert.deepEqual(q.lines,['This project holds Via in a layer stack (3D heat); a project holds one 3D model.',
+  ...M.replaceLines({from:'Via in a layer stack (3D heat)',runs:1,saved:'none'})]);
+ assert.deepEqual(q.buttons.map(b=>[b.act,b.label]),[['save','Save and replace'],['replace','Replace without saving'],['tab','Open in a new tab'],['cancel','Cancel']]);
+ assert.equal(M.OTHER_CARD_ACTION,'Open model');
+ assert.equal(M.NOT_SAVED_NOT_REPLACED,'Not replaced: the project file was not saved.');
+});

@@ -34,6 +34,18 @@ export function replaceLines({from,runs,saved,file}){
   '3D models are not kept in browser recovery. Undo, right after Replace, brings it back in this tab (its runs can be recomputed).',
   'The other models of the project stay as they are.'];
 }
+/** X3: the action another 3D card reads while the project holds a 3D model (it opens the question below). */
+export const OTHER_CARD_ACTION='Open model';
+/** X3: Messages when Save and replace did not write the project file. */
+export const NOT_SAVED_NOT_REPLACED='Not replaced: the project file was not saved.';
+/**
+ * X3: the question another 3D card opens: its title, its lines (the held model, then what Replace drops,
+ * from replaceLines) and its buttons, in order.
+ */
+export function openOtherQuestion({from,to,runs,saved,file}){
+ return {title:`Open ${to}?`,lines:[otherCardReason(from),...replaceLines({from,runs,saved,file})],
+  buttons:[{act:'save',label:'Save and replace'},{act:'replace',label:'Replace without saving'},{act:'tab',label:'Open in a new tab'},{act:'cancel',label:'Cancel'}]};
+}
 /** U6: the address that opens a 3D card in a fresh workspace (a new tab), beside a project that holds another. */
 export const newTabUrl=card=>`/workspace?card=${encodeURIComponent(card.id)}&fresh=1`;
 /** U6: the 3D card a fresh workspace's address asks for (?card=<id>&fresh=1), or null. */
