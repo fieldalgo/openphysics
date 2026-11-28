@@ -11,6 +11,10 @@
 //      limit is L. Use an element size of at least S µm.") appears exactly once on the page, the
 //      engine's sentence under Details; typing S (the server's suggestion, read at test time)
 //      enables Mesh: 100%.
+//  U2  card 1, stack.top.top from the faces list, Use for → Fixed temperature, Apply: the tree selects
+//      heat:fixed:stack.top.top, its Temperature input has the focus, typing 310 + Enter makes Messages
+//      read "Fixed temperature 310 K on stack.top.top." with no 300 K line left, and the name box
+//      beside the select has a label element as its accessible name: 4/4.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -87,6 +91,34 @@ try {
       && shown.estimate === 'Mesh is not available: see Messages.' && shown.meshDisabled && shown.label === 'Element size'
       && !after.meshDisabled && !after.refusal && !seen.pageErrors.length;
     record('U1', ok, {plain, shown, count, suggested: mesh.suggested_size, after, pageErrors: seen.pageErrors});
+    await ctx.close();
+  }
+  // ---- U2: Use for → Fixed temperature opens the new node, focused; Messages follows ----------------
+  {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    const top = await page.evaluate(() => [...document.querySelectorAll('#m3-faces li')].find(li => li.getAttribute('aria-label').split(': ')[1].split(', ').includes('stack.top.top'))?.dataset.face);
+    await page.click(`#m3-faces li[data-face="${top}"]`);
+    await page.selectOption('#m3-use', 'fixed');
+    const label = await page.evaluate(() => { const i = document.getElementById('m3-use-name');
+      return {aria: i.getAttribute('aria-label'), labels: [...(i.labels || [])].map(l => l.textContent.trim())}; });
+    await page.click('#m3-use-go');
+    await page.waitForSelector('[data-m3-node="heat:fixed:stack.top.top"]', {timeout: 30000});
+    await page.waitForTimeout(300);
+    const state = await page.evaluate(() => ({selected: document.querySelector('#tree [aria-selected="true"]')?.dataset.m3Node,
+      focus: document.activeElement?.dataset?.m3Heat + ':' + document.activeElement?.dataset?.m3Key}));
+    await page.keyboard.press('Control+A'); await page.keyboard.type('310'); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
+    await page.waitForTimeout(300);
+    const messages = await page.evaluate(() => document.getElementById('mp-messages').textContent);
+    const rows = [
+      state.selected === 'heat:fixed:stack.top.top',
+      state.focus === 'fixed:stack.top.top',
+      messages.includes('Fixed temperature 310 K on stack.top.top.') && !messages.includes('300 K on stack.top.top'),
+      label.aria === null && label.labels.length === 1 && label.labels[0].length > 0,
+    ];
+    record('U2', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, state, label, messages: messages.slice(0, 300)});
     await ctx.close();
   }
 } finally {

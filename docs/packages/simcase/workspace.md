@@ -449,7 +449,9 @@ name selects is not made into a selection, and says so. **Use for → Fixed temp
 on the face's name (the alone name of the latest feature, such as `via.z1` or `stack.top.top`) after
 the server's check: a face the heat kind refuses (an inner face) is not written, and Messages shows
 the kind's words (*Fixed temperature needs an outer face; via.z1 is inside*) with the document
-unchanged.
+unchanged. A fixed temperature that is written opens its node in Settings with **Temperature**
+focused, and Messages follows its later value (*Fixed temperature 310 K on stack.top.top.*). The box
+beside the select is labelled **Selection name** or **Boundary name**.
 
 **Heat transfer (3D).** Its page edits the document's `physics.heat` block (kind `thermal.steady3d`,
 [the kind](thermal_steady3d.md)): **Add fixed temperature** on a boundary name (1–2000 K, written

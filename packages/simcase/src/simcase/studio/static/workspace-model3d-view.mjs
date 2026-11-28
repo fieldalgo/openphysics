@@ -46,6 +46,7 @@ export function createModel3dView(ctx){
  // ran it (cut, probe and CSV need it), the run going, the refusal the last run ended with, the run shown
  const heat={records:[],live:[],run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
  let section=null;              // the geometry view's section {axis, at} (document units), view state
+ let pendingFocus=null;         // a Settings field to focus across the renders until the check has answered
 
  // ---- the document and the check ----
  async function runCheck(){
@@ -57,6 +58,7 @@ export function createModel3dView(ctx){
   checking=false;
   if(reply.ok){check=reply;refused=null;lastGood=reply.display;}else refused=reply;
   if(shown)ctx.render();
+  pendingFocus=null;
  }
  function commit(next,{record=true}={}){
   doc=next;if(record&&history.record(doc))ctx.onHistory();
@@ -214,6 +216,7 @@ export function createModel3dView(ctx){
    `<form class="m3-param-add"><label>Name <input name="name" spellcheck="false"></label><label>Value <input name="value" spellcheck="false" placeholder="20 um"></label><button type="submit">Add parameter</button></form>`;
  }
  function bindSettings(host){
+  if(pendingFocus){const target=pendingFocus;queueMicrotask(()=>host.querySelector(target)?.focus());}
   host.querySelectorAll('[data-m3-field]').forEach(input=>input.addEventListener('change',()=>{
    const field=[...fieldsOf(doc,selection),...fieldsOf(doc,'domain'),...fieldsOf(doc,'mesh')].find(f=>f.key===input.dataset.m3Field);
    const out=editField(doc,field,input.value,{domain:check?.domain??null});
@@ -242,6 +245,10 @@ export function createModel3dView(ctx){
    try{
     const next=kind==='fixed'?setFixedTemperature(doc,key,input.value):kind==='source'?setHeatSource(doc,key,input.value):setConductivity(doc,key,input.value);
     drafts.delete(id);commit(next);
+    // Messages follows the value: the notice of a fixed temperature says the one now in the model
+    if(kind==='fixed')lastNotice={text:`Fixed temperature ${heatOf(next).prescribed_temperature[key]} on ${key}.`,undo:true};
+    else if(lastNotice&&/^Fixed temperature /.test(lastNotice.text))lastNotice=null;
+    renderDock();
    }catch(e){drafts.set(id,{raw:input.value,problem:e.message});ctx.render();ctx.onHistory();}
   }));
   host.querySelectorAll('[data-m3-restore]').forEach(b=>{if(/^(fixed|source|k):/.test(b.dataset.m3Restore))b.onclick=()=>{drafts.delete(b.dataset.m3Restore);ctx.render();ctx.onHistory();};});
@@ -525,12 +532,12 @@ export function createModel3dView(ctx){
   if(!f){box.innerHTML='<h3>Names</h3><p class="muted">Pick a face in the view or in the faces list.</p>';return;}
   const lines=faceLines(lastGood,f),can=f.alone.length>0&&!refused;
   box.innerHTML=`<h3>Names</h3><p>${esc(lines.title)}</p><p class="muted">${esc(lines.detail)} · sides ${esc(lines.sides)}</p><ul>${lines.names.map(n=>`<li><code>${esc(n)}</code></li>`).join('')}</ul>`+
-   `<div class="m3-use"><label>Use for <select id="m3-use"><option value="new">New selection</option><option value="fixed">Fixed temperature</option></select></label><input id="m3-use-name" aria-label="new selection name" value="${esc(suggestName(f))}" spellcheck="false"><button type="button" id="m3-use-go"${can?'':' disabled aria-describedby="m3-use-why"'}>Apply</button>`+
+   `<div class="m3-use"><label>Use for <select id="m3-use"><option value="new">New selection</option><option value="fixed">Fixed temperature</option></select></label><label for="m3-use-name" id="m3-use-name-label">Selection name</label><input id="m3-use-name" value="${esc(suggestName(f))}" spellcheck="false"><button type="button" id="m3-use-go"${can?'':' disabled aria-describedby="m3-use-why"'}>Apply</button>`+
    (can?'':`<small id="m3-use-why">${esc(refused?'The geometry cannot be formed; fix the problem in Messages first.':'No single name selects this face alone.')}</small>`)+`</div>`;
   const go=box.querySelector('#m3-use-go'),use=box.querySelector('#m3-use'),nameInput=box.querySelector('#m3-use-name');
   use.onchange=()=>{const fixed=use.value==='fixed';
    nameInput.value=fixed?boundaryNameFor(f,doc.geometry.components[componentName(doc)].features.map(x=>x.name))||'':suggestName(f);
-   nameInput.setAttribute('aria-label',fixed?'boundary name of the fixed temperature':'new selection name');};
+   box.querySelector('#m3-use-name-label').textContent=fixed?'Boundary name':'Selection name';};
   go.onclick=()=>{
    if(use.value==='fixed'){fixedOn(nameInput.value.trim());return;}
    newSelection(f.id,nameInput.value.trim());
@@ -546,7 +553,9 @@ export function createModel3dView(ctx){
   if(a.ok&&a.run?.ok===false&&a.run.refused!==check?.run?.refused){
    lastNotice={text:a.run.refused,undo:false,error:true,details:a.run.code||null};renderDock();
    globalThis.document.querySelector('[data-m3-use-refusal] > p')?.focus();return;}
-  commit(next);lastNotice={text:`Fixed temperature 300 K on ${name}.`,undo:true};ctx.render();
+  // the new node opens in Settings with its Temperature focused
+  pendingFocus=`[data-m3-heat="fixed"][data-m3-key="${CSS.escape(name)}"]`;
+  commit(next);selection=`heat:fixed:${name}`;lastNotice={text:`Fixed temperature 300 K on ${name}.`,undo:true};ctx.render();
  }
  function suggestName(f){
   const taken=new Set(Object.keys(doc.geometry.components[componentName(doc)].selections||{}));
