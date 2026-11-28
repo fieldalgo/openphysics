@@ -161,6 +161,9 @@ const LARGE_EDGE: f64 = 1.5;
 const PROJECT_GAP: f64 = 0.5;
 /// Lawson flips after one insertion, at most (they end on their own; this is a guard).
 const LAWSON_CAP: u32 = 10_000;
+/// Pieces of a chain on each side of a segment point's bisected position that insert checks
+/// for holding the point.
+const LONE_WINDOW: usize = 2;
 /// A facet's frame triple is kept when the squared sine of its angle exceeds this (in
 /// doubles); below it the s, r system of a facet point is ill-conditioned.
 const FRAME_SIN2: f64 = 1e-8;
@@ -2234,8 +2237,22 @@ impl State<'_> {
         // a lone subsegment (no subfacet through it) containing p
         if self.g.s[(p as usize) - self.g.input.len()].kind() == crate::mixed::Kind::Segment {
             let sp = self.g.s[(p as usize) - self.g.input.len()];
+            // a chain is ordered along its segment, so only the pieces around p's position on
+            // it (found by bisection in doubles, with LONE_WINDOW pieces each side for
+            // rounding) can hold p; scanning every piece made each insertion linear in the
+            // chain's length
+            let xp = self.xyz[p as usize];
             let lone: Vec<(u32, u32)> = self.chain_of.get(&ekey(sp.a, sp.b)).into_iter().flatten()
-                .flat_map(|&c| self.chains[c as usize].windows(2).map(|w| ekey(w[0], w[1])).collect::<Vec<_>>())
+                .flat_map(|&c| {
+                    let ch = &self.chains[c as usize];
+                    let x0 = self.xyz[ch[0] as usize];
+                    let d = sub3(&self.xyz[ch[ch.len() - 1] as usize], &x0);
+                    let t = |x: &P3| dot(&sub3(x, &x0), &d);
+                    let tp = t(&xp);
+                    let i = ch.partition_point(|&v| t(&self.xyz[v as usize]) <= tp);
+                    let (lo, hi) = (i.saturating_sub(LONE_WINDOW + 1), (i + LONE_WINDOW).min(ch.len() - 1));
+                    ch[lo..=hi].windows(2).map(|w| ekey(w[0], w[1])).collect::<Vec<_>>()
+                })
                 .filter(|e| self.seg.contains_key(e) && e.0 != p && e.1 != p).collect();
             for e in lone {
                 if self.g.collinear(e.0, e.1, p) && self.g.view().dot_sign(self.pt(p), self.pt(e.0), self.pt(e.1)) < 0 {
