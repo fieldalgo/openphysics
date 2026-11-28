@@ -21,6 +21,12 @@
 //      Si (top) interface" with "(whole model)" in its label, the sign line is shown, and the colour bar
 //      is titled "Surface temperature"; after Save and Open the reopened run (no mesh) reads "in SiO2"
 //      until Recompute: 4/4.
+//  U5  card 1 (300 K on z0 and z1), Run, Section z = 505 Apply: the cut's legend reads "Cut z = 505 µm:
+//      a–b K" with a and b the cut's own range (the /cut answer, read at test time), not the surface's;
+//      "µm" stands beside the Section box; the Layers row reads "sub · 0–500 µm · oxide · 500–510 µm ·
+//      top · 510–610 µm"; Cut (CSV) stands in the Section group; clicking it saves
+//      "via-in-a-layer-stack-3d-heat-cut-z-505um.csv" with the metre columns (F7); and Messages reads
+//      "Cut (CSV) saved as …": 6/6.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -181,6 +187,40 @@ try {
       /^[\d.]+ K in SiO2 at \(.*\) µm$/.test(reopened),
     ];
     record('U3', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, live, reopened});
+    await ctx.close();
+  }
+  // ---- U5: the section: the cut's own range and legend, the unit, the layers' z, Cut (CSV) and its name ----
+  {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card]');
+    const doc = structuredClone(CARD); doc.physics.heat.prescribed_temperature = {z0: '300 K', z1: '300 K'};
+    await openFile(page, 'u5.json', session(doc)); await checked(page);
+    const layers = await page.evaluate(() => document.querySelector('#tree [data-m3-node="feature:0"] .m3-note')?.textContent || '');
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    await page.selectOption('#m3-section-axis', 'z'); await page.fill('#m3-section-at', '505'); await page.click('#m3-section-go');
+    await page.waitForSelector('#m3-cut-bar', {timeout: 30000});
+    const run = await page.evaluate(() => document.querySelector('[data-m3-cut-csv]')?.getAttribute('href')?.split('/')[4]);
+    const direct = await page.evaluate(async r => (await fetch(`/api/model3d/runs/${r}/cut`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({axis: 'z', at: 505})})).json(), run);
+    const shown = await page.evaluate(() => ({bar: document.getElementById('m3-cut-bar')?.getAttribute('aria-label') || '',
+      title: document.querySelector('#m3-cut-bar .m3-cb-title')?.textContent || '', surface: document.querySelector('.m3-colourbar:not(.m3-cut-bar)')?.getAttribute('aria-label') || '',
+      unit: document.querySelector('.m3-section #m3-section-unit')?.textContent || '', csv: !!document.querySelector('.m3-section #m3-section-csv[data-m3-cut-csv]')}));
+    const fmt = x => String(Number(x.toPrecision(6)));
+    const legend = `Cut z = 505 µm: ${fmt(direct.temperature_min.value)}–${fmt(direct.temperature_max.value)} K`;
+    const saved = page.waitForEvent('download', {timeout: 30000});
+    await page.click('#m3-section-csv');
+    const dl = await saved, name = dl.suggestedFilename(), csv = await readFile(await dl.path(), 'utf8');
+    await page.waitForTimeout(200);
+    const messages = await page.evaluate(() => document.getElementById('mp-messages')?.textContent || '');
+    const rows = [
+      shown.bar === `${legend} (blue to red)` && shown.title === 'Cut z = 505 µm' && shown.surface !== '' && !shown.surface.includes(fmt(direct.temperature_min.value) + ' K (blue)'),
+      shown.unit === 'µm',
+      layers === 'sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2 (via))',
+      shown.csv,
+      name === 'via-in-a-layer-stack-3d-heat-cut-z-505um.csv' && csv.split('\n').includes('x_m,y_m,z_m,temperature_K'),
+      messages.includes(`Cut (CSV) saved as ${name}.`),
+    ];
+    record('U5', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 6, layers, shown, legend, name, messages: messages.slice(0, 300)});
     await ctx.close();
   }
 } finally {

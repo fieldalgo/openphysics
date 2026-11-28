@@ -52,7 +52,7 @@ export class TemperatureView3D extends View3D{
   this.applySection();this.render();
  }
 
- /** Show a cut answer (positions from its origin_m) in the same colours, the part beyond it clipped; null removes it. */
+ /** Show a cut answer (positions from its origin_m) coloured over the cut's own range, the part beyond it clipped; null removes it. */
  setCut(cut){
   if(this.cutMesh){this.scene.remove(this.cutMesh);this.cutMesh.geometry.dispose();this.cutMesh=null;}
   this.cut=cut;
@@ -60,7 +60,9 @@ export class TemperatureView3D extends View3D{
   const p=decode(cut.positions,Float32Array),ix=decode(cut.indices,Uint32Array),T=decode(cut.temperature,Float32Array);
   const shift=cut.origin_m.map((o,a)=>o-this.view.origin_m[a]);
   const pos=new Float32Array(3*ix.length),col=new Float32Array(3*ix.length);
-  for(let q=0;q<ix.length;q++){const i=ix[q],c=temperatureColor(T[i],this.tmin,this.tmax);
+  // the cut's own colour range (its own legend under the view), not the surface's
+  const lo=cut.temperature_min.value,hi=cut.temperature_max.value;
+  for(let q=0;q<ix.length;q++){const i=ix[q],c=temperatureColor(T[i],lo,hi);
    for(let a=0;a<3;a++){pos[3*q+a]=p[3*i+a]+shift[a];col[3*q+a]=c[a];}}
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));

@@ -294,7 +294,8 @@ one 3D model. Open Copper via through a slab (3D heat) in a new browser tab.*라
 
 **트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 적힌 그대로의 매개변수,
 *t_ox = 10 um · via_w = 20 um*), **Geometry 1**과 그 아래 **Domain**(*200 × 200 × 610 µm*, 또는 *200 × 200 µm, z from the
-features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*,
+features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2 (via))*,
+각 층의 z 범위는 쓴 그대로, `t_ox` 같은 매개변수면 검사가 평가한 값;
 *2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*4 regions · 22 faces*, 서버 검사에서), **Materials**(*Si · Si (top) · SiO2 ·
 Cu*), **Heat transfer (3D)**와 그 아래 **Thermal conductivity**(*from Materials*), **Fixed temperature N**마다(*z0 · 300 K*),
 **Heat source N**마다(*Si (top) · 1e12 W/m³*), **Insulated**(*every other outer face*), **Mesh 1**(*size 40 µm · Estimate 2,400
@@ -403,8 +404,11 @@ removes heat shows a negative rate).*, galerkin의 반력 열률은 열을 넣�
 노드의 Tmax나 Tmin은 *336.05 K at the SiO2 / Si (top) interface, (38.5, 163, 510) µm*로 읽히고(`/api/model3d/runs/{id}/extremes`가 노드 둘레의
 영역을 밝힘), 파일에서 연 실행은 다시 계산할 때까지 *in SiO2*로 읽힙니다. **Result** 보기는 실행의 면 온도를 최소는 파랑,
 최대는 빨강으로, *Surface temperature*라는 제목의 색 막대와 함께 보입니다(그 범위는 면의 것이라 표의 모델 전체 범위보다 좁을 수
-있음). 도구 막대의 **Section**(x, y 또는 z = 구성 요소 단위의 위치)은 형상 보기를 자르고,
-결과에서는 실행 장의 정확한 단면을 그립니다(*Cut z = 505 µm: 833.653–939.105 K.*). 입력이 바뀐 결과는 흐려집니다(*Run 1:
+있음). 도구 막대의 **Section**(x, y 또는 z = 구성 요소 단위의 위치, 단위는 상자 옆에 보임)은 형상 보기를 자르고,
+결과에서는 실행 장의 정확한 단면을 그립니다(*Cut z = 505 µm: 833.653–939.105 K.*). 단면은 그 자신의 범위로 칠하고
+면의 막대 아래에 따로 범례를 둡니다(*Cut z = 505 µm*, 최소와 최대). **Apply** 옆의 **Cut (CSV)**는 그 단면을
+*via-in-a-layer-stack-3d-heat-cut-z-505um.csv*로 저장하고(모델 이름, 평면, 위치; 열은 그대로 미터)
+Messages가 *Cut (CSV) saved as …*라고 말합니다. 입력이 바뀐 결과는 흐려집니다(*Run 1:
 inputs changed since this run*). 단면, 탐침, CSV는 서버의 실행이 필요합니다: 파일에서 연 실행은 기록만 있어 **Recompute**와
 함께 *Recompute this run to cut, probe or export CSV.*라고 말하며, Recompute는 그 입력을 다시 실행해 같은 행에 넣습니다.
 

@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 
@@ -202,7 +202,7 @@ export function createModel3dView(ctx){
     (live?'':`<p class="muted" id="m3-recompute-why">Recompute this run to cut, probe or export CSV.</p>`)+
     `<form class="m3-probe" data-m3-probe><fieldset${live?'':' disabled'}><legend>Probe (${esc(u)})</legend>${['x','y','z'].map((a,k)=>`<label>${a} <input name="${a}" value="${esc(heat.probe?.point?.[k]??'')}" inputmode="decimal" aria-label="probe ${a}"></label>`).join('')}<button type="submit">Probe</button></fieldset></form>`+
     `<p id="m3-probe-result" aria-live="polite">${esc(heat.probe?.text||'')}</p>`+
-    `<p class="m3-exports">Export: ${live?`<a href="/api/model3d/runs/${esc(live)}/export/surface.csv" download>Surface (CSV)</a> · ${heat.cut?`<a href="/api/model3d/runs/${esc(live)}/export/cut.csv?axis=${heat.cut.axis}&at=${encodeURIComponent(heat.cut.at)}" download>Cut (CSV)</a> · `:''}`:''}<button type="button" data-m3-run-act="json">Run (JSON)</button></p>`;
+    `<p class="m3-exports">Export: ${live?`<a href="/api/model3d/runs/${esc(live)}/export/surface.csv" download>Surface (CSV)</a> · ${heat.cut&&heat.cut.run===i?`${cutLink()} · `:''}`:''}<button type="button" data-m3-run-act="json">Run (JSON)</button></p>`;
   }
   return '';
  }
@@ -263,6 +263,7 @@ export function createModel3dView(ctx){
   if(addSource)addSource.onsubmit=e=>{e.preventDefault();const region=addSource.elements.region.value;
    try{commit(setHeatSource(doc,region,addSource.elements.value.value));selection=`heat:source:${region}`;ctx.render();}catch(err){ctx.notice(err.message);lastNotice={text:err.message,undo:false};renderDock();}};
   host.querySelectorAll('[data-m3-run-act]').forEach(b=>b.onclick=()=>runAction(b.dataset.m3RunAct));
+  host.querySelectorAll('[data-m3-cut-csv]').forEach(a=>a.onclick=e=>{e.preventDefault();saveCut();});
   const probe=host.querySelector('[data-m3-probe]');
   if(probe)probe.onsubmit=e=>{e.preventDefault();probeAt(['x','y','z'].map(a=>Number(probe.elements[a].value)));};
   host.querySelectorAll('[data-m3-unselect]').forEach(b=>b.onclick=()=>{
@@ -288,6 +289,7 @@ export function createModel3dView(ctx){
   const onResult=mesh.pane==='result'&&heat.shown!==null&&!!heat.records[heat.shown]?.surface;
   const onMesh=!onResult&&mesh.pane==='mesh'&&!!mesh.view,stale=!!(mesh.view&&check?.mesh?.ok&&check.mesh.key!==mesh.view.key);
   const resultStale=onResult&&keptRunFor(doc,heat.records)!==heat.shown;
+  const cutShown=onResult&&!!heat.cut&&heat.cut.run===heat.shown&&!!heat.live[heat.shown];
   host.innerHTML=`<div class="m3-head"><h2>${esc(title)}</h2><div class="m3-run">`+
    (mesh.job?`<button type="button" id="m3-mesh-cancel">Cancel meshing</button>`:`<button type="button" id="m3-mesh"${why?' disabled aria-describedby="m3-block"':''}>Mesh</button>`)+
    (heat.run?`<button type="button" id="m3-run-cancel">Cancel run</button>`:`<button type="button" id="m3-run"${runWhy&&kept<0?' disabled':''} aria-describedby="m3-run-why">Run</button>`)+
@@ -296,16 +298,16 @@ export function createModel3dView(ctx){
    meshJob()+runJob()+
    `<div class="m3-views" role="toolbar" aria-label="3D view">${['iso','+x','-x','+y','-y','+z','-z'].map(v=>`<button type="button" data-m3-view="${v}">${v==='iso'?'Iso':v.toUpperCase().replace('-','−')}</button>`).join('')}<button type="button" data-m3-fit>Fit</button>`+
    `<span class="m3-section"><label>Section <select id="m3-section-axis" aria-label="section plane"><option value="">none</option>${['x','y','z'].map(a=>`<option value="${a}"${section?.axis===a?' selected':''}>${a} =</option>`).join('')}</select></label>`+
-   `<input id="m3-section-at" aria-label="section position" inputmode="decimal" value="${esc(section?.at??'')}"><button type="button" id="m3-section-go">Apply</button></span>`+
+   `<input id="m3-section-at" aria-label="section position" inputmode="decimal" value="${esc(section?.at??'')}"><span class="m3-unit" id="m3-section-unit">${esc(shownUnit(comp.length_unit))}</span><button type="button" id="m3-section-go">Apply</button>${cutShown?cutLink('m3-section-csv'):''}</span>`+
    `<span class="m3-pane" role="group" aria-label="Shown"><button type="button" data-m3-pane="geometry" aria-pressed="${!onMesh&&!onResult}">Geometry</button><button type="button" data-m3-pane="mesh" aria-pressed="${onMesh}"${mesh.view?'':' disabled title="Mesh first"'}>Mesh view</button>`+
    `<button type="button" data-m3-pane="result" aria-pressed="${onResult}"${heat.records.length?'':' disabled title="Run first"'}>Result</button></span></div>`+
    `<div class="m3-stage${refused&&!onMesh&&!onResult?' stale':''}${(onMesh&&stale)||resultStale?' stale':''}"><div id="m3-canvas-slot"></div>${refused&&lastGood&&!onMesh&&!onResult?'<p class="m3-last">Last shape that could be formed</p>':''}`+
    `${onMesh&&stale?'<p class="m3-last">Mesh of an earlier geometry; mesh again to update it</p>':''}${resultStale?`<p class="m3-last">Run ${heat.shown+1}: inputs changed since this run</p>`:''}</div>`+
-   (onResult?colourBar(heat.records[heat.shown]):'')+
+   (onResult?colourBar(heat.records[heat.shown]):'')+(cutShown?cutBar():'')+
    `<section class="m3-faces"><h3 id="m3-faces-heading">Faces</h3><ul id="m3-faces" aria-labelledby="m3-faces-heading"></ul></section>`+
    `<section class="m3-names" id="m3-names" aria-live="polite"></section>`+
    `<p class="muted">Lengths in ${esc(shownUnit(comp.length_unit))}. A face's names say which surface of which feature it lies on.</p>`;
-  const ramp=host.querySelector('.m3-ramp');if(ramp)ramp.style.background=ramp.dataset.ramp;   // CSSOM, not an inline style attribute (CSP)
+  host.querySelectorAll('.m3-ramp').forEach(ramp=>{ramp.style.background=ramp.dataset.ramp;});   // CSSOM, not an inline style attribute (CSP)
   const v=ensureViewer(),slot=host.querySelector('#m3-canvas-slot');
   if(onResult){const rv=ensureResultViewer(),rec=heat.records[heat.shown];slot.append(heat.canvas);
    if(rv.source!==rec){rv.source=rec;rv.setHidden([...hidden]);rv.load(rec.surface);rv.setCut(heat.cut&&heat.cut.run===heat.shown?heat.cut.answer:null);}rv.select(face);}
@@ -325,6 +327,7 @@ export function createModel3dView(ctx){
   host.querySelector('#m3-run')?.addEventListener('click',()=>startRun());
   host.querySelector('#m3-run-cancel')?.addEventListener('click',()=>cancelRun());
   host.querySelectorAll('[data-m3-show-run]').forEach(b=>b.onclick=()=>{selection=`run:${+b.dataset.m3ShowRun+1}`;showRun(+b.dataset.m3ShowRun);ctx.render();});
+  host.querySelectorAll('[data-m3-cut-csv]').forEach(a=>a.onclick=e=>{e.preventDefault();saveCut();});
   host.querySelector('#m3-section-go').onclick=()=>applySection(host.querySelector('#m3-section-axis').value,host.querySelector('#m3-section-at').value);
   renderFaces();renderNames();
  }
@@ -351,6 +354,26 @@ export function createModel3dView(ctx){
   const out={...values};
   for(const k of ['temperature_min','temperature_max'])if(ext[k]?.node===values[k]?.node)out[k]={...values[k],regions:ext[k].regions};
   return out;
+ }
+ function ramp(lo,hi){const mid=(lo+hi)/2;
+  return [lo,mid,hi].map(t=>`rgb(${temperatureColor(t,lo,hi).map(c=>Math.round(c*255)).join(',')})`).join(',');}
+ /** U5: the cut's legend, over its own colour range. */
+ function cutBar(){
+  const c=heat.cut.answer,lo=c.temperature_min.value,hi=c.temperature_max.value,text=cutLegend({...c,axis:heat.cut.axis,at:heat.cut.at},heat.records[heat.cut.run].surface.unit);
+  return `<div class="m3-colourbar m3-cut-bar" id="m3-cut-bar" role="img" aria-label="${esc(text)} (blue to red)"><span class="m3-cb-title">${esc(text.slice(0,text.indexOf(':')))}</span><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${ramp(lo,hi)})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`;
+ }
+ /** U5: the shown cut as CSV (the server's export, columns in metres), saved under the model's and the plane's name. */
+ function cutLink(id){const live=heat.live[heat.cut.run];
+  return `<a${id?` id="${id}"`:''} data-m3-cut-csv href="/api/model3d/runs/${esc(live)}/export/cut.csv?axis=${heat.cut.axis}&at=${encodeURIComponent(heat.cut.at)}">Cut (CSV)</a>`;}
+ async function saveCut(){
+  const c=heat.cut;if(!c)return;const rec=heat.records[c.run],live=heat.live[c.run];
+  const name=cutFileName(rec.document?.name??doc.name,c.axis,c.at,rec.surface.unit);
+  try{const r=await fetch(`/api/model3d/runs/${encodeURIComponent(live)}/export/cut.csv?axis=${c.axis}&at=${encodeURIComponent(c.at)}`);
+   if(!r.ok){let t=`Cut (CSV) was not saved (HTTP ${r.status}).`;try{t=(await r.json()).refused||t;}catch{}throw new Error(t);}
+   const url=URL.createObjectURL(await r.blob()),a=globalThis.document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   lastNotice={text:`Cut (CSV) saved as ${name}.`,undo:false};}
+  catch(e){lastNotice={text:e.message,undo:false};}
+  renderDock();
  }
  function colourBar(rec){
   const s=rec.surface,lo=s.temperature_min.value,hi=s.temperature_max.value,mid=(lo+hi)/2;
