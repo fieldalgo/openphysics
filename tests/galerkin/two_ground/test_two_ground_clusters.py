@@ -129,3 +129,68 @@ def test_layered_coupled_coplanar_section_passes_the_ground_check_with_margin():
                    interpolation_degree=14)
     assert result.smooth_interpolation_boxes == 42
     assert result.ground_refinement_error < 1e-12
+
+
+def test_smooth_kernel_is_reciprocal():
+    """Plane-scaled blocks j > i + 1 are filled by transposition: the smooth kernel is reciprocal."""
+    rng = np.random.default_rng(3)
+    w, h = 1., .1
+    targets = np.column_stack((rng.uniform(.2, .5, 40), rng.uniform(.01, .09, 40)))
+    sources = np.column_stack((rng.uniform(.4, .8, 30), rng.uniform(.01, .09, 30)))
+    forward = module._smooth(targets, sources, w, h, 10)
+    backward = module._smooth(sources, targets, w, h, 10)
+    assert np.max(abs(forward - backward.T)) <= 1e-14 * np.max(abs(forward))
+
+
+def layered_coupled(count):
+    """The layered coupled coplanar section below, normalized: many plane-scaled boxes."""
+    y0, t = 1e-4, 35e-6
+    polygons = [rectangle(1.6e-3, 3e-4, y0, t), rectangle(2.1e-3, 3e-4, y0, t),
+                rectangle(4e-4, 1e-3, y0, t), rectangle(2.6e-3, 1e-3, y0, t)]
+    polygons, unit, w, h = module._admit(polygons, 4e-3, 2e-4, count, side_walls=False, max_aspect=64)
+    a, b, owners = kernel.panels(polygons, count, 'cubic')
+    images = max(8, int(np.ceil(h / w * np.log(1e14) / np.pi)) + 1)
+    return a, b, owners, w, h, images
+
+
+def test_plane_scaled_matrix_equals_every_box_pair_computed():
+    a, b, owners, w, h, images = layered_coupled(16)
+    labels = module._clusters(a, b, owners, w, h)
+    groups = [np.flatnonzero(labels == label) for label in np.unique(labels)]
+    assert len(groups) > 10
+    boxes = box_grids(a, b, labels, 12)
+    expected = kernel.half_matrix(a, b, order=8)
+    for i, rows in enumerate(groups):
+        for j, columns in enumerate(groups):
+            expected[np.ix_(rows, columns)] += boxes[i][1] @ module._smooth(boxes[i][0], boxes[j][0], w, h, images) @ boxes[j][1].T
+    actual, reciprocity = module._matrix(a, b, w, h, degree=12, order=8, images=images, labels=labels)
+    assert np.max(abs(actual - (expected + expected.T) / 2)) <= 1e-14 * np.max(abs(expected))
+    assert reciprocity <= 1e-10
+
+
+def box_grids(a, b, labels, degree):
+    grids = []
+    for label in np.unique(labels):
+        g = np.flatnonzero(labels == label)
+        points = np.concatenate((a[g], b[g]))
+        grids.append(module._projection(a[g], b[g], points.min(axis=0), points.max(axis=0), degree))
+    return grids
+
+
+@pytest.mark.parametrize('pair', [(1, 1), (1, 2), (2, 1)], ids=['diagonal', 'neighbour', 'neighbour-reversed'])
+def test_raw_reciprocity_still_compares_independent_blocks(monkeypatch, pair):
+    """Diagonal blocks and both orders of neighbouring boxes are computed, not transposed:
+    an error in only one of them is still caught by the raw reciprocity check."""
+    a, b, owners, w, h, images = layered_coupled(16)
+    labels = module._clusters(a, b, owners, w, h)
+    grids = box_grids(a, b, labels, 12)
+    original = module._smooth
+
+    def skewed(targets, sources, *args):
+        out = original(targets, sources, *args)
+        if np.array_equal(targets, grids[pair[0]][0]) and np.array_equal(sources, grids[pair[1]][0]):
+            out = out + 1e-6 * np.max(abs(out)) * np.triu(np.ones_like(out), 1)
+        return out
+    monkeypatch.setattr(module, '_smooth', skewed)
+    with pytest.raises(ValueError, match='raw matrix reciprocity failed'):
+        module._matrix(a, b, w, h, degree=12, order=8, images=images, labels=labels)
