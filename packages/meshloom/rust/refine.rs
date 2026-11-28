@@ -186,6 +186,103 @@ const SUB_RATIO: f64 = 1.5;
 /// Edge removal: the largest ring of tetrahedra around an edge it considers.
 const EDGE_RING_MAX: usize = 7;
 
+/// The point on segment [c, d] closest to x, as its parameter in [0, 1].
+fn closest_t(x: &P3, c: &P3, d: &P3) -> f64 {
+    let u = sub3(d, c);
+    let uu = dot(&u, &u);
+    if !(uu > 0.0) {
+        return 0.0;
+    }
+    (dot(&sub3(x, c), &u) / uu).clamp(0.0, 1.0)
+}
+
+/// Distance from x to segment [c, d].
+fn seg_dist(x: &P3, c: &P3, d: &P3) -> f64 {
+    let t = closest_t(x, c, d);
+    let q: P3 = std::array::from_fn(|k| c[k] + t * (d[k] - c[k]));
+    let e = sub3(x, &q);
+    dot(&e, &e).sqrt()
+}
+
+/// Thin parts of facets, before refinement: two input edges of one facet without a common
+/// end point that lie a distance d apart over a length L. A subsegment is split while a
+/// vertex of the other edge lies in its diametral ball, so both edges end in pieces of about
+/// 2d where they are d apart: about L / (2d) points. When that estimate (the largest over
+/// the parts of the shorter edge within d sqrt(2)^k of the other, k = 1..8) exceeds the point
+/// cap, refinement ends at once with the error the cap would give, naming the facet; reaching
+/// the cap point by point took hours on such inputs. It is an estimate, not a bound: points
+/// of the two edges that fall exactly opposite each other need fewer. Locked facets get no
+/// points and are skipped.
+fn thin_facets(xyz: &[P3], fedges: &[Vec<(u32, u32)>], locked_facet: &[bool], cap: usize) -> Result<(), String> {
+    for (fi, es) in fedges.iter().enumerate() {
+        if es.len() < 4 || locked_facet[fi] {
+            continue;
+        }
+        let len = |e: &(u32, u32)| { let d = sub3(&xyz[e.1 as usize], &xyz[e.0 as usize]); dot(&d, &d).sqrt() };
+        // only pairs closer than the longest edge / (2 cap) can exceed the cap
+        let reach = es.iter().map(len).fold(0.0, f64::max) / (2.0 * cap as f64);
+        let bb: Vec<(P3, P3)> = es.iter().map(|&(a, b)| {
+            let (p, q) = (xyz[a as usize], xyz[b as usize]);
+            (std::array::from_fn(|k| p[k].min(q[k]) - reach), std::array::from_fn(|k| p[k].max(q[k]) + reach))
+        }).collect();
+        let mut order: Vec<usize> = (0..es.len()).collect();
+        order.sort_by(|&i, &j| bb[i].0[0].total_cmp(&bb[j].0[0]));
+        for (oi, &i) in order.iter().enumerate() {
+            for &j in &order[oi + 1..] {
+                if bb[j].0[0] > bb[i].1[0] {
+                    break;
+                }
+                let (e, f) = (es[i], es[j]);
+                if e.0 == f.0 || e.0 == f.1 || e.1 == f.0 || e.1 == f.1 || (0..3).any(|k| bb[j].0[k] > bb[i].1[k] || bb[i].0[k] > bb[j].1[k]) {
+                    continue;
+                }
+                // along the shorter edge [a, b], distance to the other edge [c, d] (convex in t)
+                let (s, o) = if len(&e) <= len(&f) { (e, f) } else { (f, e) };
+                let (a, b, c, d) = (xyz[s.0 as usize], xyz[s.1 as usize], xyz[o.0 as usize], xyz[o.1 as usize]);
+                let at = |t: f64| -> P3 { std::array::from_fn(|k| a[k] + t * (b[k] - a[k])) };
+                let dist = |t: f64| seg_dist(&at(t), &c, &d);
+                // the minimum by ternary search on the convex distance
+                let (mut lo, mut hi) = (0.0f64, 1.0f64);
+                for _ in 0..100 {
+                    let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+                    if dist(m1) <= dist(m2) { hi = m2 } else { lo = m1 }
+                }
+                let tm = (lo + hi) / 2.0;
+                let dmin = dist(tm);
+                if !(dmin > 0.0) || !(dmin < reach) {
+                    continue;
+                }
+                let l = len(&s);
+                let mut best = 0.0f64;
+                for k in 1..=8 {
+                    let r = dmin * std::f64::consts::SQRT_2.powi(k);
+                    // the ends of {t : dist(t) <= r} around tm, by bisection
+                    let edge = |inside: f64, outside: f64| -> f64 {
+                        if dist(outside) <= r {
+                            return outside;
+                        }
+                        let (mut i, mut o) = (inside, outside);
+                        for _ in 0..60 {
+                            let m = (i + o) / 2.0;
+                            if dist(m) <= r { i = m } else { o = m }
+                        }
+                        i
+                    };
+                    let part = (edge(tm, 1.0) - edge(tm, 0.0)) * l;
+                    best = best.max(part / (2.0 * r));
+                }
+                if best > cap as f64 {
+                    return Err(format!("facet {fi} is thin: its input edges {}-{} and {}-{} are {:.3e} apart, \
+                                        so refinement would need about {:.1e} points there, more than the cap of {} \
+                                        (max_points); merge or widen that part of the input",
+                                       s.0, s.1, o.0, o.1, dmin, best, cap));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn ekey(a: u32, b: u32) -> (u32, u32) {
     (a.min(b), a.max(b))
 }
@@ -2916,6 +3013,7 @@ pub fn refine(plc: &crate::plc::Plc, b: &mut Boundary, opt: RefineOptions, seeds
             }
         }
     }
+    thin_facets(&xyz, &fedges, &locked_facet, opt.max_points)?;
     let mut chain_of: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
     for (c, ch) in b.plc.rec.chains.iter().enumerate() {
         chain_of.entry(ekey(ch[0], ch[ch.len() - 1])).or_default().push(c as u32);

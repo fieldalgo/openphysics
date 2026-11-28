@@ -274,7 +274,10 @@ names may change before the mesher's public API.
   counted in `stats` (`exempt_subsegments`, `exempt_subfacets`). A cap on inserted
   points (`max_points`, or by default 20·V/h³ + 200·A/h² + 100·n₀, plus 200·A/ℓ² with a
   ratio where ℓ is the shortest input edge, between 1,000 and 5,000,000) ends refinement
-  with `RefineError` instead of a hang. All 14 C10 inputs refine to the end at h = ½, ¼
+  with `RefineError` instead of a hang. A facet with two input edges that share no end
+  point and lie d apart over a length L needs about L/(2d) points there; when that is
+  above the cap, refinement ends with that `RefineError` before it starts, naming the
+  facet (see Limits). All 14 C10 inputs refine to the end at h = ½, ¼
   and ⅛ of their size with ratio 2 and pass V1–V4. V7 (guaranteed mode, ratio 2, max
   ratio ≤ 2(1 + 10⁻⁹), decided exactly) passes on C2 at h = 0.12, 0.06 and 0.03 (max
   1.970, 1.993, 1.914), on C3 at h = 0.8, 0.4 and 0.2 (1.888, 1.892, 1.763) and on C9 at
@@ -407,6 +410,22 @@ See [third-party software](../../third-party.md).
   tetrahedra for a needle surface, and 12,067, 12,463 and 17,018 for a coplanar one.
   Compare results on the same arrays: C14 measures the loader's canonical arrays, so a
   quick check against a C14 number has to use them too.
+- **Thin parts of the input.** meshloom has no merge tolerance: it meshes the doubles as
+  given, so two points a rounding apart are two points and refinement resolves the
+  distance between them. Two input edges of one facet that share no end point and lie d
+  apart over a length L need about L/(2d) points there; when that is above the point
+  cap, refinement ends with `RefineError` naming the facet before it starts. The
+  estimate is not a proven bound (points of the two edges exactly opposite each other
+  could need fewer), but every measured case needed more: on two boxes side by side and
+  face to face with gaps of 1e-5 and 1e-6 of the 14.4 mm diagonal at h = 0.8 mm
+  (2026-11-28), refinement without the check reached caps of 0.9, 1.1 and 2 times the
+  estimate in all 12 runs, and at twice the estimate its segment points alone were about
+  twice the estimate. What meshes within a cap is far coarser than a rounding: at a gap
+  of 1e-5 of the diagonal (144 nm) the boxes side by side meshed with 156,708 nodes and
+  face to face reached the cap of 600,000 points, so a caller that merges nearby points
+  should merge at that scale, not at 1e-8. Two facets close to each other with no facet
+  joining them are not checked: refinement reaches the cap point by point there, which
+  can take an hour.
 - A graded size is one function for the whole domain; it cannot be combined with a
   mapping from region name to size. Curved surfaces are limited
   to the builder's primitives, sampled once, uniformly, at h, with no refinement on

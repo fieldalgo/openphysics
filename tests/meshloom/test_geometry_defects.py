@@ -6,11 +6,15 @@
 Each case runs ``generate3d`` in a child process with a time limit, since the failure
 being guarded against is a hang. It must end either in a mesh that passes V1 (exact
 orient3d > 0 on the doubles), the V2 contract checks and V3(b) (the nodes of each
-boundary face lie in their facet's plane).
+boundary face lie in their facet's plane), or in a ``RefineError`` that names the thin
+facet, without coming near the limit.
 
 - ``seed55``: two facets that share an edge and lie one rounding apart from one plane
   met at a dihedral angle refinement read as "parallel planes", so the small-angle rule
   did not apply and points on each facet split the other's subfacets without end.
+- ``seed42``, ``seed46``, ``strip``, ``gap``: a facet with two input edges 0.4 pm to
+  862 pm apart. Refinement would need far more points there than the cap; it now says so
+  before it starts instead of reaching the cap point by point.
 - ``seed11``, ``seed171``: hung and failed with "subfacet ... is degenerate in doubles"
   on the geometry branch's build; they mesh on main since earlier changes, kept here.
 """
@@ -29,8 +33,9 @@ if not meshloom.kernel_available():
 
 from geometry_defect_cases import CASES  # noqa: E402
 
-# seconds: the meshes take 5-25 s on a 2026 cloud runner
+# seconds: the meshes take 5-25 s on a 2026 cloud runner; the errors are immediate
 LIMIT = 300
+ERROR_LIMIT = 60
 
 
 def check(m, case):
@@ -113,3 +118,15 @@ def test_meshes(name):
     assert r["invalid"] == "", r
     assert r["regions"] == len({n for _, n in CASES[name]["region_points"]}), r
 
+
+@pytest.mark.parametrize("name, facet, edges", [
+    ("seed42", 24, "8-9 and 10-11"),
+    ("seed46", 26, "18-19 and 20-21"),
+    ("strip", 8, "8-9 and 10-11"),
+    ("gap", 0, "12-14 and 8-10"),
+])
+def test_thin_facet_is_refused(name, facet, edges):
+    r = outcome(name, ERROR_LIMIT)
+    assert r["outcome"] == "RefineError", r
+    assert f"facet {facet} is thin: its input edges {edges} are" in r["msg"], r
+    assert "more than the cap of 600000 (max_points)" in r["msg"], r
