@@ -216,7 +216,7 @@ export function createModel3dView(ctx){
  function bindSettings(host){
   host.querySelectorAll('[data-m3-field]').forEach(input=>input.addEventListener('change',()=>{
    const field=[...fieldsOf(doc,selection),...fieldsOf(doc,'domain'),...fieldsOf(doc,'mesh')].find(f=>f.key===input.dataset.m3Field);
-   const out=editField(doc,field,input.value);
+   const out=editField(doc,field,input.value,{domain:check?.domain??null});
    if(out.problem){drafts.set(field.key,{raw:input.value,problem:out.problem});ctx.render();ctx.onHistory();return;}
    drafts.delete(field.key);commit(out.doc);
   }));
@@ -229,7 +229,7 @@ export function createModel3dView(ctx){
   });
   host.querySelector('[data-m3-layer]')?.addEventListener('click',()=>{const i=+/^feature:(\d+)$/.exec(selection)[1];try{commit(addLayer(doc,i));}catch(e){ctx.notice(e.message);}});
   host.querySelectorAll('[data-m3-unlayer]').forEach(b=>b.onclick=()=>{const i=+/^feature:(\d+)$/.exec(selection)[1];try{commit(removeLayer(doc,i,+b.dataset.m3Unlayer));}catch(e){ctx.notice(e.message);}});
-  host.querySelectorAll('[data-m3-add]').forEach(b=>b.onclick=()=>{commit(addFeature(doc,b.dataset.m3Add));selection=`feature:${doc.geometry.components[componentName(doc)].features.length-1}`;ctx.render();});
+  host.querySelectorAll('[data-m3-add]').forEach(b=>b.onclick=()=>{commit(addFeature(doc,b.dataset.m3Add,{domain:check?.domain??null}));selection=`feature:${doc.geometry.components[componentName(doc)].features.length-1}`;ctx.render();});
   host.querySelectorAll('[data-m3-param]').forEach(input=>input.addEventListener('change',()=>{try{commit(setParameter(doc,input.dataset.m3Param,input.value));}catch(e){ctx.notice(e.message);}}));
   host.querySelectorAll('[data-m3-unparam]').forEach(b=>b.onclick=()=>{
    const name=b.dataset.m3Unparam,used=(check?.parameters||[]).find(p=>p.name===name)?.used_by||[];

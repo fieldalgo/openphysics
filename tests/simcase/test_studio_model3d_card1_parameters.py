@@ -110,3 +110,13 @@ def test_the_mesh_and_the_solve_are_the_same_bit_for_bit():
     assert (len(a.nodes), len(a.tets)) == (1551, 6774)
     assert _mesh_sha(a) == _mesh_sha(b)
     assert _solve(a) == _solve(b)
+
+
+def test_the_check_answers_the_evaluated_domain(client):
+    """The domain in the component's unit with its parameters and expressions evaluated, which
+    Studio's Domain row, size guards and Add feature's defaults read when a bound is not a number."""
+    doc = card()
+    doc["geometry"]["components"]["stack3d"]["domain"]["zmax"] = "500 + t_ox + 100"
+    answer = check(client, doc)
+    assert answer["domain"] == {"xmin": 0.0, "xmax": 200.0, "ymin": 0.0, "ymax": 200.0, "zmin": 0.0, "zmax": 610.0}
+    assert check(client, numeric())["domain"] == answer["domain"]

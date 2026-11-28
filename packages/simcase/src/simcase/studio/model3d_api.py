@@ -368,7 +368,16 @@ def check_view(doc: dict, component: str | None = None) -> dict:
     return {"ok": True, "component": cx.component, "unit": str(comp.length_unit),
             "features": _coverage(comp, cx), "regions": display["regions"],
             "parameters": _parameters(doc, model, cx.component),
-            "selections": display["selections"], "display": display, "mesh": mesh, "run": _run_part(doc)}
+            "selections": display["selections"], "display": display, "mesh": mesh, "run": _run_part(doc),
+            "domain": _domain(comp)}
+
+
+def _domain(comp) -> dict:
+    """The domain in the component's length unit, its parameters and expressions evaluated (numbers):
+    what Studio's Domain row, size guards and Add feature's defaults read when a bound is written as
+    a parameter or an expression."""
+    return {k: float(Fraction(comp.domain[k]) / comp.pm_per_unit)
+            for k in ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax")}
 
 
 def _run_part(doc: dict) -> dict:
@@ -609,7 +618,8 @@ def check_view_shapes(doc: dict, component: str | None = None) -> dict:
     return {"ok": True, "component": shapes.component, "unit": str(comp.length_unit),
             "features": _coverage_shapes(comp, shapes), "regions": display["regions"],
             "parameters": _parameters(doc, model, shapes.component),
-            "selections": [], "display": display, "mesh": mesh, "run": _run_part(doc)}
+            "selections": [], "display": display, "mesh": mesh, "run": _run_part(doc),
+            "domain": _domain(comp)}
 
 
 # ----------------------------------------------------------------------------- the routes
