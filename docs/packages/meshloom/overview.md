@@ -180,7 +180,15 @@ names may change before the mesher's public API.
   distance of the reference point from its nearer end (rule 1); a segment with two
   such ends, or a piece without a reference point, at its middle. The parameter is a
   short dyadic near the target, and a target outside the middle 62/64 of the piece
-  falls back to the middle. The result is the Delaunay tetrahedralization of the input
+  falls back to the middle. A vertex with more than 32 segments (a fan's centre) at
+  which a piece is missing is protected first, as Shewchuk does: every segment at it
+  gets points at radii rc 2^k from it (rc is at most 2/3 of the distance to its nearest
+  neighbour and a third of each segment) and one point just short of its far end on a
+  dyadic grid of radii common to the hub's segments; later split points on those
+  segments are rounded down to that grid too. The points of a thin fan's segments then
+  lie on common spheres, so float32 rim points, whose radii differ by a rounding, do
+  not make the segments encroach each other without end (a 36,000-segment fan
+  converges in 83 rounds). The result is the Delaunay tetrahedralization of the input
   and S points under the index-ordered perturbation, with each segment as a chain of
   edges through its own S points. A piece shorter than 2^-`max_depth` of its segment
   raises `RuntimeError` instead of looping (termination after rounding the parameter
