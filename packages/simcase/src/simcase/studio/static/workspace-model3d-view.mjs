@@ -22,7 +22,7 @@ import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,add
  valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
-import {NEEDS_TWO,SAME_INPUTS,compareRows,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
+import {NEEDS_TWO,SAME_INPUTS,compareRows,heatRateNote,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
 
 const WORDS={estimateText,meshBlocked};      // slice C's words, passed to the pure helpers
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -684,6 +684,7 @@ export function createModel3dView(ctx){
   host.innerHTML=`<h2>Compare</h2><div class="m3-compare-pick" role="group" aria-label="Runs compared">${pick('m3-compare-a','Run A',ia)}${pick('m3-compare-b','Run B',ib)}</div>`+
    `<table class="m3-values m3-compare" id="m3-compare-values"><thead><tr><th scope="col">Quantity</th><th scope="col">Run ${ia+1} (A)</th><th scope="col">Run ${ib+1} (B)</th><th scope="col">B − A</th></tr></thead>`+
    `<tbody>${rows.map(r=>`<tr><th scope="row">${esc(r[0])}</th><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`).join('')}</tbody></table>`+
+   (heatRateNote(A.values,B.values)?`<p class="muted" id="m3-compare-sign">${esc(heatRateNote(A.values,B.values))}</p>`:'')+
    `<h3 id="m3-compare-inputs-heading">Inputs that differ</h3>`+(changes.length?`<ul id="m3-compare-inputs" aria-labelledby="m3-compare-inputs-heading">${changes.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:`<p id="m3-compare-inputs">${esc(SAME_INPUTS)}</p>`)+
    `<h3>Surface temperature, B − A</h3>`+
    (notice?`<p class="m3-notice" id="m3-compare-mesh" role="note">${esc(notice)}</p>`:why?`<p class="muted" id="m3-compare-recompute">${esc(why)}</p>`:

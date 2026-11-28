@@ -87,3 +87,14 @@ test('C3-6: the pickers default to the two newest runs; fewer than two runs says
  assert.equal(C.NEEDS_TWO,'Compare needs two runs of this 3D model.');
  assert.equal(C.inputsText([]),'Same inputs.');
 });
+
+test('V6: one line under B − A reads the heat-rate sign, with an example when the pair makes one apt',()=>{
+ const v=q=>({heat_rate_by_selection:Object.fromEntries(Object.entries(q).map(([k,x])=>[k,{value:x,unit:'W'}]))});
+ const head='Heat rates keep the run table\'s sign: positive into the model, negative out of it. B − A is run B minus run A';
+ assert.equal(C.heatRateNote(v({z0:-1.25}),v({z0:-1.5})),`${head}, so −0.25 W through z0 means more heat leaves through z0 in run B.`);
+ assert.equal(C.heatRateNote(v({z0:-1.5}),v({z0:-1.25})),`${head}, so +0.25 W through z0 means less heat leaves through z0 in run B.`);
+ assert.equal(C.heatRateNote(v({z1:1}),v({z1:1.25})),`${head}, so +0.25 W through z1 means more heat enters through z1 in run B.`);
+ assert.equal(C.heatRateNote(v({z0:-1}),v({z0:1})),`${head}.`,'a sign change: no example');
+ assert.equal(C.heatRateNote(v({z0:-1}),v({z0:-1})),`${head}.`,'no change: no example');
+ assert.equal(C.heatRateNote(v({}),v({})),null,'no heat rates: no line');
+});

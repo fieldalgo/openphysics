@@ -16,6 +16,9 @@
 //      its pane; the ribbon's Compute shows Run for the 3D model and it runs (Run 1 completes), while
 //      the optical model shows none; card 1's note says "Preset: heat source 1e12 W/m³ in Si (top)
 //      (4 W)": 3/3.
+//  V6  card 2: Run 1, z1 302 K, Run 2, Compare: right under the table one line reads "Heat rates keep
+//      the run table's sign … B − A is run B minus run A, so −… W through z0 means more heat leaves
+//      through z0 in run B."; it equals the helper on the two runs' /values: 2/2.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -167,6 +170,27 @@ try {
       note.includes('Preset: heat source 1e12 W/m³ in Si (top) (4 W)'),
     ];
     record('V11', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, table, ribbon, ran, flat, note});
+  }
+  // ---- V6: Compare's line on the heat-rate sign ----
+  if (want('V6')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="via-slab-3d"]');
+    await page.click('[data-model3d-card="via-slab-3d"]'); await checked(page);
+    const ids = [];
+    page.on('response', async r => { if (r.url().endsWith('/api/model3d/run') && r.request().method() === 'POST') { try { ids.push((await r.json()).run); } catch {} } });
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    await page.click('#tree [data-m3-node="heat:fixed:z1"]');
+    await page.fill('[data-m3-heat="fixed"][data-m3-key="z1"]', '302'); await page.press('[data-m3-heat="fixed"][data-m3-key="z1"]', 'Enter');
+    await page.waitForTimeout(200); await checked(page);
+    await page.click('#m3-run'); await completed(page, 2); await page.waitForTimeout(300);
+    await page.click('[data-page="Compare"]'); await page.waitForSelector('#m3-compare-values');
+    const line = await page.evaluate(() => document.getElementById('m3-compare-sign')?.textContent || '');
+    const under = await page.evaluate(() => document.getElementById('m3-compare-values')?.nextElementSibling?.id || '');
+    const direct = await page.evaluate(async ids => { const C = await import('/workspace-assets/workspace-model3d-compare.mjs');
+      const v = async id => (await fetch(`/api/model3d/runs/${id}/values`)).json(); return C.heatRateNote(await v(ids[0]), await v(ids[1])); }, ids);
+    const rows = [under === 'm3-compare-sign' && /means more heat leaves through z0 in run B\.$/.test(line), line === direct];
+    record('V6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 2, line, direct, under});
+    await ctx.close();
   }
 } finally {
   await writeFile(join(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
