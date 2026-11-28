@@ -46,6 +46,7 @@ Python API를 직접 호출하거나, 지원하는 모델을 JSON으로 실행�
 | 재료 영역이 있는 열전도 | 지원 | 도형이 있는 `thermal.steady2d`, `thermal.transient2d` | 영역 한도 안에서 전용 화면 |
 | 3D 정적 탄성·지정 온도 열탄성 | [사면체 고체](packages/galerkin/elasticity3d.md)와 [열응력](packages/galerkin/thermoelasticity3d.md) | 미지원 | 미지원 |
 | 구속된 고체의 3D 고유진동 | [주파수와 모드 형상](packages/galerkin/structural_modes3d.md) | 미지원 | 미지원 |
+| 3D 고체 사이의 불완전 접촉을 통한 정상 열전달 | [접촉면 양쪽 온도와 열전달률](packages/galerkin/thermal3d.md#고체-사이의-유한한-열접촉) | 미지원 | 미지원 |
 | 구속된 3D 고체의 강제진동 | [복소 변위·응력](packages/galerkin/structural_harmonic3d.md) | 미지원 | 미지원 |
 | 3D 과도 열전도와 준정적 열응력 | [히터 가열·냉각](packages/galerkin/transient_heater_3d.md) | 미지원 | 미지원 |
 | 온도 의존 비저항을 적용한 3D 정전압 히터 | [과도 연성 예제](packages/galerkin/temperature_dependent_heater_3d.md) | 미지원 | 미지원 |

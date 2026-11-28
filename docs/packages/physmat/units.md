@@ -22,6 +22,7 @@ from physmat.units import q, q_array, convert, convert_array, convert_complex
 q("200 GPa", "youngs_modulus")                   # 200000000000.0  (Pa)
 q("200000 MPa", "youngs_modulus")                # the same double
 q("25 degC", "ambient_temperature")              # 298.15  (K)
+q("5 kW/(m^2 K)", "thermal_contact_conductance")  # 5000.0 (W/(m² K))
 q("12 ppm/K", "linear_expansion_coefficient")    # 1.2e-05  (1/K)
 q("220 ㎚", "length")                             # 2.2e-07  (m)
 q(0.3, "poisson_ratio")                          # a bare number: dimensionless quantities only

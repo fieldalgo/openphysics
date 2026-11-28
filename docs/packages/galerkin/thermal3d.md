@@ -46,6 +46,7 @@ result = solve_steady_heat_3d(
 | heat_source_density | Q in W/m^3, `{region name: Q}`, a finite real `(T,)` array in `mesh.tets` order, or a callable taking the read-only `(T, 3)` tetrahedron centroids and returning `(T,)` values; default `None`, no source |
 | inward_heat_flux | `{face tag: flux}` in W/m^2, positive into the body |
 | convection | `{face tag: (h, T_ambient)}`, h >= 0 in W/(m^2 K), ambient in K |
+| thermal_contact_conductance | Map each pair of matching face tags to its finite contact conductance per area in W/(m² K). Zero insulates the pair. |
 
 Values are constant on each selected tag. Flux and convection on the same triangle
 are additive. Unknown, empty, or non-exterior selections, duplicate faces within
@@ -70,6 +71,7 @@ the internal `galerkin.kernels` (consistent units: kelvin here), not of the publ
 | `outward_convective_heat_rate` | `(N,)` W, nodal integrals of h (T - T_ambient) |
 | `relative_conservation_residual` | absolute sum of generated plus reaction minus both outward rates, divided by the sum of absolute nodal rates |
 | `prescribed_node_ids` | sorted node indices that were fixed |
+| `contact_heat_rate` | With a contact pair, signed nodal heat rates in W, positive leaving that side. Zero away from the contacts. Omitted contact data give `None`. |
 
 Nodal heat rates are watts, not per depth, so the fields have no `_per_depth`
 (asking for one raises an `AttributeError` that says why); `.units` maps each
@@ -78,6 +80,16 @@ the free residual exceeds `1e-10` of the system scale or the heat balance exceed
 `1e-10`, so a returned result has passed both. JAX or PyTorch values raise
 `TypeError`; the one derivative path is a shape derivative, `motion=MeshMotion(...)` with a
 JAX or PyTorch t ([shape derivatives](shape_derivative.md#3d-steady-heat)).
+
+## Finite thermal contact between solids
+
+Give the two sides separate node IDs so that their temperatures can differ. Tag each side as an outward-facing surface of its own solid. Both sides must have the same triangle geometry and vertex coordinates, with opposite outward normals. The solver matches triangles geometrically, so the tags can list their faces in different orders. Shared nodes enforce continuous temperature for a perfectly bonded interface.
+
+For tags named `heater_contact` and `substrate_contact`, pass `thermal_contact_conductance={("heater_contact", "substrate_contact"): 2000.0}` to the steady solver. Heat flux leaving the heater is the conductance times the local heater-to-substrate temperature difference. This example coefficient gives an area-specific thermal resistance of 0.0005 m² K/W. To obtain total power leaving the heater through this contact, sum `result.contact_heat_rate` over the heater-side nodes. The substrate receives the same power. Where several contact patches meet at a node, the reported nodal rate includes all of them. For a uniform interface flux the temperature jump equals the flux divided by the conductance.
+
+Positive conductance thermally connects the bodies. Each connected assembly needs a prescribed temperature or positive external convection. Zero conductance leaves the bodies separately anchored. Apply external flux or convection to faces outside the chosen contact. The [heater and substrate example](../../../examples/galerkin/thermal_contact_3d.py) builds the two sets of nodes and compares their interface temperatures with a series thermal resistance calculation.
+
+The example applies 2 W over 80 mm² and holds the substrate base at 300 K. At contact conductances of 500, 5,000 and 50,000 W/(m² K), the computed area-mean interface jumps are 50, 5 and 0.5 K. Each agrees with the series resistance result. Both sides carry 2 W in opposite directions. The [analytical tests](../../../tests/galerkin/test_thermal_contact3d.py) also check a slab with a volume source and an external convective sink. An [independent scikit-fem comparison](../../../tests/galerkin/test_crosscheck_skfem_thermal_contact3d.py) uses an oblique interface where the heat flow changes direction across the surface.
 
 ## Validation
 
@@ -122,9 +134,7 @@ python -m pytest -q tests/galerkin/test_thermal3d.py tests/refsol/test_thermal3d
 
 ## Limits
 
-- Isotropic, temperature-independent conductivity, constant within a region;
-  no tensors, flux, Robin, transient or coupling to mechanics. The 2D module
-  keeps those; they are not ported to 3D here.
+- The steady solver uses isotropic, temperature-independent conductivity, constant within a region. Finite thermal contact uses matching faces on a static mesh.
 - A callable source is sampled once per tetrahedron (its centroid), which keeps
   the P1 orders above but is not an exact integral of a varying source.
 - Dirichlet nodes must lie on the exterior boundary; interior nodes are refused.

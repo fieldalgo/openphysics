@@ -1132,7 +1132,7 @@ DESIGN_MENUS = {
     **_menus("heat_rate joule_power", POWER),
     **_menus("heat_rate_per_depth joule_power_per_depth heat_rate_per_depth_tolerance", W_M),
     "heat_flux": ("W/m^2", "kW/m^2", "W/cm^2", "W/mm^2", "mW/mm^2"),
-    "heat_transfer_coefficient": ("W/(m^2 K)", "kW/(m^2 K)", "W/(cm^2 K)"),
+    **_menus("heat_transfer_coefficient thermal_contact_conductance", ("W/(m^2 K)", "kW/(m^2 K)", "W/(cm^2 K)")),
     **_menus("time time_step duration output_times", TIME),
     "electric_potential": ("uV", "mV", "V", "kV"), "electric_potential_tolerance": ("uV", "mV", "V"),
     **_menus("electrical_conductivity reference_conductivity", SIGMA),
@@ -1181,7 +1181,7 @@ CANONICAL_ADDED = {"capacitance_per_length": "F/m", "inductance_per_length": "H/
                    "damping_energy": "J", "resonance_energy": "J"}
 # Output rows of 4.8 with no menu ("—"): the canonical unit only.
 OUTPUT_ONLY = {"mass_normalized_displacement": "1/kg^(1/2)", "node_coordinates": "m", "stored_heat": "J", "stored_heat_per_depth": "J/m", "heat_storage_rate": "W",
-               "heat_storage_rate_per_depth": "W/m", "thermal_energy_functional": "J K",
+               "heat_storage_rate_per_depth": "W/m", "contact_heat_rate": "W", "thermal_energy_functional": "J K",
                "thermal_energy_functional_per_depth": "J K/m", "thermal_diffusivity": "m^2/s",
                "conductance_per_depth": "S/m", "permittivity": "F/m", "charge": "C", "charge_per_depth": "C/m",
                "capacitance": "F", "capacitance_per_depth": "F/m", "stored_energy": "J", "stored_energy_per_depth": "J/m",
@@ -1520,8 +1520,8 @@ def test_p2_names_are_legal_with_their_unit_and_places():
     # TE fraction added te_polarization_fraction (a result fraction), 260 and 387 until the single-point group
     # index added wavelength_step (the step of results.group_index), 261 and 388 until the open-boundary
     # search added pml_search_mode_count; structural modes then added mass_normalized_displacement.
-    # Frequency response adds two nonnegative Rayleigh damping coefficients.
-    assert len(units._ENTRIES) == 265 and len(names) == 392
+    # Frequency response adds two Rayleigh coefficients; thermal contact adds conductance and nodal heat rate.
+    assert len(units._ENTRIES) == 267 and len(names) == 394
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal

@@ -26,7 +26,7 @@ references and fixed thresholds.
 | 3D vacuum PEC cavity on an external tetrahedral mesh (meshine, gmshio), PEC on chosen face tags | `solve_cavity` | [Cavity API, external meshes](cavity_solver.md#external-meshes), [mesh format](mesh3d_format.md) | — |
 | 3D rectangular cavity with lossy box-shaped dielectric/magnetic regions and finite-conductivity walls: complex frequencies and Q | `solve_material_cavity_box` | [Material cavity](material_cavity.md) | — |
 | 3D cavity on an external mesh with lossy materials per region and PEC or impedance walls per face tag | `solve_material_cavity` | [Material cavity, external meshes](material_cavity.md#external-meshes) | — |
-| Steady 3D heat conduction on tetrahedral meshes, isotropic per region, Dirichlet faces and insulation | `galerkin.thermal3d.solve_steady_heat_3d` | [Contract and validation](thermal3d.md) | — |
+| Steady 3D heat conduction on tetrahedral meshes, regional conductivity, external flux, convection and finite thermal contact | `galerkin.thermal3d.solve_steady_heat_3d` | [Contract and validation](thermal3d.md) | — |
 | Transient 3D heat conduction with interval loads | `galerkin.transient_heat3d.solve_transient_heat_3d` | [Contract and heat balance](transient_heat3d.md) | — |
 | Voltage-driven transient 3D Joule heating with temperature-dependent conductivity | `galerkin.transient_joule_heat3d.solve_transient_joule_heat_3d` | [Inputs and energy balance](transient_joule_heat3d.md) | — |
 | Steady 2D heat conduction, isotropic, Dirichlet and insulated boundaries | `galerkin.thermal.solve_steady_heat` | [Contract](thermal_steady2d.md), [validation](thermal_independent_validation.md) | [thermal_steady2d.py](../../../examples/galerkin/thermal_steady2d.py) |
