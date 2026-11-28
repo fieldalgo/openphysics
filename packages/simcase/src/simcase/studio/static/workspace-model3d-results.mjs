@@ -11,7 +11,20 @@ import {SHADE,decode,pick,rayAt,viewCamera} from '/model3d-assets/model3d-model.
 import {temperatureColor,cutColor,srgbToLinear,UNITS} from './workspace-model3d.mjs';
 
 export class TemperatureView3D extends View3D{
- constructor(canvas,options){super(canvas,options);this.cut=null;this.lastHit=null;}
+ constructor(canvas,options){super(canvas,options);this.cut=null;this.lastHit=null;
+  this.outlineMaterial3=new THREE.LineBasicMaterial({color:0x111827});}   // X2: near-black, on neither colour map
+
+ /** X2: the selected face's boundary edges (edges of one of its triangles only), as line segments. */
+ selectionOutline(){
+  const g=new THREE.BufferGeometry();if(this.selected===null||this.selected===undefined)return g;
+  const count=new Map(),key=(a,b)=>a<b?a*4294967296+b:b*4294967296+a,n=this.indices.length/3;
+  for(let t=0;t<n;t++){if(this.owner[t]!==this.selected)continue;
+   for(let j=0;j<3;j++){const a=this.indices[3*t+j],b=this.indices[3*t+(j+1)%3],k=key(a,b);count.set(k,(count.get(k)||0)+1);}}
+  const segs=[];
+  for(const [k,c] of count)if(c===1){const a=Math.floor(k/4294967296),b=k%4294967296;
+   segs.push(...this.positions.subarray(3*a,3*a+3),...this.positions.subarray(3*b,3*b+3));}
+  g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(segs),3));return g;
+ }
 
  /** Show a surface answer (positions in metres from origin_m, one temperature per position). */
  load(surface,{keep=false}={}){
@@ -38,16 +51,17 @@ export class TemperatureView3D extends View3D{
   const pos=new Float32Array(9*m),col=new Float32Array(9*m);let k=0;
   for(let t=0;t<n;t++){
    const f=this.owner[t];if(!shown.has(f))continue;
-   const s=f===this.selected?1:SHADE[v.faces[f].axis];
+   // X2: a selected face keeps its temperature colours (red is the scale's hot end); its outline marks it
+   const s=SHADE[v.faces[f].axis];
    for(let j=0;j<3;j++){
-    const i=this.indices[3*t+j],c=f===this.selected?[0.82,0.14,0.18]:temperatureColor(this.temperature[i],this.tmin,this.tmax);
+    const i=this.indices[3*t+j],c=temperatureColor(this.temperature[i],this.tmin,this.tmax);
     pos.set(this.positions.subarray(3*i,3*i+3),k);col[k]=srgbToLinear(c[0]*s);col[k+1]=srgbToLinear(c[1]*s);col[k+2]=srgbToLinear(c[2]*s);k+=3;   // V8: sRGB colours as linear
    }
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));
   this.mesh=new THREE.Mesh(g,this.material);
-  this.edges=new THREE.LineSegments(new THREE.BufferGeometry(),this.edgeMaterial);
+  this.edges=new THREE.LineSegments(this.selectionOutline(),this.outlineMaterial3);
   this.scene.add(this.mesh,this.edges);
   this.applySection();this.render();
  }
