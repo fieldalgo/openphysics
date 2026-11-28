@@ -428,7 +428,9 @@ inputs changed since this run*). 단면, 탐침, CSV는 서버의 실행이 필�
 새로운 둘; 실행이 하나면 *Compare needs two runs of this 3D model.*). 표는 각 실행의 값을 그 Results 페이지처럼(Tmax,
 Tmin, 고정 온도마다의 열률, 전체 열원, 수지 잔차), 그리고 메시(노드, 사면체, 경로, 요소 크기)를 보이고, 수마다
 옆에 **B − A**를 둡니다. 여기서 Tmax와 Tmin은 *at the A / B interface*가 아니라 *in <영역>*으로 읽힙니다: 실행
-기록에는 그 영역 목록이 없습니다(서버에 묻는 것은 살아 있는 실행의 Results 페이지뿐). **Inputs that differ**는 다른 문서 칸을 트리의 말로 나열합니다(*Fixed temperature z1: 301 K →
+기록에는 그 영역 목록이 없습니다(서버에 묻는 것은 살아 있는 실행의 Results 페이지뿐). 표 아래 한 줄이 열률의 부호를 읽어 줍니다: *Heat rates keep the run
+table's sign: positive into the model, negative out of it. B − A is run B minus run A, so −31.7515 W through z0 means more heat
+leaves through z0 in run B.*(예는 두 열률의 부호가 같고 다를 때만). **Inputs that differ**는 다른 문서 칸을 트리의 말로 나열합니다(*Fixed temperature z1: 301 K →
 311 K*, *Parameter t_ox: 10 µm → 5 µm*, *Mesh element size: 0.1 m → 0.12 m*; 없으면 *Same inputs.*). 두 실행은 기록의
 메시 키(문서의 geometry와 mesh 블록의 다이제스트; 경계나 재료를 바꿔도 같음)와 노드·사면체 수가 같으면 메시를
 공유합니다. 노드 하나하나를 비교하는 것은 아닙니다. 메시를 공유하면 보기는 면 노드마다의 온도 차 B − A를 범례와

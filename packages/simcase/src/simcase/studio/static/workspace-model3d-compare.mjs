@@ -55,6 +55,22 @@ export function compareRows(a,b,unit){
  return rows;
 }
 
+/**
+ * V6: the line under the table about heat rates' sign: B − A is run B minus run A, in the run table's
+ * convention (positive into the model). An example uses the first selection both runs have, when both
+ * rates have the same sign and differ; null without heat rates.
+ */
+export function heatRateNote(va,vb){
+ const qa=va?.heat_rate_by_selection||{},qb=vb?.heat_rate_by_selection||{};
+ const names=Object.keys(qa).filter(k=>k in qb);
+ if(!names.length)return null;
+ const head="Heat rates keep the run table's sign: positive into the model, negative out of it. B − A is run B minus run A";
+ const k=names[0],a=qa[k].value,b=qb[k].value,d=delta(b,a);
+ if(d===0||Math.sign(a)!==Math.sign(b)||a===0)return `${head}.`;
+ const out=a<0,more=out?d<0:d>0;
+ return `${head}, so ${signed(d,qb[k].unit||'W')} through ${k} means ${more?'more':'less'} heat ${out?'leaves':'enters'} through ${k} in run B.`;
+}
+
 // ---- C3-2: the inputs that differ ----------------------------------------------------------------
 
 const shown=v=>v===undefined?'none':typeof v==='object'&&v!==null?shownText(JSON.stringify(v)):shownText(String(v));

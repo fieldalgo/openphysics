@@ -535,7 +535,10 @@ model.*). The table gives each run's values as its Results page writes them (Tma
 temperature's heat rate, the total source, the balance residual) and its mesh (nodes, tetrahedra,
 route, element size), with **B − A** beside each number. Tmax and Tmin read *in <region>* there, not
 *at the A / B interface*: a run record keeps no region list for them (only a live run's Results page
-asks the server). **Inputs that differ** lists the document's
+asks the server). One line under the table reads the heat rates' sign: *Heat rates keep the run table's
+sign: positive into the model, negative out of it. B − A is run B minus run A, so −31.7515 W through z0
+means more heat leaves through z0 in run B.* (the example only when both rates have one sign and
+differ). **Inputs that differ** lists the document's
 fields in the tree's words (*Fixed temperature z1: 301 K → 311 K*, *Parameter t_ox: 10 µm → 5 µm*,
 *Mesh element size: 0.1 m → 0.12 m*; *Same inputs.* when none). Two runs share a mesh when their
 records have the same mesh key (the digest of the document's geometry and mesh blocks; a boundary or
