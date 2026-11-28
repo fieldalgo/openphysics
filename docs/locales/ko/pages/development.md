@@ -236,11 +236,14 @@ CPU에 따라 44~70분, 네 부분으로는 2026-11-21에 10~21분 걸렸습니�
 코너 harmonic 풀이가 약 2.3배 느려 시험 job 제한은 60분이며, 이 제한은 멈춘 실행을 끊기 위한 것입니다. 표에 없는 파일은 얼마나 오래 걸리든
 중앙값(몇 초)으로 세므로, 파일을 더하면 완전한 실행의 `source-tests-*.xml`로 표를 다시 만드십시오(CI에서 약 3분 걸리는
 `test_studio_closed_target.py`가 표에 없이 더해진 뒤 main의 실행 45415835896에서 느린 러너의 5번째 부분이 제한에
-닿았습니다). 파일을
-통째로 배정하므로 가장 큰 파일이 한 부분의 바닥입니다(`tools/tests/test_examples_smoke.py`
-5.7분, 예제를 파일 안에서 정한 순서로 돌림). 같은 이유로 5.5분짜리 M3 판 세밀화 연구는 자기
-파일(`tests/galerkin/test_cavity_mesh_slab_refinement.py`)에 둡니다. 로컬에서 한 부분만
-돌리려면:
+닿았습니다). 2026-11-28부터 표는 부분 전체 열한 벌에서 파일마다 가장 느린 시간을 남깁니다(아래
+`--slowest`). 합계 약 398분, 지금까지 본 가장 느린 러너에서 부분마다 약 25분입니다. 같은 실행들에서 한
+실행으로 만든 표로는 job마다 12~38분이었습니다. 파일을 통째로 배정하므로 가장 큰 파일이 한 부분의
+바닥입니다(`tests/galerkin/test_laplace_corner_linear_field.py`, 지금까지 본 가장 느린 러너에서 23.4분).
+같은 이유로 5.5분짜리 M3 판 세밀화 연구는 자기 파일(`tests/galerkin/test_cavity_mesh_slab_refinement.py`)에
+둡니다. corner-field 모듈은 밀집 풀이 하나를 캐시로 여러 시험이 함께 쓰므로, 시험 하나씩이 아니라 시험들이
+함께 쓰는 캐시된 풀이별로 나눕니다. 시험 하나씩 나누면 그 풀이를 다른 부분에서 다시 돌리게 됩니다.
+로컬에서 한 부분만 돌리려면:
 
 ```bash
 PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/16
