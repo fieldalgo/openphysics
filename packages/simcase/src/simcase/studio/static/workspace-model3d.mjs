@@ -591,6 +591,17 @@ export const HEAT_RATE_SIGN='Heat rate: positive into the model, negative out of
 export const colourBarTitle='Surface temperature';
 /** U7: the view toolbar's Regions control: each region that is drawn (not void), shown unless hidden. */
 export const regionToggles=(view,hidden)=>(view?.regions||[]).filter(r=>!r.void).map(r=>({name:r.name,shown:!hidden.has(r.name)}));
+/** V9: each of a face's names with its reach: [name, "only this face" | "also face 3, face 7"] (from the check's display). */
+export function nameScopes(view,face){
+ return face.names.map(n=>{const others=(view?.faces||[]).filter(f=>f.id!==face.id&&f.names.includes(n)).map(f=>`face ${f.id}`);
+  return [n,others.length?`also ${others.join(', ')}`:'only this face'];});
+}
+/** V9: for an interior face, how to see it: hide the region on its + side (above it for a z face) with Regions. */
+export function interiorHint(face){
+ if(face.exterior||!face.plus?.length)return null;
+ const where=face.axis==='z'?'the region above it':`the region on its +${face.axis} side`;
+ return `Interior face: hide ${face.plus.join(', ')}, ${where}, with Regions in the view toolbar to see it.`;
+}
 /** U7: the line under a face's names: each one picks this face (some also pick others). */
 export const NAMES_ANY='Any of these names selects this face.';
 const sig6=x=>Number(Number(x).toPrecision(6));

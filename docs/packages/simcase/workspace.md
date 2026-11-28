@@ -457,8 +457,10 @@ a running job.
 
 **The view and selections.** The view is the [3D view](studio_3d.md) with its controls (keys on the
 view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views, 0 isometric). A face
-picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names, with the line *Any of
-these names selects this face.* (some also select other faces). **Regions** in the view toolbar has a
+picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names, each marked *only this face* or *also face 3*
+(from the check's faces), with the line *Any of these names selects this face.*; an interior face adds
+*Interior face: hide Si (top), the region above it, with Regions in the view toolbar to see it.* (for a
+face across x or y, the region on its +x or +y side). **Regions** in the view toolbar has a
 checkbox per region; an unchecked region is hidden in the geometry, mesh and result views, so an inner
 face can be picked: in the +z view `via.z1` is picked once *Si (top)*, the region above it, is hidden.
 The engine's names are unchanged. **Use for → New
