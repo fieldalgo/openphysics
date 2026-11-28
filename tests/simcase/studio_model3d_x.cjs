@@ -59,3 +59,9 @@ test('X4: the estimate refusal offers a Use button per size, the smallest first'
  // the time words: under 45 s in seconds, from 45 s in minutes
  assert.match(M.meshRefusalText({...OFF,minute_seconds:44.4},'um'),/13\.4 µm: under a minute \(estimated about 44 s\)\.$/);
 });
+
+test('X6: the line under the surface bar: the surface span and the whole model\'s Tmax',()=>{
+ const surface={temperature_min:{value:300,unit:'K'},temperature_max:{value:362.24412,unit:'K'}};
+ const values={temperature_max:{value:362.2991,unit:'K',region:'SiO2'},temperature_min:{value:300,unit:'K',region:'Si'}};
+ assert.equal(M.surfaceSpanText(surface,values),'Colours span the surface, 300–362.244 K; the whole model reaches 362.299 K (Tmax).');
+});
