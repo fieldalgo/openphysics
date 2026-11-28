@@ -16,11 +16,10 @@ test('the card is its own Library group, with the square-via note',()=>{
  assert.equal(M.CARD3D.title,'Via in a layer stack (3D heat)');
  assert.equal(M.CARD3D.note,'Square via (a round via needs cylinders, coming with the next geometry step)');
  assert.equal(M.CARD3D.asset,'/model3d-assets/model3d-layer-stack-3d.json');
- assert.deepEqual(M.FEATURE_TYPES.filter(t=>t.available).map(t=>t.label),['Box','Layers']);
- // design 5.2, the coordinator's exact reasons
- assert.deepEqual(M.FEATURE_TYPES.filter(t=>!t.available).map(t=>[t.label,t.reason]),[['Extrude','Extrude comes with a later geometry step'],
-  ['Cylinder','Cylinders come with the next geometry step'],['Sphere','Spheres come with the next geometry step']]);
- assert.throws(()=>M.addFeature(card(),'cylinder'),{message:'Cylinders come with the next geometry step'});
+ assert.deepEqual(M.FEATURE_TYPES.filter(t=>t.available).map(t=>t.label),['Box','Layers','Cylinder','Sphere']);
+ // design 5.2, the coordinator's exact reason (Cylinder and Sphere are taken since E2-UI)
+ assert.deepEqual(M.FEATURE_TYPES.filter(t=>!t.available).map(t=>[t.label,t.reason]),[['Extrude','Extrude comes with a later geometry step']]);
+ assert.throws(()=>M.addFeature(card(),'extrude'),{message:'Extrude comes with a later geometry step'});
 });
 
 test('the tree (design 5.2): Component 1 with Parameters, Geometry 1 (Domain, numbered features, Form result) and Materials',()=>{

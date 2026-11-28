@@ -335,10 +335,16 @@ Si (top) · SiO2 · Cu*), **Heat transfer (3D)** with **Thermal conductivity** (
 **Fixed temperature N** (*z0 · 300 K*), each **Heat source N** (*Si (top) · 1e12 W/m³*) and **Insulated**
 (*every other outer face*), **Mesh 1** (*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, the server's
 estimate), **Study 1 · Steady** and **Results** with the kept runs. The coverage words come from the exact complex: *covered in part by 2 (via)*, or
-*covered by 2 (b), 3 (c); adds no region* when later features take all of it. Geometry 1 offers **Add feature** with **Box** and
-**Layers**; **Extrude**, **Cylinder** and **Sphere** are greyed with their reason (*Extrude comes with a
-later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
-geometry step*). A feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its
+*covered by 2 (b), 3 (c); adds no region* when later features take all of it. Geometry 1 offers **Add feature** with **Box**,
+**Layers**, **Cylinder** and **Sphere**; **Extrude** is greyed with its reason (*Extrude comes with a
+later geometry step*). A new cylinder runs through the whole domain height at the x–y centre, with r
+a quarter of the smaller x–y extent; a new sphere sits at the centre, with r a quarter of the
+smallest extent. Cylinders and spheres are taken in meshloom's builder shapes only (one cylinder
+through the slab, one sphere, concentric spheres); whether a builder takes the model is the check's
+answer, in the engine's words ([builder shapes](geometry_engine3d.md#cylinders-and-spheres-in-builder-shapes-slice-3)).
+A cylinder row reads *r 0.3 m · z 0–1 m*, a sphere row *r 0.3 m*. A centre or radius against the
+domain is a combination: only the server checks it, so the engine's stem is shown (*cylinder 'via'
+crosses the side domain.x1 …*), not a range sentence. A feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its
 tree row), **Duplicate** and **Delete** (*via deleted; Undo restores it.*); a layers feature also has
 **Add layer** and **Remove layer** (1 to 32 layers). There is no drag. **Form result** lists the
 regions and the selections, and the faces are listed under the view.
@@ -355,6 +361,8 @@ opened from a file with other values is read as written):
 | material | one of the model's materials, or empty (void) |
 | box xmin … zmax | min < max on each axis; inside the domain where the domain is a number |
 | layers thickness | greater than 0; 1 to 32 layers |
+| cylinder r; sphere r | greater than 0 |
+| cylinder zmin, zmax | min < max (a cylinder's axis is z, shown as *z (fixed)*) |
 | element_size (optional) | domain diagonal / 400 to domain diagonal / 4 |
 | Domain xmin … zmax | min < max |
 

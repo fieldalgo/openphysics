@@ -109,6 +109,8 @@ export function createModel3dView(ctx){
   const text=deletedText(doc,i);commit(deleteFeature(doc,i));selection='geometry';lastNotice={text,undo:true};ctx.render();
  }
  function fieldInput(field){
+  if(field.kind==='fixed'){const id='m3f-'+field.key.replace(/[^A-Za-z0-9]/g,'-');
+   return `<label class="m3-field" for="${id}"><span>${esc(field.label)}</span><input id="${id}" value="${esc(field.value)}" readonly aria-readonly="true"></label>`;}
   const key=field.key,draft=drafts.get(key),value=draft?draft.raw:getField(doc,key);
   const shownValue=value===null||value===undefined?'':String(value);
   const si=field.kind==='length'&&!draft?fieldNote(doc,key):'';
