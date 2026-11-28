@@ -44,7 +44,7 @@ import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {createModel3dView} from './workspace-model3d-view.mjs';
-import {CARD3D,CARDS3D,card3dOf,freshCard,newTabUrl,otherCardReason,replaceLines} from './workspace-model3d.mjs';
+import {CARD3D,CARDS3D,NOT_SAVED_NOT_REPLACED,OTHER_CARD_ACTION,card3dOf,freshCard,newTabUrl,openOtherQuestion} from './workspace-model3d.mjs';
 import {ENVELOPE,matchesAgainText} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
@@ -211,8 +211,8 @@ function library3d(host){
  const section=document.createElement('section');section.className='library-3d';
  const heading=document.createElement('h3');heading.textContent='3D models (experimental)';
  const group=document.createElement('div');group.className='cards-3d';
- // V2: while the project holds one 3D model, another 3D card opens in a new tab at one click (and says
- // why), or replaces the held model after a question that names what is dropped
+ // X3: while the project holds one 3D model, another 3D card reads "Open model" and opens a question that
+ // names the held model and what Replace drops: save and replace, replace, open in a new tab, or cancel
  const held=m3View.inProject()?m3View.card():null;
  for(const card of CARDS3D){
   const other=!!held&&held!==card.id,cell=document.createElement('div');cell.className='card-3d-cell';
@@ -221,13 +221,9 @@ function library3d(host){
   const status=document.createElement('span');status.className='application-status available';status.textContent=card.status;
   const description=document.createElement('p');description.textContent=card.description;
   const note=document.createElement('span');note.className='card-scope';note.textContent=card.note;
-  const action=document.createElement('span');action.className='card-action';action.textContent=other?'Open in a new tab':m3View.inProject()&&m3View.card()===card.id?'Return to the 3D model':'Open model';
-  button.append(title,status,description,note);
-  if(other){const why=document.createElement('span');why.className='card-scope card-why';why.textContent=otherCardReason(m3View.projectTitle());button.append(why);}
-  button.append(action);cell.append(button);
-  button.onclick=()=>other?window.open(newTabUrl(card),'_blank','noopener'):choose3d(card);
-  if(other){const replace=document.createElement('button');replace.type='button';replace.className='card-replace';replace.dataset.m3Replace=card.id;
-   replace.textContent='Replace the 3D model…';replace.onclick=()=>askReplace3d(card);cell.append(replace);}
+  const action=document.createElement('span');action.className='card-action';action.textContent=other?OTHER_CARD_ACTION:m3View.inProject()&&m3View.card()===card.id?'Return to the 3D model':'Open model';
+  button.append(title,status,description,note,action);cell.append(button);
+  button.onclick=()=>other?askReplace3d(card):choose3d(card);
   group.append(cell);
  }
  section.append(heading,group);cards.after(section);
@@ -256,23 +252,27 @@ function model3dSaved(){
  let saved;try{saved=JSON.parse(JSON.parse(project.stamp)[1])[2];}catch{saved=undefined;}
  return {state:saved!==undefined&&saved===m3View.contentStamp()?'saved':'changed',file:project.file.name};
 }
-// V2: Replace the held 3D model with another card's, after a question naming what is dropped; one
-// Undo (in Messages) restores the earlier document and its run records (live cut and probe: Recompute)
+// X3: another 3D card's question (V2's Replace): Save and replace writes the project file and replaces
+// only once the held model reads saved; one Undo (in Messages) restores the earlier document and its
+// run records (live cut and probe: Recompute)
 function askReplace3d(card){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  const st=m3View.state();if(st.mesh.job||st.heat.running){notice('Wait for the 3D model\'s mesh or run to finish, or cancel it.');return;}
  if(m3View.drafts()){notice(m3View.blockText());return;}
  const dialog=document.createElement('dialog');dialog.id='m3-replace-dialog';dialog.setAttribute('aria-labelledby','m3-replace-title');
  const draw=()=>{
-  const s=model3dSaved(),lines=replaceLines({from:m3View.projectTitle(),to:card.title,runs:m3View.records().length,saved:s.state,file:s.file});
+  const s=model3dSaved(),q=openOtherQuestion({from:m3View.projectTitle(),to:card.title,runs:m3View.records().length,saved:s.state,file:s.file});
   dialog.replaceChildren();
-  const h=document.createElement('h2');h.id='m3-replace-title';h.textContent='Replace the 3D model?';dialog.append(h);
-  for(const line of lines){const p=document.createElement('p');p.textContent=line;dialog.append(p);}
+  const h=document.createElement('h2');h.id='m3-replace-title';h.textContent=q.title;dialog.append(h);
+  for(const line of q.lines){const p=document.createElement('p');p.textContent=line;dialog.append(p);}
   const row=document.createElement('div');row.className='dialog-actions';
-  const make=(act,label)=>{const b=document.createElement('button');b.type='button';b.dataset.act=act;b.textContent=label;row.append(b);return b;};
-  make('save','File › Save').onclick=async()=>{await saveProjectFile({saveAs:false});if(dialog.open)draw();};
-  make('replace',`Replace with ${card.title}`).onclick=()=>{dialog.close();replace3d(card);};
-  make('cancel','Cancel').onclick=()=>dialog.close();
+  const act={
+   save:async()=>{await saveProjectFile({saveAs:false});if(!dialog.open)return;
+    if(model3dSaved().state==='saved'){dialog.close();replace3d(card);}else{notice(NOT_SAVED_NOT_REPLACED);draw();}},
+   replace:()=>{dialog.close();replace3d(card);},
+   tab:()=>{dialog.close();window.open(newTabUrl(card),'_blank','noopener');},
+   cancel:()=>dialog.close()};
+  for(const b of q.buttons){const el=document.createElement('button');el.type='button';el.dataset.act=b.act;el.textContent=b.label;el.onclick=act[b.act];row.append(el);}
   dialog.append(row);
  };
  draw();dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();

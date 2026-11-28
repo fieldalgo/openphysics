@@ -27,8 +27,8 @@
 //      top · 510–610 µm"; Cut (CSV) stands in the Section group; clicking it saves
 //      "via-in-a-layer-stack-3d-heat-cut-z-505um.csv" with the metre columns (F7); and Messages reads
 //      "Cut (CSV) saved as …": 6/6.
-//  U6  card 1 open, then card 2 from the Library (V2(a): the card itself reads "Open in a new tab" with
-//      the reason); it opens
+//  U6  card 1 open, then card 2 from the Library (X3: the card reads "Open model" with no reason line,
+//      and its question's Open in a new tab); it opens
 //      /workspace?card=via-slab-3d&fresh=1 in a new tab showing card 2 with no refusal, while the
 //      first tab keeps card 1; with an optical run's recovery record from the first tab, the new tab
 //      offers no recovery (Recover disabled, its note says so) and, after an edit of its 3D model, the
@@ -259,11 +259,13 @@ try {
         r.onerror = () => reject(r.error); }; o.onerror = () => reject(o.error); }));
     const before = await latest(page);
     await page.click('[data-page="Applications"]');
-    // V2(a): card 2 itself now reads "Open in a new tab" (with the reason) and opens the tab at one click
+    // X3: card 2 reads "Open model" (no reason line); its question's Open in a new tab opens the tab
     const refusal = await page.evaluate(() => { const b = document.querySelector('[data-model3d-card="via-slab-3d"]');
-      return {text: b?.querySelector('.card-why')?.textContent || '', button: b?.querySelector('.card-action')?.textContent || ''}; });
+      return {why: b?.querySelector('.card-why')?.textContent ?? null, button: b?.querySelector('.card-action')?.textContent || ''}; });
     const popup = ctx.waitForEvent('page', {timeout: 30000});
-    await page.click('[data-model3d-card="via-slab-3d"]');
+    await page.click('[data-model3d-card="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]');
+    const question = await page.evaluate(() => document.querySelector('#m3-replace-dialog p')?.textContent || '');
+    await page.click('#m3-replace-dialog [data-act="tab"]');
     const tab = await popup; await tab.waitForLoadState();
     await tab.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
     const fresh = await tab.evaluate(() => ({url: location.pathname + location.search, title: document.querySelector('.m3-head h2')?.textContent || '',
@@ -275,13 +277,13 @@ try {
     await page.click('[data-page="Model"]').catch(() => {});
     const original = await page.evaluate(() => document.querySelector('.m3-head h2')?.textContent || '');
     const rows = [
-      refusal.button === 'Open in a new tab' && refusal.text.includes('a project holds one 3D model'),
+      refusal.button === 'Open model' && refusal.why === null && question.includes('a project holds one 3D model'),
       fresh.url === '/workspace?card=via-slab-3d&fresh=1' && fresh.title === 'Copper via through a slab (3D heat)' && !/already holds/.test(fresh.status)
         && original === 'Via in a layer stack (3D heat)',
       before !== null && before === after && fresh.recover && fresh.detail.startsWith('This tab was opened for one 3D model: it offers no browser recovery'),
       note !== '' && !note.includes('Copper via'),
     ];
-    record('U6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, note, refusal, fresh, original,
+    record('U6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, note, refusal, question, fresh, original,
       same: before === after, before: before && before.slice(0, 80)});
     await ctx.close();
   }
