@@ -40,6 +40,7 @@ const out = process.argv[3] || 'model3d-heat-browser';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 await mkdir(out, {recursive: true});
 const V1 = await readFile(join(ROOT, 'tests/simcase/studio_session_fixtures/project-v1.json'), 'utf8');
+const CARD2 = JSON.parse(await readFile(join(ROOT, 'packages/simcase/src/simcase/studio/static/model3d-via-slab-3d.json'), 'utf8'));
 const INSIDE = 'Fixed temperature needs an outer face; via.z1 is inside';
 const origin = new URL(base).origin;
 const report = {base, checks: {}};
@@ -293,8 +294,12 @@ try {
       // W6-UI: Run 1's values table equals the run route's /values, through the page's own rows
       const values = await page.evaluate(async id => (await fetch(`/api/model3d/runs/${id}/values`)).json(), runId);
       const table = await page.evaluate(() => [...document.querySelectorAll('#m3-values tr')].map(r => [r.querySelector('th').textContent, r.querySelector('td').textContent]));
-      const fromRoute = await page.evaluate(async v => (await import('/workspace-assets/workspace-model3d.mjs')).valuesRows(v, 'm'), values);
-      record('W6-UI card 2', JSON.stringify(table) === JSON.stringify(fromRoute) && table.length === 6, {run: runId, table, fromRoute,
+      // the route's values through the page's rows, with the expected heat rate of the run's document beside z0
+      const fromRoute = await page.evaluate(async ([v, d]) => { const M = await import('/workspace-assets/workspace-model3d.mjs');
+        return M.valuesRows(v, 'm', {expected: M.expectedHeatRate(d)}); }, [values, CARD2]);
+      const expectedLine = table.find(r => r[0] === 'Expected heat rate')?.join(' ');
+      record('W6-UI card 2', JSON.stringify(table) === JSON.stringify(fromRoute) && table.length === 7
+        && expectedLine === 'Expected heat rate 31.99 W (parallel formula)', {run: runId, table, fromRoute, expectedLine,
         heatRates: values.heat_rate_by_selection, relativeResidual: values.relative_balance_residual});
       // W14 (recorded only)
       const t1 = Date.now();
@@ -373,7 +378,7 @@ try {
     await page.screenshot({path: join(out, 'w13-card2-keyboard.png')});
     const ok = steps.cardFocused && steps.canvasFocused && steps.rotated && steps.view5 && steps.sideFocused && steps.onUse && steps.fixed
       && steps.name === 'via.side' && steps.onApply && steps.refusal === 'Fixed temperature needs an outer face; via.side is inside'
-      && JSON.stringify(steps.unchanged) === '["heat:fixed:z0","heat:fixed:z1"]' && steps.runFocused && steps.values === 6
+      && JSON.stringify(steps.unchanged) === '["heat:fixed:z0","heat:fixed:z1"]' && steps.runFocused && steps.values === 7
       && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
     record('W13 card 2', ok, {steps, console: seen.console, pageErrors: seen.pageErrors});
     await page.close();

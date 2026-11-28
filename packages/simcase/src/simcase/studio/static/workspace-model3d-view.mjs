@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 
@@ -192,7 +192,7 @@ export function createModel3dView(ctx){
    const unit=r.surface?.unit||'um',live=heat.live[i],u=shownUnit(unit);
    const same=keptRunFor(doc,heat.records)===i;
    return `<h3>Run ${i+1} · Temperature</h3>`+
-    `<table class="m3-values" id="m3-values"><tbody>${valuesRows(r.values,unit).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`+
+    `<table class="m3-values" id="m3-values"><tbody>${valuesRows(r.values,unit,{expected:expectedHeatRate(r.document)}).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`+
     `<p class="muted">Mesh: ${r.mesh.nodes.toLocaleString('en-US')} nodes, ${r.mesh.tetrahedra.toLocaleString('en-US')} tetrahedra (${esc(r.mesh.route)}).${same?' These are the current inputs.':' The inputs have changed since this run.'}</p>`+
     `<div class="m3-actions">${same?'':'<button type="button" data-m3-run-act="inputs">Use this run\'s inputs</button>'}${live?'':'<button type="button" data-m3-run-act="recompute">Recompute</button>'}</div>`+
     (live?'':`<p class="muted" id="m3-recompute-why">Recompute this run to cut, probe or export CSV.</p>`)+

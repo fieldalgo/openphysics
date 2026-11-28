@@ -333,7 +333,14 @@ Its physics holds 300 K on `z0` and 301 K on `z1`, every other outer face insula
 *1 Cylinder via* · *r 0.3 m · z 0–1 m* and *Form result* · *2 regions · 9 faces*; the view draws the
 shape for display (the names of a curved face such as `via.side` add *Shape drawn for display; the
 mesh follows it to within its size*).
-Mesh 1 and Run take it as they take card 1. A project holds one 3D model: while it holds one from
+Mesh 1 and Run take it as they take card 1. Beside the run's own *Heat rate through z0*, the run's
+values show *Expected heat rate 31.99 W (parallel formula)*: Q = ΔT/L · (k_v·πr² + k_s·(A − πr²)),
+computed from the run's document (A and L the domain's area and height, r the cylinder's radius, k_v
+and k_s the copper's and the slab's conductivity, ΔT from the fixed temperatures on `z0` and `z1`).
+The line is shown only where the formula applies (one cylinder through the whole slab height, fixed
+temperatures on exactly `z0` and `z1`, no heat source, every value a number or a quantity); otherwise
+there is no line. The run's 31.75 W is below it because the drawn and meshed cylinder is an inscribed
+polygon. A project holds one 3D model: while it holds one from
 card 1, choosing card 2 leaves it as it is and says *This project already holds the 3D model Via in a
 layer stack (3D heat); a project holds one 3D model. Open Copper via through a slab (3D heat) in a new
 browser tab.* (and the other way round). The project file names the card (`layer-stack-3d` or
