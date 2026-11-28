@@ -296,7 +296,8 @@ browser recovery and keeps none.*), 그래서 그 탭을 연 탭의 복구는 �
 제안합니다.
 
 **트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 매개변수,
-*t_ox = 10 µm · via_w = 20 µm*; 모든 설명과 이름표는 µm로 보이고 입력 칸은 쓴 그대로 *10 um*), **Geometry 1**과 그 아래
+*t_ox = 10 µm · via_w = 20 µm*; 모든 설명과 이름표는 µm로 보이고 입력 칸은 쓴 그대로 *10 um*; Names 상자와 Faces 목록은
+*Face 4 · z = 510 µm*, *area 400 µm²*), **Geometry 1**과 그 아래
 **Domain**(축마다의 범위, *x 0–200 · y 0–200 · z 0–610 µm*; 카드 2는 *x −1–1 · y −1–1 · z 0–1 m*; 또는 *x 0–200 · y 0–200 µm,
 z from the features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2 (via))*,
 각 층의 z 범위는 쓴 그대로, `t_ox` 같은 매개변수면 검사가 평가한 값;

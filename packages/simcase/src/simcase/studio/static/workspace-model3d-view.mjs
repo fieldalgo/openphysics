@@ -587,7 +587,7 @@ export function createModel3dView(ctx){
   const f=face===null||!lastGood?null:lastGood.faces[face];
   box.dataset.face=f?String(f.id):'';
   if(!f){box.innerHTML='<h3>Names</h3><p class="muted">Pick a face in the view or in the faces list.</p>';return;}
-  const lines=faceLines(lastGood,f),can=f.alone.length>0&&!refused;
+  const raw=faceLines(lastGood,f),lines={...raw,title:shownText(raw.title),detail:shownText(raw.detail)},can=f.alone.length>0&&!refused;
   box.innerHTML=`<h3>Names</h3><p>${esc(lines.title)}</p><p class="muted">${esc(lines.detail)} · sides ${esc(lines.sides)}</p><ul>${lines.names.map(n=>`<li><code>${esc(n)}</code></li>`).join('')}</ul><p class="muted" id="m3-names-any">${esc(NAMES_ANY)}</p>`+
    `<div class="m3-use"><label>Use for <select id="m3-use"><option value="new">New selection</option><option value="fixed">Fixed temperature</option></select></label><label for="m3-use-name" id="m3-use-name-label">Selection name</label><input id="m3-use-name" value="${esc(suggestName(f))}" spellcheck="false"><button type="button" id="m3-use-go"${can?'':' disabled aria-describedby="m3-use-why"'}>Apply</button>`+
    (can?'':`<small id="m3-use-why">${esc(refused?'The geometry cannot be formed; fix the problem in Messages first.':'No single name selects this face alone.')}</small>`)+`</div>`;
