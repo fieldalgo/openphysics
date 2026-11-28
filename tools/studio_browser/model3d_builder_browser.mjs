@@ -14,6 +14,12 @@
 //      before meshing, the rounding stem, a below-tolerance E-CONTRACT and E-MESH-ESTIMATE: Messages
 //      shows the engine's words as written and the code under Details, the tree marks features[i]
 //      (else Mesh 1 for a mesh refusal), and Mesh says why it is disabled: 100%;
+//  W5 curved (E2-UI) one document per stem the check raises for cylinders and spheres, each edited in
+//      the form from a good shape (circle_segments opened from a file): the engine's words as written
+//      with no words of Studio's, the code under Details, the tree mark on features[i] (else Mesh 1),
+//      the last good shape greyed and labelled "Last shape that could be formed", Mesh and Run
+//      disabled with main's reasons ("Fix 1 problem in Messages to mesh" / "... to run"; a refusal
+//      before meshing gives its own words and the view is not greyed): 100%;
 //  W9  through the workspace: Mesh 1 shows the estimate before meshing, equal to
 //      /api/model3d/mesh/estimate's; at 1.5 times the limit Mesh is disabled with the refusal and no
 //      mesh job is requested: 3/3;
@@ -43,6 +49,7 @@ const out = process.argv[3] || 'model3d-builder-browser';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 await mkdir(out, {recursive: true});
 const CARD = JSON.parse(await readFile(join(ROOT, 'packages/simcase/src/simcase/studio/static/model3d-layer-stack-3d.json'), 'utf8'));
+const CARD2 = JSON.parse(await readFile(join(ROOT, 'packages/simcase/src/simcase/studio/static/model3d-via-slab-3d.json'), 'utf8'));
 const MESH = await import(pathToFileURL(join(ROOT, 'packages/simcase/src/simcase/studio/static/model3d-mesh-model.mjs')).href);
 const V1 = await readFile(join(ROOT, 'tests/simcase/studio_session_fixtures/project-v1.json'), 'utf8');
 const W4_NAMES = ['stack.sub.domain.x0', 'stack.oxide.domain.y1', 'stack.top.domain.x1', 'stack.top.top', 'via.x0', 'via.x1',
@@ -284,6 +291,75 @@ try {
     const passed = rows.filter(r => r.ok).length;
     record('W5 before meshing', passed === rows.length && !seen.pageErrors.length, {passed, of: rows.length, rows, pageErrors: seen.pageErrors,
       notApplicable: ['circle_segments: no curved feature in a 3d component the check takes']});
+    await page.close();
+  }
+
+  // ---- W5 for cylinders and spheres (E2-UI): from a good shape, edited into each stem ----------
+  {
+    const C = structuredClone(CARD2), comp = d => d.geometry.components.c;
+    const withFeatures = (features, background) => { const d = structuredClone(C); comp(d).features = features; comp(d).background = {material: background}; return d; };
+    const ball = (name, cx, cz, r, material = 'copper') => ({name, type: 'sphere', cx, cy: 0, cz, r, material});
+    const inBox = withFeatures([ball('ball', 0, 0.5, 0.3)], 'slab'), nested = withFeatures([ball('a', 0, 0.5, 0.3), ball('b', 0, 0.5, 0.2, 'slab')], null);
+    delete nested.physics;           // concentric spheres (C11) have no domain faces: card 2's z0 and z1 name nothing there
+    const edited = (d, i, key, value) => { const e = structuredClone(d); comp(e).features[i][key] = value; return e; };
+    // [start document, the edits made in the form [i, key, typed], the document they make, forming?, the tree mark]
+    const cases = {
+      'cylinder touches a side': [C, [[0, 'cx', '0.7']], edited(C, 0, 'cx', 0.7), true, 'feature:0'],
+      'cylinder crosses a side': [C, [[0, 'cx', '0.9']], edited(C, 0, 'cx', 0.9), true, 'feature:0'],
+      'cylinder not through the slab': [C, [[0, 'zmax', '0.5']], edited(C, 0, 'zmax', 0.5), true, 'feature:0'],
+      'sphere touches a side': [inBox, [[0, 'cz', '0.8']], edited(inBox, 0, 'cz', 0.8), true, 'feature:0'],
+      'spheres touch or cross': [nested, [[1, 'cx', '0.2']], edited(nested, 1, 'cx', 0.2), true, 'feature:1'],
+      'sphere beside a box': [inBox, 'add box', null, true, null],
+      'below tolerance': [C, [[0, 'cx', '0.69999996']], edited(C, 0, 'cx', 0.69999996), false, 'mesh'],
+      'circle_segments (from a file)': [null, null, (() => { const d = structuredClone(C); comp(d).features[0].circle_segments = 32; return d; })(), true, 'feature:0'],
+    };
+    const {page, seen} = await open(browser, {width: 1440, height: 900});
+    const rows = [];
+    for (const [label, [start, edits, made, forming, markGiven]] of Object.entries(cases)) {
+      let doc = made, mark = markGiven;
+      if (start) {
+        // the start document's own check: its faces listed, no shape or mesh refusal (it is the last good shape)
+        const startCheck = await serverCheck(page, start);
+        await openFile(page, 'good.json', session(start));
+        await page.waitForFunction(n => document.getElementById('mp-messages')?.dataset.m3State === 'checked'
+          && document.querySelectorAll('#m3-faces li').length === n && !document.querySelector('.m3-stage.stale'), startCheck.display?.faces?.length ?? -1, {timeout: 30000});
+        const good = startCheck.ok === true && startCheck.mesh?.ok === true
+          && await page.evaluate(() => !document.querySelector('[data-m3-refusal]:not([data-m3-run-refusal])'));
+        if (edits === 'add box') {
+          await page.click('[data-m3-node="geometry"]'); await page.click('[data-m3-add="box"]');
+          doc = await page.evaluate(async d => (await import('/workspace-assets/workspace-model3d.mjs')).addFeature(d, 'box'), start);
+        } else {
+          for (const [i, key, typed] of edits) {
+            await page.click(`[data-m3-node="feature:${i}"]`);
+            const sel = `[data-m3-field="features[${i}].${key}"]`;
+            await page.fill(sel, typed); await page.press(sel, 'Enter');
+          }
+        }
+        if (!good) { rows.push({label, ok: false, why: 'the start document was refused'}); continue; }
+      } else await openFile(page, 'stem.json', session(doc));
+      const expected = await serverCheck(page, doc);
+      const want = forming ? expected : expected.mesh;
+      if (mark === null) mark = `feature:${want.feature_index}`;
+      await page.waitForSelector(forming ? '[data-m3-refusal]' : '[data-m3-mesh-refusal]', {timeout: 30000});
+      await page.waitForFunction(() => document.getElementById('mp-messages').dataset.m3State === 'checked');
+      const shown = await page.evaluate(sel => ({text: document.querySelector(`${sel} p`).textContent,
+        details: document.querySelector(`${sel} details`)?.textContent || '',
+        marked: [...document.querySelectorAll('[data-m3-node].has-problem')].map(b => b.dataset.m3Node),
+        meshDisabled: document.getElementById('m3-mesh')?.disabled === true, block: document.getElementById('m3-block')?.textContent || '',
+        runDisabled: document.getElementById('m3-run')?.disabled === true, runWhy: document.getElementById('m3-run-why')?.textContent || '',
+        stale: !!document.querySelector('.m3-stage.stale'), last: document.querySelector('.m3-last')?.textContent || null}),
+        forming ? '[data-m3-refusal]' : '[data-m3-mesh-refusal]');
+      const fromFile = !start;
+      const ok = want?.ok === false && shown.text === want.refused && shown.details.includes(want.code)
+        && JSON.stringify(shown.marked) === JSON.stringify([mark]) && shown.meshDisabled && shown.runDisabled
+        && (forming ? shown.block === 'Fix 1 problem in Messages to mesh' && shown.runWhy === 'Fix 1 problem in Messages to run'
+          && shown.stale && (fromFile || shown.last === 'Last shape that could be formed')
+          : shown.block === want.refused && shown.runWhy === want.refused && !shown.stale);
+      rows.push({label, code: want?.code, mark, expected: want?.refused, shown, lastShape: fromFile ? 'not applicable: opened from a file, no earlier shape' : shown.last, ok});
+      await page.screenshot({path: join(out, `w5-curved-${label.replace(/[^a-z0-9]+/gi, '-')}.png`)});
+    }
+    const passed = rows.filter(r => r.ok).length;
+    record('W5 curved', passed === rows.length && !seen.pageErrors.length, {passed, of: rows.length, rows, pageErrors: seen.pageErrors});
     await page.close();
   }
 
