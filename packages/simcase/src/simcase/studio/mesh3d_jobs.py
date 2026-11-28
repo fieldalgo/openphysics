@@ -192,7 +192,7 @@ def child(doc: dict, component: str | None, outdir: str, conn) -> None:
         _write(out, {"nodes": nodes, "tetrahedra": tets, "tetrahedron_regions": np.asarray(mesh.regions, dtype=np.int64),
                      "surface_nodes": used, "surface_triangles": triangles, "surface_faces": faces,
                      "surface_regions": regions, "quality": quality}, summary)
-        np.savez(out / MESH, **mesh3d_to_arrays(built))
+        np.savez(out / MESH, **mesh3d_to_arrays(built, doc, component))
         conn.send(("done", None))
     except GeometryError as exc:
         conn.send(("error", {"message": str(exc), "code": getattr(exc, "code", None)}))

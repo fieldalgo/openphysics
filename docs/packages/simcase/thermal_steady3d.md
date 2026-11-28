@@ -68,15 +68,23 @@ The mesh and the solve can run apart, for example the mesh in another process (S
   temperature, reaction heat rate and every summary value), with no mesh time. `run` itself
   is now the mesh step and then this same solve. A mesh of the other route or of another
   component is refused by name (`E-CONTRACT`).
-- `simcase.mesh3d_to_arrays(mesh)` and `simcase.mesh3d_from_arrays(arrays, document=None)` write a
-  `Mesh3DResult` or a `galerkin.Mesh3D` as a flat `{name: ndarray}` of numeric and string arrays
-  (format `openphysics-mesh3d-arrays-v1` in the `meta` array; names carry an index, never a tag),
-  which `numpy.savez` writes and `numpy.load(..., allow_pickle=False)` reads, and read it back bit
-  for bit. On the meshloom route the exact complex is rebuilt from the document's geometry; the
-  hand-off and meshloom's raw output are not kept.
+- `simcase.mesh3d_to_arrays(mesh, document, component=None)` and
+  `simcase.mesh3d_from_arrays(arrays, document, component=None)` write a `Mesh3DResult` or a
+  `galerkin.Mesh3D` as a flat `{name: ndarray}` of numeric and string arrays (format
+  `openphysics-mesh3d-arrays-v1` in the `meta` array; names carry an index, never a tag), which
+  `numpy.savez` writes and `numpy.load(..., allow_pickle=False)` reads, and read it back bit for
+  bit. The arrays carry the SHA-256 of the document's canonical `geometry` and `mesh` blocks (the
+  blocks that make the mesh: a change of physics keeps it) and the component's name;
+  `mesh3d_from_arrays` refuses arrays of another format, of other geometry or mesh blocks, or of
+  another component (`ValueError`). On the meshloom route the exact complex is rebuilt from the
+  document's geometry; the hand-off and meshloom's raw output are not kept.
+
+  **The arrays format is experimental and internal to Studio's process hand-off** (its mesh child
+  writes it, its server reads it back). It is not a file format users save, and it may change in
+  any release.
 
 `tests/simcase/test_thermal_steady3d_on_mesh.py` checks the solve against `simcase.run` and the
-array round trip, both bitwise, on all three routes.
+array round trip, both bitwise, on all three routes, and the three refusals.
 
 ## Keys
 

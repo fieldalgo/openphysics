@@ -63,14 +63,21 @@ result.save("out/")                               # summary.json, fields.npz, mo
   `simcase.run`이 주는 결과를 비트까지 같게(노드, 사면체, 온도, 반작용 열유량, 요약 값 전부) 메시 시간 없이
   돌려줍니다. 이제 `run` 자체가 메시 단계 다음에 이 풀이를 돌립니다. 다른 경로나 다른 구성 요소의 메시는
   이름을 들어 거부합니다(`E-CONTRACT`).
-- `simcase.mesh3d_to_arrays(mesh)`와 `simcase.mesh3d_from_arrays(arrays, document=None)`는 `Mesh3DResult`나
-  `galerkin.Mesh3D`를 숫자·문자열 배열만 담은 평평한 `{이름: ndarray}`로 쓰고(형식은 `meta` 배열의
-  `openphysics-mesh3d-arrays-v1`, 이름에는 태그가 아닌 번호만 들어갑니다) 비트까지 같게 되읽습니다.
-  `numpy.savez`로 쓰고 `numpy.load(..., allow_pickle=False)`로 읽을 수 있습니다. meshloom 경로에서는 정확한
-  복합체를 문서의 형상에서 다시 만들고, 넘겨주기와 meshloom 원본 출력은 남기지 않습니다.
+- `simcase.mesh3d_to_arrays(mesh, document, component=None)`와
+  `simcase.mesh3d_from_arrays(arrays, document, component=None)`는 `Mesh3DResult`나 `galerkin.Mesh3D`를
+  숫자·문자열 배열만 담은 평평한 `{이름: ndarray}`로 쓰고(형식은 `meta` 배열의 `openphysics-mesh3d-arrays-v1`,
+  이름에는 태그가 아닌 번호만 들어갑니다) 비트까지 같게 되읽습니다. `numpy.savez`로 쓰고
+  `numpy.load(..., allow_pickle=False)`로 읽을 수 있습니다. 배열에는 문서의 정규화한 `geometry`·`mesh` 블록의
+  SHA-256(메시를 만드는 블록이라 physics가 바뀌어도 그대로)과 구성 요소 이름이 들어 있어,
+  `mesh3d_from_arrays`는 다른 형식, 다른 형상·메시 블록, 다른 구성 요소의 배열을 거부합니다(`ValueError`).
+  meshloom 경로에서는 정확한 복합체를 문서의 형상에서 다시 만들고, 넘겨주기와 meshloom 원본 출력은 남기지
+  않습니다.
+
+  **이 배열 형식은 실험 단계이며 Studio의 프로세스 사이 넘겨주기 전용입니다**(메시 자식 프로세스가 쓰고 서버가
+  되읽습니다). 사용자가 저장하는 파일 형식이 아니며 어느 릴리스에서든 바뀔 수 있습니다.
 
 `tests/simcase/test_thermal_steady3d_on_mesh.py`가 세 경로 모두에서 `simcase.run`과의 풀이 비교와 배열
-왕복을 비트 단위로 확인합니다.
+왕복을 비트 단위로, 그리고 세 가지 거부를 확인합니다.
 
 ## 키
 
