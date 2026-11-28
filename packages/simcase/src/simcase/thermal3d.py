@@ -25,6 +25,7 @@ or {region: value}); every other exterior face is insulated. Each region's
 from __future__ import annotations
 
 import copy
+import math
 import time
 from fractions import Fraction
 
@@ -287,19 +288,74 @@ def extrude_mesh(doc):
     return _extrude(doc.geometry_model, doc.component, doc.si["mesh"]["element_size"])
 
 
-def _extrude(model, comp, element_size):
-    from galerkin import from_mesher
-    from meshine import Domain, box_sides, extrude, generate, rectangle
-    from .geometry_document import layer_stack
-    stack = layer_stack(model, comp.name)
+#: the largest footprint triangle meshine's refinement leaves: circumradius <= 0.6 h (``generate``'s
+#: size_factor), so its area is at most that of the equilateral triangle of that circumradius
+FOOTPRINT_TRIANGLE_AREA = 3 * math.sqrt(3) / 4 * 0.6 ** 2
+#: up to this lower bound of footprint triangles the extrude count is made exact by meshing the footprint
+EXACT_FOOTPRINT_TRIANGLES = 10_000
+
+
+def _extrude_size(comp, element_size) -> float:
     f = comp.features[0]
-    h = _metres(f.mesh_size) if f.mesh_size is not None else float(element_size)
+    return _metres(f.mesh_size) if f.mesh_size is not None else float(element_size)
+
+
+def _footprint(comp, h):
+    from meshine import Domain, box_sides, generate, rectangle
     d = comp.domain
     x0, x1, y0, y1 = (_metres(d[k]) for k in ("xmin", "xmax", "ymin", "ymax"))
     plate = Domain(size=h)
     plate.add_region("plate", rectangle(x0, y0, x1, y1))
-    footprint = generate(plate, box_sides(x0, x1, y0, y1))
-    mesh = extrude(footprint, [_metres(z) for z in stack.levels], stack.table_for(footprint.region_names), size=h)
+    return generate(plate, box_sides(x0, x1, y0, y1))
+
+
+def _sub_layers(model, comp, h) -> tuple[list, dict, int]:
+    """``(levels in m, the extrude table, solid sub-layers)``: meshine.extrude's ``size`` rule, the
+    fewest sub-layers at most h thick, counted over the layers with a material."""
+    from .geometry_document import layer_stack
+    stack = layer_stack(model, comp.name)
+    levels = [_metres(z) for z in stack.levels]
+    table = stack.table_for(["plate"])
+    counts = np.maximum(1, np.ceil(np.diff(np.asarray(levels, dtype=float)) / float(h) * (1 - 1e-12))).astype(np.int64)
+    solid = int(sum(int(n) for n, m in zip(counts, table["plate"]) if m is not None))
+    return levels, stack, solid
+
+
+def extrude_count(model, comp, element_size) -> dict:
+    """The tetrahedra of the extrude route without extruding: 3 per prism, footprint triangles T2 times
+    solid sub-layers. Exact (the footprint meshed) when the lower bound A / (0.468 h^2) of T2 is at most
+    ``EXACT_FOOTPRINT_TRIANGLES``; otherwise that lower bound. ``{"tetrahedra", "exact",
+    "footprint_triangles", "sub_layers"}``."""
+    h = _extrude_size(comp, element_size)
+    d = comp.domain
+    area = (_metres(d["xmax"]) - _metres(d["xmin"])) * (_metres(d["ymax"]) - _metres(d["ymin"]))
+    lower = max(1, math.ceil(area / (FOOTPRINT_TRIANGLE_AREA * h * h) * (1 - 1e-12)))
+    _, _, solid = _sub_layers(model, comp, h)
+    if lower <= EXACT_FOOTPRINT_TRIANGLES:
+        t2 = len(_footprint(comp, h).triangles)
+        return {"tetrahedra": 3 * t2 * solid, "exact": True, "footprint_triangles": t2, "sub_layers": solid}
+    return {"tetrahedra": 3 * lower * solid, "exact": False, "footprint_triangles": lower, "sub_layers": solid}
+
+
+def extrude_limit_error(comp, count: int, limit: int, *, exact: bool):
+    from .geometry_document import GeometryError
+    what = f"{count} tetrahedra" if exact else f"at least {count} tetrahedra"
+    return GeometryError(f"component {comp.name!r}: {what} on the extrude route (3 x footprint triangles x "
+                         f"sub-layers); the limit is {limit} (mesh.element_count_limit)",
+                         path="mesh.element_count_limit", code="E-MESH-ESTIMATE")
+
+
+def _extrude(model, comp, element_size, *, limit: int | None = None):
+    """The extrude mesh; with ``limit``, its exact count is checked after the footprint mesh and before
+    the extrusion (``E-MESH-ESTIMATE``), so nothing over the limit is built."""
+    from galerkin import from_mesher
+    from meshine import extrude
+    h = _extrude_size(comp, element_size)
+    footprint = _footprint(comp, h)
+    levels, stack, solid = _sub_layers(model, comp, h)
+    if limit is not None and 3 * len(footprint.triangles) * solid > limit:
+        raise extrude_limit_error(comp, 3 * len(footprint.triangles) * solid, limit, exact=True)
+    mesh = extrude(footprint, levels, stack.table_for(footprint.region_names), size=h)
     return from_mesher(mesh)
 
 
@@ -310,13 +366,20 @@ def build_thermal3d_mesh(document, component: str | None = None):
     meshloom's builder shapes). ``document`` is a format 0.3 document (a dict or a
     ``simcase.Document``) with a version 1 geometry block and a ``mesh`` block; it needs no physics
     block. ``solve_thermal3d`` solves on the result; ``mesh3d_to_arrays`` writes it as arrays."""
-    from .geometry_document import GeometryError, _pick, parse
-    from .geometry_engine3d import build_mesh3d
+    from .geometry_document import _pick, parse
+    from .geometry_engine3d import _mesh_options, build_mesh3d
     data = getattr(document, "data", document)
     model = parse(data)
     comp = _pick(model, component)
     if comp.dimension != "3d" or not is_extrude_route(comp):
         return build_mesh3d(data, component)
+    return _extrude(model, comp, _element_size(data, comp),
+                    limit=_mesh_options(data, comp)["element_count_limit"])
+
+
+def _element_size(data, comp):
+    """``mesh.element_size`` in m, as the document reader converts it (None when the feature gives one)."""
+    from .geometry_document import GeometryError
     size = None
     if comp.features[0].mesh_size is None:
         mesh = data.get("mesh") if isinstance(data.get("mesh"), dict) else {}
@@ -329,7 +392,7 @@ def build_thermal3d_mesh(document, component: str | None = None):
             raise GeometryError(f"mesh.element_size: {c.diagnostics[0].message if c.diagnostics else 'not a size'}",
                                 path="mesh.element_size", code="E-VALUE-FORM")
         size = c.value
-    return _extrude(model, comp, size)
+    return size
 
 
 def build(doc):

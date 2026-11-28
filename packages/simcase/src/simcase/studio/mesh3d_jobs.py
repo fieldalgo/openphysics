@@ -77,7 +77,8 @@ def estimate(doc: dict, component: str | None = None) -> dict:
     found = estimate_mesh3d(doc, component)
     (info,) = found.diagnostics
     return {"code": info.code, "message": info.message, "component": found.component,
-            "tetrahedra": found.tetrahedra, "limit": found.limit, "seconds": found.seconds}
+            "tetrahedra": found.tetrahedra, "limit": found.limit, "seconds": found.seconds,
+            "route": found.route, "count": found.count}
 
 
 # ----------------------------------------------------------------------------- the child

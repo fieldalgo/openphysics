@@ -53,8 +53,17 @@ refusal that blocks meshing blocks the estimate too, in the same words:
 `E-3D-COMBINATION` and the others. Studio calls it to refuse an
 over-limit document before it starts a meshing process ([3D view](studio_3d.md#mesh)).
 A component holding only one slab `layers` feature, which `build_mesh3d` refuses for the
-`meshine.extrude` route, gets the same T from its exact complex; the extrude mesh's own count
-differs (E1 at 0.8 mm: T 3,076, 7,680 made).
+`meshine.extrude` route, gets that route's own count, 3 × footprint triangles × solid sub-layers
+(`route` `"extrude"`): exact when the footprint's lower bound A / (0.468 h²) is at most 10,000
+triangles (the 2D footprint is meshed: E1 at 0.8 mm gives 7,680, the mesh made, in about 20 ms; at
+0.4 mm 49,152 in about 40 ms; `count` `"exact"`), otherwise that lower bound, worded "at least N
+tetrahedra (extrude route; the exact count is known after the footprint mesh)" (`count`
+`"lower bound"`; 0.468 h² is the largest triangle meshine's refinement leaves, circumradius ≤ 0.6 h).
+The limit refuses either before any mesh. When only the lower bound is known and it is under the
+limit, `build_thermal3d_mesh` checks the exact count after the footprint mesh and refuses before
+extruding, with `E-MESH-ESTIMATE` in the same words, so nothing over the limit is built. On this
+route the seconds are rough: the time per tetrahedron is the meshloom route's. Elsewhere `route` is
+`"meshloom"` or `"builder"` and `count` `"estimate"`.
 
 `simcase.geometry_engine3d.evaluate3d(model, component=None)` returns the complex alone,
 for a model from `simcase.geometry_document.parse`. It refuses a component holding one

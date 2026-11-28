@@ -101,7 +101,10 @@ mesh's surface. It runs no physics and changes no file.
   quality, so Studio computes q from the mesh.
 - **The route** is the `thermal.steady3d` kind's (`simcase.build_thermal3d_mesh`): a component
   holding only one slab `layers` feature (E1) is meshed by `meshine.extrude`, everything else by
-  `simcase.build_mesh3d`. Its estimate is the T of its exact complex (`estimate_mesh3d`).
+  `simcase.build_mesh3d`. On the extrude route the estimate is that route's count, exact for
+  footprints up to 10,000 triangles and a lower bound above them; then the limit check can happen
+  in the child, after the footprint mesh and before the extrusion, with the estimate's words
+  ([estimate](geometry_engine3d.md)). The estimate answer adds `route` and `count`.
 
 ## Run
 
