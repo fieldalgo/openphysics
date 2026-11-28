@@ -576,6 +576,7 @@ dialog::backdrop{background:#162a4b66}
 .m3-section .m3-unit{color:#5b6573}
 .m3-colourbar{display:flex;gap:8px;align-items:center;max-width:720px;margin:6px 0;font-size:12px}
 .m3-colourbar .m3-ramp{flex:1;height:12px;border:1px solid #d4d9e1;border-radius:2px}
+.m3-cb-note{margin:0 0 6px;font-size:12px;color:#4b5563}
 .m3-values{border-collapse:collapse;font-size:12px;margin:6px 0}.m3-values th,.m3-values td{padding:2px 6px;text-align:left;vertical-align:top}
 .m3-probe fieldset{display:flex;flex-wrap:wrap;gap:6px;align-items:end;border:1px solid #d4d9e1;border-radius:4px}
 .m3-probe input{width:6em}

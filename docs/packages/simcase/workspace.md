@@ -544,7 +544,9 @@ at a node shared by two regions reads *336.05 K at the SiO2 / Si (top) interface
 (`/api/model3d/runs/{id}/extremes` names the regions around the node); a run opened from a file reads *in SiO2*
 until it is recomputed. The **Result** view shows the run's
 surface temperature, blue at the minimum and red at the maximum, with its colour bar titled *Surface
-temperature* (its range is the surface's, which can be narrower than the whole model's in the table). A face selected
+temperature* (its range is the surface's, which can be narrower than the whole model's in the table). A line under it
+says so with the run record's numbers: *Colours span the surface, 300–362.244 K; the whole model reaches 362.299 K
+(Tmax).* A face selected
 there keeps its temperature colours and is outlined in near-black; the geometry and mesh views keep their fill. The toolbar's
 **Section** (x, y or z = a position in the component's unit, shown beside the box) clips the geometry view and, on a result,
 draws the exact cut of the run's field (*Cut z = 505 µm: 833.653–939.105 K.*), coloured over the cut's

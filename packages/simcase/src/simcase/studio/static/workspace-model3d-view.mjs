@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,meshSizeOffers,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,adviceText,cutColor} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,surfaceSpanText,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,adviceText,cutColor} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 import {NEEDS_TWO,SAME_INPUTS,compareRows,heatRateNote,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
@@ -402,7 +402,8 @@ export function createModel3dView(ctx){
  function colourBar(rec){
   const s=rec.surface,lo=s.temperature_min.value,hi=s.temperature_max.value,mid=(lo+hi)/2;
   const css=[lo,mid,hi].map(t=>`rgb(${temperatureColor(t,lo,hi).map(c=>Math.round(c*255)).join(',')})`).join(',');
-  return `<div class="m3-colourbar" role="img" aria-label="${colourBarTitle} from ${Number(lo.toPrecision(6))} K (blue) to ${Number(hi.toPrecision(6))} K (red)"><span class="m3-cb-title">${colourBarTitle}</span><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${css})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`;
+  return `<div class="m3-colourbar" role="img" aria-label="${colourBarTitle} from ${Number(lo.toPrecision(6))} K (blue) to ${Number(hi.toPrecision(6))} K (red)"><span class="m3-cb-title">${colourBarTitle}</span><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${css})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`+
+   `<p class="m3-cb-note" id="m3-surface-span">${esc(surfaceSpanText(s,rec.values))}</p>`;
  }
  async function applySection(axis,raw){
   const at=Number(raw);

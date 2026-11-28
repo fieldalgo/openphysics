@@ -707,6 +707,8 @@ export function interiorHint(face){
 export const NAMES_ANY='Any of these names selects this face.';
 const sig6=x=>Number(Number(x).toPrecision(6));
 /** U5: the cut's own legend, for its own colour range: "Cut z = 505 µm: 300–336.051 K". */
+/** X6: the line under the surface bar: the colours' span (the surface's) and the whole model's Tmax (the record's values). */
+export const surfaceSpanText=(surface,values)=>`Colours span the surface, ${sig6(surface.temperature_min.value)}–${sig6(surface.temperature_max.value)} K; the whole model reaches ${sig6(values.temperature_max.value)} K (Tmax).`;
 export const cutLegend=(cut,unit)=>`Cut ${cut.axis} = ${cut.at} ${shownUnit(unit)}: ${sig6(cut.temperature_min.value)}–${sig6(cut.temperature_max.value)} K`;
 /** U5: a saved cut's file name, with the model and the plane: "via-in-a-layer-stack-3d-heat-cut-z-505um.csv"
  * (the unit as the document writes it, in ASCII). The CSV's columns stay in metres (F7). */

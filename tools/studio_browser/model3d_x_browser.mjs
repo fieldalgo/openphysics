@@ -30,6 +30,9 @@
 //      and B equal each run's own run-table cells (the /extremes words: "… K at the SiO2 / Si (top)
 //      interface, (…) µm" for Tmax); after File › Save and opening that file in a new page (kept
 //      records, no live run), Compare's Tmax cells read "… K in <region> at (…) µm": 2/2.
+//  X6  card 1, Run 1, the Result view: the line under the surface bar reads "Colours span the surface,
+//      <lo>–<hi> K; the whole model reaches <Tmax> K (Tmax).", lo and hi the record's surface
+//      temperature_min and temperature_max and Tmax its values' temperature_max (6 significant digits): 1/1.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -300,6 +303,22 @@ try {
       kept[tmax]?.length === 3 && / K in [^,()]+ at \(/.test(kept[tmax][0]) && / K in [^,()]+ at \(/.test(kept[tmax][1]) && !/interface/.test(kept[tmax].join(' ')),
     ];
     record('X5', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 2, t1, t2, live, kept});
+    await ctx.close();
+  }
+  if (want('X6')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    let runId = null;
+    page.on('response', async r => { if (r.url().endsWith('/api/model3d/run') && r.request().method() === 'POST') { try { runId = (await r.json()).run; } catch {} } });
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(500);
+    await page.click('[data-m3-pane="result"]').catch(() => {}); await page.waitForTimeout(300);
+    const line = await page.evaluate(() => document.getElementById('m3-surface-span')?.textContent ?? null);
+    const rec = await page.evaluate(async id => (await fetch(`/api/model3d/runs/${id}/record?maps=kept`)).json(), runId);
+    const six = x => String(Number(x.toPrecision(6)));
+    const want = `Colours span the surface, ${six(rec.surface.temperature_min.value)}–${six(rec.surface.temperature_max.value)} K; the whole model reaches ${six(rec.values.temperature_max.value)} K (Tmax).`;
+    const rows = [line === want];
+    record('X6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, line, want});
     await ctx.close();
   }
 } finally {
