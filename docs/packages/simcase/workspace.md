@@ -319,18 +319,19 @@ component in µm over a 200 × 200 µm domain (z from 0 to 610 µm): one `layers
 Si) and a later box `via` (x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through
 the oxide. The via is square until cylinders come: *Square via (a round via needs cylinders, coming
 with the next geometry step)*. Choosing the card adds the 3D model to the tab; the workspace and
-multiphysics models stay as they are, and the card of another model returns to it. The 3D model has no
-mesh, run or result yet; **Mesh** and **Run** are shown disabled with their reason (*Meshing and heat
-come in a later step of the 3D model.*).
+multiphysics models stay as they are, and the card of another model returns to it. The 3D model is
+meshed by **Mesh 1** (below); it has no run or result yet, and **Run** is shown disabled with its
+reason (*Heat comes in a later step of the 3D model.*).
 
 **The tree** (design §5.2, for this step). The group **Component 1 · 3D · µm** holds **Parameters**
 (beside it the parameters as written, *t_ox = 10 um · via_w = 20 um*), **Geometry 1** with **Domain**
 (*200 × 200 × 610 µm*, or *200 × 200 µm, z from the features*), the features numbered in order (later
 wins: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*, *2 Box via* · *20 × 20 × 10
-µm*) and **Form result** (*3 regions · 22 faces*, from the server's check), then **Materials** (*Si ·
-SiO2 · Cu*). The coverage words come from the exact complex: *covered in part by 2 (via)*, or
-*covered by 2 (b), 3 (c); adds no region* when later features take all of it. Heat transfer, Mesh,
-Study and Results come with the next steps. Geometry 1 offers **Add feature** with **Box** and
+µm*) and **Form result** (*3 regions · 22 faces*, from the server's check), **Materials** (*Si ·
+SiO2 · Cu*) and **Mesh 1** (*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, the server's
+estimate). The coverage words come from the exact complex: *covered in part by 2 (via)*, or
+*covered by 2 (b), 3 (c); adds no region* when later features take all of it. Heat transfer, Study
+and Results come with the next step. Geometry 1 offers **Add feature** with **Box** and
 **Layers**; **Extrude**, **Cylinder** and **Sphere** are greyed with their reason (*Extrude comes with a
 later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
 geometry step*). A feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its
@@ -356,7 +357,7 @@ opened from a file with other values is read as written):
 A refused value uses the 2D builder's range sentence (*Via x max must be between 90–200 µm.*,
 *Stack oxide thickness must be greater than 0 µm.*, *Via element size must be between 1.68–168 µm.*)
 and stays as a highlighted draft with **Restore last valid value**. While a draft is shown, File ›
-Save, Save As and Export are disabled, and Mesh and Run name the draft as their reason. Combinations
+Save, Save As and Export are disabled, and Mesh names the draft as its reason. Combinations
 of features are checked by the server only. The **Parameters** table lists each parameter's name,
 value, kind (length or ratio), range (when the document gives one), SI value and how many fields use
 it; a refusal about a parameter (E-DOMAIN, E-EXPRESSION-KIND, a cycle) is shown on its row. A used
@@ -370,7 +371,28 @@ words as written and its code and path under **Details** (for example *sphere 'b
 in a 3d component; boxes and slab layers are* · `E-3D-COMBINATION` at
 `geometry.components.c.features[2]`); Studio adds no words of its own to them. The tree marks the
 feature it names (the later one), the view keeps the last shape that could be formed, greyed and
-labelled *Last shape that could be formed*, and Mesh and Run say *Fix 1 problem in Messages to mesh*.
+labelled *Last shape that could be formed*, and Mesh says *Fix 1 problem in Messages to mesh*.
+
+The check also answers the mesh estimate (`simcase.estimate_mesh3d`), or the refusal that blocks
+meshing although the shape forms: the element count over its limit (`E-MESH-ESTIMATE`), a piece below
+the mesher tolerance (`E-CONTRACT`), or two values that round to one coordinate (*west.x1 and east.x0
+round to the same coordinate 9000.000000000002 m*). Such a refusal is shown in Messages the same way;
+the tree marks the feature its path names, else **Mesh 1** (*refused*); the view is not greyed, since
+the shape is formed; and Mesh is disabled with the refusal's words.
+
+**Mesh 1.** Its page shows the estimate and the `element_size` of the document's mesh block (a
+quantity; a bare number is in the component's unit; diagonal/400 to diagonal/4 as for a feature).
+**Mesh** in the graphics header runs Studio's mesh job (the [3D view's mesh routes](studio_3d.md#what-it-sends-and-answers))
+in a separate process: the steps (*Forming geometry → Meshing (expected about 1 s) → Checking the
+mesh → Ready*), the elapsed time and *taking longer than the estimate* past twice the estimate. While
+it runs, the button is **Cancel meshing**; a cancel ends the process and keeps nothing (*Meshing
+cancelled; nothing kept.* in Messages). Done, Messages says *Meshed stack3d: 1551 nodes, 6774
+tetrahedra, 3 regions.*, the page lists the mesh's statistics, and the view switches to **Mesh view**
+(coloured by region, with mesh edges; the same controls and face picking); **Geometry** switches back.
+A mesh of an unchanged geometry and mesh block is reused at once. After an edit the mesh view is
+greyed and labelled *Mesh of an earlier geometry; mesh again to update it*. The mesh is view state:
+it is neither in Undo nor in the project or session file, and leaving or closing the 3D model cancels
+a running job.
 
 **The view and selections.** The view is the [3D view](studio_3d.md) with its controls (keys on the
 view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views, 0 isometric). A face
@@ -403,10 +425,11 @@ recovery yet.
 | Check | What | Threshold | Measured | Where |
 |---|---|---|---|---|
 | W4 | 10 listed faces of the card (`stack.sub.domain.x0`, `stack.oxide.domain.y1`, `stack.top.domain.x1`, `stack.top.top`, `via.x0`, `via.x1`, `via.y0`, `via.y1`, `via.z0`, `via.z1`) picked, Use for → New selection; the written selection and the listed name typed by hand resolve to the picked face (server: through `build_mesh3d`, to the picked face's mesh faces) | 10/10 | 10/10 (server and browser; two faces picked in the view, eight in the faces list) | `tests/simcase/test_studio_model3d_check.py`, `tools/studio_browser/model3d_builder_browser.mjs` |
-| W5 | one document per E-3D-COMBINATION stem the check raises (footprint layers alone; beside other features; extrude, cylinder, sphere not taken yet): the engine's words in Messages, the code under Details, the tree mark on features[i], Mesh and Run's reason | 100% | 5/5. The stems "… round to the same coordinate" and circle_segments come from `build_mesh3d` when meshing (a later step) | same |
+| W5 | one document per E-3D-COMBINATION stem the check raises while forming (footprint layers alone; beside other features; extrude, cylinder, sphere not taken yet), and per refusal before meshing (the rounding stem, a below-tolerance E-CONTRACT, E-MESH-ESTIMATE): the engine's words in Messages, the code under Details, the tree mark on features[i] (else Mesh 1), Mesh's reason | 100% | 5/5 and 3/3 (server and browser). circle_segments is not applicable: no curved feature in a 3d component the check takes | same, and `tests/simcase/test_studio_model3d_check_mesh.py` |
+| W9 (workspace) | Mesh 1 shows the estimate before meshing; at 1.5 times the limit Mesh is disabled with the refusal and no mesh job is requested; the estimate equals `/api/model3d/mesh/estimate`'s | 3/3 | 3/3 (server and browser) | same |
 | W11 (no runs) | the document digest after Save and Open, project and session; a version 1 project without 3D written byte for byte as before | equal; unchanged | equal; unchanged | `tests/simcase/studio_model3d_files.cjs`, the browser check |
-| W12 | the Library, and the Model with the card, at 1440 × 900 and 390 × 844: no console error or CSP violation, canvas drawn, no horizontal scroll at 390, faces list reached by Tab; screenshots kept | all hold | all hold | the browser check |
-| W13 (part B) | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → New selection | no pointer event | 0 pointer events | the browser check |
+| W12 | the Library, the Model with the card, and its mesh view (Mesh 1, Mesh), at 1440 × 900 and 390 × 844: no console error or CSP violation, canvas drawn, no horizontal scroll at 390, faces list reached by Tab; screenshots kept | all hold | all hold | the browser check |
+| W13 | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → New selection; then Mesh 1, size 8 µm, Mesh, Cancel meshing, the cancel line reached in Messages by Tab and the job *cancelled* on the server, size 40 µm, Mesh again to the mesh view | no pointer event | 0 pointer events | the browser check |
 
 The pure helpers (`workspace-model3d.mjs`) are checked by `tests/simcase/studio_model3d_builder.cjs`;
 the browser check also compares the tree's rows and notes with the server's answer. It is local

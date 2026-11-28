@@ -538,10 +538,10 @@ dialog::backdrop{background:#162a4b66}
 .m3-run small{color:var(--muted,#5b6575);max-width:32em}
 .m3-views{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .m3-stage{position:relative}
-.m3-stage.stale #m3-canvas{opacity:.4;filter:grayscale(1)}
+.m3-stage.stale #m3-canvas,.m3-stage.stale #m3-mesh-canvas{opacity:.4;filter:grayscale(1)}
 .m3-last{position:absolute;top:8px;left:10px;margin:0;padding:2px 8px;background:#fff;border:1px solid #d4d9e1;border-radius:3px;font-size:12px}
-#m3-canvas{display:block;width:100%;max-width:720px;aspect-ratio:10/7;height:auto;border:1px solid #d4d9e1;border-radius:4px;touch-action:none;background:#fbfcfd}
-#m3-canvas:focus-visible{outline:3px solid #2f6fb3;outline-offset:2px}
+#m3-canvas,#m3-mesh-canvas{display:block;width:100%;max-width:720px;aspect-ratio:10/7;height:auto;border:1px solid #d4d9e1;border-radius:4px;touch-action:none;background:#fbfcfd}
+#m3-canvas:focus-visible,#m3-mesh-canvas:focus-visible{outline:3px solid #2f6fb3;outline-offset:2px}
 .m3-names ul,.m3-faces ul{list-style:none;margin:0;padding:0}
 .m3-faces ul{max-height:260px;overflow:auto}
 .m3-faces li{display:flex;gap:8px;align-items:baseline;padding:3px 4px;border-radius:3px;cursor:pointer}
@@ -563,3 +563,10 @@ dialog::backdrop{background:#162a4b66}
 .m3-note{font-size:11px;color:#8a5a00;white-space:normal;overflow-wrap:anywhere}
 #tree [data-m3-node]{flex-wrap:wrap;height:auto;min-height:28px;white-space:normal}#tree [data-m3-node] .m3-note{flex-basis:100%;padding-left:22px}
 .has-problem{color:#a33a2c}
+.m3-pane{display:inline-flex;gap:0;margin-left:auto}
+.m3-pane button[aria-pressed="true"]{background:#e6eef8;border-color:#2f6fb3}
+.m3-mesh-job{margin:6px 0;font-size:12px}
+.m3-mesh-job p{margin:0 0 4px}.m3-mesh-job p.longer{color:#8a5a00}
+.m3-mesh-job ol{list-style:none;margin:0;padding:0}.m3-mesh-job li{display:inline}.m3-mesh-job li+li::before{content:' → ';color:#8995a3;font-weight:400}
+.m3-mesh-job li.done{color:#4c6a50}.m3-mesh-job li.current{font-weight:600}.m3-mesh-job li.todo{color:#8995a3}
+.m3-mesh-stats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px}.m3-mesh-stats dd{margin:0}

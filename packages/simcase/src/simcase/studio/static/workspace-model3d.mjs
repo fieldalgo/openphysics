@@ -7,6 +7,8 @@
 // The ranges here are Studio's own guards against unusable sizes (design 5.2), not contract rules: a
 // document opened from a file with other values is read as written.
 import {betweenText} from './workspace-inputs.mjs';
+// Slice C's mesh words (estimateText, meshBlocked) live in /model3d-assets/model3d-mesh-model.mjs;
+// the page passes them in (words), so this module keeps to the workspace assets and Node tests it.
 
 /** The Library card of the 3D group (not an application card: it has its own group). */
 export const CARD3D=Object.freeze({id:'layer-stack-3d',kind:'model3d',title:'Via in a layer stack (3D heat)',
@@ -88,6 +90,7 @@ export function fieldNote(doc,key){
 
 /** The fields of a node, in table order: [{key, label, kind, rule, optional}] (kind: length | name | material). */
 export function fieldsOf(doc,node){
+ if(node==='mesh')return [{key:'mesh.element_size',label:'element_size',kind:'length',rule:{meshSize:true}}];
  if(node==='domain')return ['xmin','xmax','ymin','ymax','zmin','zmax'].map(k=>({key:`domain.${k}`,label:k,kind:'length'}));
  const m=/^feature:(\d+)$/.exec(node);if(!m)return [];
  const i=+m[1],f=component(doc).features[i];if(!f)return [];
@@ -106,10 +109,11 @@ export function fieldsOf(doc,node){
 const STEP=/([A-Za-z_][A-Za-z0-9_]*)|\[(\d+)\]/g;
 const steps=key=>[...key.matchAll(STEP)].map(m=>m[2]!==undefined?+m[2]:m[1]);
 /** The value at a component-relative key ("features[1].xmin"). */
-export function getField(doc,key){let at=component(doc);for(const s of steps(key)){if(at==null)return undefined;at=at[s];}return at;}
+const rootOf=(doc,key)=>key.startsWith('mesh.')?doc:component(doc);     // the mesh block is the document's
+export function getField(doc,key){let at=rootOf(doc,key);for(const s of steps(key)){if(at==null)return undefined;at=at[s];}return at;}
 /** A copy of doc with the value at key set (no checks: see editField); undefined removes the key. */
 export function setField(doc,key,value){
- const out=copy(doc),path=steps(key);let at=component(out);
+ const out=copy(doc),path=steps(key);let at=rootOf(out,key);
  for(const s of path.slice(0,-1))at=at[s];
  if(value===undefined)delete at[path.at(-1)];else at[path.at(-1)]=value;return out;
 }
@@ -137,11 +141,12 @@ function rangeProblem(doc,key,v){
   const lo=m[3]==='min'?(dmin===null?null:{v:dmin,eq:true}):(other===null?null:{v:other,eq:false});
   const hi=m[3]==='min'?(other===null?null:{v:other,eq:false}):(dmax===null?null:{v:dmax,eq:true});
   return between(`${cap(f.name)} ${axis} ${m[3]}`,lo,hi);}
- m=/^features\[(\d+)\]\.element_size$/.exec(key);
+ m=/^(?:features\[(\d+)\]|mesh)\.element_size$/.exec(key);
  if(m){const ext=AXES.map(a=>{const lo=at(a+'min'),hi=at(a+'max');return lo===null||hi===null?null:hi-lo;});
   if(ext.includes(null))return null;
   const diag=Math.hypot(...ext),lo=Number((diag/400).toPrecision(3)),hi=Number((diag/4).toPrecision(3));
-  return v<diag/400||v>diag/4?betweenText(`${cap(comp.features[+m[1]].name)} element size`,lo,hi,u):null;}
+  const label=m[1]===undefined?'Mesh':cap(comp.features[+m[1]].name);
+  return v<diag/400||v>diag/4?betweenText(`${label} element size`,lo,hi,u):null;}
  return null;
 }
 const thicknessLabel=(doc,key)=>{const m=/^features\[(\d+)\]\.layers\[(\d+)\]/.exec(key),f=component(doc).features[+m[1]];
@@ -157,9 +162,12 @@ export function editField(doc,field,raw){
   if(field.optional&&String(raw??'').trim()==='')return {doc:setField(doc,field.key,undefined),si:null};
   const p=parseLength(raw,unit,field.rule);
   if(p.problem==='positive')return {problem:`${thicknessLabel(doc,field.key)} must be greater than 0 ${shownUnit(unit)}.`};
+  if(field.rule?.meshSize&&(p.problem||p.si===null))return {problem:'A mesh size is a number or a quantity such as 20 um.'};
   if(p.problem)return {problem:p.problem};
   if(p.si!==null){const problem=rangeProblem(doc,field.key,p.si/UNITS[unit]);if(problem)return {problem};}
-  return {doc:setField(doc,field.key,p.value),si:p.si};
+  // the document mesh block takes quantities: a bare number is in the component's unit
+  const stored=field.rule?.meshSize&&typeof p.value==='number'?`${p.value} ${unit}`:p.value;
+  return {doc:setField(doc,field.key,stored),si:p.si};
  }
  const text=String(raw??'').trim();
  if(field.kind==='name'){
@@ -196,7 +204,7 @@ const plural=(n,one)=>`${n} ${one}${n===1?'':'s'}`;
  * answer for this document (or null); refused: the last refusal ({feature_index}) or null.
  * Each row: {key, label, level, note, problem}.
  */
-export function treeRows(doc,check=null,refused=null){
+export function treeRows(doc,check=null,refused=null,words=null){
  const comp=component(doc),rows=[],u=shownUnit(comp.length_unit),d=comp.domain||{};
  const params=Object.entries(doc.geometry.parameters||{});
  rows.push({key:'component',label:`Component 1 · 3D · ${u}`,level:1,note:'',problem:false});
@@ -205,14 +213,20 @@ export function treeRows(doc,check=null,refused=null){
  const ext=AXES.map(a=>{const lo=inUnit(d[a+'min'],comp.length_unit),hi=inUnit(d[a+'max'],comp.length_unit);return lo===null||hi===null?null:num(hi-lo);});
  const zFree=d.zmin===undefined&&d.zmax===undefined;
  rows.push({key:'domain',label:'Domain',level:3,note:ext[0]===null||ext[1]===null?'':zFree?`${ext[0]} × ${ext[1]} ${u}, z from the features`:ext[2]===null?`${ext[0]} × ${ext[1]} ${u}`:`${ext.join(' × ')} ${u}`,problem:false});
+ const meshOff=meshRefusal(check);
  comp.features.forEach((f,i)=>{
   const cover=check?.features?.[i]?.text||'',summary=featureSummary(comp,f);
-  rows.push({key:`feature:${i}`,label:featureLabel(f,i),level:3,note:[summary,cover&&`(${cover})`].filter(Boolean).join(' '),problem:refused?.feature_index===i});
+  rows.push({key:`feature:${i}`,label:featureLabel(f,i),level:3,note:[summary,cover&&`(${cover})`].filter(Boolean).join(' '),
+   problem:refused?.feature_index===i||meshOff?.feature_index===i});
  });
  const faces=check?.display?.faces?.length;
  rows.push({key:'form',label:'Form result',level:3,note:refused?'refused':check?`${plural(check.regions.length,'region')}${faces===undefined?'':' · '+plural(faces,'face')}`:'',
   problem:!!refused&&refused.feature_index===null&&!/^geometry\.parameters\b/.test(refused.path||'')});
  rows.push({key:'materials',label:'Materials',level:2,note:Object.keys(doc.materials||{}).join(' · '),problem:false});
+ const size=doc.mesh?.element_size,sizeText=size===undefined?'':`size ${String(size).replace(/\bum\b/g,'µm')}`;
+ const est=!refused&&check?.mesh?.ok&&words?words.estimateText(check.mesh.estimate):'';
+ rows.push({key:'mesh',label:'Mesh 1',level:2,note:meshOff?'refused':[sizeText,est].filter(Boolean).join(' · '),
+  problem:!!meshOff&&(meshOff.feature_index===null||meshOff.feature_index===undefined)});
  return rows;
 }
 
@@ -336,9 +350,20 @@ export function refusalMessage(refusal){
  return {text:refusal.refused,details:refusal.code?`${refusal.code}${refusal.path?' at '+refusal.path:''}`:(refusal.path||''),
   feature:refusal.feature_index??null};
 }
+/** The refusal that blocks meshing in a check answer (the shape formed), or null. */
+export const meshRefusal=check=>check?.mesh&&check.mesh.ok===false?check.mesh:null;
+/**
+ * Why Mesh is not offered, or null: a draft, the shape's refusal, the mesh refusal in the
+ * engine's words, a running job (slice C's words), no check yet.
+ */
+export function meshReason({drafts=0,refused=null,check=null,running=false}={},words){
+ if(drafts||refused)return blockReason({drafts,refused});
+ const off=meshRefusal(check);
+ return words.meshBlocked({estimate:check?.mesh?.ok?check.mesh.estimate:null,refused:off?off.refused:null,running});
+}
 /** Why Mesh and Run are not offered: a refusal, a draft, or (in this step) that they come later. */
 export function blockReason({refused=null,drafts=0}={}){
  if(drafts)return `Correct the highlighted ${drafts===1?'field':'fields'} or restore ${drafts===1?'its':'their'} last valid ${drafts===1?'value':'values'} first.`;
  if(refused)return 'Fix 1 problem in Messages to mesh';
- return 'Meshing and heat come in a later step of the 3D model.';
+ return 'Heat comes in a later step of the 3D model.';
 }
