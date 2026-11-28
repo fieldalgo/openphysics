@@ -27,7 +27,8 @@
 //      top · 510–610 µm"; Cut (CSV) stands in the Section group; clicking it saves
 //      "via-in-a-layer-stack-3d-heat-cut-z-505um.csv" with the metre columns (F7); and Messages reads
 //      "Cut (CSV) saved as …": 6/6.
-//  U6  card 1 open, then card 2 from the Library: the refusal has "Open in a new tab"; it opens
+//  U6  card 1 open, then card 2 from the Library (V2(a): the card itself reads "Open in a new tab" with
+//      the reason); it opens
 //      /workspace?card=via-slab-3d&fresh=1 in a new tab showing card 2 with no refusal, while the
 //      first tab keeps card 1; with an optical run's recovery record from the first tab, the new tab
 //      offers no recovery (Recover disabled, its note says so) and, after an edit of its 3D model, the
@@ -257,11 +258,12 @@ try {
         r.onsuccess = () => { o.result.close(); const v = r.result; resolve(v ? JSON.stringify({savedAt: v.savedAt, session: v.session ?? v.text ?? null}) : null); };
         r.onerror = () => reject(r.error); }; o.onerror = () => reject(o.error); }));
     const before = await latest(page);
-    await page.click('[data-page="Applications"]'); await page.click('[data-model3d-card="via-slab-3d"]');
-    const refusal = await page.evaluate(() => ({text: document.getElementById('file-status')?.textContent || '',
-      button: document.querySelector('#file-status button[data-m3-new-tab="via-slab-3d"]')?.textContent || ''}));
+    await page.click('[data-page="Applications"]');
+    // V2(a): card 2 itself now reads "Open in a new tab" (with the reason) and opens the tab at one click
+    const refusal = await page.evaluate(() => { const b = document.querySelector('[data-model3d-card="via-slab-3d"]');
+      return {text: b?.querySelector('.card-why')?.textContent || '', button: b?.querySelector('.card-action')?.textContent || ''}; });
     const popup = ctx.waitForEvent('page', {timeout: 30000});
-    await page.click('#file-status button[data-m3-new-tab="via-slab-3d"]');
+    await page.click('[data-model3d-card="via-slab-3d"]');
     const tab = await popup; await tab.waitForLoadState();
     await tab.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
     const fresh = await tab.evaluate(() => ({url: location.pathname + location.search, title: document.querySelector('.m3-head h2')?.textContent || '',

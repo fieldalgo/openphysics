@@ -23,6 +23,17 @@ export const CARD3D_SLAB=Object.freeze({id:'via-slab-3d',kind:'model3d',title:'C
  description:'A copper via through a slab, 300 K at the bottom and 301 K at the top. The curved shape is drawn for display; the mesh follows it to within its size.'});
 /** The Library's 3D group, in order. */
 export const CARDS3D=Object.freeze([CARD3D,CARD3D_SLAB]);
+/** V2: the line on another 3D card while the project holds a 3D model. */
+export const otherCardReason=title=>`This project holds ${title}; a project holds one 3D model.`;
+/** V2: what Replace drops, from the state Studio holds: saved 'saved' | 'changed' | 'none', file the project file's name. */
+export function replaceLines({from,runs,saved,file}){
+ const what=runs?`its document and its ${runs} ${runs===1?'run':'runs'}`:'its document (no runs)';
+ return [`Replacing drops ${from} from this project: ${what}.`,
+  saved==='saved'?`It is saved in ${file} with no changes since.`:saved==='changed'?`It has changes since the last File › Save to ${file}; those changes are lost unless you save first.`
+   :'It is not saved to any file, so all of it is lost unless you save first.',
+  '3D models are not kept in browser recovery. Undo, right after Replace, brings it back in this tab (its runs can be recomputed).',
+  'The other models of the project stay as they are.'];
+}
 /** U6: the address that opens a 3D card in a fresh workspace (a new tab), beside a project that holds another. */
 export const newTabUrl=card=>`/workspace?card=${encodeURIComponent(card.id)}&fresh=1`;
 /** U6: the 3D card a fresh workspace's address asks for (?card=<id>&fresh=1), or null. */
