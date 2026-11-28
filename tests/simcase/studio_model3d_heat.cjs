@@ -91,7 +91,7 @@ test('temperature colours, the values table and the progress line',()=>{
  assert.deepEqual(rows.map(r=>r[0]),['Temperature, max','Temperature, min','Heat rate through z0','Total heat source','Energy balance residual']);
  assert.equal(rows[0][1],'1127.33 K in Si (top) at (179, 0, 610) µm');
  assert.equal(rows[1][1],'300 K in Si at (0, 0, 0) µm');
- assert.equal(rows[2][1],'-4 W');assert.equal(rows[3][1],'4 W');assert.equal(rows[4][1],'-1.35e-13 W (1.69e-14 of the source)');
+ assert.equal(rows[2][1],'-4 W');assert.equal(rows[3][1],'4 W');assert.equal(rows[4][1],'-1.35e-13 W (1.69e-14 of the summed heat rates)');
  assert.equal(M.runProgress({status:'running',step:'mesh',elapsed_s:3.2,expected_s:1.4,longer_than_estimate:true}),'Meshing · 0:03 · taking longer than the estimate');
  assert.equal(M.runProgress({status:'running',step:'solve',elapsed_s:61,expected_s:1.4,longer_than_estimate:false}),'Solving · 1:01');
  assert.equal(M.runProgress({status:'cancelled'}),'Run cancelled; nothing kept.');
