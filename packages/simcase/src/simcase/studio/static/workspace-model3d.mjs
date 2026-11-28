@@ -509,25 +509,51 @@ export function setFixedTemperature(doc,name,raw){
  const value=quantity(raw,T_FIELD),out=withHeat(doc),h=out.physics.heat;
  h.prescribed_temperature={...(h.prescribed_temperature||{}),[name]:value};return out;
 }
+// X1: two-significant-digit grid values strictly beyond a bound, three of them, moving away from it
+const sig2=x=>Number(Number(x).toPrecision(2));
+function stepAway(v,dir){                         // the next 2-significant-digit value from v in direction dir (+1 up, −1 down)
+ if(v===0)return null;
+ const a=Math.abs(v),down=(dir<0)===(v>0);       // toward zero in magnitude?
+ const e=Math.floor(Math.log10(a)+1e-12),pow=Math.abs(a-10**e)<1e-12*a;
+ const step=down&&pow?10**(e-2):10**(e-1);
+ let m=down?Math.floor(a/step+1e-9)*step:Math.ceil(a/step-1e-9)*step;
+ if(down?m>=a-1e-12*a:m<=a+1e-12*a)m=down?m-step:m+step;
+ return Math.sign(v)*sig2(m);
+}
+export function gridInside(bound,dir){
+ const out=[];let v=bound;
+ for(let k=0;k<3;k++){v=stepAway(v,dir);if(v===null)break;out.push(v);}
+ return out;
+}
 /**
- * V10: a plain suggestion for "cylinder 'via' crosses the side domain.x1 …": keep the cylinder inside
- * that side (beyond a domain side it leaves the model), from the side's coordinate (as written, or as
- * the check evaluated it) and r: "Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or r ≤ 0.2 m." Null for other refusals.
+ * V10/X1: plain words for "cylinder 'via' crosses the side domain.x1 …" and "… touches domain.x1 at one
+ * line …": keep the cylinder strictly inside that side (beyond a domain side it leaves the model), from the
+ * side's coordinate (as written, or as the check evaluated it) and r. {text, tries}: tries are grid values
+ * one step and more inside the bound, for the view to confirm with the server before it names one
+ * (adviceText). Null for other refusals.
  */
 export function crossingAdvice(refused,doc,evaluated=null){
- const m=/^cylinder '(.+?)' crosses the side domain\.([xy])([01]) /.exec(refused?.refused||'');
+ const m=/^cylinder '(.+?)' (crosses the side|touches) domain\.([xy])([01])\b/.exec(refused?.refused||'');
  if(!m)return null;
  const comp=component(doc),unit=comp.length_unit,u=shownUnit(unit),f=comp.features.find(x=>x.name===m[1]);
- const axis=m[2],hi=m[3]==='1',key=`${axis}${hi?'max':'min'}`,c=`c${axis}`;
+ const axis=m[3],hi=m[4]==='1',key=`${axis}${hi?'max':'min'}`,c=`c${axis}`;
  const X=inUnit(comp.domain?.[key],unit)??(typeof evaluated?.[key]==='number'?evaluated[key]:null);
  if(!f||X===null)return null;
  const t=x=>`${String(num(x)).replace('-','−')} ${u}`,r=inUnit(f.r,unit),centre=inUnit(f[c],unit);
- const side=`Cylinder ${f.name} crosses the domain side ${axis} = ${t(X)}.`;
- const keep=r===null?`Keep ${c} ${hi?'+':'−'} r ${hi?'≤':'≥'} ${t(X)}.`
-  :`Keep ${c} ${hi?'≤':'≥'} ${t(hi?X-r:X+r)} (${c} ${hi?'+':'−'} r ${hi?'≤':'≥'} ${t(X)})`;
- if(r===null)return `${side} ${keep}`;
+ const side=m[2]==='touches'?`Cylinder ${f.name} touches the domain side ${axis} = ${t(X)} along a line.`:`Cylinder ${f.name} crosses the domain side ${axis} = ${t(X)}.`;
+ const parts=[],tries=[];
+ if(r!==null){const b=hi?X-r:X+r;
+  parts.push({field:c,head:`Keep ${c} ${hi?'<':'>'} ${t(b)} (${c} ${hi?'+':'−'} r ${hi?'<':'>'} ${t(X)})`});
+  tries.push({field:c,values:gridInside(b,hi?-1:1)});}
+ else parts.push({field:null,head:`Keep ${c} ${hi?'+':'−'} r ${hi?'<':'>'} ${t(X)}`});
  const room=centre===null?null:hi?X-centre:centre-X;
- return `${side} ${keep}${room!==null&&room>0?`, or r ≤ ${t(room)}`:''}.`;
+ if(r!==null&&room!==null&&room>0){parts.push({field:'r',head:`Or r < ${t(room)}`});tries.push({field:'r',values:gridInside(room,-1)});}
+ const a={side,parts,tries,unit:u,text:''};a.text=adviceText(a,{});return a;
+}
+/** X1: the advice with the values the server confirmed: "Keep cx < 0.7 m (cx + r < 1 m): cx = 0.69 m forms." */
+export function adviceText(a,confirmed){
+ const t=x=>`${String(num(x)).replace('-','−')} ${a.unit}`;
+ return [a.side,...a.parts.map(p=>p.head+(p.field&&confirmed[p.field]!==undefined?`: ${p.field} = ${t(confirmed[p.field])} forms`:'')+'.')].join(' ');
 }
 /** V1: why Use for → Fixed temperature cannot apply yet (no value, or the field's own problem), or null. */
 export function useTemperatureProblem(raw){

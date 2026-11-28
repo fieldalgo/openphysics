@@ -286,7 +286,8 @@ try {
     await page.waitForFunction(() => document.getElementById('mp-messages').dataset.m3State === 'checked');
     const shown = await page.evaluate(() => ({text: document.querySelector('[data-m3-refusal] > p')?.textContent || '',
       details: document.querySelector('[data-m3-refusal] details')?.textContent || ''}));
-    const rows = [shown.text === 'Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or r ≤ 0.2 m.'
+    // X1: strict bounds; values the server confirmed are named after them
+    const rows = [/^Cylinder via crosses the domain side x = 1 m\. Keep cx < 0\.7 m \(cx \+ r < 1 m\)(: cx = [\d.]+ m forms)?\. Or r < 0\.2 m(: r = [\d.]+ m forms)?\.$/.test(shown.text)
       && shown.details.includes('E-3D-COMBINATION') && shown.details.includes("cylinder 'via' crosses the side domain.x1")];
     record('V10', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, shown});
     await ctx.close();
