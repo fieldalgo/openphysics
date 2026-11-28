@@ -217,7 +217,8 @@ heat rate is Q = ΔT/L · (k_v πr² + k_s (A − πr²)) = 31.99159 W.
   `{"ok": true, ...}` with:
   - `features`: per feature its `index`, `id`, `type`, its `volume` inside the
     domain and the volume its own cells keep (`owned`), both in the component's
-    length unit cubed, and its `coverage`. The coverage is `full`, `partial`
+    length unit cubed, and its `coverage`; a box also has its evaluated `size` (x, y, z in the
+    component's length unit, its parameters and expressions evaluated). The coverage is `full`, `partial`
     ("covered in part by N (id)"), `none` ("covered by N (id); adds no region") or `outside`
     ("outside the domain; adds no region"). N lists the later features (numbered
     from 1) whose box overlaps it and that keep volume themselves. All of this is

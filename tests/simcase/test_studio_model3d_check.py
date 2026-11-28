@@ -42,6 +42,16 @@ def card():
     return json.loads(CARD.read_text(encoding="utf-8"))
 
 
+def numeric():
+    """Card 1 written out in numbers: the document before it held its design parameters (t_ox, via_w)."""
+    doc = card()
+    del doc["geometry"]["parameters"]
+    comp = doc["geometry"]["components"]["stack3d"]
+    comp["features"][0]["layers"][1]["thickness"] = 10
+    comp["features"][1].update(xmin=90, xmax=110, ymin=90, ymax=110, zmin=500, zmax=510)
+    return doc
+
+
 def doc3d(features, *, domain=(0, 10, 0, 10, 0, 5), background="air", footprint=False):
     keys = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax")
     comps = {"c": {"dimension": "3d", "length_unit": "um", "domain": dict(zip(keys, domain)),
@@ -72,10 +82,11 @@ def test_the_card_is_the_slice_b_document():
     assert comp["length_unit"] == "um" and comp["domain"] == {"xmin": 0, "xmax": 200, "ymin": 0, "ymax": 200,
                                                                "zmin": 0, "zmax": 610}
     stack, via = comp["features"]
+    assert d["geometry"]["parameters"] == {"t_ox": {"value": "10 um"}, "via_w": {"value": "20 um"}}
     assert [(lay["name"], lay["thickness"], lay["material"]) for lay in stack["layers"]] == [
-        ("sub", 500, "Si"), ("oxide", 10, "SiO2"), ("top", 100, "Si (top)")]
+        ("sub", 500, "Si"), ("oxide", "t_ox", "SiO2"), ("top", 100, "Si (top)")]
     assert (via["type"], via["xmin"], via["xmax"], via["ymin"], via["ymax"], via["zmin"], via["zmax"]) == (
-        "box", 90, 110, 90, 110, 500, 510)
+        "box", "100 - via_w / 2", "100 + via_w / 2", "100 - via_w / 2", "100 + via_w / 2", 500, "500 + t_ox")
     assert {k: v["thermal_conductivity"] for k, v in d["materials"].items()} == {
         "Si": "130 W/(m K)", "Si (top)": "130 W/(m K)", "SiO2": "1.4 W/(m K)", "Cu": "400 W/(m K)"}
 
@@ -119,7 +130,7 @@ def test_a_later_feature_that_owns_nothing_does_not_cover(client):
 
 
 def test_check_lists_parameters_in_si_and_selections(client):
-    doc = card()
+    doc = numeric()
     geometry = doc["geometry"]
     geometry["parameters"] = {"w": {"value": "20 um"}}
     via = geometry["components"]["stack3d"]["features"][1]

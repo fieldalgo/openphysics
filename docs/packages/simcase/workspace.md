@@ -317,7 +317,11 @@ layer stack (3D heat)** (`layer-stack-3d`), beside the application cards, not am
 component in µm over a 200 × 200 µm domain (z from 0 to 610 µm): one `layers` feature `stack`
 (substrate 500 µm of Si, k = 130 W/(m K); oxide 10 µm of SiO2, k = 1.4 W/(m K); top silicon 100 µm of
 `Si (top)`, k = 130 W/(m K)) and a later box `via` (x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through
-the oxide. The via is square here: *Square via (the round via is the card Copper via through a slab)*. The top silicon has its own material, `Si (top)`, with the properties
+the oxide. Its geometry holds the design's two parameters: `t_ox` = 10 µm, the oxide's thickness and
+the via's height (z from 500 to `500 + t_ox`), and `via_w` = 20 µm, the via's width (x and y from
+`100 - via_w / 2` to `100 + via_w / 2`), so the via always crosses only the oxide. The oxide's
+thickness field reads *= t_ox (10 µm)*; the via's row still reads *20 × 20 × 10 µm*, the size the
+server's check evaluates. The via is square here: *Square via (the round via is the card Copper via through a slab)*. The top silicon has its own material, `Si (top)`, with the properties
 of `Si`, only because a heat source names a region by its material today (a layer or feature name such
 as `stack.top` is not a region of the heat kind). Its physics is Heat transfer (3D): 300 K on `z0`, a
 heat source of 1e12 W/m³ in `Si (top)` (4 W in all), every other outer face insulated. The source is a test value (it heats the card to

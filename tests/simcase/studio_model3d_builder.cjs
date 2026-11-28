@@ -9,6 +9,10 @@ const STATIC_DIR=path.join(__dirname,'..','..','packages','simcase','src','simca
 let M,W;
 test.before(async()=>{M=await import(STATIC+'workspace-model3d.mjs');const C=await import(STATIC+'model3d-mesh-model.mjs');W={estimateText:C.estimateText,meshBlocked:C.meshBlocked};});
 const card=()=>JSON.parse(fs.readFileSync(path.join(STATIC_DIR,'model3d-layer-stack-3d.json'),'utf8'));
+// card 1 written out in numbers: the document before it held its design parameters (t_ox, via_w);
+// the editing tests below need numeric via extents and a model without parameters
+const numeric=()=>{const d=card(),c=d.geometry.components.stack3d;delete d.geometry.parameters;c.features[0].layers[1].thickness=10;
+ Object.assign(c.features[1],{xmin:90,xmax:110,ymin:90,ymax:110,zmin:500,zmax:510});return d;};
 const comp=doc=>doc.geometry.components.stack3d;
 
 test('the card is its own Library group, with the square-via note',()=>{
@@ -23,15 +27,18 @@ test('the card is its own Library group, with the square-via note',()=>{
 });
 
 test('the tree (design 5.2): Component 1 with Parameters, Geometry 1 (Domain, numbered features, Form result) and Materials',()=>{
- const check={features:[{text:'covered in part by 2 (via)'},{text:''}],regions:[1,2,3,4],display:{faces:new Array(23).fill({})},
+ const check={features:[{text:'covered in part by 2 (via)'},{text:'',size:[20,20,10]}],regions:[1,2,3,4],display:{faces:new Array(23).fill({})},
   mesh:{ok:true,estimate:{tetrahedra:2402,seconds:1.4411},key:'k'}};
  const rows=M.treeRows(card(),check,null,W);
- assert.deepEqual(rows.map(r=>[r.label,r.level,r.note]),[['Component 1 · 3D · µm',1,''],['Parameters',2,''],['Geometry 1',2,''],
+ assert.deepEqual(rows.map(r=>[r.label,r.level,r.note]),[['Component 1 · 3D · µm',1,''],['Parameters',2,'t_ox = 10 um · via_w = 20 um'],['Geometry 1',2,''],
   ['Domain',3,'200 × 200 × 610 µm'],['1 Layers stack',3,'sub · oxide · top (covered in part by 2 (via))'],['2 Box via',3,'20 × 20 × 10 µm'],
   ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · Si (top) · SiO2 · Cu'],
   ['Heat transfer (3D)',2,''],['Thermal conductivity',3,'from Materials'],['Fixed temperature 1',3,'z0 · 300 K'],['Heat source 1',3,'Si (top) · 1e12 W/m³'],
   ['Insulated',3,'every other outer face'],['Mesh 1',2,'size 40 µm · Estimate 2,400 tetrahedra · about 1 s'],['Study 1 · Steady',2,''],['Results',2,'no run yet']]);
- let doc=M.addParameter(M.addParameter(card(),'t_ox','10 um'),'via_w','20 um');
+ // the card's own fields that name a parameter show it with its written value
+ assert.equal(M.fieldNote(card(),'features[0].layers[1].thickness'),'= t_ox (10 µm)');
+ assert.equal(M.fieldNote(card(),'features[1].xmin'),'','an expression is the server\'s to evaluate');
+ let doc=M.addParameter(M.addParameter(numeric(),'t_ox','10 um'),'via_w','20 um');
  const free=JSON.parse(JSON.stringify(doc));delete free.geometry.components.stack3d.domain.zmin;delete free.geometry.components.stack3d.domain.zmax;
  const r2=M.treeRows(free,null);
  assert.equal(r2.find(r=>r.key==='parameters').note,'t_ox = 10 um · via_w = 20 um');
@@ -73,31 +80,31 @@ test('the mesh size: a quantity in the document mesh block, within the 5.2 range
 
 test('field edits: numbers, quantities, names and expressions; a bad one is a draft problem',()=>{
  // a field holding a parameter name shows it with its written value; a number its SI value
- const named=M.setField(M.addParameter(card(),'t_ox','10 um'),'features[0].layers[1].thickness','t_ox');
+ const named=M.setField(M.addParameter(numeric(),'t_ox','10 um'),'features[0].layers[1].thickness','t_ox');
  assert.equal(M.fieldNote(named,'features[0].layers[1].thickness'),'= t_ox (10 µm)');
- assert.equal(M.fieldNote(card(),'features[1].xmin'),'= 0.00009 m');
- assert.equal(M.fieldNote(M.setField(card(),'features[1].xmin','100 - w / 2'),'features[1].xmin'),'');
- const f=M.fieldsOf(card(),'feature:1').find(x=>x.key==='features[1].xmin');
- let r=M.editField(card(),f,'95');assert.equal(comp(r.doc).features[1].xmin,95);assert.ok(Math.abs(r.si-9.5e-5)<1e-18);assert.equal(M.siText(r.si),'= 0.000095 m');
- r=M.editField(card(),f,'0.1 mm');assert.equal(comp(r.doc).features[1].xmin,'0.1 mm');assert.ok(Math.abs(r.si-1e-4)<1e-18);
- r=M.editField(card(),f,'100 - w / 2');assert.equal(comp(r.doc).features[1].xmin,'100 - w / 2');assert.equal(r.si,null);
- assert.equal(M.editField(card(),f,'').problem,'Enter a length: a number, a quantity such as 12 um, a parameter name or an expression.');
- assert.equal(M.editField(card(),f,'3 ft').problem,'ft is not a length unit (m, mm, um, nm).');
- assert.equal(M.editField(card(),f,'2;rm').problem,'2;rm is not a number, a quantity, a parameter name or an expression.');
- const t=M.fieldsOf(card(),'feature:0').find(x=>x.key==='features[0].layers[1].thickness');
- assert.deepEqual(t.rule,{positive:true});assert.equal(M.editField(card(),t,'0').problem,'Stack oxide thickness must be greater than 0 µm.');
- assert.equal(M.editField(card(),t,'-1 um').problem,'Stack oxide thickness must be greater than 0 µm.');
- const mat=M.fieldsOf(card(),'feature:1').find(x=>x.kind==='material');
- assert.equal(comp(M.editField(card(),mat,'Si').doc).features[1].material,'Si');
- assert.equal(comp(M.editField(card(),mat,'').doc).features[1].material,null);
- assert.equal(M.editField(card(),mat,'Gold').problem,'Gold is not a material of this model (Si, Si (top), SiO2, Cu).');
+ assert.equal(M.fieldNote(numeric(),'features[1].xmin'),'= 0.00009 m');
+ assert.equal(M.fieldNote(M.setField(numeric(),'features[1].xmin','100 - w / 2'),'features[1].xmin'),'');
+ const f=M.fieldsOf(numeric(),'feature:1').find(x=>x.key==='features[1].xmin');
+ let r=M.editField(numeric(),f,'95');assert.equal(comp(r.doc).features[1].xmin,95);assert.ok(Math.abs(r.si-9.5e-5)<1e-18);assert.equal(M.siText(r.si),'= 0.000095 m');
+ r=M.editField(numeric(),f,'0.1 mm');assert.equal(comp(r.doc).features[1].xmin,'0.1 mm');assert.ok(Math.abs(r.si-1e-4)<1e-18);
+ r=M.editField(numeric(),f,'100 - w / 2');assert.equal(comp(r.doc).features[1].xmin,'100 - w / 2');assert.equal(r.si,null);
+ assert.equal(M.editField(numeric(),f,'').problem,'Enter a length: a number, a quantity such as 12 um, a parameter name or an expression.');
+ assert.equal(M.editField(numeric(),f,'3 ft').problem,'ft is not a length unit (m, mm, um, nm).');
+ assert.equal(M.editField(numeric(),f,'2;rm').problem,'2;rm is not a number, a quantity, a parameter name or an expression.');
+ const t=M.fieldsOf(numeric(),'feature:0').find(x=>x.key==='features[0].layers[1].thickness');
+ assert.deepEqual(t.rule,{positive:true});assert.equal(M.editField(numeric(),t,'0').problem,'Stack oxide thickness must be greater than 0 µm.');
+ assert.equal(M.editField(numeric(),t,'-1 um').problem,'Stack oxide thickness must be greater than 0 µm.');
+ const mat=M.fieldsOf(numeric(),'feature:1').find(x=>x.kind==='material');
+ assert.equal(comp(M.editField(numeric(),mat,'Si').doc).features[1].material,'Si');
+ assert.equal(comp(M.editField(numeric(),mat,'').doc).features[1].material,null);
+ assert.equal(M.editField(numeric(),mat,'Gold').problem,'Gold is not a material of this model (Si, Si (top), SiO2, Cu).');
  assert.equal(M.siText(9.5e-5),'= 0.000095 m');assert.equal(M.siText(null),'');
- assert.deepEqual(M.fieldsOf(card(),'domain').map(x=>x.label),['xmin','xmax','ymin','ymax','zmin','zmax']);
+ assert.deepEqual(M.fieldsOf(numeric(),'domain').map(x=>x.label),['xmin','xmax','ymin','ymax','zmin','zmax']);
 });
 
 test('ranges (design 5.2): the 2D range sentence; Studio guards, not contract rules',()=>{
- const f=key=>M.fieldsOf(card(),key.startsWith('domain')?'domain':'feature:'+/features\[(\d+)\]/.exec(key)[1]).find(x=>x.key===key);
- const p=(key,raw,doc=card())=>M.editField(doc,f(key),raw).problem;
+ const f=key=>M.fieldsOf(numeric(),key.startsWith('domain')?'domain':'feature:'+/features\[(\d+)\]/.exec(key)[1]).find(x=>x.key===key);
+ const p=(key,raw,doc=numeric())=>M.editField(doc,f(key),raw).problem;
  // a box: min < max on each axis, inside the domain where the domain is fixed
  assert.equal(p('features[1].xmax','80'),'Via x max must be between 90–200 µm.');
  assert.equal(p('features[1].xmax','210'),'Via x max must be between 90–200 µm.');
@@ -105,7 +112,7 @@ test('ranges (design 5.2): the 2D range sentence; Studio guards, not contract ru
  assert.equal(p('features[1].zmin','-5'),'Via z min must be between 0–510 µm.');
  assert.equal(p('features[1].xmax','150'),undefined);
  assert.equal(p('features[1].xmax','w'),undefined,'a name or an expression is the server\'s to check');
- const free=JSON.parse(JSON.stringify(card()));free.geometry.components.stack3d.domain.xmax='2 * w';
+ const free=JSON.parse(JSON.stringify(numeric()));free.geometry.components.stack3d.domain.xmax='2 * w';
  assert.equal(M.editField(free,f('features[1].xmax'),'500').problem,undefined,'no fixed domain bound: only min < max');
  assert.equal(M.editField(free,f('features[1].xmax'),'50').problem,'Via x max must be greater than 90 µm.');
  // the domain: min < max
@@ -114,22 +121,22 @@ test('ranges (design 5.2): the 2D range sentence; Studio guards, not contract ru
  // names: unique in the component; layer names unique in the feature
  assert.equal(p('features[1].name','stack'),'stack is already the name of another feature.');
  assert.equal(p('features[1].name','2via'),'A name starts with a letter or _ and holds letters, digits and _.');
- const lay=M.fieldsOf(card(),'feature:0').find(x=>x.key==='features[0].layers[2].name');
- assert.equal(M.editField(card(),lay,'sub').problem,'sub is already the name of another layer of stack.');
+ const lay=M.fieldsOf(numeric(),'feature:0').find(x=>x.key==='features[0].layers[2].name');
+ assert.equal(M.editField(numeric(),lay,'sub').problem,'sub is already the name of another layer of stack.');
  // element_size (optional): domain diagonal/400 to diagonal/4 (672.3 µm here)
- const es=M.fieldsOf(card(),'feature:1').find(x=>x.key==='features[1].element_size');
+ const es=M.fieldsOf(numeric(),'feature:1').find(x=>x.key==='features[1].element_size');
  assert.equal(es.optional,true);
- assert.equal(M.editField(card(),es,'1').problem,'Via element size must be between 1.68–168 µm.');
- assert.equal(M.editField(card(),es,'200').problem,'Via element size must be between 1.68–168 µm.');
- assert.equal(M.getField(M.editField(card(),es,'20').doc,'features[1].element_size'),20);
- assert.equal('element_size' in M.editField(M.editField(card(),es,'20').doc,es,'').doc.geometry.components.stack3d.features[1],false,'empty clears it');
+ assert.equal(M.editField(numeric(),es,'1').problem,'Via element size must be between 1.68–168 µm.');
+ assert.equal(M.editField(numeric(),es,'200').problem,'Via element size must be between 1.68–168 µm.');
+ assert.equal(M.getField(M.editField(numeric(),es,'20').doc,'features[1].element_size'),20);
+ assert.equal('element_size' in M.editField(M.editField(numeric(),es,'20').doc,es,'').doc.geometry.components.stack3d.features[1],false,'empty clears it');
  // layers: 1 to 32 rows
- let many=card();for(let k=0;k<29;k++)many=M.addLayer(many,0);
+ let many=numeric();for(let k=0;k<29;k++)many=M.addLayer(many,0);
  assert.equal(M.getField(many,'features[0].layers').length,32);
  assert.throws(()=>M.addLayer(many,0),{message:'A layers feature holds 1 to 32 layers.'});
- let one=card();one=M.removeLayer(M.removeLayer(one,0,2),0,1);
+ let one=numeric();one=M.removeLayer(M.removeLayer(one,0,2),0,1);
  assert.throws(()=>M.removeLayer(one,0,0),{message:'A layers feature holds 1 to 32 layers.'});
- assert.deepEqual(M.getField(M.addLayer(card(),0),'features[0].layers').map(l=>l.name),['sub','oxide','top','layer']);
+ assert.deepEqual(M.getField(M.addLayer(numeric(),0),'features[0].layers').map(l=>l.name),['sub','oxide','top','layer']);
 });
 
 test('feature operations: move, duplicate, delete, add',()=>{
@@ -147,7 +154,7 @@ test('feature operations: move, duplicate, delete, add',()=>{
 });
 
 test('parameters: a used parameter cannot be deleted, and the refusal names its users in feature order',()=>{
- let doc=M.addParameter(card(),'w','20 um');
+ let doc=M.addParameter(numeric(),'w','20 um');
  assert.deepEqual(doc.geometry.parameters,{w:{value:'20 um'}});
  assert.throws(()=>M.addParameter(doc,'w','1'),{message:'A parameter w already exists.'});
  assert.throws(()=>M.addParameter(doc,'2w','1'),{message:/^A parameter name starts with a letter/});
