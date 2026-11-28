@@ -33,7 +33,8 @@
 //! subfacet a face, every sub-segment piece an edge, and every interior face that is
 //! not a subfacet locally Delaunay (the constrained Delaunay characterisation).
 
-use std::collections::{HashMap, HashSet};
+// the standard tables with the fast hasher (no result depends on their order)
+use crate::facet::{FxMap as HashMap, FxSet as HashSet};
 
 use crate::delaunay::Geom;
 use crate::mixed::{MixedCounters, MixedPoints};
@@ -422,7 +423,7 @@ fn fast_fill(g: &MixedPoints, front: &Front, verts: &[u32]) -> Option<Vec<[u32; 
     let mesh = crate::delaunay::Mesh::build(sub, &order, false).ok()?;
     let tets: Vec<[u32; 4]> = mesh.tets().iter().map(|t| t.map(|i| verts[i as usize])).collect();
     // oriented faces of the tetrahedralization: rotate_min(inward face) -> tetrahedron
-    let mut by_face: HashMap<[u32; 3], usize> = HashMap::with_capacity(4 * tets.len());
+    let mut by_face: HashMap<[u32; 3], usize> = HashMap::with_capacity_and_hasher(4 * tets.len(), Default::default());
     for (i, v) in tets.iter().enumerate() {
         for k in 0..4 {
             by_face.insert(rotate_min(face(v, k)), i);
@@ -455,7 +456,7 @@ fn fast_fill(g: &MixedPoints, front: &Front, verts: &[u32]) -> Option<Vec<[u32; 
     }
     let out: Vec<[u32; 4]> = tets.iter().zip(&keep).filter(|(_, &k)| k).map(|(t, _)| *t).collect();
     // the kept tetrahedra must be bounded by exactly the front (each front face once)
-    let mut bound: HashMap<[u32; 3], u32> = HashMap::new();
+    let mut bound: HashMap<[u32; 3], u32> = HashMap::default();
     for v in &out {
         for k in 0..4 {
             *bound.entry(rotate_min(face(v, k))).or_default() += 1;
@@ -616,7 +617,7 @@ pub fn recover_facets_with(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[
     let all: Vec<(usize, [u32; 3])> = subfacets.iter().enumerate()
         .flat_map(|(f, ts)| ts.iter().map(move |t| (f, *t)))
         .collect();
-    let mut by_key: HashMap<[u32; 3], Vec<usize>> = HashMap::new();
+    let mut by_key: HashMap<[u32; 3], Vec<usize>> = HashMap::default();
     for (i, (_, t)) in all.iter().enumerate() {
         by_key.entry(key(*t)).or_default().push(i);
     }
@@ -648,10 +649,10 @@ pub fn recover_facets_with(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[
             let m = g.view();
             m.orient2d_proj(a, t0.map(|x| m.from_id(x)), &mut MixedCounters::default()) != 0
         }).ok_or("a subfacet is degenerate")?;
-        let mut reg = Region { plane: t0, axis, tris: &region, keys: region.iter().map(|t| key(*t)).collect(), side: HashMap::new() };
+        let mut reg = Region { plane: t0, axis, tris: &region, keys: region.iter().map(|t| key(*t)).collect(), side: HashMap::default() };
         // 1. the cavity
-        let mut cav: HashSet<u32> = HashSet::new();
-        let mut seen: HashSet<u32> = HashSet::new();
+        let mut cav: HashSet<u32> = HashSet::default();
+        let mut seen: HashSet<u32> = HashSet::default();
         let mut stack: Vec<u32> = Vec::new();
         let rverts: HashSet<u32> = region.iter().flatten().copied().collect();
         for &v in &rverts {
@@ -763,8 +764,8 @@ pub fn verify_cdt(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[Vec<[u32;
                   hull: &HashSet<[u32; 3]>) -> Result<CdtReport, String> {
     let n = g.len();
     let mut used = vec![false; n];
-    let mut faces: HashMap<[u32; 3], Vec<(u32, u32)>> = HashMap::new();
-    let mut edges: HashSet<(u32, u32)> = HashSet::new();
+    let mut faces: HashMap<[u32; 3], Vec<(u32, u32)>> = HashMap::default();
+    let mut edges: HashSet<(u32, u32)> = HashSet::default();
     for (t, v) in tets.iter().enumerate() {
         if v.iter().any(|&x| x as usize >= n) {
             return Err(format!("tetrahedron {t} has a vertex out of range"));
@@ -785,7 +786,7 @@ pub fn verify_cdt(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[Vec<[u32;
     }
     let constraints: HashSet<[u32; 3]> = subfacets.iter().flatten().map(|t| key(*t)).collect();
     let mut r = CdtReport { tets: tets.len(), ..Default::default() };
-    let mut hull_now = HashSet::new();
+    let mut hull_now = HashSet::default();
     for (k, list) in &faces {
         match list.as_slice() {
             [_] => {
@@ -828,7 +829,7 @@ pub fn verify_cdt(g: &mut MixedPoints, tets: &[[u32; 4]], subfacets: &[Vec<[u32;
 
 /// Hull faces (sorted triples) of a tetrahedralization.
 pub fn hull_faces(tets: &[[u32; 4]]) -> HashSet<[u32; 3]> {
-    let mut count: HashMap<[u32; 3], u32> = HashMap::new();
+    let mut count: HashMap<[u32; 3], u32> = HashMap::default();
     for v in tets {
         for i in 0..4 {
             *count.entry(key(face(v, i))).or_default() += 1;
