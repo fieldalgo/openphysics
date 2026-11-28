@@ -137,7 +137,8 @@ with `meshloom.__version__` and `kernel_version()`, the sampling read from the b
 geodesic frequency n), and the measured V5 deviation of the mesh nodes on the surface from the
 exact parameters. `result.complex` is `None`: the exact complex of a sampled surface is not
 built yet, and `evaluate3d` and `display_complex3d` refuse such a component by name
-(`E-3D-COMBINATION` at `geometry.components.<name>`).
+(`E-3D-COMBINATION` at `geometry.components.<name>`); `simcase.display_shapes3d` draws it
+([Display shape](#display-shape)).
 
 One size only: a feature or background `element_size`, `mesh.controls` sizes, `selections`
 and `boundary_tags` are refused by name with a sampled surface, until a later slice.
@@ -148,6 +149,52 @@ domain face (C5) or the difference of consecutive radii (C11), below `MESHER_REL
 (3e-8) of the diagonal is refused with `E-CONTRACT` at `geometry.components.<name>` and the
 parser's sentence, naming the later feature. C1's and C11's domains only bound void space (the
 builders mesh no box there), so a sphere's distance to them is not checked.
+
+### Display shape
+
+`simcase.display_shapes3d(model, component=None)` returns a `Display3D`: a display shape of a
+builder-shaped component, separate from the mesh, for the Studio 3D view. It meshes nothing and
+does not change what `build_mesh3d` does or refuses. The component is picked as
+`display_complex3d` picks it; what no builder takes is refused in `recognise`'s own words
+(`E-3D-COMBINATION` naming the feature, the touch and cross stems included), and a component
+with no cylinder or sphere is refused by name (`E-CONTRACT`), pointing to `display_complex3d`.
+
+`Display3D` carries `component`, the builder `shape`, `domain` (pm), `length` (the display
+length ℓ = domain diagonal / 200, pm), `faces`, `regions`, `note` and `section(axis, at_pm)`.
+`faces` and `regions` hold the attribute types `simcase.geometry_display3d.DisplayFace` and
+`DisplayRegion` (not in `simcase.__all__`; their fields are the contract Studio reads):
+
+- `DisplayFace`: `index`; `shape` (`plane`, `cylinder` or `sphere`); `axis` (0–2) and `coord`
+  (pm) for a plane, `None` for a curved face; `names` (sorted: the mesh's provenance names of
+  the triangles it stands for); `tag` (`x0` … `z1`, else `void`; `None` inside); `exterior`;
+  `minus` and `plus` (region names; a plane's minus side has the smaller coordinate, and a
+  curved face's minus side is its **outside**, its plus side its **inside**, so `via.side` reads
+  background | via); `area` (m², the exact face's); `segments` (n of a ring, f of a sphere, 0 for
+  a rectangle); `vertices` ((V, 3) float64 pm; on a plane the axis coordinate is exactly the
+  integer `coord`); `triangles` ((T, 3) int64); `edges` ((E, 2, 3) float64 pm, the outline).
+- `DisplayRegion`: `name`, `material`, `void`, `volume` (m³, the exact body's) and `faces` (the
+  ids of the faces it is on a side of).
+
+`section(axis, at_pm)` (axis `"x"`, `"y"`, `"z"` or 0–2) returns a dict: `segments` ((S, 2, 3)
+float64 pm), `faces` (the face id of each segment) and `regions` (the non-void regions the
+plane meets); a plane outside the domain is refused.
+
+| Shape | Faces (name sets) |
+|---|---|
+| C4 `via_in_slab` | four side rectangles `domain.x0` … `domain.y1`; at z0 the annulus {`domain.z0`} and the disc {`<id>.bottom`, `domain.z0`}; at z1 likewise; `<id>.side` (background \| via) |
+| C5 `sphere_in_box` | six rectangles and `<id>.surface` (interior) |
+| C1 `sphere` | `<id>.surface` (exterior) |
+| C11 `nested_spheres` | one sphere per radius, `<id>.surface`, interior or exterior as the builder tags them |
+
+Each face's name set is the name set of the mesh triangles it stands for, so a pick gives the
+mesh's names. The display rule (adopted design §4.3): straight-edged planar faces are exact;
+a cylinder side is two rings of the inscribed n-gon with n = min(256, max(48, ⌈2πr/ℓ⌉)), the
+disc a fan of the same n-gon and the annulus a strip between it and the rectangle, every vertex
+on the exact plane; a sphere is an icosahedral geodesic grid of frequency
+f = min(64, max(8, ⌈1.05 r/ℓ⌉)), 10 f² + 2 vertices, every vertex on the sphere. Sections are
+exact: a cylinder cut by z gives the n-gon, cut by x or y two lines at ±√(r² − d²); a sphere cut
+at d < r a circle of ρ = √(r² − d²), drawn with n from the same rule at ρ. The shape is drawn for
+display; the mesh follows it to within its size. Checks: [3D view](studio_3d.md#checks).
 
 ## The meshloom hand-off
 
@@ -296,7 +343,8 @@ G8 and G9 run on main pushes and manual dispatch only (`geometry3d-full`).
   arrangement wait for meshloom's composable samplers.
 - Builder-shaped components are meshed by `build_mesh3d`, but `evaluate3d` and
   `display_complex3d` refuse them by name (no exact complex of a sampled surface is built
-  yet), so a 3D view cannot draw them yet.
+  yet); the 3D view draws them from `display_shapes3d`'s display shape, not from an exact
+  complex.
 - One size per region; no graded sizes or sizes on surfaces yet.
 - Pieces thinner than about 1e-7 of the diagonal, though above the tolerance, can make meshloom
   not return: two boxes with a face offset by 862 pm (6e-8 of a 14.4 mm diagonal) at h = 0.8 mm

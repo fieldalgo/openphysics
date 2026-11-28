@@ -7,7 +7,7 @@
 상태: **실험적.** 3D 보기는 버전 1 형상 문서([계약](geometry_document.md))의 `3d`
 구성 요소를 `/geometry-lab`의 [형상 실험실](geometry_lab.md) 페이지에서 보여 줍니다.
 읽기 전용이며, 5단계 엔진(`simcase.geometry_engine3d`)이 받는 것, 곧 상자와 `layers`
-기능의 슬래브 층만 받으며, 이를 메시하고([메시](#메시)) 서버에서 3D 정상 열을 풀 수 있습니다([실행](#실행)). 모델 작업 공간에는
+기능의 슬래브 층, 그리고 표시 모양으로 그리는 meshloom builder 모양의 원통과 구([원통과 구](#원통과-구))를 받으며, 이를 메시하고([메시](#메시)) 서버에서 3D 정상 열을 풀 수 있습니다([실행](#실행)). 모델 작업 공간에는
 아직 나오지 않습니다. 페이지, 조작, HTTP 응답은 어느 릴리스에서든 바뀔 수 있습니다.
 
 ## 사용
@@ -134,6 +134,32 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 | `export/run.json` | `{values, document}` |
 | `record?maps=kept` | 실행 기록 `thermal-steady3d-run-v1`: `document`, `document_sha256`, `values`, `mesh`, `maps`(`kept`이면 `surface`, `not kept`이면 그 개수; [멀티피직스 실행의 maps](workspace.md)와 같음) |
 
+## 원통과 구
+
+원통이나 구가 meshloom의 builder 모양(C4 판을 관통하는 비아, C5 상자 안의 구, C1 구, C11 동심 구;
+[builder 모양](geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3)) 가운데 하나인 `3d` 구성 요소에는
+정확한 복합체가 없습니다. 보기는 이를 `simcase.display_shapes3d`([표시 모양](geometry_engine3d.md#표시-모양))로
+그립니다. 면의 이름 집합이 메시의 출처 이름이어서 고르면 메시의 이름을 주며, 면은 따로 정한 표시 규칙으로
+그립니다(평면은 정확, 원통의 고리와 양 끝의 원판·고리는 내접 n각형 n = min(256, max(48, ⌈2πr/ℓ⌉)), 구는 정이십면체
+측지 격자 f = min(64, max(8, ⌈1.05 r/ℓ⌉)), ℓ = 영역 대각선 / 200). 곡면을 고르면 **Names**에 "Shape drawn for
+display; the mesh follows it to within its size"가 붙고, 곡면은 꼭짓점 법선으로 음영을 넣습니다.
+
+- 표시, 단면, 검사 응답은 파싱한 모델의 피처 종류로 갈립니다. 원통이나 구를 가진 구성 요소는
+  `display_shapes3d`로 가고, 다른 구성 요소는 복합체의 응답을 그대로 둡니다. 어느 builder도 받지 않는 원통이나
+  구는 전처럼 builder의 문구로 거부합니다.
+- 표시 응답은 모든 필드를 유지합니다. 면마다 `shape`(`plane`, `cylinder`, `sphere`)와 `segments`(n 또는 f,
+  직사각형은 0)가 붙고, 곡면은 `axis`와 `at`이 null이며, 응답에 `display_note`가 붙습니다. 단면은 정확합니다.
+  원통을 z로 자르면 n각형, x나 y로 자르면 ±√(r² − d²)의 두 선, 구를 d < r에서 자르면 ρ = √(r² − d²)의 원입니다.
+- 검사(`check_view_shapes`)는 정확한 부피로 피처의 덮임(비아는 `full`, C11에서는 가장 안쪽을 뺀 구가
+  `partial`, 안쪽 구들에 "covered in part by"), 정확한 부피의 영역, 빈 선택, `mesh` 아래 슬라이스 3의 추정(경로
+  `builder`)을 답합니다.
+- **Mesh**와 **Run**이 이 구성 요소를 받습니다. 메시 작업의 자식 프로세스는 builder 메시의 경계·경계면
+  삼각형마다, 그 삼각형을 가진 출처 이름 집합과 이름 집합이 같은 표시 면을 붙입니다(`route: "builder"`).
+
+카드 `model3d-via-slab-3d.json`(`/model3d-assets/`)은 5단계의 E2입니다. k_s = 1 W/(m·K)인 판
+[−1, 1]² × [0, 1] m, (0, 0)에 있는 r = 0.3 m, k_v = 100 W/(m·K)의 비아, z0에 300 K와 z1에 301 K, 옆면 단열,
+`mesh.element_size` 0.1 m. 기대 열유량은 Q = ΔT/L · (k_v πr² + k_s (A − πr²)) = 31.99159 W입니다.
+
 ## 보내는 것과 응답
 
 - `POST /api/model3d/display`는 `{"doc": <문서>, "component": <이름 또는 null>}`을
@@ -252,6 +278,10 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 | W7 | 경로로 푼 E1과 `refsol.thermal3d.layered_slab`(P1에서 정확): 노드 최대 \|T_h − T\|; 윗면 열유량(`heat_rate_by_selection.z1`)의 상대 오차 | ≤ 1e-10; ≤ 1e-9 | 1.4e-12 K; 2.5e-11 | 같은 곳 |
 | W17 | E1의 단면과 유리수 산술(`fractions.Fraction`)로 계산한 정확한 P1 절단: 같은 점, 최대 \|T − T_exact\|; 평면 여섯(1 mm 경계면의 z, z = 1.2345 mm, x = 3.3, y = 7.1, 면 x = 0과 z = 2.5 mm), 압출·meshloom 경로, 경로를 거친 z = 1.2345 mm의 `cut.csv` | ≤ 1e-12 K | 최악 2.8e-14 K(노드 평면에서 0) | `tests/simcase/test_studio_heat3d_slice.py`, `test_studio_heat3d_run.py` |
 | W8-run | 실행의 mesh 단계에서 Cancel: 11 µm의 열 카드(추정 약 69초)를 실제 서버 프로세스에서 실행 시작 3초 뒤 취소 | Cancel 2초 뒤 자식 종료; 실행은 취소, 남긴 것 없음; 파일 없음 | 모두 만족 | `tests/simcase/test_studio_heat3d_run.py`, CI 작업 `studio-mesh3d-w8` |
+| W1(a) 모양 | C1, C4, C5, C11과 E2 카드: 메시의 경계·경계면 삼각형마다 표시 면 id가 있고, 그 면의 이름 집합이 같은 h에서 meshloom의 builder 메시에 슬라이스 3의 태그 표를 적용한 독립 표와 같음 | 불일치 0 | 0(삼각형 720, 1614, 1662, 1220, 5658개) | `tests/simcase/test_studio_model3d_shapes_mesh.py` |
+| W1(b) 모양 | 같은 다섯: 평면 표시 면마다 float32 이전 pm에서 `vertices[:, axis] == coord`가 정확히 성립 | 평면 밖 꼭짓점 0 | 0(평면 면 8, 6, 0, 0, 8개) | `tests/simcase/test_geometry_display3d.py` |
+| W2 모양 | 정확한 넓이에 대한 표시 넓이, s(x) = sin x / x: 직사각형 상대 오차, 원판 (A − A_h)/A ≤ 1 − s(2π/n), 고리 0 ≤ A_h − A ≤ πr²(1 − s(2π/n)), 원통 옆면 (A − A_h)/A ≤ 1 − s(π/n), 구 0 ≤ (A − A_h)/A ≤ max_f (ρ_f/R)²(각각 + 1e-12) | 직사각형 ≤ 1e-6, 각 한계 | 직사각형 0, 원판 4.14e-4, 고리 A의 3.15e-5, 옆면 1.04e-4(n = 126, 한계에 닿음), 구 1.18e-4~4.56e-4(한계 2.24e-4~8.63e-4) | 같은 곳 |
+| W18 | h = 0.1에서 `POST /api/model3d/run`으로 푼 E2 카드: e_Q = \|Q_h − Q\|/Q(Q_h는 z1의 반작용), 그리고 Q_h, 노드 T, 반작용을 `build_mesh3d` + `galerkin.solve_steady_heat_3d` 직접 호출과 SHA-256으로 비교 | ≤ 1e-2, 같음 | 7.51e-3(Q_h = 31.75147 W, Q = 31.99159 W, 사면체 23,427개), 같음 | `tests/simcase/test_studio_model3d_shapes_mesh.py` |
 | W14(실행) | 서버 쪽 겉면 지도와 z 단면의 시간과 크기 | 기록 | 아래 | `tests/simcase/test_studio_heat3d_run.py`(가장 큰 것은 `OPENPHYSICS_STUDIO_W14=1`) |
 | W14 | 사면체 약 48,000개인 카드와 겉면 삼각형 150,000개에서 성능: 메시 응답 시간, 메시 보기 프레임 시간(120 프레임 중앙값), 탭 JS 힙 | 기록, 하드웨어 GL Chromium에서 관문: 힙 300 MB 이하, 프레임 중앙값 33 ms 이하 | 아래 기록, 관문은 **돌리지 않음**(소프트웨어 GL만) | 같음 |
 
@@ -309,7 +339,9 @@ macOS, Windows)는 HTTP 없이 mesh 단계의 실행을 취소합니다.
   보여 주지 않습니다.
 - 실행의 풀이는 중단할 수 없습니다. 풀이 중 Cancel은 풀이가 돌아오면 결과를 버립니다. 최근 실행 여덟 개의
   메시, 해, 응답을 메모리에 둡니다.
-- meshloom builder 모양(원통, 구)의 구성 요소는 3D 보기가 보여 주지 않으므로 Mesh와 Run이 형성 단계에서 보기의
+- meshloom builder 모양(원통, 구)의 구성 요소는 정확한 복합체가 아니라 표시 모양으로 그립니다. 그린 고리와
+  구는 정확한 곡면에서 표시 규칙의 한계(W2) 안에 있고, 메시는 자기 크기 안에서 이를 따릅니다. 아직 선택이나
+  경계 태그를 받지 않으므로(builder 경로가 거부) "Use for → New selection"은 `/api/model3d/selection`이 엔진의
   문구로 거부합니다.
 - `layers` 기능 하나만 가진 구성 요소(E1)는 (Mesh와 Run 모두) `meshine.extrude`로 메시하고
   `evaluate3d`는 거부합니다. 보기는 공개 함수 `simcase.display_complex3d`에서 복합체를

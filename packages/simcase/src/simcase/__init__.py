@@ -28,7 +28,7 @@ __all__ = ["Document", "DocumentError", "FORMAT", "examples", "__version__",
            "build_domain", "build_mesh", "MeshedModel", "study_points", "solve_point",
            "run", "RunResult", "ElectricJouleRunResult", "JouleConvergenceError", "MechanicsRunResult", "CavityRunResult", "ThermalRunResult", "TransientThermalRunResult", "SubspaceSweepResult", "VectorField", "ModeTrackingError", "ModeSelectionError",
            "MeshLimitError", "check_mesh_limits", "RegionComplexity", "region_complexity", "has_region_geometry", "void_area",
-           "GeometryError", "parse_geometry", "evaluate_geometry", "build_mesh3d", "Mesh3DResult", "display_complex3d", "estimate_mesh3d", "Mesh3DEstimate",
+           "GeometryError", "parse_geometry", "evaluate_geometry", "build_mesh3d", "Mesh3DResult", "display_complex3d", "display_shapes3d", "Display3D", "estimate_mesh3d", "Mesh3DEstimate",
            "build_thermal3d_mesh", "solve_thermal3d", "mesh3d_to_arrays", "mesh3d_from_arrays", "reader", "quantities",
            "providers", "multiphysics"]
 
@@ -73,6 +73,7 @@ def _import_runner() -> None:
     from .geometry_document import GeometryError, parse as parse_geometry
     from .geometry_engine import evaluate as evaluate_geometry
     from .geometry_engine3d import Mesh3DResult, build_mesh3d, display_complex3d
+    from .geometry_display3d import Display3D, display_shapes3d
     from .mesh3d_estimate import Mesh3DEstimate, estimate_mesh3d
     from .thermal3d import build_thermal3d_mesh, solve_thermal3d
     from .mesh3d_arrays import mesh3d_from_arrays, mesh3d_to_arrays

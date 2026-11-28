@@ -157,6 +157,36 @@ def _surface_extrude(mesh, cx):
     return used, local.reshape(-1, 3), faces, regions, names
 
 
+def _surface_shapes(result, shapes):
+    """``_surface`` of a builder-shaped mesh (cylinders or spheres, no complex): each exterior or interface
+    triangle is given the display face (``simcase.display_shapes3d``) whose name set equals the set of
+    provenance names that hold that triangle; sorted by face id (stable)."""
+    names = [r.name for r in shapes.regions]
+    void = {r.name for r in shapes.regions if r.void}
+    face_of = {frozenset(f.names): f.index for f in shapes.faces}
+    side_region = []
+    for f in shapes.faces:
+        region = next((n for n in f.plus + f.minus if n not in void), None)
+        side_region.append(-1 if region is None else names.index(region))
+    held: dict = {}
+    for name, tris in sorted(result.provenance_faces.items()):
+        for key in map(tuple, np.sort(np.asarray(tris, dtype=np.int64).reshape(-1, 3), axis=1).tolist()):
+            held.setdefault(key, set()).add(name)
+    mesh = result.mesh
+    parts = [np.asarray(t, dtype=np.int64).reshape(-1, 3) for _, t in sorted(mesh.tagged_faces.items())]
+    parts += [np.asarray(t, dtype=np.int64).reshape(-1, 3) for _, t in sorted(mesh.interfaces.items())]
+    triangles = np.concatenate(parts)
+    faces = np.array([face_of.get(frozenset(held.get(key, ())), -1)
+                      for key in map(tuple, np.sort(triangles, axis=1).tolist())], dtype=np.int64)
+    if (faces < 0).any():
+        raise GeometryError(f"internal: {int((faces < 0).sum())} builder mesh triangles match no display face")
+    order = np.argsort(faces, kind="stable")
+    faces, triangles = faces[order], triangles[order]
+    used, local = np.unique(triangles, return_inverse=True)
+    regions = np.array([side_region[f] for f in faces.tolist()], dtype=np.int64)
+    return used, local.reshape(-1, 3), faces, regions, names
+
+
 def _write(outdir: Path, arrays: dict, summary: dict) -> None:
     for name in ARRAYS:
         np.save(outdir / f"{name}.npy", arrays[name], allow_pickle=False)
@@ -168,14 +198,22 @@ def child(doc: dict, component: str | None, outdir: str, conn) -> None:
     out = Path(outdir)
     try:
         conn.send(("step", "forming"))
-        cx = display_complex3d(parse_geometry(doc), component)
+        from .model3d_api import builder_shapes
+        model = parse_geometry(doc)
+        shapes = builder_shapes(model, component)          # cylinders or spheres in a builder shape
+        cx = display_complex3d(model, component) if shapes is None else None
         conn.send(("step", "meshing"))
         built = build_thermal3d_mesh(doc, component)       # the thermal.steady3d kind's route choice
         conn.send(("step", "checking"))
         if isinstance(built, Mesh3DResult):
             mesh, route = built.mesh, ("meshloom" if built.complex is not None else "builder")
-            used, triangles, faces, regions, names = _surface(built)
-            component_name, estimate, notes = built.complex.component, float(built.estimate), built.diagnostics
+            if built.complex is None:
+                used, triangles, faces, regions, names = _surface_shapes(built, shapes)
+                component_name = shapes.component
+            else:
+                used, triangles, faces, regions, names = _surface(built)
+                component_name = built.complex.component
+            estimate, notes = float(built.estimate), built.diagnostics
         else:
             mesh, route = built, "extrude"
             used, triangles, faces, regions, names = _surface_extrude(mesh, cx)

@@ -118,7 +118,7 @@ A / (0.468 h²)가 삼각형 10,000개 이하이면 2D 발자국을 메시해 �
 높이, 시상 한계 r(1 − cos(π/m)), 또는 측지 빈도 n), 곡면 위 메시 노드가 정확한 매개변수에서 벗어난 V5 측정값을
 담습니다. `result.complex`는 `None`입니다. 표본화한 곡면의 정확한 구성은 아직 만들지 않으며, `evaluate3d`와
 `display_complex3d`는 그런 구성 요소를 이름을 밝혀 거부합니다(`geometry.components.<name>`에서
-`E-3D-COMBINATION`).
+`E-3D-COMBINATION`). 그런 구성 요소는 `simcase.display_shapes3d`가 그립니다([표시 모양](#표시-모양)).
 
 크기는 하나만 받습니다. 표본화한 곡면이 있으면 피처나 배경의 `element_size`, `mesh.controls` 크기,
 `selections`, `boundary_tags`를 뒤 슬라이스까지 이름을 밝혀 거부합니다.
@@ -128,6 +128,46 @@ A / (0.468 h²)가 삼각형 10,000개 이하이면 2D 발자국을 메시해 �
 `MESHER_RELATIVE_TOLERANCE`(3e-8)보다 작으면 `geometry.components.<name>`에서 `E-CONTRACT`와 파서의 문장으로,
 나중 피처 이름을 밝혀 거부합니다. C1과 C11의 도메인은 빈 공간의 경계만 주므로(그곳에서 builder는 상자를 메시하지
 않음) 구와 도메인 사이 거리는 검사하지 않습니다.
+
+### 표시 모양
+
+`simcase.display_shapes3d(model, component=None)`는 `Display3D`를 돌려줍니다. builder 모양 구성 요소를
+Studio 3D 보기에 그리기 위한 표시 모양이며 메시와는 따로입니다. 아무것도 메시하지 않고 `build_mesh3d`가 하거나
+거부하는 것을 바꾸지 않습니다. 구성 요소는 `display_complex3d`처럼 고릅니다. 어느 builder도 받지 않는 것은
+`recognise`의 문구 그대로 거부하고(피처를 밝힌 `E-3D-COMBINATION`, 닿음·가로지름 줄기 포함), 원통도 구도 없는
+구성 요소는 `display_complex3d`를 가리키며 이름을 밝혀 거부합니다(`E-CONTRACT`).
+
+`Display3D`는 `component`, builder `shape`, `domain`(pm), `length`(표시 길이 ℓ = 영역 대각선 / 200, pm),
+`faces`, `regions`, `note`, `section(axis, at_pm)`을 가집니다. `faces`와 `regions`는 속성 형식
+`simcase.geometry_display3d.DisplayFace`와 `DisplayRegion`을 담습니다(`simcase.__all__`에는 없으며, 그 필드가
+Studio가 읽는 계약입니다).
+
+- `DisplayFace`: `index`, `shape`(`plane`, `cylinder`, `sphere`), 평면이면 `axis`(0–2)와 `coord`(pm), 곡면이면
+  `None`, `names`(정렬: 그 면이 대신하는 메시 삼각형의 출처 이름), `tag`(`x0` … `z1`, 그 밖은 `void`, 내부면은
+  `None`), `exterior`, `minus`와 `plus`(영역 이름. 평면의 minus 쪽은 좌표가 작은 쪽이고, 곡면의 minus 쪽은
+  **바깥**, plus 쪽은 **안**이어서 `via.side`는 background | via로 읽힘), `area`(m², 정확한 면의 넓이),
+  `segments`(고리의 n, 구의 f, 직사각형은 0), `vertices`((V, 3) float64 pm, 평면에서는 축 좌표가 정수 `coord`와
+  정확히 같음), `triangles`((T, 3) int64), `edges`((E, 2, 3) float64 pm, 윤곽).
+- `DisplayRegion`: `name`, `material`, `void`, `volume`(m³, 정확한 물체의 부피), `faces`(그 영역이 한쪽에 있는
+  면의 id).
+
+`section(axis, at_pm)`(axis는 `"x"`, `"y"`, `"z"` 또는 0–2)은 dict를 돌려줍니다: `segments`((S, 2, 3) float64
+pm), `faces`(선분마다 면 id), `regions`(평면이 만나는 void가 아닌 영역). 영역 밖의 평면은 거부합니다.
+
+| 모양 | 면(이름 집합) |
+|---|---|
+| C4 `via_in_slab` | 옆면 직사각형 넷 `domain.x0` … `domain.y1`, z0에서 고리 {`domain.z0`}와 원판 {`<id>.bottom`, `domain.z0`}, z1도 같음, `<id>.side`(background \| via) |
+| C5 `sphere_in_box` | 직사각형 여섯과 `<id>.surface`(내부) |
+| C1 `sphere` | `<id>.surface`(외부) |
+| C11 `nested_spheres` | 반지름마다 구 하나 `<id>.surface`, builder가 붙인 대로 내부 또는 외부 |
+
+면마다 이름 집합이 그 면이 대신하는 메시 삼각형의 이름 집합과 같아서, 고른 면이 메시의 이름을 줍니다. 표시
+규칙(채택 설계 §4.3): 곧은 모서리의 평면은 정확합니다. 원통 옆면은 내접 n각형 고리 둘이며
+n = min(256, max(48, ⌈2πr/ℓ⌉)), 원판은 같은 n각형의 부채, 고리는 그것과 직사각형 사이의 띠이고 모든 꼭짓점이
+정확한 평면 위에 있습니다. 구는 빈도 f = min(64, max(8, ⌈1.05 r/ℓ⌉))의 정이십면체 측지 격자(꼭짓점 10 f² + 2개)이며
+모든 꼭짓점이 구 위에 있습니다. 단면은 정확합니다. 원통을 z로 자르면 n각형, x나 y로 자르면 ±√(r² − d²)의 두
+선이고, 구를 d < r에서 자르면 ρ = √(r² − d²)의 원이며 ρ에서 같은 규칙의 n으로 그립니다. 모양은 표시용으로
+그리며 메시는 자기 크기 안에서 이를 따릅니다. 검사: [3D 보기](studio_3d.md#검사).
 
 ## meshloom에 넘기기
 
@@ -260,7 +300,8 @@ G8과 G9는 main push와 수동 dispatch에서만 돕니다(`geometry3d-full`).
   거부합니다. 원통과 구는 builder 모양 넷에서만, 크기 하나로 받습니다. "나중 피처가 이김" 배열 안의 일반
   원통과 구는 meshloom의 조합 가능한 표본기를 기다립니다.
 - builder 모양의 구성 요소는 `build_mesh3d`가 메시하지만 `evaluate3d`와 `display_complex3d`는 이름을 밝혀
-  거부합니다(표본화한 곡면의 정확한 구성은 아직 만들지 않음). 그래서 3D 보기는 아직 이를 그릴 수 없습니다.
+  거부합니다(표본화한 곡면의 정확한 구성은 아직 만들지 않음). 3D 보기는 정확한 구성이 아니라
+  `display_shapes3d`의 표시 모양으로 이를 그립니다.
 - 영역마다 크기 하나입니다. 등급 크기나 표면 크기는 아직 없습니다.
 - 허용 오차보다는 크지만 대각선의 약 1e-7보다 얇은 조각은 meshloom이 돌아오지 않게 할 수 있습니다. 면을
   862 pm(대각선 14.4 mm의 6e-8) 어긋나게 둔 상자 둘을 h = 0.8 mm로 메시하면 600 s 안에 끝나지 않았고, 어긋남이

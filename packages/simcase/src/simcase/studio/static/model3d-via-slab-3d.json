@@ -1,0 +1,56 @@
+{
+  "openphysics": "0.3",
+  "name": "Copper via through a slab (3D heat)",
+  "materials": {
+    "slab": {
+      "thermal_conductivity": "1 W/(m K)"
+    },
+    "copper": {
+      "thermal_conductivity": "100 W/(m K)"
+    }
+  },
+  "geometry": {
+    "version": 1,
+    "components": {
+      "c": {
+        "dimension": "3d",
+        "length_unit": "m",
+        "domain": {
+          "xmin": -1,
+          "xmax": 1,
+          "ymin": -1,
+          "ymax": 1,
+          "zmin": 0,
+          "zmax": 1
+        },
+        "background": {
+          "material": "slab"
+        },
+        "features": [
+          {
+            "name": "via",
+            "type": "cylinder",
+            "cx": 0,
+            "cy": 0,
+            "r": 0.3,
+            "zmin": 0,
+            "zmax": 1,
+            "material": "copper"
+          }
+        ]
+      }
+    }
+  },
+  "physics": {
+    "heat": {
+      "type": "thermal.steady3d",
+      "prescribed_temperature": {
+        "z0": "300 K",
+        "z1": "301 K"
+      }
+    }
+  },
+  "mesh": {
+    "element_size": "0.1 m"
+  }
+}
