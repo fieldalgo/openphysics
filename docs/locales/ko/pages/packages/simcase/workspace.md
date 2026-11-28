@@ -282,9 +282,13 @@ Cu*), **Heat transfer (3D)**와 그 아래 **Thermal conductivity**(*from Materi
 **Heat source N**마다(*Si (top) · 1e12 W/m³*), **Insulated**(*every other outer face*), **Mesh 1**(*size 40 µm · Estimate 2,400
 tetrahedra · about 1 s*, 서버의 추정), **Study 1 · Steady**, 보관한 실행을 담은 **Results**가 있습니다. 덮임 말은 정확한 complex에서 옵니다: *covered in part by 2 (via)*, 또는 나중 특징이 전부 차지하면
 *covered by 2 (b), 3 (c); adds no region*. Geometry 1의
-**Add feature**는 **Box**와 **Layers**를 내놓고, **Extrude**, **Cylinder**, **Sphere**는 이유와 함께 흐리게 보입니다
-(*Extrude comes with a later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
-geometry step*). 특징 설정에는 **Move up**, **Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**(*via
+**Add feature**는 **Box**, **Layers**, **Cylinder**, **Sphere**를 내놓고, **Extrude**는 이유와 함께 흐리게 보입니다
+(*Extrude comes with a later geometry step*). 새 원기둥은 x–y 중심에서 영역 높이 전체를 지나며 r은 x–y 범위 중 작은 것의
+4분의 1이고, 새 구는 중심에 있으며 r은 가장 작은 범위의 4분의 1입니다. 원기둥과 구는 meshloom의 builder 형상(슬래브를 지나는
+원기둥 하나, 구 하나, 동심 구)에서만 받으며, builder가 모델을 받는지는 엔진의 말로 된 검사의 답입니다
+([builder 형상](geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3)). 원기둥 행은 *r 0.3 m · z 0–1 m*, 구 행은
+*r 0.3 m*로 읽힙니다. 영역에 대한 중심이나 반지름은 조합이라 서버만 검사하므로, 범위 문장이 아니라 엔진의 줄기(*cylinder 'via'
+crosses the side domain.x1 …*)가 보입니다. 특징 설정에는 **Move up**, **Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**(*via
 deleted; Undo restores it.*)가 있고, layers 특징에는 **Add layer**와 **Remove layer**(층 1–32개)도 있습니다. 끌어 옮기기는
 없습니다. **Form result**는 영역과 선택을 나열하고, 면은 보기 아래에 나열됩니다.
 
@@ -299,6 +303,8 @@ deleted; Undo restores it.*)가 있고, layers 특징에는 **Add layer**와 **R
 | material | 모델의 재료 중 하나, 또는 빈 값(void) |
 | box xmin … zmax | 축마다 min < max; 영역이 수이면 영역 안 |
 | layers thickness | 0보다 큼; 층 1–32개 |
+| cylinder r; sphere r | 0보다 큼 |
+| cylinder zmin, zmax | min < max(원기둥의 축은 z이며 *z (fixed)*로 보임) |
 | element_size(선택) | 영역 대각선 / 400 ~ 영역 대각선 / 4 |
 | Domain xmin … zmax | min < max |
 

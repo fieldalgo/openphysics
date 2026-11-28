@@ -17,13 +17,13 @@ export const CARD3D=Object.freeze({id:'layer-stack-3d',kind:'model3d',title:'Via
  note:'Square via (a round via needs cylinders, coming with the next geometry step)',
  description:'A silicon substrate, an oxide layer and top silicon, with a copper via through the oxide. Build and check the 3D geometry; meshing and heat come in later steps.'});
 
-/** Add feature: Box and Layers are taken; the others are greyed with their reason. */
+/** Add feature: Box, Layers, Cylinder and Sphere are taken; Extrude is greyed with its reason. */
 export const FEATURE_TYPES=Object.freeze([
  {type:'box',label:'Box',available:true},
  {type:'layers',label:'Layers',available:true},
  {type:'extrude',label:'Extrude',available:false,reason:'Extrude comes with a later geometry step'},
- {type:'cylinder',label:'Cylinder',available:false,reason:'Cylinders come with the next geometry step'},
- {type:'sphere',label:'Sphere',available:false,reason:'Spheres come with the next geometry step'},
+ {type:'cylinder',label:'Cylinder',available:true},
+ {type:'sphere',label:'Sphere',available:true},
 ]);
 const TYPE_LABEL={box:'Box',layers:'Layers',extrude:'Extrude',cylinder:'Cylinder',sphere:'Sphere'};
 
@@ -89,7 +89,7 @@ export function fieldNote(doc,key){
  return p.problem?'':siText(p.si);
 }
 
-/** The fields of a node, in table order: [{key, label, kind, rule, optional}] (kind: length | name | material). */
+/** The fields of a node, in table order: [{key, label, kind, rule, optional}] (kind: length | name | material | fixed, shown read-only). */
 export function fieldsOf(doc,node){
  if(node==='mesh')return [{key:'mesh.element_size',label:'element_size',kind:'length',rule:{meshSize:true}}];
  if(node==='domain')return ['xmin','xmax','ymin','ymax','zmin','zmax'].map(k=>({key:`domain.${k}`,label:k,kind:'length'}));
@@ -104,6 +104,11 @@ export function fieldsOf(doc,node){
    {key:`${base}.layers[${j}].thickness`,label:`layer ${j+1} thickness`,kind:'length',rule:{positive:true}},
    {key:`${base}.layers[${j}].material`,label:`layer ${j+1} material`,kind:'material'}]),
   {key:`${base}.element_size`,label:'element_size',kind:'length',optional:true}];
+ // a cylinder or sphere in a builder shape takes one size only (mesh.element_size): no element_size here
+ if(f.type==='cylinder'||f.type==='sphere')return [{key:`${base}.name`,label:'name',kind:'name'},
+  ...(f.type==='cylinder'?[{key:`${base}.axis`,label:'axis',kind:'fixed',value:'z (fixed)'}]:[]),
+  ...(f.type==='cylinder'?['cx','cy','r','zmin','zmax']:['cx','cy','cz','r']).map(k=>({key:`${base}.${k}`,label:k,kind:'length'})),
+  {key:`${base}.material`,label:'material',kind:'material'}];
  return [{key:`${base}.name`,label:'name',kind:'name'}];
 }
 
@@ -138,10 +143,15 @@ function rangeProblem(doc,key,v){
   return between(`Domain ${m[1]} ${m[2]}`,m[2]==='max'?{v:other,eq:false}:null,m[2]==='min'?{v:other,eq:false}:null);}
  m=/^features\[(\d+)\]\.([xyz])(min|max)$/.exec(key);
  if(m){const f=comp.features[+m[1]],axis=m[2];
-  const other=inUnit(f[axis+(m[3]==='min'?'max':'min')],unit),dmin=at(axis+'min'),dmax=at(axis+'max');
+  // a cylinder's zmin < zmax only: its extent against the domain is the server's (a combination)
+  const other=inUnit(f[axis+(m[3]==='min'?'max':'min')],unit),dmin=f.type==='cylinder'?null:at(axis+'min'),dmax=f.type==='cylinder'?null:at(axis+'max');
   const lo=m[3]==='min'?(dmin===null?null:{v:dmin,eq:true}):(other===null?null:{v:other,eq:false});
   const hi=m[3]==='min'?(other===null?null:{v:other,eq:false}):(dmax===null?null:{v:dmax,eq:true});
   return between(`${cap(f.name)} ${axis} ${m[3]}`,lo,hi);}
+ // a cylinder's or sphere's radius: above 0. Its centre and radius against the domain are a
+ // combination, which the server checks (the engine's stems, such as "crosses the side ...")
+ m=/^features\[(\d+)\]\.r$/.exec(key);
+ if(m)return between(`${cap(comp.features[+m[1]].name)} r`,{v:0,eq:false},null);
  m=/^(?:features\[(\d+)\]|mesh)\.element_size$/.exec(key);
  if(m){const ext=AXES.map(a=>{const lo=at(a+'min'),hi=at(a+'max');return lo===null||hi===null?null:hi-lo;});
   if(ext.includes(null))return null;
@@ -196,6 +206,11 @@ function featureSummary(comp,f){
  if(f.type==='layers')return f.layers.map(l=>l.name).join(' · ');
  if(f.type==='box'){const size=AXES.map(a=>{const lo=inUnit(f[a+'min'],comp.length_unit),hi=inUnit(f[a+'max'],comp.length_unit);return lo===null||hi===null?null:num(hi-lo);});
   return size.includes(null)?'':`${size.join(' × ')} ${shownUnit(comp.length_unit)}`;}
+ if(f.type==='cylinder'||f.type==='sphere'){
+  const v=k=>{const x=inUnit(f[k],comp.length_unit);return x===null?null:num(x);},u=shownUnit(comp.length_unit),r=v('r');
+  if(r===null)return '';
+  if(f.type==='sphere')return `r ${r} ${u}`;
+  const z0=v('zmin'),z1=v('zmax');return z0===null||z1===null?`r ${r} ${u}`:`r ${r} ${u} · z ${z0}–${z1} ${u}`;}
  return '';
 }
 const plural=(n,one)=>`${n} ${one}${n===1?'':'s'}`;
@@ -271,7 +286,12 @@ export function removeLayer(doc,i,j){
 }
 /** Delete feature i (Undo restores it). */
 export function deleteFeature(doc,i){const out=copy(doc);component(out).features.splice(i,1);return out;}
-/** A new Box or Layers feature at the end: a box in the middle of the domain, a layers feature with one slab. */
+/**
+ * A new feature at the end: a box in the middle of the domain, a layers feature with one slab, a
+ * cylinder through the whole domain height at the x-y centre (r a quarter of the smaller x-y extent),
+ * a sphere at the centre (r a quarter of the smallest extent). Whether a builder takes it is the
+ * check's answer, in the engine's words.
+ */
 export function addFeature(doc,type){
  const kind=FEATURE_TYPES.find(t=>t.type===type);
  if(!kind)fail(`Unknown feature type ${type}.`);
@@ -282,6 +302,12 @@ export function addFeature(doc,type){
  const material=Object.keys(out.materials||{})[0]??null;
  if(type==='box'){const [x0,x1]=mid('xmin','xmax'),[y0,y1]=mid('ymin','ymax'),[z0,z1]=mid('zmin','zmax');
   comp.features.push({name:uniqueName(comp,'box'),type:'box',xmin:x0,xmax:x1,ymin:y0,ymax:y1,zmin:z0,zmax:z1,material});}
+ else if(type==='cylinder'||type==='sphere'){
+  const axes=type==='cylinder'?['x','y']:AXES,known=AXES.every(a=>num(d[a+'min'])!==null&&num(d[a+'max'])!==null);
+  const c=a=>known?(d[a+'min']+d[a+'max'])/2:0,r=known?Math.min(...axes.map(a=>d[a+'max']-d[a+'min']))/4:0.25;
+  comp.features.push(type==='cylinder'
+   ?{name:uniqueName(comp,'cylinder'),type:'cylinder',cx:c('x'),cy:c('y'),r,zmin:known?d.zmin:0,zmax:known?d.zmax:1,material}
+   :{name:uniqueName(comp,'sphere'),type:'sphere',cx:c('x'),cy:c('y'),cz:c('z'),r,material});}
  else{const [z0,z1]=mid('zmin','zmax');
   comp.features.push({name:uniqueName(comp,'layers'),type:'layers',z0,layers:[{name:'layer',thickness:z1-z0,material}]});}
  return out;
