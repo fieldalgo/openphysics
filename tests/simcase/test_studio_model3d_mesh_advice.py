@@ -64,3 +64,30 @@ def test_other_mesh_refusals_are_unchanged(client):
     doc = card("40 um")
     answer = client.post("/api/model3d/check", json={"doc": doc}).json()
     assert answer["mesh"]["ok"] is True and "suggested_size" not in answer["mesh"]
+
+
+def estimate(size):
+    doc = card(size)
+    doc["mesh"]["element_count_limit"] = 10 ** 12
+    return simcase.estimate_mesh3d(doc)
+
+
+def test_v3_the_refusal_also_answers_a_size_that_meshes_in_about_a_minute(client):
+    """V3: ``suggested_minute`` is the smallest grid size whose estimate (seconds, the engine's 0.6 ms
+    per tetrahedron) is at most 60 s and within the limit; at the grid value below it the estimate is
+    over 60 s (or the limit). Both sizes come with their estimates. All numbers are the engine's at test
+    time; the engine's own keys are unchanged."""
+    mesh = client.post("/api/model3d/check", json={"doc": card("2 um")}).json()["mesh"]
+    assert mesh["code"] == "E-MESH-ESTIMATE"
+    assert set(mesh) == {"ok", "refused", "code", "path", "feature_index", "tetrahedra", "limit", "suggested_size",
+                         "suggested_tetrahedra", "suggested_seconds", "suggested_minute", "minute_tetrahedra",
+                         "minute_seconds"}
+    n, m = mesh["suggested_size"], mesh["suggested_minute"]
+    at_n, at_m = estimate(f"{n} um"), estimate(f"{m} um")
+    assert (mesh["suggested_tetrahedra"], mesh["suggested_seconds"]) == (at_n.tetrahedra, at_n.seconds)
+    assert (mesh["minute_tetrahedra"], mesh["minute_seconds"]) == (at_m.tetrahedra, at_m.seconds)
+    assert at_m.seconds <= 60 and at_m.tetrahedra <= mesh["limit"] and m >= n
+    assert m == float(f"{m:.3g}"), "three significant digits"
+    below = round(m - 10 ** (math.floor(math.log10(m)) - 2), 12)
+    under = estimate(f"{below} um")
+    assert under.seconds > 60 or under.tetrahedra > mesh["limit"], "the grid value below is over a minute"

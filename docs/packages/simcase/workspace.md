@@ -432,9 +432,13 @@ round to the same coordinate 9000.000000000002 m*). Such a refusal is shown in M
 the tree marks the feature its path names, else **Mesh 1** (*refused*); the view is not greyed, since
 the shape is formed; and Mesh is disabled with the refusal's words. An estimate over the limit
 (`E-MESH-ESTIMATE`) is worded once, in Messages, in plain words: *Component 1 needs about 19,215,000
-tetrahedra; the limit is 600,000. Use an element size of at least 6.36 µm.* The size is the smallest
-on a three-significant-digit grid that the same estimate accepts, found by the check (`suggested_size`,
-with `tetrahedra` and `limit`, beside the engine's `refused`). The engine's sentence and its key are
+tetrahedra; the limit is 600,000. Element size 6.36 µm meshes about 597,583 tetrahedra (estimated about 6
+min); 11.7 µm about 98,783 (estimated about 1 min).* The first size is the smallest on a
+three-significant-digit grid that the same estimate accepts; the second the smallest whose estimated
+time is at most 60 s (the engine's estimate, 0.6 ms per tetrahedron, so about 100,000 tetrahedra; not a
+measured time). The check finds both (`suggested_size` and `suggested_minute`, each with its
+`…_tetrahedra` and `…_seconds`, with `tetrahedra` and `limit`, beside the engine's `refused`), and the
+tree's Mesh 1 row reads *too fine*. The engine's sentence and its key are
 under **Details**. Mesh and Run say *Fix 1 problem in Messages to mesh* (*… to run*), and Mesh 1's page
 *Mesh is not available: see Messages.* The size field is labelled **Element size**.
 

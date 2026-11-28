@@ -234,7 +234,11 @@ heat rate is Q = ΔT/L · (k_v πr² + k_s (A − πr²)) = 31.99159 W.
     in the words of `/api/model3d/mesh/estimate` (`simcase.estimate_mesh3d`, the mesh job's
     reuse key), or the refusal that blocks meshing in the form below: E-MESH-ESTIMATE above the
     element count limit, a below-tolerance E-CONTRACT, or two values that round to one
-    coordinate (E-3D-COMBINATION at `features[i]`). The shape is formed either way, so the
+    coordinate (E-3D-COMBINATION at `features[i]`). An E-MESH-ESTIMATE refusal also carries
+    Studio's advice: `tetrahedra`, `limit`, `suggested_size` (the smallest size the limit takes)
+    and `suggested_minute` (the smallest whose estimated time is at most 60 s), each with its
+    estimate (`suggested_tetrahedra`, `suggested_seconds`, `minute_tetrahedra`, `minute_seconds`;
+    the engine's estimate, not a measured time). The shape is formed either way, so the
     answer stays `"ok": true`; on the card it adds about 7 ms to the check's 8 ms.
   - `domain`: the component's domain in its length unit, with parameters and expressions evaluated
     (numbers), for the workspace's Domain row, size guards and Add feature's defaults.

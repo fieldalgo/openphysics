@@ -387,30 +387,37 @@ def _domain(comp) -> dict:
 
 def _estimate_advice(doc: dict, comp) -> dict:
     """What a plain E-MESH-ESTIMATE message needs (Studio's words; the engine's stay in ``refused``):
-    ``tetrahedra`` (this document's estimate), ``limit`` and ``suggested_size``: the smallest mesh
-    element size on a grid of three significant digits in the component's unit that the same estimate
-    accepts (``simcase.estimate_mesh3d``, called, not changed), or None when no single size is
-    accepted (feature sizes, say). Studio's guard keeps the size at most the domain diagonal / 4."""
+    ``tetrahedra`` (this document's estimate), ``limit``, ``suggested_size``: the smallest mesh element
+    size on a grid of three significant digits in the component's unit that the same estimate accepts,
+    and (V3) ``suggested_minute``: the smallest such size whose estimated time is at most 60 s and within
+    the limit, each with its estimate (``suggested_tetrahedra``/``suggested_seconds``,
+    ``minute_tetrahedra``/``minute_seconds``). ``simcase.estimate_mesh3d`` is called, not changed; its
+    seconds are the engine's estimate (0.6 ms per tetrahedron), not a measured time. The sizes are None
+    when no single size is accepted (feature sizes, say); Studio's guard keeps a size at most the domain
+    diagonal / 4."""
     import copy
     from simcase import estimate_mesh3d
     unit = str(comp.length_unit)
     limit = int((doc.get("mesh") or {}).get("element_count_limit", 600000))
 
-    def count(size):
+    def est(size):
         trial = copy.deepcopy(doc)
         trial.setdefault("mesh", {})["element_count_limit"] = 10 ** 12
         if size is not None:
             trial["mesh"]["element_size"] = f"{size:.12g} {unit}"
         try:
-            return estimate_mesh3d(trial).tetrahedra
+            return estimate_mesh3d(trial)
         except GeometryError:
             return None
 
-    out = {"tetrahedra": count(None), "limit": limit, "suggested_size": None}
+    whole = est(None)
+    out = {"tetrahedra": whole.tetrahedra if whole else None, "limit": limit, "suggested_size": None,
+           "suggested_tetrahedra": None, "suggested_seconds": None, "suggested_minute": None,
+           "minute_tetrahedra": None, "minute_seconds": None}
     d = comp.domain
     diag = math.sqrt(sum((float(Fraction(d[b] - d[a]) / comp.pm_per_unit)) ** 2
                          for a, b in (("xmin", "xmax"), ("ymin", "ymax"), ("zmin", "zmax"))))
-    if out["tetrahedra"] is None or not diag:
+    if whole is None or not diag:
         return out
     grid = lambda h: float(f"{h:.3g}")                                    # noqa: E731
 
@@ -423,26 +430,38 @@ def _estimate_advice(doc: dict, comp) -> dict:
         m = round(h / 10 ** e)
         return grid((m - 1) * 10 ** e) if m > 100 else grid(999 * 10 ** (e - 1))
 
-    probe = diag / 100
-    t = count(probe)
-    if not t:
+    probe = est(diag / 100)
+    if not probe or not probe.tetrahedra:
         return out
-    h = grid(probe * (t / limit) ** (1 / 3))
-    for _ in range(60):              # up to the first accepted grid value
-        t = count(h)
-        if t is None or h > diag / 4:
-            return out
-        if t <= limit:
-            break
-        h = up(h)
-    else:
+
+    def smallest(accept, guess):
+        """The smallest grid size whose estimate ``accept`` takes, walking up from ``guess`` to the first
+        accepted value and then down while the value below is still accepted; (size, estimate) or None."""
+        h = grid(guess)
+        for _ in range(60):
+            e = est(h)
+            if e is None or h > diag / 4:
+                return None
+            if accept(e):
+                break
+            h = up(h)
+        else:
+            return None
+        for _ in range(60):
+            below = est(down(h))
+            if below is None or not accept(below):
+                break
+            h, e = down(h), below
+        return h, e
+
+    found = smallest(lambda e: e.tetrahedra <= limit, diag / 100 * (probe.tetrahedra / limit) ** (1 / 3))
+    if found is None:
         return out
-    for _ in range(60):              # down while the value below is still accepted
-        t = count(down(h))
-        if t is None or t > limit:
-            break
-        h = down(h)
-    out["suggested_size"] = h
+    out["suggested_size"], out["suggested_tetrahedra"], out["suggested_seconds"] = found[0], found[1].tetrahedra, found[1].seconds
+    minute = smallest(lambda e: e.tetrahedra <= limit and e.seconds <= 60,
+                      max(found[0], diag / 100 * (probe.seconds / 60) ** (1 / 3)))
+    if minute is not None:
+        out["suggested_minute"], out["minute_tetrahedra"], out["minute_seconds"] = minute[0], minute[1].tetrahedra, minute[1].seconds
     return out
 
 
