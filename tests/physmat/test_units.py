@@ -1179,7 +1179,7 @@ CANONICAL_ADDED = {"capacitance_per_length": "F/m", "inductance_per_length": "H/
                    "rms_roughness": "m", "air_wavelength": "m", "photon_energy": "J", "plasma_energy": "J",
                    "damping_energy": "J", "resonance_energy": "J"}
 # Output rows of 4.8 with no menu ("—"): the canonical unit only.
-OUTPUT_ONLY = {"node_coordinates": "m", "stored_heat": "J", "stored_heat_per_depth": "J/m", "heat_storage_rate": "W",
+OUTPUT_ONLY = {"mass_normalized_displacement": "1/kg^(1/2)", "node_coordinates": "m", "stored_heat": "J", "stored_heat_per_depth": "J/m", "heat_storage_rate": "W",
                "heat_storage_rate_per_depth": "W/m", "thermal_energy_functional": "J K",
                "thermal_energy_functional_per_depth": "J K/m", "thermal_diffusivity": "m^2/s",
                "conductance_per_depth": "S/m", "permittivity": "F/m", "charge": "C", "charge_per_depth": "C/m",
@@ -1508,8 +1508,8 @@ def test_p2_names_are_legal_with_their_unit_and_places():
     # P3_L3_NAMES, 258 and 385 until L3 commit 11d0 added radius (P3_L3_RADIUS), 259 and 386 until the mode
     # TE fraction added te_polarization_fraction (a result fraction), 260 and 387 until the single-point group
     # index added wavelength_step (the step of results.group_index), 261 and 388 until the open-boundary
-    # search added pml_search_mode_count (a count of physics.*.pml)
-    assert len(units._ENTRIES) == 262 and len(names) == 389
+    # search added pml_search_mode_count; structural modes then added mass_normalized_displacement.
+    assert len(units._ENTRIES) == 263 and len(names) == 390
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal
