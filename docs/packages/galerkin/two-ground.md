@@ -40,7 +40,9 @@ establish numerical convergence everywhere within them.
 The method is a constant Galerkin boundary discretization of the homogeneous
 Laplace Green function: a two-Dirichlet-plane strip plus reflected lateral
 images for Neumann sides. Exact singular half-space integrals are combined with
-a smooth tensor interpolant. Interpolation degree is explicitly 10,12,14 or 16
+the smooth remainder, which is interpolated on tensor boxes, except that a
+plane-scaled box with fewer panels than the degree integrates it directly
+(see below). Interpolation degree is explicitly 10,12,14 or 16
 (default12), compared with degree−2. The solver never silently changes a
 requested setting.
 
@@ -108,6 +110,21 @@ stripline sections (37–42 boxes, 64 panels per edge, degree 14) this cut a
 solve from 9.6–14.1 s to 6.3–10.1 s; capacitance changed by at most 6e-16 and
 the current Gram by at most 2e-14 of its largest entry, less than changing the
 interpolation degree from 14 to 16 (1e-15 and 3e-14).
+
+A plane-scaled box with fewer panels than the interpolation degree is not
+interpolated: the smooth kernel is integrated directly at `degree` Gauss points
+per panel, fewer points (panels × degree) than the degree² tensor grid. Grid
+and direct boxes combine in any pair, and the degree−2 comparison (1e-10) still
+compares two independent rules, degree−2 and degree points per panel or grid
+side, so the requested degree is still the only setting. Between two direct
+boxes no interpolation is left for the raw reciprocity check to compare: it
+then compares only rounding of the same reciprocal integrals. Tests check that
+a direct box agrees with a degree-16 interpolated box to 1e-13. On the three
+sections (34 of 42 boxes direct in the coupled one) this cut a solve to
+3.9–7.2 s, 2.1–2.5 times faster than before both steps; against the solver
+before both steps capacitance changed by at most 1.5e-15 and the current Gram
+by at most 3e-14 of its largest entry, the size of the change from degree 14
+to 16.
 
 Internal matrix, reciprocity, residual, energy, current-conservation and ground
 refinement checks retain a 1e-10 gate. The matrix condition bound must be below
