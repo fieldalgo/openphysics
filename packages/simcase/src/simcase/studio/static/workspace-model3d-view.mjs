@@ -16,7 +16,7 @@ import {CANCELLED,longer,meshBlocked,progressText,statsRows,stepList,estimateTex
 import {faceLines,regionColor} from '/model3d-assets/model3d-model.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {markPageTabs} from './workspace-tabs.mjs';
-import {CARD3D,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
+import {CARD3D,CARDS3D,card3dOf,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
  valuesRows,runProgress,boundaryNameFor,temperatureColor} from './workspace-model3d.mjs';
@@ -33,6 +33,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 export function createModel3dView(ctx){
  const {$}=ctx;
  let doc=null,title=CARD3D.title,history=null,shown=false,inProject=false;
+ let card=null;                 // the Library card the model came from (its id), or null
  let check=null,refused=null,lastGood=null,request=0,checking=false;
  let selection='geometry',face=null,hidden=new Set();
  const drafts=new Map();          // field key → {raw, problem}
@@ -61,7 +62,8 @@ export function createModel3dView(ctx){
   doc=next;if(record&&history.record(doc))ctx.onHistory();
   drafts.clear();runCheck();if(shown)ctx.render();
  }
- function open(document,{asTitle=CARD3D.title,runs=[]}={}){
+ function open(document,{asTitle=CARD3D.title,runs=[],card:from}={}){
+  card=from===undefined?card3dOf(document)?.id??null:from;
   stopJob();stopRun();mesh.status=null;mesh.view=null;mesh.pane='geometry';
   heat.records=runs.slice(-MAX_RUNS);heat.live=heat.records.map(()=>null);heat.status=null;heat.failure=null;heat.shown=null;heat.cut=null;heat.probe=null;section=null;
   doc=JSON.parse(JSON.stringify(document));title=asTitle;history=new Model3dHistory(doc);
@@ -91,7 +93,7 @@ export function createModel3dView(ctx){
   const head=all.find(r=>r.key==='component'),name='Component 1';
   return `<div class="pane-title"><span>Model builder</span><span class="pane-detail">3D model</span></div>${treeOpen()}`+
    `<section class="tree-group" role="none">${groupHeading(name,!treeView.collapsed.has(name),head.label)}${all.filter(r=>r.key!=='component').map(item).join('')}</section></div>`+
-   `<div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>3D steady heat (experimental)</strong><p>Boxes and slab layers, checked by the exact engine, meshed and solved in a separate process.</p></div>`;
+   `<div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>3D steady heat (experimental)</strong><p>Boxes and slab layers, and cylinders and spheres in meshloom's builder shapes, checked by the server, meshed and solved in a separate process.</p></div>`;
  }
  function choose(key){
   selection=key;ctx.ui.page='Model';
@@ -594,7 +596,7 @@ export function createModel3dView(ctx){
   document.querySelectorAll('[data-view]').forEach(b=>b.hidden=true);
   const toolbar=document.querySelector('.workspace > .toolbar');if(toolbar)toolbar.style.display=page==='Model'?'flex':'none';
   $('breadcrumb').textContent='Model / '+(rows().find(r=>r.key===selection)?.label||'Geometry 1');
-  document.querySelector('.workspace > .note').textContent='A 3D model of boxes and slab layers: Mesh 1 meshes it, Run solves steady heat.';
+  document.querySelector('.workspace > .note').textContent='A 3D model of boxes, slab layers, cylinders and spheres: Mesh 1 meshes it, Run solves steady heat.';
   $('solver-log').hidden=true;$('workflow').hidden=true;
   for(const id of ['run-optical','run-heat','run-joule','run-multiphysics','run-multiphysics-reason','add-physics','add-coupling','run-options','run-baseline-option'])if($(id))$(id).hidden=true;
   const steps=$('sequence');if(steps)steps.innerHTML='<span class="sequence-empty">Study 1 · Steady: Run meshes the component and solves Heat transfer (3D).</span>';
@@ -607,14 +609,16 @@ export function createModel3dView(ctx){
  }
 
  return {
-  card:()=>CARD3D.id,kind:'model3d',
+  card:()=>card,kind:'model3d',
+  /** The session file name Export suggests: the card's, else the card 1 name of before. */
+  sessionFile:()=>(CARDS3D.find(c=>c.id===card)||CARD3D).sessionFile,
   active:()=>shown,inProject:()=>inProject,
   open,
   /** A model3d session read by parseSession: its document (and the title the project gives it). */
-  openSession:(session,{asTitle}={})=>open(session.document,{asTitle,runs:session.runs||[]}),
+  openSession:(session,{asTitle,card:from}={})=>open(session.document,{asTitle,runs:session.runs||[],card:from}),
   show(){if(!inProject)return;shown=true;ctx.ui.page='Model';ctx.render();},
   leave(){stopJob();stopRun();shown=false;const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();delete box.dataset.m3State;}},
-  close(){stopJob();stopRun();heat.records=[];heat.live=[];mesh.view=null;mesh.status=null;shown=false;inProject=false;doc=null;history=null;check=null;refused=null;lastGood=null;},
+  close(){stopJob();stopRun();card=null;heat.records=[];heat.live=[];mesh.view=null;mesh.status=null;shown=false;inProject=false;doc=null;history=null;check=null;refused=null;lastGood=null;},
   renderPage,
   canUndo:()=>!!history?.canUndo,canRedo:()=>!!history?.canRedo,
   undo(){if(!history?.canUndo)return;doc=history.undo();drafts.clear();runCheck();ctx.render();ctx.onHistory();},
