@@ -766,6 +766,8 @@ export function createModel3dView(ctx){
   contentStamp:()=>doc?documentDigest(doc)+'|'+heat.records.map(r=>r.run).join(','):null,
   sessionText:()=>writeModel3dSession(doc,null,heat.records),
   document:()=>doc,
+  /** V2: the kept run records (for Replace's Undo). */
+  records:()=>heat.records.slice(),
   state:()=>({check,refused,selection,face,mesh:{job:mesh.job,status:mesh.status?.status||null,view:!!mesh.view,pane:mesh.pane},
    heat:{runs:heat.records.length,live:heat.live.slice(),running:heat.run?.id||null,status:heat.status?.status||null,shown:heat.shown,failure:heat.failure?.message||null}}),
  };

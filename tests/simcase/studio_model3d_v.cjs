@@ -104,3 +104,17 @@ test('V8: the cut has a saturated map with the surface\'s ends; colours are conv
  assert.ok(Math.abs(M.srgbToLinear(0.5)-0.21404)<1e-5);
  assert.ok(Math.abs(M.srgbToLinear(0.04)-0.04/12.92)<1e-12);
 });
+
+test('V2: the other 3D card says why it opens in a new tab; Replace names exactly what is dropped',()=>{
+ assert.equal(M.otherCardReason('Via in a layer stack (3D heat)'),'This project holds Via in a layer stack (3D heat); a project holds one 3D model.');
+ const base={from:'Via in a layer stack (3D heat)',to:'Copper via through a slab (3D heat)',runs:2};
+ assert.deepEqual(M.replaceLines({...base,saved:'none'}),[
+  'Replacing drops Via in a layer stack (3D heat) from this project: its document and its 2 runs.',
+  'It is not saved to any file, so all of it is lost unless you save first.',
+  '3D models are not kept in browser recovery. Undo, right after Replace, brings it back in this tab (its runs can be recomputed).',
+  'The other models of the project stay as they are.']);
+ assert.equal(M.replaceLines({...base,saved:'changed',file:'study.json'})[1],'It has changes since the last File › Save to study.json; those changes are lost unless you save first.');
+ assert.equal(M.replaceLines({...base,saved:'saved',file:'study.json'})[1],'It is saved in study.json with no changes since.');
+ assert.equal(M.replaceLines({...base,runs:1,saved:'none'})[0],'Replacing drops Via in a layer stack (3D heat) from this project: its document and its 1 run.');
+ assert.equal(M.replaceLines({...base,runs:0,saved:'none'})[0],'Replacing drops Via in a layer stack (3D heat) from this project: its document (no runs).');
+});

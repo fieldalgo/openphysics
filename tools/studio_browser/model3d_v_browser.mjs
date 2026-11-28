@@ -37,6 +37,17 @@
 //  V8  card 1 (300 K on z0 and z1), Run, Section z = 505, view +z zoomed (6 × +): the cut's pixels (every one) reach the colour
 //      map's blue and red ends within 12/255 per channel; their mean HSV saturation is ≥ 0.25; the cut's
 //      legend is in view without scrolling at 1440 × 900: 3/3. Screenshots: v8-surface.png, v8-cut.png.
+//  V2a an optical run (a recovery record), then card 1 with a run; in the Library card 2 reads "Open in
+//      a new tab" with "This project holds Via in a layer stack (3D heat); a project holds one 3D
+//      model."; one click opens /workspace?card=via-slab-3d&fresh=1 with card 2 (no Messages step);
+//      the first tab keeps both models and the recovery record (session) unchanged; in the new tab,
+//      card 1 reads the same with card 2's title: 4/4.
+//  V2b "Replace the 3D model…": the dialog's lines equal replaceLines for the unsaved state, and after
+//      its File › Save for the saved state (that file's name); Cancel changes nothing; Replace opens
+//      card 2 and leaves the recovery record's session as it was; Messages' Undo brings card 1 back:
+//      a new File › Save has the same model3d digest (document and runs) and the same workspace digest
+//      as the save before Replace, with the recovery session unchanged; the save holds card 1 and the
+//      optical model: 5/5.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -337,6 +348,82 @@ try {
         bar: [bar.left, bar.top, bar.right, bar.bottom].map(Math.round), canvas: [cv.left, cv.top, cv.right, cv.bottom].map(Math.round), inner: innerHeight}; });
     const rows = [px.n > 100 && px.nearCold <= 12 && px.nearHot <= 12, px.meanSat >= 0.25, px.legendInView];
     record('V8', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, ...px});
+    await ctx.close();
+  }
+  // ---- V2: another 3D card opens in a new tab at one click; Replace names what is dropped; Undo ----
+  if (want('V2')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForFunction(() => /^Connected/.test(document.getElementById('connection-status').textContent) && !!document.querySelector('[data-template=optical]'));
+    // the project: an optical run (a browser recovery record), then card 1 with one run
+    await page.click('[data-template=optical]'); await page.waitForFunction(() => !document.getElementById('run-optical').disabled, null, {timeout: 30000});
+    await page.click('#run-optical');
+    await page.waitForFunction(() => /complete/i.test(document.getElementById('job-message').textContent), null, {timeout: 180000});
+    await page.waitForFunction(() => /^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent), null, {timeout: 20000});
+    await page.click('[data-page="Applications"]'); await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    const session = pg => pg.evaluate(() => new Promise((resolve, reject) => { const o = indexedDB.open('openphysics-studio-notebook', 1);
+      o.onsuccess = () => { const r = o.result.transaction('snapshots', 'readonly').objectStore('snapshots').get('latest');
+        r.onsuccess = () => { o.result.close(); resolve(r.result?.session ?? null); }; r.onerror = () => reject(r.error); }; o.onerror = () => reject(o.error); }));
+    const recBefore = await session(page);
+    // (a) card 2 reads "Open in a new tab" with the reason, and one click opens it
+    await page.click('[data-page="Applications"]');
+    const cardA = await page.evaluate(() => { const b = document.querySelector('[data-model3d-card="via-slab-3d"]');
+      return {action: b?.querySelector('.card-action')?.textContent || '', why: b?.querySelector('.card-why')?.textContent || '', status: document.getElementById('file-status')?.textContent || ''}; });
+    const popup = ctx.waitForEvent('page', {timeout: 30000});
+    await page.click('[data-model3d-card="via-slab-3d"]');
+    const tab = await popup; await tab.waitForLoadState();
+    await tab.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
+    const fresh = await tab.evaluate(() => ({url: location.pathname + location.search, title: document.querySelector('.m3-head h2')?.textContent || ''}));
+    const statusAfter = await page.evaluate(() => document.getElementById('file-status')?.textContent || '');
+    // the reverse: in the new tab (card 2 held), card 1 reads the same with card 2's title
+    await tab.click('[data-page="Applications"]');
+    const reverse = await tab.evaluate(() => { const b = document.querySelector('[data-model3d-card="layer-stack-3d"]');
+      return {action: b?.querySelector('.card-action')?.textContent || '', why: b?.querySelector('.card-why')?.textContent || ''}; });
+    await tab.close();
+    const recAfterTab = await session(page);
+    const rowsA = [
+      cardA.action === 'Open in a new tab' && cardA.why === 'This project holds Via in a layer stack (3D heat); a project holds one 3D model.',
+      fresh.url === '/workspace?card=via-slab-3d&fresh=1' && fresh.title === 'Copper via through a slab (3D heat)' && statusAfter === cardA.status,
+      recBefore !== null && recAfterTab === recBefore && await page.evaluate(() => document.querySelectorAll('[data-model3d-card]').length) === 2,
+      reverse.action === 'Open in a new tab' && reverse.why === 'This project holds Copper via through a slab (3D heat); a project holds one 3D model.',
+    ];
+    record('V2a', rowsA.every(Boolean) && !seen.pageErrors.length, {passed: rowsA.filter(Boolean).length, of: 4, cardA, fresh, reverse, sameRecord: recAfterTab === recBefore});
+    // (b) Replace: the question, Cancel, File › Save, Replace, Undo
+    const dialogText = () => page.evaluate(() => [...document.querySelectorAll('#m3-replace-dialog p')].map(p => p.textContent));
+    const expected = (saved, file) => page.evaluate(async ([s, f]) => (await import('/workspace-assets/workspace-model3d.mjs'))
+      .replaceLines({from: 'Via in a layer stack (3D heat)', to: 'Copper via through a slab (3D heat)', runs: 1, saved: s, file: f}), [saved, file]);
+    await page.click('[data-m3-replace="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]');
+    const unsaved = await dialogText();
+    await page.click('#m3-replace-dialog [data-act="cancel"]'); await page.waitForTimeout(200);
+    const afterCancel = await page.evaluate(() => ({dialog: !!document.getElementById('m3-replace-dialog'), card1: document.querySelector('[data-model3d-card="layer-stack-3d"] .card-action')?.textContent}));
+    await page.click('[data-m3-replace="via-slab-3d"]'); await page.waitForSelector('#m3-replace-dialog[open]');
+    const file1 = await download(page, () => page.click('#m3-replace-dialog [data-act="save"]'));
+    await page.waitForTimeout(300);
+    const savedName = await page.evaluate(() => document.querySelector('#m3-replace-dialog p:nth-of-type(2)')?.textContent.match(/saved in (.+) with no changes since\./)?.[1] || '');
+    const saved = await dialogText();
+    const p1 = JSON.parse(file1), entry = (p, kind) => p.models.find(m => m.kind === kind);
+    await page.click('#m3-replace-dialog [data-act="replace"]');
+    await page.waitForFunction(() => document.querySelector('.m3-head h2')?.textContent === 'Copper via through a slab (3D heat)', null, {timeout: 30000});
+    await checked(page);
+    const recAfterReplace = await session(page);
+    await page.click('#file-status button[data-m3-undo-replace]');
+    await page.waitForFunction(() => document.querySelector('.m3-head h2')?.textContent === 'Via in a layer stack (3D heat)', null, {timeout: 30000});
+    await checked(page);
+    // after Undo the project equals the saved one (the footer says so, and Save has nothing to write): Save As writes it
+    const footer = await page.evaluate(() => document.getElementById('autosave-status')?.textContent || '');
+    const file2 = await download(page, async () => { await page.click('#file-menu-button'); await page.click('#menu-save-as'); }), p2 = JSON.parse(file2);
+    const recAfterUndo = await session(page);
+    const rowsB = [
+      JSON.stringify(unsaved) === JSON.stringify(await expected('none')) && savedName !== '' && JSON.stringify(saved) === JSON.stringify(await expected('saved', savedName)),
+      !afterCancel.dialog && afterCancel.card1 === 'Return to the 3D model',
+      recAfterReplace === recBefore,
+      entry(p1, 'model3d')?.digest === entry(p2, 'model3d')?.digest && entry(p1, 'workspace')?.digest === entry(p2, 'workspace')?.digest
+        && p1.models.length === p2.models.length && recAfterUndo === recBefore && footer === '3D model saved in the project file',
+      entry(p1, 'model3d')?.card === 'layer-stack-3d' && !!entry(p1, 'workspace'),
+    ];
+    record('V2b', rowsB.every(Boolean) && !seen.pageErrors.length, {passed: rowsB.filter(Boolean).length, of: 5, unsaved, saved, savedName, afterCancel,
+      digests: {m3: [entry(p1, 'model3d')?.digest, entry(p2, 'model3d')?.digest], ws: [entry(p1, 'workspace')?.digest, entry(p2, 'workspace')?.digest]},
+      footer, record: {afterTab: recAfterTab === recBefore, afterReplace: recAfterReplace === recBefore, afterUndo: recAfterUndo === recBefore}});
     await ctx.close();
   }
 } finally {
