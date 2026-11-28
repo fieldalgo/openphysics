@@ -271,12 +271,16 @@ solves run about 2.3 times slower, so the test jobs' limit is 60 minutes; it onl
 median, a few seconds, however long it runs: rebuild the table from a complete run's
 `source-tests-*.xml` when files are added (part 5 of main's run 45415835896 reached the
 limit after the 3-minute `test_studio_closed_target.py` was added, unlisted, on a slow
-runner). Since files are
-assigned whole, the largest file is a part's floor
-(`tools/tests/test_examples_smoke.py`, 5.7 minutes, whose examples run in an
-order that the file keeps); the 5.5-minute M3 slab refinement study has its own
-file (`tests/galerkin/test_cavity_mesh_slab_refinement.py`) for this reason. To
-run a part locally:
+runner). Since 2026-11-28 the table keeps each file's slowest time over eleven complete
+sets of parts (`--slowest`, below): about 398 minutes, or about 25 minutes per part on the
+slowest runner seen, against 12 to 38 minutes per job in the same runs by a one-run
+table. Since files are assigned whole, the largest file is a part's floor
+(`tests/galerkin/test_laplace_corner_linear_field.py`, 23.4 minutes on the slowest runner
+seen); the 5.5-minute M3 slab refinement study has its own file
+(`tests/galerkin/test_cavity_mesh_slab_refinement.py`) for this reason. The corner-field
+modules share each dense solve between their tests through a cache, so they are split by
+the cached solve their tests share, never test by test, which would repeat those solves in
+other parts. To run a part locally:
 
 ```bash
 PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/16
