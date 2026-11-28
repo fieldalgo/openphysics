@@ -153,7 +153,7 @@ try {
         && JSON.stringify(tree.rows.map(r => r[0])) === JSON.stringify(['parameters', 'geometry', 'domain', 'feature:0', 'feature:1', 'form', 'materials', 'mesh'])
         && notes.mesh === `size 40 µm · ${MESH.estimateText(answer.mesh.estimate)}`
         && notes['feature:0'] === 'sub · oxide · top (covered in part by 2 (via))' && notes['feature:1'] === '20 × 20 × 10 µm'
-        && notes.form === `${tree.server.regions} regions · ${tree.server.faces} faces` && notes.materials === 'Si · SiO2 · Cu';
+        && notes.form === `${tree.server.regions} regions · ${tree.server.faces} faces` && notes.materials === 'Si · Si (top) · SiO2 · Cu';
       record('Tree (design 5.2)', treeOk, tree);
     }
     await page.close();

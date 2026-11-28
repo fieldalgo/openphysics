@@ -266,16 +266,18 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 상태: **실험적.** Library의 **3D models (experimental)** 묶음에 카드 **Via in a layer stack (3D heat)**
 (`layer-stack-3d`)가 응용 카드들 옆에, 그 사이가 아니라 따로 있습니다. µm 단위, 200 × 200 µm 영역(z는 0–610 µm)의 3d
 구성 요소이며, `layers` 특징 `stack` 하나(기판 Si 500 µm, k = 130 W/(m K); 산화막 SiO2 10 µm, k = 1.4 W/(m K); 위 실리콘
-Si 100 µm)와 산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어
+`Si (top)` 100 µm, k = 130 W/(m K))와 산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어
 있습니다. 원기둥이 오기 전까지 via는 정사각형입니다: *Square via (a round via needs cylinders, coming with the next
-geometry step)*. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
+geometry step)*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
+이름으로만 가리키기 때문입니다(`stack.top` 같은 층이나 특징 이름은 열 종류의 영역이 아님). 물리는 Heat transfer (3D)입니다:
+`z0`에 300 K, `Si (top)`에 열원 1e12 W/m³(모두 4 W), 나머지 바깥 면은 모두 단열. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
 그 모델로 돌아갑니다. 3D 모델은 **Mesh 1**(아래)로 메시합니다. 아직 실행과 결과는 없으며, **Run**은 이유(*Heat comes
 in a later step of the 3D model.*)와 함께 꺼진 채 보입니다.
 
 **트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 적힌 그대로의 매개변수,
 *t_ox = 10 um · via_w = 20 um*), **Geometry 1**과 그 아래 **Domain**(*200 × 200 × 610 µm*, 또는 *200 × 200 µm, z from the
 features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*,
-*2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*3 regions · 22 faces*, 서버 검사에서), **Materials**(*Si · SiO2 ·
+*2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*4 regions · 22 faces*, 서버 검사에서), **Materials**(*Si · Si (top) · SiO2 ·
 Cu*), **Mesh 1**(*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, 서버의 추정)이 있습니다. 덮임 말은 정확한 complex에서 옵니다: *covered in part by 2 (via)*, 또는 나중 특징이 전부 차지하면
 *covered by 2 (b), 3 (c); adds no region*. Heat transfer, Study, Results는 다음 단계에서 옵니다. Geometry 1의
 **Add feature**는 **Box**와 **Layers**를 내놓고, **Extrude**, **Cylinder**, **Sphere**는 이유와 함께 흐리게 보입니다
@@ -322,7 +324,7 @@ same coordinate 9000.000000000002 m*). 이런 거부도 Messages에 같은 방�
 별도 프로세스로 실행합니다: 단계(*Forming geometry → Meshing (expected about 1 s) → Checking the mesh → Ready*), 경과 시간,
 추정의 두 배를 넘으면 *taking longer than the estimate*. 실행 중에는 버튼이 **Cancel meshing**이며, 취소는 프로세스를 끝내고
 아무것도 남기지 않습니다(Messages에 *Meshing cancelled; nothing kept.*). 끝나면 Messages가 *Meshed stack3d: 1551 nodes, 6774
-tetrahedra, 3 regions.*라고 말하고, 페이지가 메시 통계를 나열하며, 보기가 **Mesh view**(영역별 색, 메시 모서리; 같은 조작과
+tetrahedra, 4 regions.*라고 말하고, 페이지가 메시 통계를 나열하며, 보기가 **Mesh view**(영역별 색, 메시 모서리; 같은 조작과
 면 고르기)로 바뀝니다. **Geometry**로 돌아갑니다. 형상과 mesh 블록이 바뀌지 않은 메시는 바로 재사용합니다. 편집한 뒤에는 메시
 보기가 흐려지고 *Mesh of an earlier geometry; mesh again to update it*라는 이름이 붙습니다. 메시는 보기 상태입니다: Undo에도,
 프로젝트나 세션 파일에도 없으며, 3D 모델을 떠나거나 닫으면 실행 중인 작업을 취소합니다.
@@ -339,13 +341,17 @@ tetrahedra, 3 regions.*라고 말하고, 페이지가 메시 통계를 나열하
 
 **파일.** File › Save는 3D 모델 항목과 함께 프로젝트 파일을 버전 2로 씁니다. **File › Export › Model with runs (session
 file)…**는 3D 모델만 세션 파일로 씁니다(결정 F2):
-`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, 선택적 `view` 객체와 세션
-한도 16 MiB. 지금은 문서를 담고, 실행은 나중 버전에서 옵니다. File › Open은 둘 다 읽습니다. `application`이 `"model3d"`인
+`{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, 선택적 `view` 객체, 선택적
+`runs` 목록(`thermal-steady3d-run-v1` 형식의 기록 최대 10개, 오래된 것부터; 실행이 없는 파일에는 `runs` 키가 없고 전과
+바이트까지 같게 씀)과 세션 한도 16 MiB. 프로젝트 파일의 항목이 그 세션이므로 프로젝트도 실행을 담으며, 프로젝트 버전 2는
+바뀌지 않습니다. File › Open은 둘 다 읽습니다. `application`이 `"model3d"`인
 세션은 광학과 다중물리 세션의 버전 규칙보다 먼저 자체 규칙으로 읽으며, 그 규칙은 바뀌지 않습니다(단위 배치 이전의 버전 1
 파일은 거부를 유지). 거부는 파일 종류를 밝힙니다: *This model3d session is version 2, newer than this Studio reads (version
-1). Open it in a newer Studio.*, *Unknown key "runs" in the model3d session.*, *The model3d session holds no document.*,
+1). Open it in a newer Studio.*, *Unknown key "results" in the model3d session.*, *The model3d session holds no document.*,
 *The model3d session holds a document that is not format 0.3.*, *The model3d session holds a document without a version 1
-geometry block.*, *The model3d session has an invalid view.* 3D 모델은 아직 브라우저 복구에 보관하지 않습니다.
+geometry block.*, *The model3d session has an invalid view.*, *The model3d session has runs that are not a
+list.*, *The model3d session holds 11 runs; at most 10 are kept.*, *Run 1 of the model3d session is not a
+thermal-steady3d-run-v1 record.* 3D 모델은 아직 브라우저 복구에 보관하지 않습니다.
 
 **검사.** 측정 전에 미리 정했습니다:
 

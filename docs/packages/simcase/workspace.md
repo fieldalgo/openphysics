@@ -316,9 +316,12 @@ Status: **experimental.** The Library's group **3D models (experimental)** holds
 layer stack (3D heat)** (`layer-stack-3d`), beside the application cards, not among them. It is a 3d
 component in µm over a 200 × 200 µm domain (z from 0 to 610 µm): one `layers` feature `stack`
 (substrate 500 µm of Si, k = 130 W/(m K); oxide 10 µm of SiO2, k = 1.4 W/(m K); top silicon 100 µm of
-Si) and a later box `via` (x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through
+`Si (top)`, k = 130 W/(m K)) and a later box `via` (x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through
 the oxide. The via is square until cylinders come: *Square via (a round via needs cylinders, coming
-with the next geometry step)*. Choosing the card adds the 3D model to the tab; the workspace and
+with the next geometry step)*. The top silicon has its own material, `Si (top)`, with the properties
+of `Si`, only because a heat source names a region by its material today (a layer or feature name such
+as `stack.top` is not a region of the heat kind). Its physics is Heat transfer (3D): 300 K on `z0`, a
+heat source of 1e12 W/m³ in `Si (top)` (4 W in all), every other outer face insulated. Choosing the card adds the 3D model to the tab; the workspace and
 multiphysics models stay as they are, and the card of another model returns to it. The 3D model is
 meshed by **Mesh 1** (below); it has no run or result yet, and **Run** is shown disabled with its
 reason (*Heat comes in a later step of the 3D model.*).
@@ -327,8 +330,8 @@ reason (*Heat comes in a later step of the 3D model.*).
 (beside it the parameters as written, *t_ox = 10 um · via_w = 20 um*), **Geometry 1** with **Domain**
 (*200 × 200 × 610 µm*, or *200 × 200 µm, z from the features*), the features numbered in order (later
 wins: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*, *2 Box via* · *20 × 20 × 10
-µm*) and **Form result** (*3 regions · 22 faces*, from the server's check), **Materials** (*Si ·
-SiO2 · Cu*) and **Mesh 1** (*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, the server's
+µm*) and **Form result** (*4 regions · 22 faces*, from the server's check), **Materials** (*Si ·
+Si (top) · SiO2 · Cu*) and **Mesh 1** (*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, the server's
 estimate). The coverage words come from the exact complex: *covered in part by 2 (via)*, or
 *covered by 2 (b), 3 (c); adds no region* when later features take all of it. Heat transfer, Study
 and Results come with the next step. Geometry 1 offers **Add feature** with **Box** and
@@ -387,7 +390,7 @@ in a separate process: the steps (*Forming geometry → Meshing (expected about 
 mesh → Ready*), the elapsed time and *taking longer than the estimate* past twice the estimate. While
 it runs, the button is **Cancel meshing**; a cancel ends the process and keeps nothing (*Meshing
 cancelled; nothing kept.* in Messages). Done, Messages says *Meshed stack3d: 1551 nodes, 6774
-tetrahedra, 3 regions.*, the page lists the mesh's statistics, and the view switches to **Mesh view**
+tetrahedra, 4 regions.*, the page lists the mesh's statistics, and the view switches to **Mesh view**
 (coloured by region, with mesh edges; the same controls and face picking); **Geometry** switches back.
 A mesh of an unchanged geometry and mesh block is reused at once. After an edit the mesh view is
 greyed and labelled *Mesh of an earlier geometry; mesh again to update it*. The mesh is view state:
@@ -410,14 +413,18 @@ selection in the tree, the picked face and the camera are not in it.
 **Files.** File › Save writes the project file as version 2 with the 3D model's entry. **File ›
 Export › Model with runs (session file)…** writes the 3D model alone as a session file (decision F2):
 `{"format":"openphysics-studio-session","version":1,"application":"model3d","document":{…}}`, with an
-optional `view` object and the 16 MiB session limit. It holds the document now; runs come with a later
-version. File › Open reads both; a session whose `application` is `"model3d"` is read by its own rules
+optional `view` object, an optional `runs` list (up to 10 records of format
+`thermal-steady3d-run-v1`, oldest first; a file without runs has no `runs` key and is written byte for
+byte as before) and the 16 MiB session limit. The project file's entry is that session, so the project
+keeps the runs too; project version 2 is unchanged. File › Open reads both; a session whose `application` is `"model3d"` is read by its own rules
 before the version rules of the optical and multiphysics sessions, which are unchanged (a version 1
 file of before the units batch keeps its refusal). Its refusals name the file: *This model3d session
 is version 2, newer than this Studio reads (version 1). Open it in a newer Studio.*, *Unknown key
-"runs" in the model3d session.*, *The model3d session holds no document.*, *The model3d session holds
+"results" in the model3d session.*, *The model3d session holds no document.*, *The model3d session holds
 a document that is not format 0.3.*, *The model3d session holds a document without a version 1
-geometry block.*, *The model3d session has an invalid view.* The 3D model is not kept in browser
+geometry block.*, *The model3d session has an invalid view.*, *The model3d session has runs that are
+not a list.*, *The model3d session holds 11 runs; at most 10 are kept.*, *Run 1 of the model3d session
+is not a thermal-steady3d-run-v1 record.* The 3D model is not kept in browser
 recovery yet.
 
 **Checks.** Pre-registered, fixed before measuring:

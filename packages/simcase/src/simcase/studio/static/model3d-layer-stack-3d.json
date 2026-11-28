@@ -5,6 +5,9 @@
     "Si": {
       "thermal_conductivity": "130 W/(m K)"
     },
+    "Si (top)": {
+      "thermal_conductivity": "130 W/(m K)"
+    },
     "SiO2": {
       "thermal_conductivity": "1.4 W/(m K)"
     },
@@ -48,7 +51,7 @@
               {
                 "name": "top",
                 "thickness": 100,
-                "material": "Si"
+                "material": "Si (top)"
               }
             ]
           },
@@ -64,6 +67,17 @@
             "material": "Cu"
           }
         ]
+      }
+    }
+  },
+  "physics": {
+    "heat": {
+      "type": "thermal.steady3d",
+      "prescribed_temperature": {
+        "z0": "300 K"
+      },
+      "heat_source_density": {
+        "Si (top)": "1e12 W/m^3"
       }
     }
   },

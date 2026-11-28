@@ -42,7 +42,7 @@ test('F2: a model3d session is checked by name; other version 1 files keep their
  const refused=(doc,message)=>assert.throws(()=>N.parseSession(JSON.stringify(doc)),{message});
  refused({...good,version:2},'This model3d session is version 2, newer than this Studio reads (version 1). Open it in a newer Studio.');
  refused({...good,version:0},'Unsupported model3d session version.');
- refused({...good,runs:[]},'Unknown key "runs" in the model3d session.');
+ refused({...good,results:[]},'Unknown key "results" in the model3d session.');
  refused({...good,document:[]},'The model3d session holds no document.');
  refused({...good,document:{...good.document,openphysics:'0.2'}},'The model3d session holds a document that is not format 0.3.');
  const flat=JSON.parse(JSON.stringify(good));delete flat.document.geometry.version;
@@ -98,4 +98,55 @@ test('F1: the reader refuses a 3D model where version 2 does not allow it, by na
   'Via in a layer stack (3D heat) is a multiphysics model, but its session is a model3d session.');
  assert.ok(PF.CARDS.includes('layer-stack-3d'));
  assert.deepEqual([...PF.KINDS],['workspace','multiphysics','model3d']);
+});
+
+// ---- runs (slice D, decision: an optional "runs" in version 1) ----------------------------------
+const record=()=>JSON.parse(fixture('model3d-run-record.json'));
+const digest=x=>M.canonicalDigest(x);
+
+test('runs: a session with runs keeps them after document and view; without runs, no key', () => {
+ const doc=card(),rec=record();
+ const text=M.writeModel3dSession(doc,null,[rec]);
+ assert.deepEqual(Object.keys(JSON.parse(text)),['format','version','application','document','runs']);
+ assert.deepEqual(Object.keys(JSON.parse(M.writeModel3dSession(doc,{camera:'iso'},[rec]))),['format','version','application','document','view','runs']);
+ assert.equal(M.writeModel3dSession(doc,null,[]),M.writeModel3dSession(doc),'no runs: the bytes of a session without runs');
+ const read=N.parseSession(text);
+ assert.equal(read.runs.length,1);assert.deepEqual(read.runs[0],rec);
+ // W11 with runs, file part: the document, values and surface-map digests equal after save and read
+ assert.equal(M.documentDigest(read.document),M.documentDigest(doc));
+ assert.equal(digest(read.runs[0].values),digest(rec.values));
+ assert.equal(digest(read.runs[0].surface),digest(rec.surface));
+ assert.equal(M.writeModel3dSession(read.document,read.view,read.runs),text,'a second save writes the same bytes');
+});
+
+test('runs: each record is checked by name; at most 10 runs', () => {
+ const good=JSON.parse(M.writeModel3dSession(card(),null,[record()]));
+ const refused=(mutate,message)=>{const doc=JSON.parse(JSON.stringify(good));mutate(doc);assert.throws(()=>N.parseSession(JSON.stringify(doc)),{message});};
+ refused(d=>{d.runs={};},'The model3d session has runs that are not a list.');
+ refused(d=>{d.runs[0].result='thermal-steady3d-run-v2';},'Run 1 of the model3d session is not a thermal-steady3d-run-v1 record.');
+ refused(d=>{delete d.runs[0].values;},'Run 1 of the model3d session is not a thermal-steady3d-run-v1 record.');
+ refused(d=>{d.runs[0].document_sha256='x';},'Run 1 of the model3d session is not a thermal-steady3d-run-v1 record.');
+ refused(d=>{d.runs[0].document.openphysics='0.2';},'Run 1 of the model3d session is not a thermal-steady3d-run-v1 record.');
+ refused(d=>{delete d.runs[0].surface;},'Run 1 of the model3d session is not a thermal-steady3d-run-v1 record.');
+ refused(d=>{d.runs=Array.from({length:11},()=>d.runs[0]);},'The model3d session holds 11 runs; at most 10 are kept.');
+ const notKept=record();delete notKept.surface;notKept.maps='not kept';notKept.counts={surface_nodes:1,surface_triangles:1};
+ assert.equal(N.parseSession(M.writeModel3dSession(card(),null,[notKept])).runs[0].maps,'not kept');
+ assert.throws(()=>M.writeModel3dSession(card(),null,Array.from({length:11},record)),{message:'The 3D model keeps at most 10 runs.'});
+});
+
+test('runs: a project keeps the 3D model with its runs; W11 digests after Save and Open', () => {
+ const text=M.writeModel3dSession(card(),null,[record()]);
+ const entry=PF.projectEntry({id:'m3',kind:'model3d',title:'Via in a layer stack (3D heat)',card:'layer-stack-3d',text});
+ const out=PF.writeProject(project([entry]));
+ const read=PF.readProject(out.text).models[0];
+ assert.equal(read.session.runs.length,1);
+ assert.equal(digest(read.session.runs[0].values),digest(record().values));
+ assert.equal(digest(read.session.runs[0].surface),digest(record().surface));
+ assert.equal(PF.writeProject(project([PF.projectEntry({id:read.id,kind:read.kind,title:read.title,card:read.card,text:read.text})])).text,out.text);
+});
+
+test('canonical digest: key order does not count, values do', () => {
+ assert.equal(digest({a:1,b:{c:2,d:[1,2]}}),digest({b:{d:[1,2],c:2},a:1}));
+ assert.notEqual(digest({a:1}),digest({a:2}));
+ assert.equal(M.canonicalJson({b:1,a:[{d:1,c:2}]}),'{"a":[{"c":2,"d":1}],"b":1}');
 });
