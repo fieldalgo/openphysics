@@ -213,7 +213,7 @@ class Heat3DRuns:
         kept = run.kept
         doc = copy.deepcopy(run.doc)
         try:
-            mesh = mesh3d_from_arrays(kept.mesh_arrays, doc)
+            mesh = mesh3d_from_arrays(kept.mesh_arrays, doc, run.component)
             result = solve_thermal3d(Document.from_dict(doc), mesh, verbose=False)
         except (DocumentError, GeometryError) as exc:
             self._finish(run, error={"message": str(exc), "code": getattr(exc, "code", None)})

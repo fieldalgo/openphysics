@@ -12,6 +12,8 @@ Checks (fixed before implementation):
 - The array round trip is bitwise: every array of ``mesh3d_to_arrays`` equal after
   ``mesh3d_from_arrays`` and a second ``mesh3d_to_arrays``, through an ``.npz`` file read with
   ``allow_pickle=False``; and solving on the round-tripped mesh gives the same SHA-256.
+- ``mesh3d_from_arrays`` refuses arrays of another format, and arrays made from another document's
+  geometry and mesh blocks or of another component.
 - The route is the kind's: a lone slab ``layers`` component gives the extrude mesh, also from a
   document with no physics block; a mesh of the other route is refused by name.
 """
@@ -19,6 +21,7 @@ Checks (fixed before implementation):
 import copy
 import hashlib
 import io
+import json
 
 import numpy as np
 import pytest
@@ -81,10 +84,10 @@ def test_solving_on_the_kind_s_mesh_equals_run_bit_for_bit(case):
 def test_the_array_round_trip_is_bitwise(case):
     data = CASES[case]()
     mesh = build_thermal3d_mesh(copy.deepcopy(data))
-    arrays = mesh3d_to_arrays(mesh)
+    arrays = mesh3d_to_arrays(mesh, data)
     assert all(isinstance(v, np.ndarray) and v.dtype != object for v in arrays.values())
     back = mesh3d_from_arrays(_npz(arrays), copy.deepcopy(data))
-    again = mesh3d_to_arrays(back)
+    again = mesh3d_to_arrays(back, data)
     assert sorted(again) == sorted(arrays)
     for k in arrays:
         assert again[k].dtype == arrays[k].dtype and again[k].shape == arrays[k].shape, k
@@ -99,9 +102,10 @@ def test_a_lone_slab_meshes_on_the_extrude_route_without_physics():
     data = k3.e1(0.8)
     geometry_only = {k: v for k, v in data.items() if k in ("openphysics", "geometry", "mesh")}
     a, b = build_thermal3d_mesh(geometry_only), build_thermal3d_mesh(data)
-    assert mesh3d_to_arrays(a).keys() == mesh3d_to_arrays(b).keys()
-    for k, v in mesh3d_to_arrays(a).items():
-        assert v.tobytes() == mesh3d_to_arrays(b)[k].tobytes(), k
+    left, right = mesh3d_to_arrays(a, geometry_only), mesh3d_to_arrays(b, data)
+    assert left.keys() == right.keys()
+    for k, v in left.items():
+        assert v.tobytes() == right[k].tobytes(), k
     with pytest.raises(simcase.GeometryError):
         simcase.build_mesh3d(geometry_only)          # build_mesh3d still refuses it, as before
 
@@ -114,3 +118,26 @@ def test_a_mesh_of_the_other_route_is_refused():
     with pytest.raises(DocumentError) as err:
         solve_thermal3d(Document.from_dict(via), build_thermal3d_mesh(slab), verbose=False)
     assert "meshloom" in str(err.value)
+
+
+def test_arrays_of_another_format_document_or_component_are_refused():
+    data = k3.e1(0.8, via=True)
+    arrays = _npz(mesh3d_to_arrays(build_thermal3d_mesh(copy.deepcopy(data)), data))
+    meta = json.loads(str(arrays["meta"][()]))
+    other = dict(arrays, meta=np.array(json.dumps({**meta, "format": "openphysics-mesh3d-arrays-v0"})))
+    with pytest.raises(ValueError, match="format 'openphysics-mesh3d-arrays-v0', expected"):
+        mesh3d_from_arrays(other, data)
+    moved = copy.deepcopy(data)
+    moved["geometry"]["components"]["pkg"]["features"][1]["xmax"] = 7
+    with pytest.raises(ValueError, match="other geometry and mesh blocks"):
+        mesh3d_from_arrays(arrays, moved)
+    finer = copy.deepcopy(data)
+    finer["mesh"]["element_size"] = "0.4 mm"
+    with pytest.raises(ValueError, match="other geometry and mesh blocks"):
+        mesh3d_from_arrays(arrays, finer)
+    physics = copy.deepcopy(data)
+    physics["physics"]["heat"]["prescribed_temperature"]["z1"] = "350 K"   # not a mesh block: accepted
+    mesh3d_from_arrays(arrays, physics)
+    renamed = dict(arrays, meta=np.array(json.dumps({**meta, "component": "other"})))
+    with pytest.raises(ValueError, match="of component 'other', not 'pkg'"):
+        mesh3d_from_arrays(renamed, data)
