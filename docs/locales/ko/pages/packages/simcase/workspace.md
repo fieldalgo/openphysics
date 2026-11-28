@@ -345,6 +345,11 @@ yet in a 3d component; boxes and slab layers are* · `geometry.components.c.feat
 (`E-MESH-ESTIMATE`), 메셔 허용 오차 아래의 조각(`E-CONTRACT`), 한 좌표로 반올림되는 두 값(*west.x1 and east.x0 round to the
 same coordinate 9000.000000000002 m*). 이런 거부도 Messages에 같은 방식으로 보이고, 트리는 경로가 가리키는 특징을, 없으면
 **Mesh 1**(*refused*)을 표시합니다. 형상은 만들어졌으므로 보기는 흐려지지 않으며, Mesh는 거부의 말을 이유로 꺼집니다.
+한도를 넘는 추정(`E-MESH-ESTIMATE`)은 Messages에 한 번, 쉬운 말로 보입니다: *Component 1 needs about 19,215,000 tetrahedra;
+the limit is 600,000. Use an element size of at least 6.36 µm.* 크기는 같은 추정이 받는 세 유효 숫자 격자의 가장 작은 값으로,
+검사가 찾습니다(엔진의 `refused` 옆에 `suggested_size`, `tetrahedra`, `limit`). 엔진의 문장과 그 키는 **Details** 아래에
+있습니다. Mesh와 Run은 *Fix 1 problem in Messages to mesh*(*… to run*), Mesh 1 페이지는 *Mesh is not available: see Messages.*라고
+말합니다. 크기 칸의 이름은 **Element size**입니다.
 
 **Mesh 1.** 그 페이지는 추정과 문서 mesh 블록의 `element_size`(물리량; 수만 쓰면 구성 요소 단위; 특징처럼 대각선/400 ~
 대각선/4)를 보입니다. 그래픽 머리말의 **Mesh**는 Studio의 메시 작업([3D 보기의 메시 경로](studio_3d.md#보내는-것과-응답))을

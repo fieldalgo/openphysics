@@ -100,19 +100,19 @@ export function fieldNote(doc,key){
 
 /** The fields of a node, in table order: [{key, label, kind, rule, optional}] (kind: length | name | material | fixed, shown read-only). */
 export function fieldsOf(doc,node){
- if(node==='mesh')return [{key:'mesh.element_size',label:'element_size',kind:'length',rule:{meshSize:true}}];
+ if(node==='mesh')return [{key:'mesh.element_size',label:'Element size',kind:'length',rule:{meshSize:true}}];
  if(node==='domain')return ['xmin','xmax','ymin','ymax','zmin','zmax'].map(k=>({key:`domain.${k}`,label:k,kind:'length'}));
  const m=/^feature:(\d+)$/.exec(node);if(!m)return [];
  const i=+m[1],f=component(doc).features[i];if(!f)return [];
  const base=`features[${i}]`;
  if(f.type==='box')return [{key:`${base}.name`,label:'name',kind:'name'},
   ...['xmin','xmax','ymin','ymax','zmin','zmax'].map(k=>({key:`${base}.${k}`,label:k,kind:'length'})),
-  {key:`${base}.material`,label:'material',kind:'material'},{key:`${base}.element_size`,label:'element_size',kind:'length',optional:true}];
+  {key:`${base}.material`,label:'material',kind:'material'},{key:`${base}.element_size`,label:'Element size',kind:'length',optional:true}];
  if(f.type==='layers')return [{key:`${base}.name`,label:'name',kind:'name'},{key:`${base}.z0`,label:'z0',kind:'length'},
   ...f.layers.flatMap((lay,j)=>[{key:`${base}.layers[${j}].name`,label:`layer ${j+1} name`,kind:'name'},
    {key:`${base}.layers[${j}].thickness`,label:`layer ${j+1} thickness`,kind:'length',rule:{positive:true}},
    {key:`${base}.layers[${j}].material`,label:`layer ${j+1} material`,kind:'material'}]),
-  {key:`${base}.element_size`,label:'element_size',kind:'length',optional:true}];
+  {key:`${base}.element_size`,label:'Element size',kind:'length',optional:true}];
  // a cylinder or sphere in a builder shape takes one size only (mesh.element_size): no element_size here
  if(f.type==='cylinder'||f.type==='sphere')return [{key:`${base}.name`,label:'name',kind:'name'},
   ...(f.type==='cylinder'?[{key:`${base}.axis`,label:'axis',kind:'fixed',value:'z (fixed)'}]:[]),
@@ -403,9 +403,22 @@ export const meshRefusal=check=>check?.mesh&&check.mesh.ok===false?check.mesh:nu
  * Why Mesh is not offered, or null: a draft, the shape's refusal, the mesh refusal in the
  * engine's words, a running job (slice C's words), no check yet.
  */
+/** True for an estimate refusal Studio words itself (Messages shows it once; Mesh and Run point there). */
+const plainEstimate=off=>off?.code==='E-MESH-ESTIMATE'&&typeof off.tetrahedra==='number';
+const thousands=n=>Number(n).toLocaleString('en-US');
+/**
+ * A refusal that blocks meshing, as Messages shows it: an estimate refusal in plain words, with the
+ * smallest element size the server's estimate accepts; any other refusal in the engine's words.
+ */
+export function meshRefusalText(off,unit){
+ if(!plainEstimate(off))return off?.refused??'';
+ const advice=typeof off.suggested_size==='number'?`Use an element size of at least ${Number(off.suggested_size.toPrecision(3))} ${shownUnit(unit)}.`:'Increase the element size.';
+ return `Component 1 needs about ${thousands(off.tetrahedra)} tetrahedra; the limit is ${thousands(off.limit)}. ${advice}`;
+}
 export function meshReason({drafts=0,refused=null,check=null,running=false}={},words){
  if(drafts||refused)return blockReason({drafts,refused});
  const off=meshRefusal(check);
+ if(plainEstimate(off))return 'Fix 1 problem in Messages to mesh';
  return words.meshBlocked({estimate:check?.mesh?.ok?check.mesh.estimate:null,refused:off?off.refused:null,running});
 }
 /** Why Mesh and Run are not offered: a refusal, a draft, or (in this step) that they come later. */
@@ -494,7 +507,7 @@ export function runReason({drafts=0,refused=null,check=null,running=false,doc=nu
  if(drafts)return blockReason({drafts});
  if(refused)return 'Fix 1 problem in Messages to run';
  if(!check)return 'Show a 3d component first.';
- const off=meshRefusal(check);if(off)return off.refused;
+ const off=meshRefusal(check);if(off)return plainEstimate(off)?'Fix 1 problem in Messages to run':off.refused;
  if(check.run&&check.run.ok===false)return check.run.refused;
  if(running)return BUSY;
  if(failure&&doc&&canonicalJson(failure.document)===canonicalJson(doc))return failure.message;

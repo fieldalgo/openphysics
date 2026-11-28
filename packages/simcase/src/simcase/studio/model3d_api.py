@@ -365,6 +365,8 @@ def check_view(doc: dict, component: str | None = None) -> dict:
         mesh = {"ok": True, "estimate": mesh3d_jobs.estimate(doc, cx.component), "key": mesh3d_jobs.reuse_key(doc)}
     except GeometryError as exc:
         mesh = _refusal(exc)
+        if exc.code == "E-MESH-ESTIMATE":
+            mesh.update(_estimate_advice(doc, comp))
     return {"ok": True, "component": cx.component, "unit": str(comp.length_unit),
             "features": _coverage(comp, cx), "regions": display["regions"],
             "parameters": _parameters(doc, model, cx.component),
@@ -378,6 +380,67 @@ def _domain(comp) -> dict:
     a parameter or an expression."""
     return {k: float(Fraction(comp.domain[k]) / comp.pm_per_unit)
             for k in ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax")}
+
+
+def _estimate_advice(doc: dict, comp) -> dict:
+    """What a plain E-MESH-ESTIMATE message needs (Studio's words; the engine's stay in ``refused``):
+    ``tetrahedra`` (this document's estimate), ``limit`` and ``suggested_size``: the smallest mesh
+    element size on a grid of three significant digits in the component's unit that the same estimate
+    accepts (``simcase.estimate_mesh3d``, called, not changed), or None when no single size is
+    accepted (feature sizes, say). Studio's guard keeps the size at most the domain diagonal / 4."""
+    import copy
+    from simcase import estimate_mesh3d
+    unit = str(comp.length_unit)
+    limit = int((doc.get("mesh") or {}).get("element_count_limit", 600000))
+
+    def count(size):
+        trial = copy.deepcopy(doc)
+        trial.setdefault("mesh", {})["element_count_limit"] = 10 ** 12
+        if size is not None:
+            trial["mesh"]["element_size"] = f"{size:.12g} {unit}"
+        try:
+            return estimate_mesh3d(trial).tetrahedra
+        except GeometryError:
+            return None
+
+    out = {"tetrahedra": count(None), "limit": limit, "suggested_size": None}
+    d = comp.domain
+    diag = math.sqrt(sum((float(Fraction(d[b] - d[a]) / comp.pm_per_unit)) ** 2
+                         for a, b in (("xmin", "xmax"), ("ymin", "ymax"), ("zmin", "zmax"))))
+    if out["tetrahedra"] is None or not diag:
+        return out
+    grid = lambda h: float(f"{h:.3g}")                                    # noqa: E731
+
+    def up(h):                       # the next grid value above h
+        e = math.floor(math.log10(h)) - 2
+        return grid(round(h / 10 ** e + 1) * 10 ** e)
+
+    def down(h):
+        e = math.floor(math.log10(h)) - 2
+        m = round(h / 10 ** e)
+        return grid((m - 1) * 10 ** e) if m > 100 else grid(999 * 10 ** (e - 1))
+
+    probe = diag / 100
+    t = count(probe)
+    if not t:
+        return out
+    h = grid(probe * (t / limit) ** (1 / 3))
+    for _ in range(60):              # up to the first accepted grid value
+        t = count(h)
+        if t is None or h > diag / 4:
+            return out
+        if t <= limit:
+            break
+        h = up(h)
+    else:
+        return out
+    for _ in range(60):              # down while the value below is still accepted
+        t = count(down(h))
+        if t is None or t > limit:
+            break
+        h = down(h)
+    out["suggested_size"] = h
+    return out
 
 
 def _run_part(doc: dict) -> dict:
@@ -615,6 +678,8 @@ def check_view_shapes(doc: dict, component: str | None = None) -> dict:
         mesh = {"ok": True, "estimate": mesh3d_jobs.estimate(doc, shapes.component), "key": mesh3d_jobs.reuse_key(doc)}
     except GeometryError as exc:
         mesh = _refusal(exc)
+        if exc.code == "E-MESH-ESTIMATE":
+            mesh.update(_estimate_advice(doc, comp))
     return {"ok": True, "component": shapes.component, "unit": str(comp.length_unit),
             "features": _coverage_shapes(comp, shapes), "regions": display["regions"],
             "parameters": _parameters(doc, model, shapes.component),

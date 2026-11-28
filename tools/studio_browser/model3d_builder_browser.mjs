@@ -282,8 +282,13 @@ try {
         marked: [...document.querySelectorAll('[data-m3-node].has-problem')].map(b => b.dataset.m3Node),
         block: document.getElementById('m3-block')?.textContent || '', meshDisabled: document.getElementById('m3-mesh')?.disabled === true,
         stale: !!document.querySelector('.m3-stage.stale'), meshNote: document.querySelector('[data-m3-node="mesh"] .m3-note')?.textContent || ''}));
-      const ok = expected?.ok === false && shown.text === expected.refused && shown.details.includes(expected.code)
-        && JSON.stringify(shown.marked) === JSON.stringify([mark]) && shown.block === expected.refused && shown.meshDisabled && !shown.stale
+      // U1: an estimate refusal is shown once in plain words (the engine's sentence under Details) and
+      // Mesh points to Messages; the other refusals keep the engine's words everywhere
+      const unit = doc.geometry.components[Object.keys(doc.geometry.components)[0]].length_unit;
+      const plain = await page.evaluate(async ([m, u]) => (await import('/workspace-assets/workspace-model3d.mjs')).meshRefusalText(m, u), [expected, unit]);
+      const own = plain !== expected?.refused;
+      const ok = expected?.ok === false && shown.text === plain && shown.details.includes(expected.code) && (!own || shown.details.includes(expected.refused))
+        && JSON.stringify(shown.marked) === JSON.stringify([mark]) && shown.block === (own ? 'Fix 1 problem in Messages to mesh' : expected.refused) && shown.meshDisabled && !shown.stale
         && shown.meshNote === 'refused';
       rows.push({label, code: expected?.code, mark, expected: expected?.refused, shown, ok});
       await page.screenshot({path: join(out, `w5-mesh-${label.replace(/[^a-z0-9]+/gi, '-')}.png`)});
@@ -384,7 +389,7 @@ try {
     const cases = [
       {name: 'estimate shown before meshing', ok: first.estimate === MESH.estimateText(direct.estimate) && first.note.endsWith(MESH.estimateText(direct.estimate)) && first.meshEnabled},
       {name: '1.5 times the limit: Mesh disabled with the refusal, no job requested', ok: overDirect.ok === false && second.disabled
-        && second.block === overDirect.refused && second.estimate === 'Mesh is not available: ' + overDirect.refused && meshPosts.length === 0},
+        && second.block === 'Fix 1 problem in Messages to mesh' && second.estimate === 'Mesh is not available: see Messages.' && meshPosts.length === 0},
       {name: 'the estimate equals /api/model3d/mesh/estimate', ok: first.estimate === MESH.estimateText(direct.estimate)},
     ];
     const passed = cases.filter(c => c.ok).length;

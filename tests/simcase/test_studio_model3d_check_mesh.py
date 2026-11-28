@@ -110,8 +110,17 @@ def test_w5_a_refusal_before_meshing_comes_with_the_formed_shape(client, case):
     expected = engine_refusal(make())
     assert answer["ok"] is True, "the shape forms: the view is not greyed"
     assert answer["display"]["faces"], "the display answer is there"
-    assert answer["mesh"] == {"ok": False, "refused": str(expected), "code": code, "path": path,
-                              "feature_index": index}
+    engine = ("ok", "refused", "code", "path", "feature_index")
+    assert {k: answer["mesh"][k] for k in engine} == {"ok": False, "refused": str(expected), "code": code, "path": path,
+                                                      "feature_index": index}
+    # an estimate refusal also answers the count, the limit and the smallest size (U1); no other does
+    extra = set(answer["mesh"]) - set(engine)
+    assert extra == ({"tetrahedra", "limit", "suggested_size"} if code == "E-MESH-ESTIMATE" else set())
+    if code == "E-MESH-ESTIMATE":
+        raised = make()
+        raised["mesh"]["element_count_limit"] = 10 ** 12
+        assert answer["mesh"]["tetrahedra"] == simcase.estimate_mesh3d(raised).tetrahedra
+        assert answer["mesh"]["limit"] == make()["mesh"]["element_count_limit"]
     assert stem in answer["mesh"]["refused"]
     assert (expected.code, expected.path) == (code, path)
 

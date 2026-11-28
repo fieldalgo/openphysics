@@ -70,7 +70,7 @@ test('the refusal while forming marks the tree as before',()=>{
 
 test('the mesh size: a quantity in the document mesh block, within the 5.2 range',()=>{
  const f=M.fieldsOf(card(),'mesh');
- assert.deepEqual(f.map(x=>[x.key,x.label]),[['mesh.element_size','element_size']]);
+ assert.deepEqual(f.map(x=>[x.key,x.label]),[['mesh.element_size','Element size']]);
  assert.equal(M.getField(card(),'mesh.element_size'),'40 um');
  assert.equal(M.editField(card(),f[0],'20').doc.mesh.element_size,'20 um','a bare number takes the component unit');
  assert.equal(M.editField(card(),f[0],'0.1 mm').doc.mesh.element_size,'0.1 mm');
