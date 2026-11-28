@@ -34,9 +34,26 @@ block (the component may be left out when there is one) and its `mesh` block:
 | `mesh.element_size` | the size of every region that gives none |
 | feature or background `element_size` | the size of that feature's or the background's regions |
 | `mesh.controls` `{"select": <region selection>, "element_size": h}` | the size of the selected regions; later entries win |
-| `mesh.element_count_limit` | default 600000; checked before meshing against T = 6.3 Σ V_r / h_r³ and passed to meshloom as its point cap |
+| `mesh.element_count_limit` | default 600000; checked before meshing against the estimate T = 6.3 ∫ dV / s³ (below) and passed to meshloom as its point cap |
 
-A region takes the smallest size of its cells. The estimate is reported in
+A region takes the smallest size of its cells. The estimate is T = 6.3 ∫ dV / s³ over the
+meshed volume, where s = min(h_r, 1.2 lfs) is the element size, smaller in thin layers and gaps.
+meshloom takes one size per region, but its refinement makes tetrahedra about as small as the
+local feature size lfs near faces closer than h, graded back to h away from them, so a layer of
+thickness t ≪ h costs about area / t² tetrahedra whatever h is. The engine cuts the component on
+the grid of every x, y plane and z level; along each grid line lfs is the distance to the
+second-nearest meshed face (between t/2 and t inside a gap of width t, d + t at a distance d
+outside it), up to the first void, which refinement does not cross. The integral is exact per
+grid block and axis, and the three axes are added. Where no two meshed faces are closer than
+h / 1.2 the estimate is 6.3 Σ V_r / h_r³ as before. Faces closer than 1e-6 of the domain
+diagonal count as one face: a sliver that thin (above the 3e-8 tolerance, so not refused) can
+make meshloom not return, and no count describes it (see Limits). The factor 1.2 was fitted on a separate
+calibration set (thin sheets, patches and gaps; built / estimate 0.75–1.41) before the checks
+below were measured: on Studio card 1 with t_ox 2, 5 and 10 µm at h 15, 20 and 40 µm,
+built / estimate is 0.73–0.86 (it was 0.92–45 with 6.3 Σ V_r / h_r³), and on the G1 box sets
+of seeds 0–9 at 0.25 mm it is 1.04–1.40 (`tests/simcase/test_mesh3d_estimate_thin.py`,
+2026-11-28). The builder shapes keep 6.3 Σ V_r / h_r³ and the extrude route its own count. The
+estimate is reported in
 `result.diagnostics` as `I-MESH-ESTIMATE` (info), with the expected meshing time at 0.4–0.6 ms
 per tetrahedron; above the limit, the document is refused with the estimate
 (`E-MESH-ESTIMATE`). A size on a boundary selection, the distance
@@ -346,6 +363,12 @@ G8 and G9 run on main pushes and manual dispatch only (`geometry3d-full`).
   yet); the 3D view draws them from `display_shapes3d`'s display shape, not from an exact
   complex.
 - One size per region; no graded sizes or sizes on surfaces yet.
+- The estimate sees a thin feature's grading only along the grid lines through it: around a
+  small isolated thin box it counts low, and where two axes are thin at once it counts high.
+- The estimate does not count slivers thinner than 1e-6 of the domain diagonal (it treats their
+  two faces as one): between the 3e-8 tolerance and that size meshloom may not return (the
+  862 pm case below), so the estimate can pass a document that never finishes meshing; Studio's
+  mesh job is cancellable there.
 - Pieces thinner than about 1e-7 of the diagonal, though above the tolerance, can make meshloom
   not return: two boxes with a face offset by 862 pm (6e-8 of a 14.4 mm diagonal) at h = 0.8 mm
   did not mesh in 600 s, where the same boxes without the offset mesh in about a second

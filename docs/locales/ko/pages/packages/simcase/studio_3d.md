@@ -64,7 +64,8 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 
 - **추정 먼저.** 3D 보기가 구성 요소를 보여 줄 때마다 페이지는 `I-MESH-ESTIMATE`
   추정(`simcase.estimate_mesh3d`, 메시하지 않음)을 받아 예를 들어 "Estimate 48,000
-  tetrahedra · about 30 s"로 보여 줍니다. T = 6.3 Σ V_r / h_r³를 유효숫자 두 자리로
+  tetrahedra · about 30 s"로 보여 줍니다. T = 6.3 ∫ dV / s³(s는 얇은 층과 틈에서 더 작아지는 요소
+  크기, [추정](geometry_engine3d.md#사용))를 유효숫자 두 자리로
   반올림한 값과, 사면체당 0.6 ms(엔진의 0.4–0.6 ms 가운데 느린 끝)로 잡은 예상 시간입니다.
   `mesh.element_count_limit`를 넘으면 **Mesh**가 꺼지고 추정의 문구 그대로 거부를
   보여 줍니다(`E-MESH-ESTIMATE`). 서버도 그런 요청은 프로세스를 시작하기 전에 거부합니다.

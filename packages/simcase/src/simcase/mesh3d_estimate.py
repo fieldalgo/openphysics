@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """The ``I-MESH-ESTIMATE`` of a ``3d`` component without meshing it (``estimate_mesh3d``).
 
-``build_mesh3d`` checks the estimate T = 6.3 sum(V_r / h_r^3) against ``mesh.element_count_limit``
+``build_mesh3d`` checks the estimate T = 6.3 integral(dV / s^3), s = min(h_r, 1.2 lfs) (the element size,
+smaller in thin layers and gaps), against ``mesh.element_count_limit``
 and then meshes in the same call. A caller that must know the estimate before it decides to mesh
 (Studio refuses before it starts a meshing process) calls this instead. It is one call to
 ``geometry_engine3d._prepare``, which is everything ``build_mesh3d`` does before meshloom, so every
@@ -30,7 +31,8 @@ class Mesh3DEstimate:
     integer), the limit in effect (``mesh.element_count_limit``), the expected seconds at 0.6 ms per
     tetrahedron, and ``diagnostics``: the ``I-MESH-ESTIMATE`` diagnostic ``build_mesh3d`` adds.
     ``route`` is ``"meshloom"``, ``"builder"`` or ``"extrude"``; ``count`` says what ``tetrahedra``
-    is: ``"estimate"`` (T = 6.3 sum(V/h^3)), ``"exact"`` or ``"lower bound"`` (the extrude route)."""
+    is: ``"estimate"`` (T = 6.3 integral(dV/s^3) on the meshloom route, 6.3 sum(V/h^3) on the builder
+    route), ``"exact"`` or ``"lower bound"`` (the extrude route)."""
 
     component: str
     tetrahedra: int

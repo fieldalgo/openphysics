@@ -71,7 +71,9 @@ mesh's surface. It runs no physics and changes no file.
 
 - **Estimate first.** Whenever the 3D view shows a component, the page asks for the
   `I-MESH-ESTIMATE` estimate (`simcase.estimate_mesh3d`, which meshes nothing) and shows
-  it as, for example, "Estimate 48,000 tetrahedra · about 30 s": T = 6.3 Σ V_r / h_r³,
+  it as, for example, "Estimate 48,000 tetrahedra · about 30 s": T = 6.3 ∫ dV / s³ with s the
+  element size, smaller in thin layers and gaps
+  ([the estimate](geometry_engine3d.md#use)),
   rounded to two significant figures, and the expected time at 0.6 ms per tetrahedron
   (the slow end of the engine's 0.4–0.6 ms). Above `mesh.element_count_limit`, **Mesh** is
   disabled and the page shows the refusal in the estimate's words (`E-MESH-ESTIMATE`); the
