@@ -331,7 +331,8 @@ m over a 2 × 2 m domain (z from 0 to 1 m), background `slab` (k = 1 W/(m K)), w
 `via_in_slab` builder shape ([builder shapes](geometry_engine3d.md#cylinders-and-spheres-in-builder-shapes-slice-3)).
 Its physics holds 300 K on `z0` and 301 K on `z1`, every other outer face insulated. Its tree reads
 *1 Cylinder via* · *r 0.3 m · z 0–1 m* and *Form result* · *2 regions · 9 faces*; the view draws the
-shape for display (Details: *Shape drawn for display; the mesh follows it to within its size*).
+shape for display (the names of a curved face such as `via.side` add *Shape drawn for display; the
+mesh follows it to within its size*).
 Mesh 1 and Run take it as they take card 1. A project holds one 3D model: while it holds one from
 card 1, choosing card 2 leaves it as it is and says *This project already holds the 3D model Via in a
 layer stack (3D heat); a project holds one 3D model. Open Copper via through a slab (3D heat) in a new
@@ -512,6 +513,13 @@ recovery yet.
 | W12 (results) | Run 1 of the card in the Result view (surface temperature, colour bar, values table) at 1440 × 900 and 390 × 844: no console error or CSP violation, canvas drawn, no horizontal scroll at 390; screenshots kept | all hold | all hold | the heat browser check |
 | W13 (heat) | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → Fixed temperature (Messages: *Fixed temperature needs an outer face; via.z1 is inside*, the document unchanged), select `stack.top.top`, Use for → Fixed temperature, a section z = 300 µm, Run to completion | no pointer event | 0 pointer events | the heat browser check |
 | W14 | the time from Run to the drawn result, and of a cut, on the card | recorded only (SwiftShader here) | about 0.9 s and 0.1 s | the heat browser check |
+| F1 | the Cylinder (axis *z (fixed)*, cx, cy, r, zmin, zmax) and Sphere (cx, cy, cz, r) forms; Studio's guards r > 0 and zmin < zmax only, in the 2D form of words; a centre or radius against the domain left to the server | 100% of the listed cases | 100% | `tests/simcase/studio_model3d_shapes.cjs` |
+| F2 | Add feature offers Box, Layers, Cylinder and Sphere (Extrude greyed); on card 2, Add → Sphere is shown refused in the engine's words (*sphere 'sphere' is not taken yet …*), the sphere kept and marked, not silently fixed | holds | holds (unit and browser) | same, and the heat browser check |
+| W6-UI | card 2: Run in the workspace completes and Run 1's values table equals `/api/model3d/runs/{id}/values` through the page's rows | 1/1 | 1/1 (z0 −31.7515 W, z1 31.7515 W; a 1D parallel-conduction estimate gives 31.99 W, the inscribed n-gon being slightly smaller) | the heat browser check |
+| W11 (card 2) | card 2 with one run, Save and Open of the project (card `via-slab-3d`) and the session: the document, values and surface-map digests; a version 1 project without 3D unchanged | equal; unchanged | equal; unchanged | the heat browser check |
+| W12 (card 2) | the Library with card 2, its Model, Mesh view and Result at 1440 × 900 and 390 × 844: no console error or CSP violation, the canvases drawn, no horizontal scroll at 390, the faces list by Tab, the display note on `via.side`'s names; screenshots kept | all hold | all hold | the heat browser check |
+| W13 (card 2) | keyboard only: card 2, rotate, view 5, `via.side` in the faces list, Use for → Fixed temperature (*Fixed temperature needs an outer face; via.side is inside*, the fixed temperatures still `z0` and `z1`), Run to completion. Use for is offered on curved faces; a selection from one is refused, as before | no pointer event | 0 pointer events | the heat browser check |
+| W14 (card 2) | Run to the drawn result, and a cut x = 0 | recorded only (SwiftShader here) | about 0.8 s (Mesh 1 already meshed) and 0.1 s | the heat browser check |
 | W13 | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → New selection; then Mesh 1, size 8 µm, Mesh, Cancel meshing, the cancel line reached in Messages by Tab and the job *cancelled* on the server, size 40 µm, Mesh again to the mesh view | no pointer event | 0 pointer events | the browser check |
 
 The pure helpers (`workspace-model3d.mjs`) are checked by `tests/simcase/studio_model3d_builder.cjs`
