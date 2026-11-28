@@ -439,7 +439,9 @@ derived: it lists nothing to edit. A rejected value is a draft with the range se
 geometry. On every edit the check also reads the document as Run reads it
 (`/api/model3d/check`'s `run` part): a refusal such as *Fixed temperature needs an outer face; via.z1
 is inside* (E-CONTRACT) marks Heat transfer (3D) and is shown in Messages in the kind's words; a
-model without a heat block shows *not set: Add a fixed temperature* and no mark.
+model without a heat block shows *not set: Add a fixed temperature* and no mark. A shape refusal or a
+refusal before meshing comes first in Run's reasons, so when the reader refuses the same document (a
+below-tolerance feature, say) only the feature or Mesh 1 is marked, not Heat transfer (3D).
 
 **Run.** **Run** in the graphics header meshes the component (Mesh 1's mesh is reused when the
 geometry and mesh block are unchanged) and solves the steady heat problem in a separate process
