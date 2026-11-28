@@ -23,7 +23,8 @@
 //! by facet (wound outward), and interfaces between regions (wound from the lower
 //! region to the higher).
 
-use std::collections::{HashMap, HashSet};
+// the standard tables with the fast hasher (no result depends on their order)
+use crate::facet::{FxMap as HashMap, FxSet as HashSet};
 
 use crate::facetrec::Boundary;
 use crate::mixed::{Mixed, MixedCounters, Pt};
@@ -139,9 +140,9 @@ pub fn open_in_check(c: &crate::plc::Checked) -> Result<(), MeshError> {
 /// Witness 6 of the C14 validity rule: an elementary segment on the boundary of an odd
 /// number of facets. A facet's boundary edges are the edges used once by its subfacets.
 fn closed(n: usize, b: &Boundary) -> Result<(), MeshError> {
-    let mut on: HashMap<(u32, u32), Vec<u32>> = HashMap::new();
+    let mut on: HashMap<(u32, u32), Vec<u32>> = HashMap::default();
     for (f, tris) in b.plc.subfacets.iter().enumerate() {
-        let mut uses: HashMap<(u32, u32), u32> = HashMap::new();
+        let mut uses: HashMap<(u32, u32), u32> = HashMap::default();
         for t in tris {
             for k in 0..3 {
                 let (u, v) = (t[k], t[(k + 1) % 3]);
@@ -211,15 +212,15 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
     let tets = &b.tets;
     // the facets of each subfacet (two facets can share one, e.g. touching shells)
     // facets per subfacet: a face shared by two touching shells is crossed twice
-    let mut multiplicity: HashMap<[u32; 3], u32> = HashMap::new();
-    let mut facet_of: HashMap<[u32; 3], u32> = HashMap::new();
+    let mut multiplicity: HashMap<[u32; 3], u32> = HashMap::default();
+    let mut facet_of: HashMap<[u32; 3], u32> = HashMap::default();
     for (f, tris) in b.plc.subfacets.iter().enumerate() {
         for t in tris {
             facet_of.entry(key(*t)).or_insert(f as u32);
             *multiplicity.entry(key(*t)).or_default() += 1;
         }
     }
-    let mut owners: HashMap<[u32; 3], Vec<(u32, usize)>> = HashMap::with_capacity(2 * tets.len());
+    let mut owners: HashMap<[u32; 3], Vec<(u32, usize)>> = HashMap::with_capacity_and_hasher(2 * tets.len(), Default::default());
     for (t, v) in tets.iter().enumerate() {
         for i in 0..4 {
             owners.entry(key(face(v, i))).or_default().push((t as u32, i));
@@ -348,7 +349,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
         }
     }
     // keep tetrahedra of the domain, regions numbered by first appearance
-    let mut number: HashMap<u32, u32> = HashMap::new();
+    let mut number: HashMap<u32, u32> = HashMap::default();
     let mut kept: Vec<usize> = Vec::new();
     let mut regions = Vec::new();
     for (t, &c) in comp.iter().enumerate() {
@@ -381,7 +382,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
     };
     // 3. rounding and renumbering
     let m = Mixed::new(points, &b.plc.rec.s);
-    let mut new_id: HashMap<u32, u32> = HashMap::new();
+    let mut new_id: HashMap<u32, u32> = HashMap::default();
     let mut nodes: Vec<P3> = Vec::new();
     let mut source: Vec<u32> = Vec::new();
     let mut out_tets = Vec::with_capacity(kept.len());
@@ -397,7 +398,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
     }
     // no duplicate nodes after rounding
     {
-        let mut seen: HashMap<[u64; 3], u32> = HashMap::new();
+        let mut seen: HashMap<[u64; 3], u32> = HashMap::default();
         for (i, p) in nodes.iter().enumerate() {
             let k = p.map(|x| if x == 0.0 { 0 } else { x.to_bits() });
             if let Some(j) = seen.insert(k, i as u32) {
@@ -419,7 +420,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
     // per tetrahedron would forbid every flip)
     let mut labels = regions;
     let boundary_before = {
-        let mut c: HashMap<[u32; 3], u32> = HashMap::new();
+        let mut c: HashMap<[u32; 3], u32> = HashMap::default();
         for v in &out_tets {
             for i in 0..4 {
                 *c.entry(key(face(v, i))).or_default() += 1;
@@ -443,7 +444,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
             let m = (0..3).min_by_key(|&j| f[j]).unwrap();
             [f[m], f[(m + 1) % 3], f[(m + 2) % 3]]
         };
-        let mut seen: HashMap<[u32; 3], ([u32; 3], u32)> = HashMap::new();
+        let mut seen: HashMap<[u32; 3], ([u32; 3], u32)> = HashMap::default();
         for v in &out_tets {
             for i in 0..4 {
                 let f = rot(face(v, i));
@@ -463,7 +464,7 @@ fn build_inner(points: &[P3], b: &Boundary, domain: Domain, seeds: &[Seed]) -> R
         }
     }
     // boundary faces and interfaces, from the output arrays
-    let mut owners_out: HashMap<[u32; 3], Vec<usize>> = HashMap::with_capacity(2 * out_tets.len());
+    let mut owners_out: HashMap<[u32; 3], Vec<usize>> = HashMap::with_capacity_and_hasher(2 * out_tets.len(), Default::default());
     for (j, v) in out_tets.iter().enumerate() {
         for i in 0..4 {
             owners_out.entry(key(face(v, i))).or_default().push(j);
@@ -519,7 +520,7 @@ fn orient(nodes: &[P3], t: [u32; 4]) -> i8 {
 /// subfacets of a flip inside a facet on the domain's boundary).
 fn local_ok(faces: &HashMap<[u32; 3], Vec<usize>>, tets: &[[u32; 4]], gone: &[usize], new: &[[u32; 4]],
             exempt: &[[u32; 3]]) -> bool {
-    let mut delta: HashMap<[u32; 3], i32> = HashMap::new();
+    let mut delta: HashMap<[u32; 3], i32> = HashMap::default();
     for &r in gone {
         for i in 0..4 {
             *delta.entry(key(face(&tets[r], i))).or_default() -= 1;
@@ -542,7 +543,7 @@ fn local_ok(faces: &HashMap<[u32; 3], Vec<usize>>, tets: &[[u32; 4]], gone: &[us
         let m = (0..3).min_by_key(|&j| f[j]).unwrap();
         (k, if [f[m], f[(m + 1) % 3], f[(m + 2) % 3]] == k { 1 } else { -1 })
     };
-    let mut chain: HashMap<[u32; 3], i32> = HashMap::new();
+    let mut chain: HashMap<[u32; 3], i32> = HashMap::default();
     for &r in gone {
         for i in 0..4 {
             let (k, s) = sign(face(&tets[r], i));
@@ -588,7 +589,7 @@ fn cavity_fill(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<
 /// fixed faces, found by walking instead of scanning every tetrahedron.
 fn star_of(tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u32; 3], Vec<usize>>, fixed: &HashMap<[u32; 3], u32>,
            pinned: &HashSet<[u32; 3]>, t: usize, v: u32) -> Vec<usize> {
-    let mut seen: HashSet<usize> = HashSet::from([t]);
+    let mut seen: HashSet<usize> = [t].into_iter().collect();
     let mut stack = vec![t];
     let mut out = Vec::new();
     while let Some(r) = stack.pop() {
@@ -733,7 +734,7 @@ fn fill_from(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u
         if inner_fixed {
             return None;
         }
-        let mut edge_use: HashMap<(u32, u32), u32> = HashMap::new();
+        let mut edge_use: HashMap<(u32, u32), u32> = HashMap::default();
         for f in &bnd {
             for j in 0..3 {
                 *edge_use.entry(edge(f[j], f[(j + 1) % 3])).or_default() += 1;
@@ -828,8 +829,8 @@ pub fn repair(nodes: &mut Vec<P3>, tets: &mut Vec<[u32; 4]>, labels: &mut Vec<u3
         if bad.is_empty() {
             return Ok(st);
         }
-        let mut faces: HashMap<[u32; 3], Vec<usize>> = HashMap::new();
-        let mut edges: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
+        let mut faces: HashMap<[u32; 3], Vec<usize>> = HashMap::default();
+        let mut edges: HashMap<(u32, u32), Vec<usize>> = HashMap::default();
         for (i, v) in tets.iter().enumerate() {
             for k in 0..4 {
                 faces.entry(key(face(v, k))).or_default().push(i);
@@ -838,8 +839,8 @@ pub fn repair(nodes: &mut Vec<P3>, tets: &mut Vec<[u32; 4]>, labels: &mut Vec<u3
                 }
             }
         }
-        let mut dirty: HashSet<usize> = HashSet::new();
-        let mut made_edges: HashSet<(u32, u32)> = HashSet::new();
+        let mut dirty: HashSet<usize> = HashSet::default();
+        let mut made_edges: HashSet<(u32, u32)> = HashSet::default();
         let mut ops: Vec<Op> = Vec::new();
         for &t in &bad {
             if dirty.contains(&t) {
@@ -965,8 +966,8 @@ fn flip_op(nodes: &[P3], tets: &[[u32; 4]], labels: &[u32], faces: &HashMap<[u32
                 continue;
             }
             // the link of the edge, and the third vertices of the fixed faces through it
-            let mut link: HashMap<u32, Vec<u32>> = HashMap::new();
-            let mut label_of: HashMap<(u32, u32), u32> = HashMap::new();
+            let mut link: HashMap<u32, Vec<u32>> = HashMap::default();
+            let mut label_of: HashMap<(u32, u32), u32> = HashMap::default();
             let mut fx: Vec<u32> = Vec::new();
             for &r in &ring_tets {
                 let xy: Vec<u32> = tets[r].iter().copied().filter(|&x| x != d && x != e).collect();
@@ -1195,14 +1196,14 @@ mod tests {
         let mut labels = vec![0u32; tets.len()];
         let mut fixed: HashMap<[u32; 3], u32> = hull.iter().enumerate().map(|(i, k)| (*k, i as u32)).collect();
         // p1 p2 is an input segment: the ring around it cannot be removed
-        let r = repair(&mut nodes, &mut tets, &mut labels, &mut fixed, &HashSet::new(), &HashSet::from([(0, 1)]));
+        let r = repair(&mut nodes, &mut tets, &mut labels, &mut fixed, &HashSet::default(), &HashSet::from([(0, 1)]));
         if r.is_ok() {
             assert!(tets.iter().all(|t| orient(&nodes, *t) > 0));
             let rot = |f: [u32; 3]| {
                 let m = (0..3).min_by_key(|&j| f[j]).unwrap();
                 [f[m], f[(m + 1) % 3], f[(m + 2) % 3]]
             };
-            let mut seen: HashMap<[u32; 3], [u32; 3]> = HashMap::new();
+            let mut seen: HashMap<[u32; 3], [u32; 3]> = HashMap::default();
             for v in &tets {
                 for i in 0..4 {
                     let f = rot(face(v, i));
@@ -1257,11 +1258,11 @@ mod tests {
             // every hull face its own facet: no two hull faces share a facet, so nothing flips in one
             let mut fixed: HashMap<[u32; 3], u32> = hull.iter().enumerate().map(|(i, k)| (*k, i as u32)).collect();
             let mut grid = grid.clone();
-            match repair(&mut grid, &mut tets, &mut labels, &mut fixed, &HashSet::new(), &HashSet::new()) {
+            match repair(&mut grid, &mut tets, &mut labels, &mut fixed, &HashSet::default(), &HashSet::default()) {
                 Ok(st) => {
                     assert_eq!(st.inverted as usize, before);
                     assert!(tets.iter().all(|t| orient(&grid, *t) > 0));
-                    let mut count: HashMap<[u32; 3], u32> = HashMap::new();
+                    let mut count: HashMap<[u32; 3], u32> = HashMap::default();
                     for v in &tets {
                         for i in 0..4 {
                             *count.entry(key(face(v, i))).or_default() += 1;
@@ -1273,7 +1274,7 @@ mod tests {
                         let m = (0..3).min_by_key(|&j| f[j]).unwrap();
                         [f[m], f[(m + 1) % 3], f[(m + 2) % 3]]
                     };
-                    let mut seen: HashMap<[u32; 3], [u32; 3]> = HashMap::new();
+                    let mut seen: HashMap<[u32; 3], [u32; 3]> = HashMap::default();
                     for v in &tets {
                         for i in 0..4 {
                             let f = rot(face(v, i));
