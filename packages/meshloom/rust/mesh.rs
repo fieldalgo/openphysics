@@ -1196,7 +1196,7 @@ mod tests {
         let mut labels = vec![0u32; tets.len()];
         let mut fixed: HashMap<[u32; 3], u32> = hull.iter().enumerate().map(|(i, k)| (*k, i as u32)).collect();
         // p1 p2 is an input segment: the ring around it cannot be removed
-        let r = repair(&mut nodes, &mut tets, &mut labels, &mut fixed, &HashSet::default(), &HashSet::from([(0, 1)]));
+        let r = repair(&mut nodes, &mut tets, &mut labels, &mut fixed, &HashSet::default(), &[(0, 1)].into_iter().collect());
         if r.is_ok() {
             assert!(tets.iter().all(|t| orient(&nodes, *t) > 0));
             let rot = |f: [u32; 3]| {

@@ -37,7 +37,8 @@
 use crate::delaunay::{self, Error, Mesh};
 use crate::mixed::{MixedCounters, MixedPoints, SPoint};
 use crate::predicates::P3;
-use std::collections::HashMap;
+// the standard table with the fast hasher (no result depends on its order)
+use crate::facet::FxMap as HashMap;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RecoveryStats {
@@ -173,7 +174,7 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
     let mut look: std::collections::BTreeSet<usize> = (0..segments.len()).collect();
     // each piece's segment by its ends, for the pieces an insertion may have removed
     let mut seg_of_s: Vec<u32> = Vec::new();
-    let mut piece_seg: HashMap<(u32, u32), u32> = HashMap::new();
+    let mut piece_seg: HashMap<(u32, u32), u32> = HashMap::default();
     for (k, s) in segments.iter().enumerate() {
         piece_seg.insert((s[0].min(s[1]), s[0].max(s[1])), k as u32);
     }
@@ -863,7 +864,7 @@ mod tests {
         let edges: HashSet<(u32, u32)> = r.tets.iter()
             .flat_map(|v| (0..4).flat_map(move |i| (i + 1..4).map(move |j| (v[i].min(v[j]), v[i].max(v[j])))))
             .collect();
-        let mut used = HashSet::new();
+        let mut used: HashSet<u32> = HashSet::new();
         for (k, c) in r.chains.iter().enumerate() {
             let s = segments[k];
             assert_eq!((c[0], *c.last().unwrap()), (s[0], s[1]), "segment {k}");
@@ -1005,7 +1006,7 @@ mod tests {
 
     fn voxel(cells: &[[i32; 3]], tilt: bool) -> crate::plc::Plc {
         let set: HashSet<[i32; 3]> = cells.iter().copied().collect();
-        let mut index: HashMap<[i32; 3], u32> = HashMap::new();
+        let mut index: HashMap<[i32; 3], u32> = HashMap::default();
         let mut points = Vec::new();
         let mut facets = Vec::new();
         let mut pid = |c: [i32; 3], points: &mut Vec<P3>| *index.entry(c).or_insert_with(|| {
