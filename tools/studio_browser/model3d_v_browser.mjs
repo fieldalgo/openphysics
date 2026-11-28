@@ -6,6 +6,8 @@
 // per item (the rows run in the order given; a third argument runs only the rows named):
 //  V5  card 1 with 300 K on z0 and z1, Run: Messages reads "Run 1 complete: maximum <T> K at the SiO2 /
 //      Si (top) interface." with the same place words as the Settings row (whole model): 1/1.
+//  V4  card 1, every face picked in the Faces list in turn: no "um" in the visible text of the Names
+//      box or the Faces list ("z = 510 µm", "area 400 µm²"): 1/1.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -83,6 +85,22 @@ try {
     const line = /Run 1 complete: maximum [\d.]+ K ([^.]+)\./.exec(got.messages)?.[1];
     const rows = [!!place && line === place && place === 'at the SiO2 / Si (top) interface'];
     record('V5', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, place, line, row: got.row});
+    await ctx.close();
+  }
+  // ---- V4: µm in the Names box and the Faces list, every face of card 1 picked in turn ----
+  if (want('V4')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    const ids = await page.evaluate(() => [...document.querySelectorAll('#m3-faces li')].map(li => li.dataset.face));
+    const um = [];
+    const scan = async label => { const t = await page.evaluate(() => (document.getElementById('m3-names')?.innerText || '') + '\n' + (document.getElementById('m3-faces')?.innerText || ''));
+      for (const m of t.matchAll(/.{0,25}\bum\b.{0,10}/g)) um.push([label, m[0]]); };
+    await scan('none');
+    for (const id of ids) { await page.click(`#m3-faces li[data-face="${id}"]`); await page.waitForTimeout(60); await scan(`face ${id}`); }
+    const sample = await page.evaluate(() => document.getElementById('m3-names')?.innerText.split('\n').slice(0, 3).join(' | '));
+    const rows = [ids.length > 0 && um.length === 0];
+    record('V4', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, faces: ids.length, um: um.slice(0, 6), sample});
     await ctx.close();
   }
 } finally {

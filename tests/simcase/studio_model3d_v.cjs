@@ -17,3 +17,9 @@ test('V5: the line after a run uses the Settings table\'s place words (no coordi
  assert.equal(M.runCompleteText(2,{temperature_max:t}),'Run 3 complete: maximum 336.051 K in SiO2.'+tail);
  assert.equal(M.runCompleteText(0,{temperature_max:{...t,regions:['SiO2']}}),'Run 1 complete: maximum 336.051 K in SiO2.'+tail);
 });
+
+test('V4: document text shown in the Names box reads µm (faces\' coordinates and areas)',()=>{
+ assert.equal(M.shownText('Face 4 · z = 510 um'),'Face 4 · z = 510 µm');
+ assert.equal(M.shownText('area 400 um² · interior'),'area 400 µm² · interior');
+ assert.equal(M.shownText('sum of drums'),'sum of drums','only the unit word');
+});

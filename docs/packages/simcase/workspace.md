@@ -358,7 +358,8 @@ as it is. The project file names the card (`layer-stack-3d` or
 
 **The tree** (design §5.2, for this step). The group **Component 1 · 3D · µm** holds **Parameters**
 (beside it the parameters, *t_ox = 10 µm · via_w = 20 µm*; every note and label shows µm, while an
-input keeps what was written, *10 um*), **Geometry 1** with **Domain** (each axis's range, *x 0–200 · y
+input keeps what was written, *10 um*; the Names box and the Faces list read *Face 4 · z = 510 µm*, *area
+400 µm²*), **Geometry 1** with **Domain** (each axis's range, *x 0–200 · y
 0–200 · z 0–610 µm*; card 2 *x −1–1 · y −1–1 · z 0–1 m*; or *x 0–200 · y 0–200 µm, z from the
 features*), the features numbered in order (later
 wins: *1 Layers stack* · *sub · 0–500 µm · oxide · 500–510 µm · top · 510–610 µm (covered in part by 2
