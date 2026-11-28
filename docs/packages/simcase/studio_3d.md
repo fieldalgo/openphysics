@@ -374,9 +374,10 @@ node tools/studio_browser/model3d_mesh_browser.mjs http://127.0.0.1:8765 out-dir
   solve holds the mesh, the solution and its answers in memory for the last eight runs.
 - Components in meshloom's builder shapes (cylinders, spheres) are drawn from a display shape, not
   an exact complex: the drawn rings and spheres are within the display rule's bounds (W2) of the
-  exact surfaces, and the mesh follows them to within its own size. They take no selections or
-  boundary tags yet (the builder route refuses them): "Use for → New selection" is refused by
-  `/api/model3d/selection` in the engine's words.
+  exact surfaces, and the mesh follows them to within its own size. A selection cannot be made
+  from a curved-shape face yet ("Use for → New selection" is refused in the engine's words; the
+  builder route takes no selections or boundary tags); boundary names work in physics fields
+  (for example `prescribed_temperature` on `z0`, `z1` or `via.bottom`).
 - A component holding one `layers` feature (E1) is meshed through
   `meshine.extrude` (by Mesh and Run alike), and `evaluate3d` refuses it; the view takes its complex from
   the public `simcase.display_complex3d`, which builds for it the complex the

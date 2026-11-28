@@ -335,9 +335,9 @@ macOS, Windows)는 HTTP 없이 mesh 단계의 실행을 취소합니다.
 - 실행의 풀이는 중단할 수 없습니다. 풀이 중 Cancel은 풀이가 돌아오면 결과를 버립니다. 최근 실행 여덟 개의
   메시, 해, 응답을 메모리에 둡니다.
 - meshloom builder 모양(원통, 구)의 구성 요소는 정확한 복합체가 아니라 표시 모양으로 그립니다. 그린 고리와
-  구는 정확한 곡면에서 표시 규칙의 한계(W2) 안에 있고, 메시는 자기 크기 안에서 이를 따릅니다. 아직 선택이나
-  경계 태그를 받지 않으므로(builder 경로가 거부) "Use for → New selection"은 `/api/model3d/selection`이 엔진의
-  문구로 거부합니다.
+  구는 정확한 곡면에서 표시 규칙의 한계(W2) 안에 있고, 메시는 자기 크기 안에서 이를 따릅니다. 곡면 모양 면에서는
+  아직 선택을 만들 수 없습니다("Use for → New selection"은 엔진의 문구로 거부하며, builder 경로는 선택이나 경계
+  태그를 받지 않음). 경계 이름은 물리 필드에서 씁니다(예: `z0`, `z1`, `via.bottom`의 `prescribed_temperature`).
 - `layers` 기능 하나만 가진 구성 요소(E1)는 (Mesh와 Run 모두) `meshine.extrude`로 메시하고
   `evaluate3d`는 거부합니다. 보기는 공개 함수 `simcase.display_complex3d`에서 복합체를
   받으며, 이 함수는 그런 구성 요소에 meshloom 경로가 만들 복합체를 만듭니다.
