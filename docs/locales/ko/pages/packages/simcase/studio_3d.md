@@ -152,7 +152,8 @@ display; the mesh follows it to within its size"가 붙고, 곡면은 꼭짓점 
   원통을 z로 자르면 n각형, x나 y로 자르면 ±√(r² − d²)의 두 선, 구를 d < r에서 자르면 ρ = √(r² − d²)의 원입니다.
 - 검사(`check_view_shapes`)는 정확한 부피로 피처의 덮임(비아는 `full`, C11에서는 가장 안쪽을 뺀 구가
   `partial`, 안쪽 구들에 "covered in part by"), 정확한 부피의 영역, 빈 선택, `mesh` 아래 슬라이스 3의 추정(경로
-  `builder`)을 답합니다.
+  `builder`), 그리고 상자와 층처럼 `run`(아래)을 답합니다: 카드 2에서는 `{"ok": true}`, `via.side`에 고정 온도를 주면
+  *Fixed temperature needs an outer face; via.side is inside*(E-CONTRACT).
 - **Mesh**와 **Run**이 이 구성 요소를 받습니다. 메시 작업의 자식 프로세스는 builder 메시의 경계·경계면
   삼각형마다, 그 삼각형을 가진 출처 이름 집합과 이름 집합이 같은 표시 면을 붙입니다(`route: "builder"`).
 
