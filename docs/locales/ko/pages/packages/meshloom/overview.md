@@ -201,7 +201,8 @@ mesh["region_names"]           # ['via', 'slab']
   바꾸는 subfacet은 양쪽을 모두 담습니다. 입력 각이 60° 미만인 곳에서는 Shewchuk(1998, 2002)와
   Ruppert(1995)의 규칙으로 연쇄를 멈춥니다. 그런 각으로 만나는 선분은 동심 껍질로 나누고, 그 각으로
   만나는 다른 면의 꼭짓점 때문에 subfacet을 나누지 않으며, 그 각 때문에 가는 사면체는 비율로 나누지
-  않습니다. 그런 사면체와 침범된 채 남은 subsegment·subfacet은 `stats`에 셉니다(`exempt_subsegments`,
+  않습니다. 평면이 doubles로 평행하고(반올림 한 번 차이) 입력 변을 공유하는 두 facet은 그 변을 따라
+  0°나 180°에 가까운 각으로 만나며, 각은 그 변을 축으로 잽니다. 그런 사면체와 침범된 채 남은 subsegment·subfacet은 `stats`에 셉니다(`exempt_subsegments`,
   `exempt_subfacets`). 삽입 점 상한(`max_points`, 기본값 20·V/h³ + 200·A/h² + 100·n₀에 비율이
   있으면 가장 짧은 입력 변 ℓ로 200·A/ℓ²를 더하고, 1,000과 5,000,000 사이)에 닿으면 멈추지 않고
   `RefineError`를 냅니다. C10 입력 14개가 모두 크기의 ½, ¼, ⅛인 h와 비율 2로 끝까지 세분화되고

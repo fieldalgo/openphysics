@@ -268,7 +268,9 @@ names may change before the mesher's public API.
   60° the rules of Shewchuk (1998, 2002) and Ruppert (1995) stop the cascades: concentric
   shells on segments meeting at such an angle, no split of a subfacet for a vertex of a
   facet meeting it there, and no ratio split of a tetrahedron that is skinny because of
-  the angle. Those tetrahedra and the subsegments and subfacets left encroached are
+  the angle. Two facets whose planes are parallel in doubles (one rounding apart) and
+  that share an input edge meet along it at an angle near 0° or 180°, measured about
+  that edge. Those tetrahedra and the subsegments and subfacets left encroached are
   counted in `stats` (`exempt_subsegments`, `exempt_subfacets`). A cap on inserted
   points (`max_points`, or by default 20·V/h³ + 200·A/h² + 100·n₀, plus 200·A/ℓ² with a
   ratio where ℓ is the shortest input edge, between 1,000 and 5,000,000) ends refinement

@@ -1744,7 +1744,24 @@ impl State<'_> {
             let dir = cross(&n1, &n2);
             let dd = dot(&dir, &dir);
             if !(dd > 1e-12) {
-                return false; // parallel planes
+                // planes parallel in doubles: two facets that share an input edge meet there at
+                // a dihedral angle near 0 or 180 degrees (planes one rounding apart, as from
+                // coordinates computed twice), and that edge is the line; with none, they do
+                // not meet at a small angle
+                return self.fedges[mine[0] as usize].iter()
+                    .filter(|e| self.fedges[g as usize].binary_search(e).is_ok())
+                    .any(|&(p, q)| {
+                        let z = self.xyz[p as usize];
+                        let h = sub3(&self.xyz[q as usize], &z);
+                        let hh = dot(&h, &h);
+                        let perp = |v: P3| -> P3 {
+                            let s = dot(&v, &h) / hh;
+                            std::array::from_fn(|k| v[k] - s * h[k])
+                        };
+                        let (uf, ug) = (perp(sub3(&cf, &z)), perp(sub3(&pw, &z)));
+                        let (lf, lg) = (dot(&uf, &uf).sqrt(), dot(&ug, &ug).sqrt());
+                        hh > 0.0 && lf > 0.0 && lg > 0.0 && dot(&uf, &ug) > 0.5 * lf * lg
+                    });
             }
             let (a, b) = (cross(&n2, &dir), cross(&dir, &n1));
             let pl: P3 = std::array::from_fn(|k| (d1 * a[k] + d2 * b[k]) / dd);
