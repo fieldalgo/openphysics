@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,cutColor} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,adviceText,cutColor} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 import {NEEDS_TWO,SAME_INPUTS,compareRows,heatRateNote,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
@@ -651,7 +651,8 @@ export function createModel3dView(ctx){
   const parts=[];
   if(refused){const m=refusalMessage(refused);
    // V10: a cylinder across a domain side: the plain suggestion first, the engine's sentence and key under Details
-   const advice=crossingAdvice(refused,doc,lastDomain);
+   const a=crossingAdvice(refused,doc,lastDomain);if(a)confirmAdvice(a,refused);
+   const advice=a?adviceText(a,advised.key===refused.refused?advised.confirmed:{}):null;
    parts.push(`<div class="mp-message error" data-m3-refusal><p>${esc(advice||m.text)}</p><div class="mp-message-actions">${m.feature!==null?`<button type="button" data-m3-show="feature:${m.feature}">Show</button>`:''}</div>`+
     (m.details||advice?`<details><summary>Details</summary><code>${esc(refused.code||'')}</code>${refused.path?` at <code>${esc(refused.path)}</code>`:''}${advice?`<p>${esc(refused.refused)}</p>`:''}</details>`:'')+`</div>`);}
   const off=refused?null:meshRefusal(check);
@@ -712,6 +713,23 @@ export function createModel3dView(ctx){
    if(compare.source!==key){compare.source=key;
     compare.viewer.load({...B.surface,temperature:encodeF32(d.delta),temperature_min:{value:d.min,unit:'K'},temperature_max:{value:d.max,unit:'K'}});}
   }
+ }
+
+ // X1: the server confirms a suggested value (the shape forms and meshes) before Messages names it;
+ // up to three grid values per field, each one step further inside
+ let advised={key:null,confirmed:{}};
+ function confirmAdvice(a,off){
+  if(advised.key===off.refused)return;
+  const key=off.refused,i=off.feature_index;advised={key,confirmed:{}};
+  for(const tr of a.tries)(async()=>{
+   for(const v of tr.values){
+    const next=JSON.parse(JSON.stringify(doc)),comp=next.geometry.components[componentName(next)];
+    if(!comp.features[i])return;comp.features[i][tr.field]=v;
+    let r;try{r=await ctx.request('/api/model3d/check',{doc:next,component:componentName(next)});}catch{return;}
+    if(advised.key!==key)return;
+    if(r.ok&&r.mesh?.ok===true){advised.confirmed[tr.field]=v;renderDock();return;}
+   }
+  })();
  }
 
  // ---- the page ----

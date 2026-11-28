@@ -357,8 +357,9 @@ try {
       const fromFile = !start;
       // V10: a cylinder across a domain side reads Studio's suggestion; the engine's sentence moves under Details
       const advice = forming ? await page.evaluate(async ([r, d, dom]) => (await import('/workspace-assets/workspace-model3d.mjs')).crossingAdvice(r, d, dom), [want, doc, null]) : null;
-      const text = advice || want?.refused;
-      const ok = want?.ok === false && shown.text === text && (!advice || shown.details.includes(want.refused)) && shown.details.includes(want.code)
+      // X1: the advice's side sentence and each bound, with a value the server confirmed possibly named after it
+      const textOk = advice ? shown.text.startsWith(advice.side) && advice.parts.every(p => shown.text.includes(p.head)) : shown.text === want?.refused;
+      const ok = want?.ok === false && textOk && (!advice || shown.details.includes(want.refused)) && shown.details.includes(want.code)
         && JSON.stringify(shown.marked) === JSON.stringify([mark]) && shown.meshDisabled && shown.runDisabled
         && (forming ? shown.block === 'Fix 1 problem in Messages to mesh' && shown.runWhy === 'Fix 1 problem in Messages to run'
           && shown.stale && (fromFile || shown.last === 'Last shape that could be formed')
