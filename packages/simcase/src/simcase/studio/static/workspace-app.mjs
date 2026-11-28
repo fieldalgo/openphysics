@@ -44,7 +44,7 @@ import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {createModel3dView} from './workspace-model3d-view.mjs';
-import {CARD3D} from './workspace-model3d.mjs';
+import {CARD3D,CARDS3D,card3dOf} from './workspace-model3d.mjs';
 import {ENVELOPE,matchesAgainText} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
@@ -208,23 +208,29 @@ function library3d(host){
  const section=document.createElement('section');section.className='library-3d';
  const heading=document.createElement('h3');heading.textContent='3D models (experimental)';
  const group=document.createElement('div');group.className='cards-3d';
- const button=document.createElement('button');button.type='button';button.dataset.model3dCard=CARD3D.id;
- const title=document.createElement('strong');title.textContent=CARD3D.title;
- const status=document.createElement('span');status.className='application-status available';status.textContent=CARD3D.status;
- const description=document.createElement('p');description.textContent=CARD3D.description;
- const note=document.createElement('span');note.className='card-scope';note.textContent=CARD3D.note;
- const action=document.createElement('span');action.className='card-action';action.textContent=m3View.inProject()?'Return to the 3D model':'Open model';
- button.append(title,status,description,note,action);group.append(button);section.append(heading,group);cards.after(section);
- button.onclick=()=>choose3d();
+ for(const card of CARDS3D){
+  const button=document.createElement('button');button.type='button';button.dataset.model3dCard=card.id;
+  const title=document.createElement('strong');title.textContent=card.title;
+  const status=document.createElement('span');status.className='application-status available';status.textContent=card.status;
+  const description=document.createElement('p');description.textContent=card.description;
+  const note=document.createElement('span');note.className='card-scope';note.textContent=card.note;
+  const action=document.createElement('span');action.className='card-action';action.textContent=m3View.inProject()&&m3View.card()===card.id?'Return to the 3D model':'Open model';
+  button.append(title,status,description,note,action);group.append(button);
+  button.onclick=()=>choose3d(card);
+ }
+ section.append(heading,group);cards.after(section);
 }
-// The 3D card: the model in the project as it was left, else the card's document. The other models stay.
-async function choose3d(){
+// A 3D card: the model in the project as it was left when it came from this card, else the card's
+// document. A project holds one 3D model: another card's model is not replaced. The other models stay.
+async function choose3d(card){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  if(openingModel){notice('Wait until the model file has been opened.');return;}
- if(m3View.inProject()){if(!leaveMultiphysics())return;m3View.show();topOfPage();return;}
- let doc;try{doc=await studioRequest('GET',CARD3D.asset);}catch(e){notice('The 3D model could not be loaded: '+e.message);return;}
- if(!leaveMultiphysics())return;fileScope++;projectId('model3d');m3View.open(doc,{asTitle:CARD3D.title});topOfPage();
- notice(`${CARD3D.title} added to this project; the other models stay as they were. Nothing was computed.`);
+ if(m3View.inProject()){
+  if(m3View.card()!==card.id){notice(`This project already holds the 3D model ${m3View.projectTitle()}; a project holds one 3D model. Open ${card.title} in a new browser tab.`);return;}
+  if(!leaveMultiphysics())return;m3View.show();topOfPage();return;}
+ let doc;try{doc=await studioRequest('GET',card.asset);}catch(e){notice('The 3D model could not be loaded: '+e.message);return;}
+ if(!leaveMultiphysics())return;fileScope++;projectId('model3d');m3View.open(doc,{asTitle:card.title,card:card.id});topOfPage();
+ notice(`${card.title} added to this project; the other models stay as they were. Nothing was computed.`);
 }
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
 // Reset): refused while its run is going; false when refused.
@@ -2199,7 +2205,7 @@ async function saveMultiphysicsSession({saveAs=false,keepSelected=false}={}){
 // Save writes the file Save As chose; without one it asks, as Save As does. Resolves when done.
 function saveSessionFile({saveAs=false,keepSelected=false}={}){
  if(savingFile){notice('A save is already in progress.');return Promise.resolve();}
- if(m3View.active()){try{if(m3View.drafts())throw new Error(m3View.blockText());deliverSession(m3View.sessionText(),'via-in-a-layer-stack-3d.json',{saveAs});}catch(e){notice('Session not saved: '+e.message);}return Promise.resolve();}
+ if(m3View.active()){try{if(m3View.drafts())throw new Error(m3View.blockText());deliverSession(m3View.sessionText(),m3View.sessionFile(),{saveAs});}catch(e){notice('Session not saved: '+e.message);}return Promise.resolve();}
  if(multiView.active())return saveMultiphysicsSession({saveAs,keepSelected}).catch(e=>notice('Session not saved: '+e.message));
  try{rejectInvalidInput();return saveOpticalSession({saveAs,keepSelected}).catch(e=>notice('Session not saved: '+e.message));}catch(e){notice('Session not saved: '+e.message);return Promise.resolve();}
 }
@@ -2363,7 +2369,7 @@ async function applyOpenedProject(read,fileName){
    await multiView.openSession(mp.session,{label:fileName,source:'file',card:mp.card});
    if(read.active!==mp.id){leaveMultiphysics();ui.page=page;render();}
   }
-  if(solid){m3View.openSession(solid.session,{asTitle:solid.title});if(read.active!==solid.id){m3View.leave();ui.page='Model';render();}}
+  if(solid){m3View.openSession(solid.session,{asTitle:solid.title,card:solid.card});if(read.active!==solid.id){m3View.leave();ui.page='Model';render();}}
   project.file=rememberFile({name:fileName,how:'opened',scope:project.scope});if(project.file)project.file.models=modelList();project.stamp=projectStamp();
   refreshPersistence();
   const words=read.models.map(m=>({title:m.title,parts:m.kind==='model3d'?modelParts({inputsOnly:true}):m.kind==='workspace'?modelParts(m.card==='optical'||m.session.runs.length?{runs:m.session.runs.length,comparison:m.session.runs.length>1}:{inputsOnly:true}):modelParts({runs:m.session.runs.length,baseline:Object.keys(m.session.baselines).length>0})}));
@@ -2400,7 +2406,7 @@ $('session-file').onchange=async event=>{const file=event.target.files[0];event.
   return;}
  const session=loaded.value.session;
  if(session.application==='multiphysics'){requestMultiphysicsSession(session,{label:file.name,source:'file',opener:$('open-session')});return;}
- if(session.application==='model3d'){guardLeave(file.name,false,()=>{if(!leaveMultiphysics())return;projectId('model3d');m3View.openSession(session,{asTitle:CARD3D.title});notice(`Opened ${file.name}: the 3D model, checked again by the server; nothing was run.`);});return;}
+ if(session.application==='model3d'){guardLeave(file.name,false,()=>{if(!leaveMultiphysics())return;projectId('model3d');const from=card3dOf(session.document);m3View.openSession(session,{asTitle:from?.title??session.document.name??CARD3D.title,card:from?.id??null});notice(`Opened ${file.name}: the 3D model, checked again by the server; nothing was run.`);});return;}
  requestLoad(session.input,{session,label:file.name,fileName:file.name,opener:$('open-session'),newProject:true});
 }catch(e){notice('Session open failed: '+e.message+' Current inputs and results kept.');}};
 

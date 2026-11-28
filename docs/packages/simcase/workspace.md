@@ -317,14 +317,27 @@ layer stack (3D heat)** (`layer-stack-3d`), beside the application cards, not am
 component in µm over a 200 × 200 µm domain (z from 0 to 610 µm): one `layers` feature `stack`
 (substrate 500 µm of Si, k = 130 W/(m K); oxide 10 µm of SiO2, k = 1.4 W/(m K); top silicon 100 µm of
 `Si (top)`, k = 130 W/(m K)) and a later box `via` (x and y in [90, 110] µm, z in [500, 510] µm, Cu, k = 400 W/(m K)) through
-the oxide. The via is square until cylinders come: *Square via (a round via needs cylinders, coming
-with the next geometry step)*. The top silicon has its own material, `Si (top)`, with the properties
+the oxide. The via is square here: *Square via (the round via is the card Copper via through a slab)*. The top silicon has its own material, `Si (top)`, with the properties
 of `Si`, only because a heat source names a region by its material today (a layer or feature name such
 as `stack.top` is not a region of the heat kind). Its physics is Heat transfer (3D): 300 K on `z0`, a
 heat source of 1e12 W/m³ in `Si (top)` (4 W in all), every other outer face insulated. The source is a test value (it heats the card to
 about 1127 K); the 2 mW hot-spot variant is a later card. Choosing the card adds the 3D model to the tab; the workspace and
 multiphysics models stay as they are, and the card of another model returns to it. The 3D model is
 meshed by **Mesh 1** and solved by **Run** (below).
+
+The group's second card, **Copper via through a slab (3D heat)** (`via-slab-3d`), is a 3d component in
+m over a 2 × 2 m domain (z from 0 to 1 m), background `slab` (k = 1 W/(m K)), with one cylinder `via`
+(r = 0.3 m at the x–y centre, through the whole slab, `copper`, k = 100 W/(m K)): meshloom's
+`via_in_slab` builder shape ([builder shapes](geometry_engine3d.md#cylinders-and-spheres-in-builder-shapes-slice-3)).
+Its physics holds 300 K on `z0` and 301 K on `z1`, every other outer face insulated. Its tree reads
+*1 Cylinder via* · *r 0.3 m · z 0–1 m* and *Form result* · *2 regions · 9 faces*; the view draws the
+shape for display (Details: *Shape drawn for display; the mesh follows it to within its size*).
+Mesh 1 and Run take it as they take card 1. A project holds one 3D model: while it holds one from
+card 1, choosing card 2 leaves it as it is and says *This project already holds the 3D model Via in a
+layer stack (3D heat); a project holds one 3D model. Open Copper via through a slab (3D heat) in a new
+browser tab.* (and the other way round). The project file names the card (`layer-stack-3d` or
+`via-slab-3d`), and Export › Model with runs suggests the card's file name
+(`copper-via-through-a-slab-3d.json`).
 
 **The tree** (design §5.2, for this step). The group **Component 1 · 3D · µm** holds **Parameters**
 (beside it the parameters as written, *t_ox = 10 um · via_w = 20 um*), **Geometry 1** with **Domain**

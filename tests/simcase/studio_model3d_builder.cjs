@@ -14,7 +14,7 @@ const comp=doc=>doc.geometry.components.stack3d;
 test('the card is its own Library group, with the square-via note',()=>{
  assert.equal(M.CARD3D.id,'layer-stack-3d');assert.equal(M.CARD3D.kind,'model3d');
  assert.equal(M.CARD3D.title,'Via in a layer stack (3D heat)');
- assert.equal(M.CARD3D.note,'Square via (a round via needs cylinders, coming with the next geometry step)');
+ assert.equal(M.CARD3D.note,'Square via (the round via is the card Copper via through a slab)');
  assert.equal(M.CARD3D.asset,'/model3d-assets/model3d-layer-stack-3d.json');
  assert.deepEqual(M.FEATURE_TYPES.filter(t=>t.available).map(t=>t.label),['Box','Layers','Cylinder','Sphere']);
  // design 5.2, the coordinator's exact reason (Cylinder and Sphere are taken since E2-UI)

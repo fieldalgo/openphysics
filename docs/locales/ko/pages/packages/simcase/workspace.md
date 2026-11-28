@@ -267,12 +267,22 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 (`layer-stack-3d`)가 응용 카드들 옆에, 그 사이가 아니라 따로 있습니다. µm 단위, 200 × 200 µm 영역(z는 0–610 µm)의 3d
 구성 요소이며, `layers` 특징 `stack` 하나(기판 Si 500 µm, k = 130 W/(m K); 산화막 SiO2 10 µm, k = 1.4 W/(m K); 위 실리콘
 `Si (top)` 100 µm, k = 130 W/(m K))와 산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어
-있습니다. 원기둥이 오기 전까지 via는 정사각형입니다: *Square via (a round via needs cylinders, coming with the next
-geometry step)*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
+있습니다. 여기서 via는 정사각형입니다: *Square via (the round via is the card Copper via through a slab)*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
 이름으로만 가리키기 때문입니다(`stack.top` 같은 층이나 특징 이름은 열 종류의 영역이 아님). 물리는 Heat transfer (3D)입니다:
 `z0`에 300 K, `Si (top)`에 열원 1e12 W/m³(모두 4 W), 나머지 바깥 면은 모두 단열. 열원은 시험 값이며(카드를
 약 1127 K까지 데움), 2 mW 열점 변형은 나중 카드입니다. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
 그 모델로 돌아갑니다. 3D 모델은 **Mesh 1**로 메시하고 **Run**으로 풉니다(아래).
+
+묶음의 두 번째 카드 **Copper via through a slab (3D heat)**(`via-slab-3d`)는 m 단위, 2 × 2 m 영역(z는 0–1 m)의 3d 구성
+요소로, 배경은 `slab`(k = 1 W/(m K))이고 원기둥 `via` 하나(x–y 중심에서 r = 0.3 m, 슬래브 전체를 지남, `copper`, k = 100
+W/(m K))가 있습니다: meshloom의 `via_in_slab` builder 형상([builder 형상](geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3)).
+물리는 `z0`에 300 K, `z1`에 301 K, 나머지 바깥 면은 모두 단열입니다. 트리는 *1 Cylinder via* · *r 0.3 m · z 0–1 m*와
+*Form result* · *2 regions · 9 faces*로 읽히고, 보기는 형상을 표시용으로 그립니다(Details: *Shape drawn for display; the mesh
+follows it to within its size*). Mesh 1과 Run은 카드 1처럼 받습니다. 프로젝트는 3D 모델 하나를 담습니다: 카드 1의 모델을 담고
+있는 동안 카드 2를 고르면 그대로 두고 *This project already holds the 3D model Via in a layer stack (3D heat); a project holds
+one 3D model. Open Copper via through a slab (3D heat) in a new browser tab.*라고 말합니다(반대도 같음). 프로젝트 파일은 카드
+(`layer-stack-3d` 또는 `via-slab-3d`)를 밝히고, Export › Model with runs는 카드의 파일 이름(`copper-via-through-a-slab-3d.json`)을
+제안합니다.
 
 **트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 적힌 그대로의 매개변수,
 *t_ox = 10 um · via_w = 20 um*), **Geometry 1**과 그 아래 **Domain**(*200 × 200 × 610 µm*, 또는 *200 × 200 µm, z from the

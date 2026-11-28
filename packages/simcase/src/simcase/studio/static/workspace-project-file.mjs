@@ -34,7 +34,7 @@ export const ENTRY_KEYS=Object.freeze(['id','kind','title','card','bytes','diges
 export const KINDS=Object.freeze(['workspace','multiphysics','model3d']);
 /** The kinds a version 1 file holds; "model3d" needs version 2. */
 const KINDS_V1=Object.freeze(['workspace','multiphysics']);
-export const CARDS=Object.freeze(['optical','heat','joule','heated-waveguide','layer-stack-3d']);
+export const CARDS=Object.freeze(['optical','heat','joule','heated-waveguide','layer-stack-3d','via-slab-3d']);
 export const UNTITLED_PROJECT='Untitled project';
 export const NAME_LIMIT=80;
 /** The session versions each kind holds: an optical session (parseSession's own list) or a
