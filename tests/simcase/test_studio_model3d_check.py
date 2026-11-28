@@ -49,6 +49,7 @@ def numeric():
     comp = doc["geometry"]["components"]["stack3d"]
     comp["features"][0]["layers"][1]["thickness"] = 10
     comp["features"][1].update(xmin=90, xmax=110, ymin=90, ymax=110, zmin=500, zmax=510)
+    comp["domain"]["zmax"] = 610
     return doc
 
 
@@ -80,7 +81,7 @@ def test_the_card_is_the_slice_b_document():
     d = card()
     comp = d["geometry"]["components"]["stack3d"]
     assert comp["length_unit"] == "um" and comp["domain"] == {"xmin": 0, "xmax": 200, "ymin": 0, "ymax": 200,
-                                                               "zmin": 0, "zmax": 610}
+                                                               "zmin": 0, "zmax": "500 + t_ox + 100"}
     stack, via = comp["features"]
     assert d["geometry"]["parameters"] == {"t_ox": {"value": "10 um"}, "via_w": {"value": "20 um"}}
     assert [(lay["name"], lay["thickness"], lay["material"]) for lay in stack["layers"]] == [

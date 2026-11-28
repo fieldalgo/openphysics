@@ -264,7 +264,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 ## 3D 모델(실험적)
 
 상태: **실험적.** Library의 **3D models (experimental)** 묶음에 카드 **Via in a layer stack (3D heat)**
-(`layer-stack-3d`)가 응용 카드들 옆에, 그 사이가 아니라 따로 있습니다. µm 단위, 200 × 200 µm 영역(z는 0–610 µm)의 3d
+(`layer-stack-3d`)가 응용 카드들 옆에, 그 사이가 아니라 따로 있습니다. µm 단위, 200 × 200 µm 영역(z는 0부터 `500 + t_ox + 100`, 곧 610 µm까지라
+위끝이 층을 따르고 `t_ox`가 바뀌어도 `z1`이 맨 위 면으로 남음)의 3d
 구성 요소이며, `layers` 특징 `stack` 하나(기판 Si 500 µm, k = 130 W/(m K); 산화막 SiO2 10 µm, k = 1.4 W/(m K); 위 실리콘
 `Si (top)` 100 µm, k = 130 W/(m K))와 산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어
 있습니다. 형상은 설계의 매개변수 둘을 담습니다: `t_ox` = 10 µm은 산화막

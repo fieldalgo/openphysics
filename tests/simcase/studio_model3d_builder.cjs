@@ -12,7 +12,9 @@ const card=()=>JSON.parse(fs.readFileSync(path.join(STATIC_DIR,'model3d-layer-st
 // card 1 written out in numbers: the document before it held its design parameters (t_ox, via_w);
 // the editing tests below need numeric via extents and a model without parameters
 const numeric=()=>{const d=card(),c=d.geometry.components.stack3d;delete d.geometry.parameters;c.features[0].layers[1].thickness=10;
- Object.assign(c.features[1],{xmin:90,xmax:110,ymin:90,ymax:110,zmin:500,zmax:510});return d;};
+ Object.assign(c.features[1],{xmin:90,xmax:110,ymin:90,ymax:110,zmin:500,zmax:510});c.domain.zmax=610;return d;};
+// the domain the server's check evaluates for card 1 (its top is "500 + t_ox + 100"): the view passes it
+const DOMAIN1={xmin:0,xmax:200,ymin:0,ymax:200,zmin:0,zmax:610};
 const comp=doc=>doc.geometry.components.stack3d;
 
 test('the card is its own Library group, with the square-via note',()=>{
@@ -27,7 +29,7 @@ test('the card is its own Library group, with the square-via note',()=>{
 });
 
 test('the tree (design 5.2): Component 1 with Parameters, Geometry 1 (Domain, numbered features, Form result) and Materials',()=>{
- const check={features:[{text:'covered in part by 2 (via)'},{text:'',size:[20,20,10]}],regions:[1,2,3,4],display:{faces:new Array(23).fill({})},
+ const check={features:[{text:'covered in part by 2 (via)'},{text:'',size:[20,20,10]}],regions:[1,2,3,4],display:{faces:new Array(23).fill({})},domain:DOMAIN1,
   mesh:{ok:true,estimate:{tetrahedra:2402,seconds:1.4411},key:'k'}};
  const rows=M.treeRows(card(),check,null,W);
  assert.deepEqual(rows.map(r=>[r.label,r.level,r.note]),[['Component 1 · 3D · µm',1,''],['Parameters',2,'t_ox = 10 um · via_w = 20 um'],['Geometry 1',2,''],
@@ -72,7 +74,7 @@ test('the mesh size: a quantity in the document mesh block, within the 5.2 range
  assert.equal(M.getField(card(),'mesh.element_size'),'40 um');
  assert.equal(M.editField(card(),f[0],'20').doc.mesh.element_size,'20 um','a bare number takes the component unit');
  assert.equal(M.editField(card(),f[0],'0.1 mm').doc.mesh.element_size,'0.1 mm');
- assert.equal(M.editField(card(),f[0],'1').problem,'Mesh element size must be between 1.68–168 µm.');
+ assert.equal(M.editField(card(),f[0],'1',{domain:DOMAIN1}).problem,'Mesh element size must be between 1.68–168 µm.');
  assert.equal(M.editField(card(),f[0],'w').problem,'A mesh size is a number or a quantity such as 20 um.');
  assert.equal(M.fieldNote(card(),'mesh.element_size'),'= 0.00004 m');
  assert.deepEqual(M.editField(card(),f[0],'20').doc.geometry,card().geometry,'the geometry is unchanged');
@@ -146,9 +148,9 @@ test('feature operations: move, duplicate, delete, add',()=>{
  const dup=M.duplicateFeature(card(),1);assert.deepEqual(comp(dup).features.map(f=>f.name),['stack','via','via_2']);
  assert.deepEqual(comp(M.duplicateFeature(dup,1)).features.map(f=>f.name),['stack','via','via_3','via_2']);
  assert.deepEqual(comp(M.deleteFeature(card(),0)).features.map(f=>f.name),['via']);
- const box=comp(M.addFeature(card(),'box')).features[2];
+ const box=comp(M.addFeature(card(),'box',{domain:DOMAIN1})).features[2];
  assert.deepEqual([box.name,box.type,box.xmin,box.xmax,box.zmin,box.zmax,box.material],['box','box',50,150,152.5,457.5,'Si']);
- const lay=comp(M.addFeature(card(),'layers')).features[2];
+ const lay=comp(M.addFeature(card(),'layers',{domain:DOMAIN1})).features[2];
  assert.deepEqual([lay.name,lay.type,lay.z0,lay.layers.length],['layers','layers',152.5,1]);
  assert.deepEqual(comp(card()).features.map(f=>f.name),['stack','via'],'the card itself is unchanged');
 });

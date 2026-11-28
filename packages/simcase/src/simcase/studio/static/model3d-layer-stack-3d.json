@@ -35,7 +35,7 @@
           "ymin": 0,
           "ymax": 200,
           "zmin": 0,
-          "zmax": 610
+          "zmax": "500 + t_ox + 100"
         },
         "background": {
           "material": null
