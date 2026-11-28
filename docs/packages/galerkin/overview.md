@@ -41,6 +41,7 @@ references and fixed thresholds.
 | Static 2D linear elasticity, plane stress or plane strain | `galerkin.elasticity.solve_elasticity` | [Contract](elasticity2d.md), [validation](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../examples/galerkin/elasticity2d.py) |
 | Static 3D linear elasticity | `galerkin.elasticity3d.solve_elasticity_3d` | [Contract and validation](elasticity3d.md) | |
 | 3D structural modes | `galerkin.structural_modes3d.solve_structural_modes_3d` | [Contract and cantilever verification](structural_modes3d.md) | |
+| 3D harmonic structural response | `galerkin.structural_harmonic3d.solve_structural_harmonic_3d` | [Contract and verification](structural_harmonic3d.md) | |
 | Global Cartesian boundary traction for elasticity | `galerkin.elasticity.solve_elasticity` | [Contract](elasticity_traction.md), [validation](elasticity_traction_independent_validation.md) | [elasticity_traction.py](../../../examples/galerkin/elasticity_traction.py) |
 | Mechanics under a prescribed same-mesh nodal Kelvin field | `galerkin.thermoelasticity.solve_thermoelasticity` | [Contract](prescribed_temperature_thermoelasticity.md), [validation](prescribed_temperature_thermoelasticity_independent_validation.md) | [prescribed_temperature_thermoelasticity.py](../../../examples/galerkin/prescribed_temperature_thermoelasticity.py) |
 | 3D thermoelasticity from same-mesh nodal temperatures | `galerkin.thermoelasticity3d.solve_thermoelasticity_3d` | [Contract and validation](thermoelasticity3d.md) | — |

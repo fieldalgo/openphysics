@@ -2493,6 +2493,7 @@
   "mass_normalized_displacement": "mass_normalized_displacement",
   "mass_normalized_electric_field": "mass_normalized_electric_field",
   "mass_normalized_electric_field_line_integral": "mass_normalized_electric_field_line_integral",
+  "mass_proportional_damping_coefficient": "mass_proportional_damping_coefficient",
   "maximum_displacement": "displacement",
   "maximum_displacement_r": "displacement",
   "maximum_displacement_x": "displacement",
@@ -2648,6 +2649,7 @@
   "specific_heat_capacity": "specific_heat_capacity",
   "stiffness_energy_functional": "stiffness_energy_functional",
   "stiffness_energy_functional_per_depth": "stiffness_energy_functional_per_depth",
+  "stiffness_proportional_damping_coefficient": "stiffness_proportional_damping_coefficient",
   "stored_energy": "stored_energy",
   "stored_energy_per_depth": "stored_energy_per_depth",
   "stored_heat": "stored_heat",
@@ -2738,11 +2740,13 @@
   "evaluation_temperature": {"places": ["api", "result"]},
   "inward_current_density": {"rank": ["scalar"]},
   "inward_heat_flux": {"rank": ["scalar"]},
-  "maximum_displacement": {"rank": ["scalar"]},
+  "maximum_displacement": {"complex": false, "rank": ["scalar"]},
   "maximum_residual_force": {"rank": ["scalar"]},
   "maximum_residual_force_per_depth": {"rank": ["scalar"]},
-  "maximum_stress": {"rank": ["scalar"]},
-  "outward_heat_flux": {"rank": ["scalar"]}
+  "maximum_stress": {"complex": false, "rank": ["scalar"]},
+  "minimum_stress": {"complex": false},
+  "outward_heat_flux": {"rank": ["scalar"]},
+  "prescribed_displacement": {"complex": false}
  },
  "display_groups": {
   "length": {"menu": ["pm", "nm", "Angstrom", "um", "mm", "cm", "m", "in", "mil"], "quantities": ["air_wavelength", "beam_waist_radius", "bend_origin", "bend_radius", "box_size", "depth", "design_velocity", "displacement", "displacement_r", "displacement_x", "displacement_y", "displacement_z", "element_size", "expected_extent", "huray_sphere_radius", "length", "line_length", "lower_corner_position", "maximum_displacement", "maximum_displacement_r", "maximum_displacement_x", "maximum_displacement_y", "maximum_displacement_z", "mode_field_diameter", "node_coordinates", "perimeter", "pml_thickness", "position", "prescribed_displacement", "prescribed_displacement_r", "prescribed_displacement_x", "prescribed_displacement_y", "prescribed_displacement_z", "radius", "refinement_distance", "resonance_wavelength", "rms_roughness", "sheet_thickness", "skin_depth", "thickness", "unnormalized_electric_field_line_integral", "upper_corner_position", "vacuum_wavelength", "wavelength_step"], "shape_numbers": true}

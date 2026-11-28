@@ -16,6 +16,7 @@
       "galerkin.temperature_joule_heating",
       "galerkin.elasticity",
       "galerkin.elasticity3d",
+      "galerkin.structural_harmonic3d",
       "galerkin.structural_modes3d",
       "galerkin.thermoelasticity",
       "galerkin.thermoelasticity3d",

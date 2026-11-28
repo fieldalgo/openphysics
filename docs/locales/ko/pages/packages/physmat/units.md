@@ -284,6 +284,7 @@ JSON 파일 두 개가 모듈 옆에 패키지 데이터로 들어갑니다.
   힌트 표시(`hint`: 그 차원의 대표 물리량이면 true, 밝히지 않을 물리량이면 false. `family`:
   `spectral`), 영어·한국어 설명을 줍니다. 해당하는 곳에는 이름마다의 부호 문장 `sign`
   (`inward_heat_flux`: "positive enters the body"), `statistic_definitions`(`maximum_stress`),
+  복소 응력에서 실수인 `maximum_stress`처럼 한정된 이름의 복소 여부를 지정하는 `name_complex`,
   기반 항목과 다른 이름의 계수 `name_rank`(`inward_heat_flux`는 스칼라인 법선 성분), 모델
   파라미터가 속한 모델 `scope`도 줍니다. 정확한 계수를 가진 닫힌 기호 목록(`barg psig bara psia`의
   `gauge`/`absolute` 표시 포함), 접두어, 외래 단위, 문자 대응표, 진단 코드, 출력 전용 수식어

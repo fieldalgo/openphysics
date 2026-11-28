@@ -24,7 +24,7 @@ Generated sections:
   and input-menu compounds with one factor in another common prefix
   (``MW/m^3``, ``mW/(m^2 K)``, ``V/cm``), each with its reading;
 - ``names``: every legal quantity name -> its registry base entry;
-- ``name_overrides``: the places and rank of a name where they differ from its
+- ``name_overrides``: the places, rank and complex flag of a name where they differ from its
   base (a name with an output-only word is an output; ``inward_heat_flux`` is a
   normal component, a scalar);
 - ``display_groups``: the members of each display group (``length``: every
@@ -57,7 +57,7 @@ RANKS = {"scalar", "vector", "tensor", "matrix"}
 PLACES = {"document", "material", "api", "result"}
 FAMILIES = {"spectral"}
 QUANTITY_FIELDS = {"dimension", "unit", "menu", "kind", "rank", "complex", "domain", "band", "warn_inside",
-                   "slot_refusals", "places", "qualifiers", "name_rank", "statistic_definitions", "symbols",
+                   "slot_refusals", "places", "qualifiers", "name_rank", "name_complex", "statistic_definitions", "symbols",
                    "refused_aliases", "status", "hint", "family", "scope", "sign", "description"}
 DOMAIN_KEYS = {"min", "min_exclusive", "max", "max_exclusive"}
 BAND_KEYS = {"abs_range", "range", "abs_min", "when_unit"}
@@ -526,7 +526,7 @@ def _names(src: dict) -> dict:
 
 
 def _name_overrides(src: dict) -> dict:
-    """Places and rank of a name where they differ from its base: a name with an output-only word
+    """Places, rank and complex flag of a name where they differ from its base: a name with an output-only word
     keeps only the output places, and ``name_rank`` sets the rank of a name (inward_heat_flux)."""
     quantities, output_words = src["quantities"], set(src["output_only_words"])
     found: dict[str, dict] = {}
@@ -539,6 +539,8 @@ def _name_overrides(src: dict) -> dict:
             own["places"] = places
         if rank != e["rank"]:
             own["rank"] = rank
+        if name in e.get("name_complex", {}):
+            own["complex"] = e["name_complex"][name]
         if own:
             found[name] = own
     return found
@@ -568,7 +570,7 @@ def _check_names(src: dict, units: dict) -> None:
             raise ValueError(f"{base}: a base that starts with an output-only word is an output")
     for base, e in quantities.items():
         own = {n for n, (b, _, _) in qualified.items() if b == base}
-        for field in ("sign", "statistic_definitions", "name_rank"):
+        for field in ("sign", "statistic_definitions", "name_rank", "name_complex"):
             for name, value in e.get(field, {}).items():
                 if name not in own:
                     raise ValueError(f"{base}: {field} names {name!r}, which is not a name of this base")
@@ -576,7 +578,9 @@ def _check_names(src: dict, units: dict) -> None:
                     raise ValueError(f"{base}: statistic_definitions names {name!r}, which has no statistic word")
                 if field == "name_rank" and not set(value) <= RANKS:
                     raise ValueError(f"{base}: name_rank of {name!r} is outside the closed rank list")
-                if field != "name_rank" and not (value.get("en") and value.get("ko")):
+                if field == "name_complex" and not isinstance(value, bool):
+                    raise ValueError(f"{base}: name_complex of {name!r} must be boolean")
+                if field in ("sign", "statistic_definitions") and not (value.get("en") and value.get("ko")):
                     raise ValueError(f"{base}: {field} of {name!r} needs en and ko")
         scope = e.get("scope")
         if scope is not None and (scope.get("quantity") not in quantities or not scope.get("model")
