@@ -652,13 +652,17 @@ export function cutColor(t,tmin,tmax){
 export const srgbToLinear=c=>c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4;
 const sci=v=>Math.abs(v)<1e-3&&v!==0?Number(v).toPrecision(3):String(sig(v));
 /** The values table of a run: [label, text] rows. */
-export function valuesRows(values,unit,{expected=null}={}){
+/** X7: the regions a document's heat source is set in (its heat_source_density keys), in order; [] without one. */
+export const heatSourceRegions=doc=>Object.keys(doc?.physics?.heat?.heat_source_density||{});
+export function valuesRows(values,unit,{expected=null,sources=[]}={}){
  const per=UNITS[unit]||1,u=shownUnit(unit);
  // a node on an interface (the live run's values name the regions around it): "at the A / B interface"
  const at=t=>`(${t.position_m.map(x=>sig(x/per,3)).join(', ')}) ${u}`;
  const place=t=>Array.isArray(t.regions)&&t.regions.length>1?`${sig(t.value)} ${t.unit} at the ${t.regions.join(' / ')} interface, ${at(t)}`
   :`${sig(t.value)} ${t.unit} in ${t.region} at ${at(t)}`;
  const rows=[['Temperature, max (whole model)',place(values.temperature_max)],['Temperature, min (whole model)',place(values.temperature_min)]];
+ // X7: where the heat comes from: "4 W in Si (top)" (the run's total source, the regions of its document)
+ if(sources.length)rows.push(['Heat source',`${sig(values.total_source.value)} ${values.total_source.unit} in ${sources.join(', ')}`]);
  for(const [name,q] of Object.entries(values.heat_rate_by_selection||{})){
   rows.push([`Heat rate through ${name}`,`${sig(q.value)} ${q.unit}`]);
   if(name==='z0'&&expected)rows.push(['Expected heat rate',`${expected.shown} (parallel formula)`]);
