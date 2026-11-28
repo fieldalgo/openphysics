@@ -282,18 +282,56 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
             plans.push((k, f64::NAN, Rule::Midpoint));
             mids.push(p.t0 + (p.t1 - p.t0) / 2.0);
         }
-        let at: Vec<P3> = plans.iter().enumerate().map(|(o, &(k, t, _))| {
-            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
-            let t = if t.is_nan() { mids[o - (plans.len() - mids.len())] } else { t };
-            std::array::from_fn(|c| a[c] + t * (b[c] - a[c]))
-        }).collect();
+        // each plan with its parameter u (t, or the middle of the piece for a NaN plan),
+        // put in a total order that does not depend on how the input numbers its points
+        // and segments before the BRIO order (which draws its rounds and breaks its ties
+        // by position in the array). The key is exact, from input coordinates and
+        // parameters only: the segment's ends, the lexicographically smaller first; then
+        // the position along the segment from that end (u, or u reversed when the
+        // segment runs the other way: comparing reversed parameters needs no
+        // arithmetic); on an equal key (one point planned twice) a fixed point before a
+        // middle, then a centre rule by its vertex's coordinates. Plans equal in all of
+        // these are the same split, and the second is skipped when it is reached.
         let fixed = plans.len() - mids.len();
+        let mut plans: Vec<(usize, f64, Rule, f64, P3)> = plans.into_iter().enumerate().map(|(o, (k, t, rule))| {
+            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
+            let mid = if t.is_nan() { mids[o - fixed] } else { f64::NAN };
+            let u = if t.is_nan() { mid } else { t };
+            (k, t, rule, mid, std::array::from_fn(|c| a[c] + u * (b[c] - a[c])))
+        }).collect();
+        let lex = crate::predicates::lex_cmp;
+        // a segment's ends from the smaller, and whether that is its second end
+        let canon = |k: usize| {
+            let (a, b) = (&points[segments[k][0] as usize], &points[segments[k][1] as usize]);
+            if lex(a, b).is_gt() { (b, a, true) } else { (a, b, false) }
+        };
+        let centre = |r: &Rule| match r { Rule::Centre(c) => Some(points[*c as usize]), _ => None };
+        plans.sort_by(|x, y| {
+            let ((ax, bx, rx), (ay, by, ry)) = (canon(x.0), canon(y.0));
+            let (ux, uy) = (if x.1.is_nan() { x.3 } else { x.1 }, if y.1.is_nan() { y.3 } else { y.1 });
+            lex(ax, ay)
+                .then_with(|| lex(bx, by))
+                .then_with(|| match (rx, ry) {
+                    // the same segment (equal ends), one direction
+                    (false, false) => ux.total_cmp(&uy),
+                    (true, true) => uy.total_cmp(&ux),
+                    // equal ends but opposite directions: two input segments on one
+                    // pair of points, which the input check refuses
+                    _ => rx.cmp(&ry),
+                })
+                .then_with(|| x.1.is_nan().cmp(&y.1.is_nan()))
+                .then_with(|| match (centre(&x.2), centre(&y.2)) {
+                    (Some(a), Some(b)) => lex(&a, &b),
+                    (a, b) => a.is_none().cmp(&b.is_none()),
+                })
+        });
+        let at: Vec<P3> = plans.iter().map(|p| p.4).collect();
         for o in delaunay::brio_order(&at) {
             let o = o as usize;
-            let (k, t, rule) = plans[o];
+            let (k, t, rule, mid, _) = plans[o];
             let s = segments[k];
             let (t, rule, i) = if t.is_nan() {
-                let i = pieces[k].partition_point(|q| q.t1 <= mids[o - fixed]);
+                let i = pieces[k].partition_point(|q| q.t1 <= mid);
                 let p = pieces[k][i];
                 if edge(&mut mesh, p.u, p.v) {
                     continue;
