@@ -23,10 +23,11 @@ use std::collections::{HashMap, HashSet};
 const GHOST: u32 = u32::MAX;
 
 /// A fast hasher for the small integer keys of the triangulation's lookup tables
-/// (multiply-rotate, as in rustc's FxHash). The tables are only looked up, never
-/// iterated, so no result depends on it.
+/// (multiply-rotate, as in rustc's FxHash). A table that is iterated must give a
+/// result that does not depend on the order (as with the standard, randomly seeded
+/// hasher).
 #[derive(Default, Clone, Copy)]
-struct Fx(u64);
+pub(crate) struct Fx(u64);
 
 impl std::hash::Hasher for Fx {
     fn finish(&self) -> u64 {
@@ -52,8 +53,8 @@ impl std::hash::Hasher for Fx {
     }
 }
 
-type FxMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<Fx>>;
-type FxSet<K> = HashSet<K, std::hash::BuildHasherDefault<Fx>>;
+pub(crate) type FxMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<Fx>>;
+pub(crate) type FxSet<K> = HashSet<K, std::hash::BuildHasherDefault<Fx>>;
 
 #[derive(Debug)]
 pub struct Facet {
