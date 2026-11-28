@@ -125,7 +125,8 @@ def solve_two_ground_rectangle(polygons, *, box_size, panels_per_edge=32, ground
     """Solve convex closed conductors between a grounded bottom and a grounded top.
 
     box_size: the rectangle's (width, height) in m; the height is the separation of the two
-    grounded planes, and the side walls have zero normal flux. Otherwise as
+    grounded planes, and the side walls have zero normal flux. ``ground_modes`` is still
+    checked (an integer in 64..4096) but does not change the result. Otherwise as
     ``galerkin.laplace_two_ground.solve_two_ground_rectangle``.
     """
     return _call(_two_ground.solve_two_ground_rectangle, polygons, box_size, panels_per_edge=panels_per_edge,
@@ -135,6 +136,8 @@ def solve_two_ground_rectangle(polygons, *, box_size, panels_per_edge=32, ground
 def solve_two_ground_rectangle_edges(polygons, *, box_size, panels_per_edge=32, ground_modes=128,
                                      interpolation_degree=12) -> TwoGroundRectangleEdgesResult:
     """``solve_two_ground_rectangle`` with the currents of each straight conductor edge.
+
+    ``ground_modes`` is still checked (an integer in 64..4096) but does not change the result.
 
     As ``galerkin.laplace_two_ground.solve_two_ground_rectangle_edges``.
     """
