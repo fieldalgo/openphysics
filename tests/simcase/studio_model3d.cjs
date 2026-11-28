@@ -91,3 +91,23 @@ test('the names panel lines',()=>{
  assert.equal(lines.title,'Face 4 · z = 3 um');assert.equal(lines.sides,'via | silicon');
  assert.deepEqual(lines.names,['stack.oxide.top','stack.top.bottom','via.z1']);
 });
+
+test('a curved face (axis null) is named by its shape, with the display note, and shaded',()=>{
+ const note='Shape drawn for display; the mesh follows it to within its size';
+ const view={...card,unit:'m',display_note:note};
+ const lines=M.faceLines(view,{id:8,shape:'cylinder',axis:null,at:null,area:1.88496,exterior:false,tag:null,
+  minus:['background'],plus:['via'],names:['via.side']});
+ assert.equal(lines.title,'Face 8 · cylinder');assert.equal(lines.sides,'background | via');
+ assert.equal(lines.detail,`area 1.88496 m² · interior · ${note}`);
+ const plane=M.faceLines(view,{id:5,shape:'plane',axis:'z',at:0,area:0.282743,exterior:true,tag:'z0',minus:[],plus:['via'],
+  names:['domain.z0','via.bottom']});
+ assert.equal(plane.title,'Face 5 · z = 0 m');assert.equal(plane.detail,'area 0.282743 m² · exterior · tag z0');
+ assert.equal(M.shapeOf({axis:'x'}),'plane');assert.equal(M.SHADE[null],0.85);
+ // a curved face is coloured by its non-void side as a plane is: plus (inside) first, else minus
+ const regions={via:{void:false},background:{void:false},hole:{void:true}};
+ const side={minus:['background'],plus:['via']};
+ assert.equal(M.faceRegion(side,regions,new Set()),'via');
+ assert.equal(M.faceRegion(side,regions,new Set(['via'])),'background');
+ assert.equal(M.faceRegion({minus:['sb'],plus:['hole']},{...regions,sb:{void:false}},new Set()),'sb');
+ const s=1/Math.sqrt(3);assert.ok(Math.abs(M.curvedShade([s,s,s])-1)<1e-15);assert.equal(M.curvedShade([s,-s,0]),0.55);
+});

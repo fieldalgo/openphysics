@@ -137,14 +137,24 @@ export function regionColor(view,name){
  return PALETTE[(i<0?0:i)%PALETTE.length];
 }
 
-/** Shading by face orientation, so the three visible sides of a box differ. */
-export const SHADE={x:0.78,y:0.62,z:1.0};
+/** Shading by face orientation, so the three visible sides of a box differ. A curved face (a
+ * cylinder side or a sphere: axis null) has the base under the key null; the 3D view shades its
+ * vertices by curvedShade. */
+export const SHADE={x:0.78,y:0.62,z:1.0,null:0.85};
+
+/** A face's shape: 'plane' (also an answer without shape: the complex's faces), 'cylinder', 'sphere'. */
+export const shapeOf=face=>face.shape??'plane';
+
+/** The shade of a curved face's vertex of unit normal n: fixed light from the isometric eye. */
+export function curvedShade(n){return 0.55+0.45*Math.abs(dot(n,[S3,S3,S3]));}
 
 /** The names panel's lines of a face. */
 export function faceLines(view,face){
- const unit=view.unit;
- return {title:`Face ${face.id} · ${face.axis} = ${Number(face.at.toPrecision(6))} ${unit}`,
-  detail:`area ${Number(face.area.toPrecision(6))} ${unit}² · ${face.exterior?'exterior':'interior'}${face.tag?' · tag '+face.tag:''}`,
+ const unit=view.unit,shape=shapeOf(face);
+ const where=face.axis==null?shape:`${face.axis} = ${Number(face.at.toPrecision(6))} ${unit}`;
+ return {title:`Face ${face.id} · ${where}`,
+  detail:`area ${Number(face.area.toPrecision(6))} ${unit}² · ${face.exterior?'exterior':'interior'}${face.tag?' · tag '+face.tag:''}`+
+   (view.display_note&&shape!=='plane'?` · ${view.display_note}`:''),
   sides:`${face.minus.length?face.minus.join(', '):'outside'} | ${face.plus.length?face.plus.join(', '):'outside'}`,
   names:face.names};
 }

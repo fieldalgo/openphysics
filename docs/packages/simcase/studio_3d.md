@@ -8,7 +8,8 @@ Status: **experimental.** The 3D view shows a `3d` component of a version 1
 geometry document ([contract](geometry_document.md)) on the
 [geometry lab](geometry_lab.md) page at `/geometry-lab`. It is read-only and takes
 what the stage 5 engine takes: boxes and the slab layers of `layers` features
-(`simcase.geometry_engine3d`), it can mesh them ([Mesh](#mesh)) and solve 3D steady heat on
+(`simcase.geometry_engine3d`), and cylinders and spheres in meshloom's builder shapes, drawn
+from a display shape ([Cylinders and spheres](#cylinders-and-spheres)); it can mesh them ([Mesh](#mesh)) and solve 3D steady heat on
 them on the server ([Run](#run)). The model
 workspace does not show it yet. Its page, its controls and its HTTP answers may change
 in any release.
@@ -147,6 +148,41 @@ requests in the component's unit, as for sections):
 | `export/run.json` | `{values, document}` |
 | `record?maps=kept` | the run record `thermal-steady3d-run-v1`: `document`, `document_sha256`, `values`, `mesh`, `maps` (`kept` with `surface`, or `not kept` with its counts, as the [multiphysics runs' maps](workspace.md)) |
 
+## Cylinders and spheres
+
+A `3d` component whose cylinders or spheres are in one of meshloom's builder shapes (C4 a via
+through a slab, C5 a sphere in a box, C1 a sphere, C11 concentric spheres;
+[builder shapes](geometry_engine3d.md#cylinders-and-spheres-in-builder-shapes-slice-3)) has no
+exact complex. The view draws it from `simcase.display_shapes3d`
+([display shape](geometry_engine3d.md#display-shape)): faces whose name sets are the mesh's
+provenance names, so picking gives the mesh's names, drawn by a display rule of their own
+(planar faces exact; cylinder rings and the discs and annuli at its ends as the inscribed
+n-gon, n = min(256, max(48, ⌈2πr/ℓ⌉)); spheres as an icosahedral geodesic grid, f =
+min(64, max(8, ⌈1.05 r/ℓ⌉)); ℓ = domain diagonal / 200). **Names** adds "Shape drawn for display;
+the mesh follows it to within its size" on a curved face; curved faces are shaded by their
+vertex normals.
+
+- The display, section and check answers branch on the parsed model's feature types: a component
+  holding a cylinder or a sphere goes through `display_shapes3d`; every other one keeps the
+  complex's answers unchanged. A cylinder or sphere no builder takes is refused in the builder's
+  words, as before.
+- The display answer keeps every field. Each face gains `shape` (`plane`, `cylinder`, `sphere`) and
+  `segments` (n or f, 0 for a rectangle); a curved face has `axis` and `at` null; the answer gains
+  `display_note`. Sections are exact: a cylinder cut by z gives its n-gon, cut by x or y two lines
+  at ±√(r² − d²); a sphere cut at d < r a circle of ρ = √(r² − d²).
+- The check (`check_view_shapes`) answers the features' coverage from exact volumes (a via is
+  `full`; in C11 each sphere but the innermost is `partial`, "covered in part by" the inner ones),
+  the regions with exact volumes, no selections, and slice 3's estimate under `mesh`
+  (route `builder`).
+- **Mesh** and **Run** take these components: the mesh job's child maps each boundary or interface
+  triangle of the builder's mesh to the display face whose name set equals the set of provenance
+  names that hold that triangle (`route: "builder"`).
+
+The card `model3d-via-slab-3d.json` (`/model3d-assets/`) is stage 5's E2: a slab
+[−1, 1]² × [0, 1] m with k_s = 1 W/(m·K), a via r = 0.3 m at (0, 0) with k_v = 100 W/(m·K),
+T = 300 K on z0 and 301 K on z1, the sides insulated, `mesh.element_size` 0.1 m. The expected
+heat rate is Q = ΔT/L · (k_v πr² + k_s (A − πr²)) = 31.99159 W.
+
 ## What it sends and answers
 
 - `POST /api/model3d/display` takes `{"doc": <document>, "component": <name or
@@ -271,6 +307,10 @@ Pre-registered (fixed before measuring; never loosened):
 | W7 | E1 through the route against `refsol.thermal3d.layered_slab` (exact for P1): max nodal \|T_h − T\|; relative error of the top heat rate (`heat_rate_by_selection.z1`) | ≤ 1e-10; ≤ 1e-9 | 1.4e-12 K; 2.5e-11 | same |
 | W17 | the cut of E1 against an exact P1 slice computed in rational arithmetic (`fractions.Fraction`): same points, max \|T − T_exact\|; six planes (z on the 1 mm interface, z = 1.2345 mm, x = 3.3, y = 7.1, the faces x = 0 and z = 2.5 mm), extrude and meshloom routes, and `cut.csv` through the route at z = 1.2345 mm | ≤ 1e-12 K | 2.8e-14 K worst (0 on node planes) | `tests/simcase/test_studio_heat3d_slice.py`, `test_studio_heat3d_run.py` |
 | W8-run | Cancel during a run's mesh step: the heat card at 11 µm (estimate about 69 s), cancelled 3 s after the run starts, on a real server process | the child has exited 2 s after Cancel; the run is cancelled and keeps nothing; no file left | all hold | `tests/simcase/test_studio_heat3d_run.py`, CI job `studio-mesh3d-w8` |
+| W1(a) shapes | C1, C4, C5, C11 and the E2 card: every boundary or interface triangle of the mesh has a display face id, and the face's name set equals an independent table from slice 3's tag tables applied to meshloom's own builder mesh at the same h | 0 mismatches | 0 (720, 1614, 1662, 1220 and 5658 triangles) | `tests/simcase/test_studio_model3d_shapes_mesh.py` |
+| W1(b) shapes | the same five: on every planar display face, `vertices[:, axis] == coord` exactly, in pm before float32 | 0 off-plane vertices | 0 (8, 6, 0, 0 and 8 planar faces) | `tests/simcase/test_geometry_display3d.py` |
+| W2 shapes | display areas against the exact areas, s(x) = sin x / x: rectangles relative; disc (A − A_h)/A ≤ 1 − s(2π/n); annulus 0 ≤ A_h − A ≤ πr²(1 − s(2π/n)); cylinder side (A − A_h)/A ≤ 1 − s(π/n); sphere 0 ≤ (A − A_h)/A ≤ max_f (ρ_f/R)² (each + 1e-12) | rectangles ≤ 1e-6; the bounds | rectangles 0; disc 4.14e-4, annulus 3.15e-5 of A, side 1.04e-4 (n = 126, at their bounds); spheres 1.18e-4 to 4.56e-4 against 2.24e-4 to 8.63e-4 | same |
+| W18 | the E2 card through `POST /api/model3d/run` at h = 0.1: e_Q = \|Q_h − Q\|/Q, Q_h the reaction on z1; and Q_h, nodal T and reaction against `build_mesh3d` + `galerkin.solve_steady_heat_3d` called directly, by SHA-256 | ≤ 1e-2; identical | 7.51e-3 (Q_h = 31.75147 W, Q = 31.99159 W; 23,427 tetrahedra); identical | `tests/simcase/test_studio_model3d_shapes_mesh.py` |
 | W14 (run) | time and size of the surface map and of a z cut, server side | recorded | below | `tests/simcase/test_studio_heat3d_run.py` (the largest with `OPENPHYSICS_STUDIO_W14=1`) |
 | W14 | performance at the card at about 48,000 tetrahedra and at 150,000 surface triangles: mesh answer time, mesh view frame time (median of 120 frames), tab JS heap | recorded; gate in Chromium with hardware GL: heap ≤ 300 MB, median frame ≤ 33 ms | recorded below; gate **not run** (software GL only) | same |
 
@@ -332,8 +372,11 @@ node tools/studio_browser/model3d_mesh_browser.mjs http://127.0.0.1:8765 out-dir
   not show the mesh yet.
 - A run's solve cannot be interrupted; Cancel during it discards the result when it returns. The
   solve holds the mesh, the solution and its answers in memory for the last eight runs.
-- Components in meshloom's builder shapes (cylinders, spheres) are not shown by the 3D view, so
-  Mesh and Run refuse them at the forming step in the view's words.
+- Components in meshloom's builder shapes (cylinders, spheres) are drawn from a display shape, not
+  an exact complex: the drawn rings and spheres are within the display rule's bounds (W2) of the
+  exact surfaces, and the mesh follows them to within its own size. They take no selections or
+  boundary tags yet (the builder route refuses them): "Use for → New selection" is refused by
+  `/api/model3d/selection` in the engine's words.
 - A component holding one `layers` feature (E1) is meshed through
   `meshine.extrude` (by Mesh and Run alike), and `evaluate3d` refuses it; the view takes its complex from
   the public `simcase.display_complex3d`, which builds for it the complex the

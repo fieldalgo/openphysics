@@ -5,8 +5,8 @@
 // the server's display triangles, a section plane and hidden regions. three.js 0.186.1 is
 // vendored unmodified and served by Studio (docs/third-party.md, browser-served files).
 import * as THREE from '/vendor/three-0.186.1/three.module.js';
-import {SHADE,VIEWS,decode,drawn,faceRegion,faceShown,fit,frameOf,orbit,pan,pick,rayAt,regionColor,
- toFrame,viewCamera,zoomBy} from '/model3d-assets/model3d-model.mjs';
+import {SHADE,VIEWS,cross,curvedShade,decode,drawn,faceRegion,faceShown,fit,frameOf,norm,orbit,pan,pick,rayAt,
+ regionColor,toFrame,viewCamera,zoomBy} from '/model3d-assets/model3d-model.mjs';
 
 const STEP=Math.PI/12;                       // 15 degrees per arrow key
 const SELECTED=new THREE.Color('#d1242f');
@@ -60,9 +60,13 @@ export class View3D{
   for(const f of v.faces){
    const region=faceRegion(f,this.regionsByName,this.hidden);
    c.set(f.id===this.selected?SELECTED:regionColor(v,region));
-   if(f.id!==this.selected)c.multiplyScalar(SHADE[f.axis]);
+   const normals=f.axis==null&&f.id!==this.selected?this.vertexNormals(f):null;     // a curved face
+   if(f.id!==this.selected&&!normals)c.multiplyScalar(SHADE[f.axis]);
    for(let t=f.first_triangle;t<f.first_triangle+f.triangle_count;t++)
-    for(let k=0;k<3;k++){const i=this.indices[3*t+k];colors[3*i]=c.r;colors[3*i+1]=c.g;colors[3*i+2]=c.b;}
+    for(let k=0;k<3;k++){
+     const i=this.indices[3*t+k],s=normals?curvedShade(normals.get(i)):1;
+     colors[3*i]=c.r*s;colors[3*i+1]=c.g*s;colors[3*i+2]=c.b*s;
+    }
   }
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(this.positions,3));
@@ -77,6 +81,18 @@ export class View3D{
   this.scene.add(this.mesh,this.edges);
   this.applySection();
   this.render();
+ }
+
+ /** Unit vertex normals of a face's triangles (the area-weighted sum of its triangles' normals). */
+ vertexNormals(f){
+  const sum=new Map(),p=this.positions,at=i=>[p[3*i],p[3*i+1],p[3*i+2]];
+  for(let t=f.first_triangle;t<f.first_triangle+f.triangle_count;t++){
+   const [a,b,c]=[0,1,2].map(k=>this.indices[3*t+k]),pa=at(a),pb=at(b),pc=at(c);
+   const n=cross([pb[0]-pa[0],pb[1]-pa[1],pb[2]-pa[2]],[pc[0]-pa[0],pc[1]-pa[1],pc[2]-pa[2]]);
+   for(const i of [a,b,c]){const s=sum.get(i)||[0,0,0];sum.set(i,[s[0]+n[0],s[1]+n[1],s[2]+n[2]]);}
+  }
+  for(const [i,s] of sum)sum.set(i,Math.hypot(...s)>0?norm(s):[0,0,1]);
+  return sum;
  }
 
  /** Section: {axis:'x'|'y'|'z', at (document units)} keeps coordinate <= at; null removes it. */
