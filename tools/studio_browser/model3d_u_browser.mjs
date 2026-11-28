@@ -142,6 +142,7 @@ try {
     await page.selectOption('#m3-use', 'fixed');
     const label = await page.evaluate(() => { const i = document.getElementById('m3-use-name');
       return {aria: i.getAttribute('aria-label'), labels: [...(i.labels || [])].map(l => l.textContent.trim())}; });
+    await page.fill('#m3-use-temp', '300');            // V1: the temperature is typed in the Use row
     await page.click('#m3-use-go');
     await page.waitForSelector('[data-m3-node="heat:fixed:stack.top.top"]', {timeout: 30000});
     await page.waitForTimeout(300);

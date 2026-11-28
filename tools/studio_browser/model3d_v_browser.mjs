@@ -23,6 +23,11 @@
 //      display gives them (one of each kind), with "Interior face: hide Si (top), the region above
 //      it, with Regions in the view toolbar to see it."; stack.top.top (exterior): its scopes equal
 //      the check's and no interior line: 3/3.
+//  V1  card 1, stack.top.top, Use for → Fixed temperature: a "Temperature (K)" box with a label, empty,
+//      placeholder "e.g. 330"; Apply disabled with "Type a temperature in K to apply." (then the parser's
+//      own reason for -5) by aria-describedby; 330 + Apply: the node reads "stack.top.top · 330 K" and
+//      one Undo removes it; Messages "Fixed temperature 330 K on stack.top.top." (no 300 K); the node is
+//      selected with its Temperature 330: 5/5.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -215,6 +220,38 @@ try {
       JSON.stringify(b.scopes) === JSON.stringify(expect(top)) && b.hint === null,
     ];
     record('V9', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, z1: a, top: b});
+    await ctx.close();
+  }
+  // ---- V1: Use for → Fixed temperature takes its value in the Use row ----
+  if (want('V1')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    const top = await page.evaluate(() => [...document.querySelectorAll('#m3-faces li')].find(li => li.getAttribute('aria-label').split(': ')[1].split(', ').includes('stack.top.top'))?.dataset.face);
+    await page.click(`#m3-faces li[data-face="${top}"]`);
+    await page.selectOption('#m3-use', 'fixed');
+    const box = await page.evaluate(() => { const i = document.getElementById('m3-use-temp'), b = document.getElementById('m3-use-temp-box');
+      return {shown: !!b && !b.hidden && i.offsetParent !== null, label: [...(i?.labels || [])].map(l => l.textContent.trim()), value: i?.value, placeholder: i?.placeholder}; });
+    const gate = () => page.evaluate(() => { const g = document.getElementById('m3-use-go'), d = g.getAttribute('aria-describedby');
+      return {disabled: g.disabled, why: d ? document.getElementById(d)?.textContent : null}; });
+    const empty = await gate();
+    await page.fill('#m3-use-temp', '-5'); const bad = await gate();
+    await page.fill('#m3-use-temp', '330'); const good = await gate();
+    await page.click('#m3-use-go');
+    await page.waitForSelector('[data-m3-node="heat:fixed:stack.top.top"]', {timeout: 30000}); await checked(page); await page.waitForTimeout(300);
+    const after = await page.evaluate(() => ({note: document.querySelector('[data-m3-node="heat:fixed:stack.top.top"] .m3-note')?.textContent || '',
+      messages: document.getElementById('mp-messages')?.textContent || '', selected: document.querySelector('#tree [aria-selected="true"]')?.dataset.m3Node,
+      input: document.querySelector('[data-m3-heat="fixed"][data-m3-key="stack.top.top"]')?.value || ''}));
+    await page.click('#undo-edit'); await checked(page); await page.waitForTimeout(200);
+    const undone = await page.evaluate(() => !document.querySelector('[data-m3-node="heat:fixed:stack.top.top"]'));
+    const rows = [
+      box.shown && box.label.length === 1 && box.label[0] === 'Temperature (K)' && box.value === '' && box.placeholder === 'e.g. 330',
+      empty.disabled && empty.why === 'Type a temperature in K to apply.' && bad.disabled && !!bad.why && bad.why !== empty.why && !good.disabled,
+      after.note === 'stack.top.top · 330 K' && undone,
+      after.messages.includes('Fixed temperature 330 K on stack.top.top.') && !after.messages.includes('300 K'),
+      after.selected === 'heat:fixed:stack.top.top' && /^330( K)?$/.test(after.input),
+    ];
+    record('V1', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 5, box, empty, bad, good, after: {...after, messages: after.messages.slice(0, 200)}, undone});
     await ctx.close();
   }
 } finally {

@@ -50,3 +50,15 @@ test('V9: each name says whether it selects only this face or also others; an in
  assert.equal(M.interiorHint(view.faces[5]),'Interior face: hide via, the region on its +x side, with Regions in the view toolbar to see it.');
  assert.equal(M.interiorHint(view.faces[1]),null,'an exterior face needs no hint');
 });
+
+test('V1: Use for → Fixed temperature takes its value: the reason while it is missing or wrong; the node with it',()=>{
+ assert.equal(M.useTemperatureProblem(''),'Type a temperature in K to apply.');
+ assert.equal(M.useTemperatureProblem('   '),'Type a temperature in K to apply.');
+ assert.equal(M.useTemperatureProblem('330'),null);
+ assert.equal(M.useTemperatureProblem('330 K'),null);
+ assert.match(M.useTemperatureProblem('-5'),/Fixed temperature/);
+ assert.match(M.useTemperatureProblem('abc'),/^Enter fixed temperature/);
+ const d=M.setFixedTemperature(card1(),'stack.top.top','330');
+ assert.equal(d.physics.heat.prescribed_temperature['stack.top.top'],'330 K');
+ assert.equal(M.fixedNoticeText('stack.top.top',d),'Fixed temperature 330 K on stack.top.top.');
+});

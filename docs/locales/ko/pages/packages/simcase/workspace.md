@@ -379,8 +379,10 @@ y를 가로지르는 면은 +x나 +y 쪽 영역). 보기 도구 막대의
 **Regions**에는 영역마다 확인란이 있습니다. 해제한 영역은 형상, 메시, 결과 보기에서 숨겨지므로 안쪽 면을 고를 수 있습니다:
 +z 보기에서 `via.z1`은 그 위의 영역 *Si (top)*을 숨기면 골라집니다. 엔진의 이름은 바뀌지 않습니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
 `selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은
-선택으로 만들지 않고 그렇게 말합니다. **Use for → Fixed temperature**는 서버 검사를 거친 뒤 면의 이름(가장 나중 특징의 단독
-이름, 예: `via.z1`, `stack.top.top`)에 300 K를 씁니다: 열 종류가 거부하는 면(안쪽 면)은 쓰지 않고, Messages가 종류의 말(*Fixed
+선택으로 만들지 않고 그렇게 말합니다. **Use for → Fixed temperature**는 같은 줄에 **Temperature (K)** 상자(비어 있음, *e.g. 330*)를
+보이며, **Apply**는 올바른 온도를 기다리며 이유를 말하고(*Type a temperature in K to apply.* 또는 칸 자체의 이유), 서버 검사를 거친
+뒤 면의 이름(가장 나중 특징의 단독 이름, 예: `via.z1`, `stack.top.top`)에 그 값을 씁니다(*Fixed temperature 330 K on
+stack.top.top.*, Undo 한 단계): 열 종류가 거부하는 면(안쪽 면)은 쓰지 않고, Messages가 종류의 말(*Fixed
 temperature needs an outer face; via.z1 is inside*)을 보이며 문서는 그대로입니다. 쓴 고정 온도는 Settings에서 제 노드를
 **Temperature**에 초점을 둔 채 열고, Messages는 나중 값을 따라갑니다(*Fixed temperature 310 K on stack.top.top.*). select 옆의
 칸에는 **Selection name** 또는 **Boundary name** 이름표가 붙습니다.
@@ -472,14 +474,14 @@ thermal-steady3d-run-v1 record.* 3D 모델은 아직 브라우저 복구에 보�
 | W10 | 문서가 보관한 실행의 문서와 같을 때에만 *No need to run*을 보임, 6 상태: 실행 뒤, 편집, Undo, Redo, *Use this run's inputs*, 프로젝트 Save와 Open 뒤 | 6/6 | 6/6(Undo 한 번이 *Use this run's inputs*를 되돌림) | `tests/simcase/studio_model3d_heat.cjs`, `tools/studio_browser/model3d_heat_browser.mjs` |
 | W11(실행) | Save와 Open 뒤, 프로젝트와 세션: 문서 digest, 실행의 값과 면 지도 digest; 3D 없는 버전 1 프로젝트는 전처럼 바이트까지 같게 씀 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음 | `tests/simcase/studio_model3d_files.cjs`, 열 브라우저 검사 |
 | W12(결과) | 카드의 Run 1을 Result 보기로(면 온도, 색 막대, 값 표), 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 열 브라우저 검사 |
-| W13(열) | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → Fixed temperature(Messages: *Fixed temperature needs an outer face; via.z1 is inside*, 문서는 그대로), `stack.top.top` 고르기, Use for → Fixed temperature, 단면 z = 300 µm, Run을 끝까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
+| W13(열) | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → Fixed temperature, Temperature 상자에 300 입력(V1)(Messages: *Fixed temperature needs an outer face; via.z1 is inside*, 문서는 그대로), `stack.top.top` 고르기, Use for → Fixed temperature, 단면 z = 300 µm, Run을 끝까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
 | W14 | 카드에서 Run부터 그려진 결과까지의 시간, 단면 시간 | 기록만(여기서는 SwiftShader) | 약 0.9 s와 0.1 s | 열 브라우저 검사 |
 | F1 | Cylinder(축 *z (fixed)*, cx, cy, r, zmin, zmax)와 Sphere(cx, cy, cz, r) 양식; Studio의 검사는 r > 0과 zmin < zmax만 2D 말투로; 영역에 대한 중심이나 반지름은 서버에 맡김 | 나열한 경우 100% | 100% | `tests/simcase/studio_model3d_shapes.cjs` |
 | F2 | Add feature가 Box, Layers, Cylinder, Sphere를 내놓음(Extrude는 흐림); 카드 2에서 Add → Sphere는 엔진의 말(*sphere 'sphere' is not taken yet …*)로 거부된 채 보이고, 구는 남아 표시되며 몰래 고쳐지지 않음 | 충족 | 충족(단위와 브라우저) | 같음, 그리고 열 브라우저 검사 |
 | W6-UI | 카드 2: 작업 공간의 Run이 끝나고, Run 1의 값 표가 페이지의 행으로 `/api/model3d/runs/{id}/values`와 같음 | 1/1 | 1/1(z0 −31.7515 W, z1 31.7515 W; 1D 병렬 전도 추정은 31.99 W이며, 내접 n각형이 조금 작음) | 열 브라우저 검사 |
 | W11(카드 2) | 실행 하나를 가진 카드 2, 프로젝트(카드 `via-slab-3d`)와 세션의 Save와 Open: 문서, 값, 면 지도 digest; 3D 없는 버전 1 프로젝트는 그대로 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음 | 열 브라우저 검사 |
 | W12(카드 2) | 카드 2가 있는 Library, 그 Model, Mesh view, Result, 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록, `via.side`의 이름에 표시 안내; 스크린샷 보관 | 모두 충족 | 모두 충족 | 열 브라우저 검사 |
-| W13(카드 2) | 키보드만: 카드 2, 회전, 보기 5, 면 목록에서 `via.side`, Use for → Fixed temperature(*Fixed temperature needs an outer face; via.side is inside*, 고정 온도는 여전히 `z0`과 `z1`), Run을 끝까지. Use for는 곡면에도 나오며, 곡면으로 선택을 만드는 것은 전처럼 거부됨 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
+| W13(카드 2) | 키보드만: 카드 2, 회전, 보기 5, 면 목록에서 `via.side`, Use for → Fixed temperature, Temperature 상자에 300 입력(V1)(*Fixed temperature needs an outer face; via.side is inside*, 고정 온도는 여전히 `z0`과 `z1`), Run을 끝까지. Use for는 곡면에도 나오며, 곡면으로 선택을 만드는 것은 전처럼 거부됨 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
 | W14(카드 2) | Run부터 그려진 결과까지, 단면 x = 0 | 기록만(여기서는 SwiftShader) | 약 0.8 s(Mesh 1이 이미 메시됨)와 0.1 s | 열 브라우저 검사 |
 | C3-1 | Compare, 카드 2의 Run 1과 2: 값 표의 모든 칸이 두 실행의 `/values` 응답과 문서에 대한 짝 도우미(A, B, B − A)와 같음 | 100% | 40/40칸 | 비교 브라우저 검사 |
 | C3-2 | 다른 입력, 세 짝: 경계(Run 1 → 2), 메시 크기(2 → 3), 없음(1 → 1) | 목록이 정확히 같음 | 3/3 | 비교 브라우저 검사; node |
