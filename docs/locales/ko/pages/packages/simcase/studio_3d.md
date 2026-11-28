@@ -7,7 +7,7 @@
 상태: **실험적.** 3D 보기는 버전 1 형상 문서([계약](geometry_document.md))의 `3d`
 구성 요소를 `/geometry-lab`의 [형상 실험실](geometry_lab.md) 페이지에서 보여 줍니다.
 읽기 전용이며, 5단계 엔진(`simcase.geometry_engine3d`)이 받는 것, 곧 상자와 `layers`
-기능의 슬래브 층만 받으며, 이를 메시하고([메시](#메시)) 서버에서 3D 정상 열을 풀 수 있습니다([실행](#실행)). 모델 작업 공간에는
+기능의 슬래브 층, 그리고 meshloom builder 모양의 원통과 구([원통과 구](#원통과-구))를 받으며, 이를 메시하고([메시](#메시)) 서버에서 3D 정상 열을 풀 수 있습니다([실행](#실행)). 모델 작업 공간에는
 아직 나오지 않습니다. 페이지, 조작, HTTP 응답은 어느 릴리스에서든 바뀔 수 있습니다.
 
 ## 사용
@@ -134,6 +134,27 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 | `export/run.json` | `{values, document}` |
 | `record?maps=kept` | 실행 기록 `thermal-steady3d-run-v1`: `document`, `document_sha256`, `values`, `mesh`, `maps`(`kept`이면 `surface`, `not kept`이면 그 개수; [멀티피직스 실행의 maps](workspace.md)와 같음) |
 
+## 원통과 구
+
+meshloom builder 모양(판 전체를 지나는 원통 하나, 상자 안이나 홀로 있는 구 하나, 동심 구)의 원통이나 구를 가진
+구성 요소는 아직 정확한 구성이 없습니다. 보기는 `simcase.display_shapes3d`([엔진](geometry_engine3d.md))로 그립니다.
+평면 면은 정확히, 원은 내접 n각형(n = min(256, max(48, ⌈2πr/ℓ⌉)), ℓ = 대각선/200), 원통 옆면은 그 각기둥, 구는
+주파수 min(64, max(8, ⌈1.05 r/ℓ⌉))의 측지 격자입니다. Details에 "Shape drawn for display; the mesh follows it to
+within its size"가 나옵니다.
+
+- **응답**은 상자 응답의 필드를 모두 가집니다. 곡면의 `axis`와 `at`은 null이고, 모든 면에 `shape`(`plane`,
+  `cylinder`, `sphere`), 응답에 `display_note`가 있습니다.
+- **이름**은 메시의 것입니다: `domain.x0`…`domain.z1`, 비아 뚜껑은 `via.bottom`과 `via.top`도, `via.side`, 구의
+  `ball.surface`. 그림이나 메시에서 고르면 같은 면입니다. 메시 보기는 메시 삼각형마다 그 삼각형을 가진 provenance
+  이름 집합과 이름 집합이 같은 면을 줍니다.
+- **단면**은 정확한 윤곽입니다. 원통의 z 단면은 그 n각형, x나 y 단면은 ±√(r² − d²)의 두 선, 구의 단면은 반지름
+  √(r² − d²)의 원입니다.
+- **확인**(`/api/model3d/check`)은 정확한 부피로 피처마다 덮임을 주고(비아는 전부, 더 작은 동심 구를 가진 구는 그것들이
+  일부를 덮음), 영역과 메시 추정(슬라이스 3의 T)을 줍니다.
+- **카드 2** `via-slab-3d`(`/model3d-assets/model3d-via-slab-3d.json`)는 5단계의 E2입니다: 판 [−1, 1]² × [0, 1] m(k = 1)을
+  지나는 r = 0.3 m 구리 비아(k = 100 W/(m K)), z0에 300 K, z1에 301 K, 옆면 단열, h = 0.1 m.
+  Q = ΔT/L (k_v πr² + k_s (A − πr²)) = 31.99159 W.
+
 ## 보내는 것과 응답
 
 - `POST /api/model3d/display`는 `{"doc": <문서>, "component": <이름 또는 null>}`을
@@ -248,6 +269,9 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 | W17 | E1의 단면과 유리수 산술(`fractions.Fraction`)로 계산한 정확한 P1 절단: 같은 점, 최대 \|T − T_exact\|; 평면 여섯(1 mm 경계면의 z, z = 1.2345 mm, x = 3.3, y = 7.1, 면 x = 0과 z = 2.5 mm), 압출·meshloom 경로, 경로를 거친 z = 1.2345 mm의 `cut.csv` | ≤ 1e-12 K | 최악 2.8e-14 K(노드 평면에서 0) | `tests/simcase/test_studio_heat3d_slice.py`, `test_studio_heat3d_run.py` |
 | W8-run | 실행의 mesh 단계에서 Cancel: 11 µm의 열 카드(추정 약 69초)를 실제 서버 프로세스에서 실행 시작 3초 뒤 취소 | Cancel 2초 뒤 자식 종료; 실행은 취소, 남긴 것 없음; 파일 없음 | 모두 만족 | `tests/simcase/test_studio_heat3d_run.py`, CI 작업 `studio-mesh3d-w8` |
 | W14(실행) | 서버 쪽 겉면 지도와 z 단면의 시간과 크기 | 기록 | 아래 | `tests/simcase/test_studio_heat3d_run.py`(가장 큰 것은 `OPENPHYSICS_STUDIO_W14=1`) |
+| W1(모양) | `display_shapes3d`로 그린 C1, C4, C5, C11, 카드 2: (a) 면 id가 없는 삼각형, 이름 집합이 정확한 표면의 것(슬라이스 3 태그로 쓴 표)과 다른 면; (b) 평면에서 벗어난 평면 면의 꼭짓점(정확, float32 전 pm) | (a) 0; (b) 0 | 0; 0 (C1 52,020, C4 1,024, C5 19,232, C11 94,420, 카드 2 1,024 삼각형) | `tests/simcase/test_geometry_display3d.py` |
+| W2(모양) | 정확한 넓이와 비교한 표시 넓이, s(x) = sin x / x: 사각형; 원판의 내접 n각형; 고리; 원통 옆면의 각기둥; 구의 내접 격자, ρ_f는 그린 삼각형의 외접원 반지름 | 사각형 ≤ 1e-6; 원판 부족 ≤ 1 − s(2π/n); 고리 초과 ≤ πr²(1 − s(2π/n)); 옆면 부족 ≤ 1 − s(π/n); 구 0 ≤ 부족 ≤ max(ρ_f/R)² | 사각형 0; C4(n = 126) 원판 4.14e-4, 고리 3.15e-5, 옆면 1.04e-4, 각각 한계와 같음; 구 1.18e-4~4.56e-4, 한계 2.24e-4~8.63e-4 | 같음 |
+| W18 | `POST /api/model3d/run`을 거친 카드 2: e_Q = \|Q_h − Q\|/Q(z1의 Q_h); `build_mesh3d` + `solve_steady_heat_3d`를 직접 부른 것과 Q_h, T, 반작용(SHA-256) | ≤ 1e-2(5단계 P2의 것); 같음 | 7.51e-3(사면체 23,427); 같음 | `tests/simcase/test_studio_model3d_shapes.py` |
 | W14 | 사면체 약 48,000개인 카드와 겉면 삼각형 150,000개에서 성능: 메시 응답 시간, 메시 보기 프레임 시간(120 프레임 중앙값), 탭 JS 힙 | 기록, 하드웨어 GL Chromium에서 관문: 힙 300 MB 이하, 프레임 중앙값 33 ms 이하 | 아래 기록, 관문은 **돌리지 않음**(소프트웨어 GL만) | 같음 |
 
 W14는 2026-11-27에 Linux의 headless Chromium 158(Xeon 2.1 GHz, CPU 4개, GPU 없음)에서
@@ -296,7 +320,7 @@ macOS, Windows)는 HTTP 없이 mesh 단계의 실행을 취소합니다.
 
 ## 한계
 
-- 5단계 slice 1처럼 상자와 슬래브 층만, 읽기 전용(3D에서 기능 편집 없음).
+- 5단계 slice 1처럼 상자와 슬래브 층, 그리고 meshloom builder 모양의 원통과 구, 읽기 전용(3D에서 기능 편집 없음).
 - 메시는 meshloom의 것(실험적)이고 품질도 meshloom의 것입니다. 추정은 엔진의 T이며
   실제 개수와 다릅니다(카드: 추정 20,160개, 실제 23,652개). 단계는 Studio가 아는
   것이고, meshloom 안의 진행은 보여 줄 수 없습니다.
@@ -304,8 +328,8 @@ macOS, Windows)는 HTTP 없이 mesh 단계의 실행을 취소합니다.
   보여 주지 않습니다.
 - 실행의 풀이는 중단할 수 없습니다. 풀이 중 Cancel은 풀이가 돌아오면 결과를 버립니다. 최근 실행 여덟 개의
   메시, 해, 응답을 메모리에 둡니다.
-- meshloom builder 모양(원통, 구)의 구성 요소는 3D 보기가 보여 주지 않으므로 Mesh와 Run이 형성 단계에서 보기의
-  문구로 거부합니다.
+- 원통과 구는 정확한 구성이 아닌 표시 규칙으로 그립니다. 그림은 정확한 모양에서 규칙의 분할 이내, 메시는 그 크기
+  이내입니다. meshloom builder 모양만 받으며, Use for → New selection은 아직 그 면을 받지 않습니다.
 - `layers` 기능 하나만 가진 구성 요소(E1)는 (Mesh와 Run 모두) `meshine.extrude`로 메시하고
   `evaluate3d`는 거부합니다. 보기는 공개 함수 `simcase.display_complex3d`에서 복합체를
   받으며, 이 함수는 그런 구성 요소에 meshloom 경로가 만들 복합체를 만듭니다.

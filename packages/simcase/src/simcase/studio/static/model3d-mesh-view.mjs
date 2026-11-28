@@ -7,7 +7,7 @@
 // gives the same face names.
 import * as THREE from '/vendor/three-0.186.1/three.module.js';
 import {View3D} from '/model3d-assets/model3d-view.mjs';
-import {SHADE,decode,faceRegion,regionColor,viewCamera} from '/model3d-assets/model3d-model.mjs';
+import {decode,faceRegion,shadeOf,regionColor,viewCamera} from '/model3d-assets/model3d-model.mjs';
 import {triangleColors} from '/model3d-assets/model3d-mesh-model.mjs';
 
 const SELECTED=new THREE.Color('#d1242f');
@@ -50,8 +50,8 @@ export class MeshView3D extends View3D{
    const own=names[this.triangleRegions[t]];
    return own!==undefined&&!this.hidden.has(own)?own:faceRegion(f,this.regionsByName,this.hidden);
   };
-  const shadeOf=t=>this.owner[t]===this.selected?1:SHADE[v.faces[this.owner[t]].axis];
-  const tri=triangleColors(this.positions,this.indices,regionOf,colorOf,shadeOf,t=>shown.has(this.owner[t]));
+  const shadeOfTri=t=>this.owner[t]===this.selected?1:shadeOf(v.faces[this.owner[t]]);
+  const tri=triangleColors(this.positions,this.indices,regionOf,colorOf,shadeOfTri,t=>shown.has(this.owner[t]));
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(tri.positions,3));
   g.setAttribute('color',new THREE.BufferAttribute(tri.colors,3));

@@ -76,6 +76,26 @@ meshes nothing and changes nothing `build_mesh3d` does or refuses. `model` is wh
 component, and an omitted name with no or several `3d` components are refused by name
 (`E-CONTRACT` at `geometry.components.<name>`).
 
+`simcase.display_shapes3d(model, component=None)` draws a `3d` component with cylinders or
+spheres in one of the builder shapes (below) for display, as a `simcase.Display3D`: it has no
+exact complex, so it is drawn from the shapes by a display rule that is not the mesh. With
+ℓ = the domain diagonal / 200:
+
+- a planar face with straight edges is drawn exactly;
+- a circle (a via's cap, the hole it leaves in a domain face, a section) is its inscribed
+  n-gon, n = min(256, max(48, ⌈2πr/ℓ⌉)), a disc fanned from its centre and an annulus the strip
+  between the n-gon and the rectangle, every vertex exactly on the face's plane;
+- a cylinder side is that n-gon's prism; a sphere an icosahedral geodesic grid of frequency
+  f = min(64, max(8, ⌈1.05 r/ℓ⌉)), 20 f² triangles with every vertex on the sphere.
+
+Its faces are the mesh's surfaces under the mesh's names (`domain.x0`…`domain.z1`, a cap
+also `<via>.bottom` / `<via>.top`, `<via>.side`, `<id>.surface`) and tags; areas and volumes are
+the exact ones; `section(axis, at)` gives the exact outline of an axis-plane cut drawn by the
+same rule, and `note` the line "Shape drawn for display; the mesh follows it to within its
+size". What no builder takes is refused in slice 3's words (`E-3D-COMBINATION`); a component
+without cylinders or spheres is refused by name (`display_complex3d` draws it).
+`display_complex3d` itself still refuses a sampled surface.
+
 ## What it builds
 
 - **Prisms.** Every `box` and every slab layer (a layer with a `material` and no
@@ -296,7 +316,7 @@ G8 and G9 run on main pushes and manual dispatch only (`geometry3d-full`).
   arrangement wait for meshloom's composable samplers.
 - Builder-shaped components are meshed by `build_mesh3d`, but `evaluate3d` and
   `display_complex3d` refuse them by name (no exact complex of a sampled surface is built
-  yet), so a 3D view cannot draw them yet.
+  yet); a 3D view draws them from `display_shapes3d`, whose shapes are not the mesh's.
 - One size per region; no graded sizes or sizes on surfaces yet.
 - Pieces thinner than about 1e-7 of the diagonal, though above the tolerance, can make meshloom
   not return: two boxes with a face offset by 862 pm (6e-8 of a 14.4 mm diagonal) at h = 0.8 mm

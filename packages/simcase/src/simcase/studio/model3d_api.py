@@ -18,6 +18,7 @@ the engine's own words (``E-3D-COMBINATION`` names the feature).
 from __future__ import annotations
 
 import base64
+import math
 import re
 from fractions import Fraction
 from pathlib import Path
@@ -27,7 +28,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
-from simcase import GeometryError, display_complex3d, parse_geometry
+from simcase import GeometryError, display_complex3d, display_shapes3d, parse_geometry
 from .bodies import RequestRefused, diagnostics, exact_json, read_envelope
 from . import heat3d_runs, mesh3d_jobs
 
@@ -40,7 +41,8 @@ NO_STORE = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 ASSETS = {name: (STATIC / name, mime) for name, mime in (
     ("model3d-view.mjs", "text/javascript"), ("model3d-model.mjs", "text/javascript"),
     ("model3d-mesh-view.mjs", "text/javascript"), ("model3d-mesh-model.mjs", "text/javascript"),
-    ("model3d-via-stack.json", "application/json"), ("model3d-layer-stack-3d.json", "application/json"))}
+    ("model3d-via-stack.json", "application/json"), ("model3d-layer-stack-3d.json", "application/json"),
+    ("model3d-via-slab-3d.json", "application/json"))}
 
 
 def install(app) -> None:
@@ -153,7 +155,143 @@ def _material(material):
 
 def display_view(doc: dict, component: str | None = None) -> dict:
     """The display answer of one ``3d`` component; raises ``GeometryError`` on a refusal."""
+    shaped = shapes_of(doc, component)
+    if shaped is not None:                      # cylinders and spheres: drawn by the display rule
+        return _display_shapes(*shaped)
     return _display(*complex_of(doc, component))
+
+
+# ----------------------------------------------------------------------------- cylinders and spheres
+
+def shapes_of(doc: dict, component: str | None = None):
+    """``(model, component, simcase.display_shapes3d's display)`` when the component holds a cylinder or
+    a sphere, else None (the exact complex draws it, ``complex_of``)."""
+    geometry = doc.get("geometry") if isinstance(doc, dict) else None
+    if not isinstance(geometry, dict) or "version" not in geometry:
+        return None
+    model = parse_geometry(doc)
+    name = component
+    if name is None:
+        solid = [n for n, c in model.components.items() if c.dimension == "3d"]
+        if not solid:
+            return None
+        name = solid[0]
+    comp = model.components.get(name)
+    if comp is None or comp.dimension != "3d" or not any(f.type in ("cylinder", "sphere") for f in comp.features):
+        return None
+    return model, comp, display_shapes3d(model, name)
+
+
+def _shape_frame(comp):
+    origin2 = [comp.domain[k + "min"] + comp.domain[k + "max"] for k in AXES]
+    return origin2, lambda p: [float((2 * p[i] - origin2[i]) / (2 * PM)) for i in range(3)]
+
+
+def _display_shapes(model, comp, disp) -> dict:
+    """The display answer of a component drawn by ``display_shapes3d``: the fields of ``_display``,
+    with ``axis`` and ``at`` null on curved faces, ``shape`` on every face and ``display_note``."""
+    upm = Fraction(comp.pm_per_unit)
+    to_unit2, to_unit3 = float((PM / upm) ** 2), float((PM / upm) ** 3)
+    origin2, to_m = _shape_frame(comp)
+    faces_of: dict = {}
+    for f in disp.faces:
+        for n in f.names:
+            faces_of.setdefault(n, []).append(f.index)
+    positions, indices, owner, faces, edges, edge_faces = [], [], [], [], [], []
+    for f in disp.faces:
+        base, first = len(positions), len(owner)
+        positions += [to_m(p) for p in f.vertices]
+        indices += (f.triangles + base).tolist()
+        owner += [f.index] * len(f.triangles)
+        faces.append({"id": f.index, "shape": f.shape,
+                      "axis": AXES[f.axis] if f.shape == "plane" else None,
+                      "at": float(Fraction(f.coord) / upm) if f.shape == "plane" else None,
+                      "names": sorted(f.names), "alone": [n for n in sorted(f.names) if faces_of[n] == [f.index]],
+                      "minus": list(f.minus), "plus": list(f.plus), "exterior": f.exterior, "tag": f.tag,
+                      "area": f.area * to_unit2, "first_triangle": first, "triangle_count": len(f.triangles)})
+        for line in f.edges:
+            for p, q in zip(line[:-1], line[1:]):
+                edges += [to_m(p), to_m(q)]
+                edge_faces.append(f.index)
+    regions = [{"name": r.name, "material": _material(r.material), "void": r.void, "volume": r.volume * to_unit3,
+                "faces": sorted(r.faces)} for r in disp.regions]
+    tags: dict = {}
+    for f in disp.faces:
+        if f.tag:
+            tags.setdefault(f.tag, []).append(f.index)
+    half = [Fraction(comp.domain[k + "max"] - comp.domain[k + "min"], 2 * PM) for k in AXES]
+    unit = str(comp.length_unit)
+    summary = [f"component {comp.name} (3d, {unit}): meshloom builder.{disp.shape}, {len(regions)} regions, "
+               f"{len(faces)} faces; {disp.note}"]
+    summary += [f"  region {r['name']}: {r['material']}, volume {r['volume']:g} {unit}^3" for r in regions]
+    summary += [f"  face {f['id']}: {f['shape']}" + (f" {f['axis']} = {f['at']:g}" if f["axis"] else "")
+                + f", area {f['area']:g} {unit}^2, " + " ".join(f["names"]) + (f" [tag {f['tag']}]" if f["tag"] else "")
+                for f in faces]
+    return {
+        "ok": True, "component": comp.name, "unit": unit,
+        "components": [{"name": n, "dimension": c.dimension} for n, c in model.components.items()],
+        "metres_per_unit": float(upm) / PM, "origin_m": [float(Fraction(o, 2 * PM)) for o in origin2],
+        "domain": {k: float(Fraction(v) / upm) for k, v in sorted(comp.domain.items())},
+        "half_extent_m": [float(h) for h in half],
+        "regions": regions, "faces": faces, "selections": [],
+        "tags": [{"tag": t, "faces": ids} for t, ids in sorted(tags.items())],
+        "counts": {"faces": len(faces), "triangles": len(owner), "vertices": len(positions), "edges": len(edge_faces)},
+        "positions": _b64(np.array(positions, dtype=np.float32).reshape(-1, 3), "f4"),
+        "indices": _b64(np.array(indices, dtype=np.uint32).reshape(-1, 3), "u4"),
+        "triangle_faces": _b64(np.array(owner, dtype=np.uint32), "u4"),
+        "edges": _b64(np.array(edges, dtype=np.float32).reshape(-1, 3), "f4"),
+        "edge_faces": _b64(np.array(edge_faces, dtype=np.uint32), "u4"),
+        "summary": "\n".join(summary), "display_note": disp.note,
+    }
+
+
+def _section_shapes(model, comp, disp, axis, at) -> dict:
+    upm = Fraction(comp.pm_per_unit)
+    at_pm = round(Fraction(str(at)) * upm)
+    lo, hi = comp.domain[axis + "min"], comp.domain[axis + "max"]
+    unit = str(comp.length_unit)
+    if not lo <= at_pm <= hi:
+        raise GeometryError(f"section {axis} = {at} {unit} is outside the domain of {comp.name!r} "
+                            f"({float(Fraction(lo) / upm):g} to {float(Fraction(hi) / upm):g} {unit})")
+    _, to_m = _shape_frame(comp)
+    cut = disp.section(axis, at_pm)
+    return {"ok": True, "component": comp.name, "unit": unit, "axis": axis, "at": at,
+            "faces": sorted({seg.face for seg in cut}), "regions": disp.section_regions(axis, at_pm),
+            "segments": _b64(np.array([[to_m(seg.p), to_m(seg.q)] for seg in cut], dtype=np.float32).reshape(-1, 2, 3),
+                             "f4"),
+            "segment_faces": _b64(np.array([seg.face for seg in cut], dtype=np.uint32), "u4")}
+
+
+def check_view_shapes(doc: dict, model, comp, disp) -> dict:
+    """``check_view`` of a component drawn by ``display_shapes3d``: each feature's coverage from the exact
+    volumes (a via is full; a sphere with smaller concentric ones inside is covered in part by them),
+    the display's regions, the parameters and the mesh estimate (slice 3's T)."""
+    display = _display_shapes(model, comp, disp)
+    upm3 = float((PM / Fraction(comp.pm_per_unit)) ** 3)
+    m = lambda k: k / PM                                        # noqa: E731
+    dom = comp.domain
+    features = []
+    for i, f in enumerate(comp.features):
+        d = f.data
+        if f.type == "cylinder":
+            volume = math.pi * m(d["r"]) ** 2 * m(d["zmax"] - d["zmin"])
+            inner = []
+        else:
+            volume = 4 * math.pi / 3 * m(d["r"]) ** 3
+            inner = [j for j, g in enumerate(comp.features) if j > i and g.type == "sphere" and g.data["r"] < d["r"]]
+        biggest = max((comp.features[j].data["r"] for j in inner), default=0)
+        owned = volume - 4 * math.pi / 3 * m(biggest) ** 3
+        refs = ", ".join(f"{j + 1} ({comp.features[j].id})" for j in inner)
+        coverage, text = ("partial", f"covered in part by {refs}") if inner else ("full", "")
+        features.append({"index": i, "id": f.id, "type": f.type, "volume": volume * upm3, "owned": owned * upm3,
+                         "coverage": coverage, "covered_by": inner, "text": text})
+    try:
+        mesh = {"ok": True, "estimate": mesh3d_jobs.estimate(doc, comp.name), "key": mesh3d_jobs.reuse_key(doc)}
+    except GeometryError as exc:
+        mesh = _refusal(exc)
+    return {"ok": True, "component": comp.name, "unit": str(comp.length_unit), "features": features,
+            "regions": display["regions"], "parameters": _parameters(doc, model, comp.name),
+            "selections": [], "display": display, "mesh": mesh}
 
 
 def _alone(cx) -> dict:
@@ -320,6 +458,9 @@ def check_view(doc: dict, component: str | None = None) -> dict:
     ``/api/model3d/mesh/estimate``) with the mesh job's reuse key, or the refusal that blocks
     meshing (E-MESH-ESTIMATE, a below-tolerance E-CONTRACT, two values rounding to one coordinate):
     the shape is formed either way, so the view is not greyed for it."""
+    shaped = shapes_of(doc, component)
+    if shaped is not None:                      # cylinders and spheres (display_shapes3d)
+        return check_view_shapes(doc, *shaped)
     model, comp, cx = complex_of(doc, component)
     display = _display(model, comp, cx)
     try:
@@ -378,6 +519,9 @@ def _summary(cx, comp, regions, faces) -> str:
 def section_view(doc: dict, component: str | None, axis: str, at) -> dict:
     """The outline where the plane ``axis = at`` (document units) cuts the faces; ``GeometryError``
     when the plane is outside the domain or the document is refused."""
+    shaped = shapes_of(doc, component)
+    if shaped is not None:
+        return _section_shapes(*shaped, axis, at)
     model, comp, cx = complex_of(doc, component)
     a = AXES.index(axis)
     at_pm = round(Fraction(str(at)) * comp.pm_per_unit)

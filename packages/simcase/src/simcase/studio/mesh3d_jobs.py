@@ -38,8 +38,8 @@ from pathlib import Path
 
 import numpy as np
 
-from simcase import (GeometryError, Mesh3DResult, build_thermal3d_mesh, display_complex3d, estimate_mesh3d,
-                     mesh3d_to_arrays, parse_geometry, reader)
+from simcase import (GeometryError, Mesh3DResult, build_thermal3d_mesh, display_complex3d, display_shapes3d,
+                     estimate_mesh3d, mesh3d_to_arrays, parse_geometry, reader)
 
 _log = logging.getLogger("simcase.studio")
 
@@ -123,6 +123,43 @@ def _surface(result):
     return used, local.reshape(-1, 3), faces, regions, names
 
 
+def _has_shapes(model, component) -> bool:
+    name = component
+    if name is None:
+        solid = [n for n, c in model.components.items() if c.dimension == "3d"]
+        name = solid[0] if len(solid) == 1 else None
+    comp = model.components.get(name) if name is not None else None
+    return comp is not None and comp.dimension == "3d" and any(f.type in ("cylinder", "sphere") for f in comp.features)
+
+
+def _surface_shapes(result, shapes):
+    """``_surface`` of a builder-shape mesh: each boundary or interface triangle is given the display face
+    (``simcase.display_shapes3d``) whose name set is the set of the mesh's provenance names holding it
+    (``via.bottom``'s triangles are in ``via.bottom`` and ``domain.z0``, the annulus's in ``domain.z0``
+    only), sorted by face id (stable); the region index is the face's plus side's, else its minus side's."""
+    names = [r.name for r in shapes.regions]
+    holders: dict = {}
+    for name, tris in sorted(result.provenance_faces.items()):
+        for t in np.asarray(tris, dtype=np.int64).reshape(-1, 3):
+            holders.setdefault(tuple(sorted(t.tolist())), (t, set()))[1].add(name)
+    by_names = {frozenset(f.names): f for f in shapes.faces}
+    triangles, faces = [], []
+    for key in sorted(holders):
+        t, held = holders[key]
+        f = by_names.get(frozenset(held))
+        if f is None:
+            raise GeometryError(f"internal: a mesh triangle under {sorted(held)} matches no display face")
+        triangles.append(t)
+        faces.append(f.index)
+    triangles, faces = np.array(triangles, dtype=np.int64).reshape(-1, 3), np.array(faces, dtype=np.int64)
+    order = np.argsort(faces, kind="stable")
+    triangles, faces = triangles[order], faces[order]
+    used, local = np.unique(triangles, return_inverse=True)
+    side = {f.index: (f.plus or f.minus or [None])[0] for f in shapes.faces}
+    regions = np.array([names.index(side[i]) if side[i] in names else -1 for i in faces.tolist()], dtype=np.int64)
+    return used, local.reshape(-1, 3), faces, regions, names
+
+
 def _surface_extrude(mesh, cx):
     """``_surface`` of a ``meshine.extrude`` mesh (a lone slab component): its exterior and interface
     triangles, each given the complex face (``display_complex3d``'s, all axis-aligned) whose plane
@@ -168,12 +205,20 @@ def child(doc: dict, component: str | None, outdir: str, conn) -> None:
     out = Path(outdir)
     try:
         conn.send(("step", "forming"))
-        cx = display_complex3d(parse_geometry(doc), component)
+        model = parse_geometry(doc)
+        if _has_shapes(model, component):                 # cylinders and spheres: the display rule's faces
+            cx, shapes = None, display_shapes3d(model, component)
+        else:
+            cx, shapes = display_complex3d(model, component), None
         conn.send(("step", "meshing"))
         built = build_thermal3d_mesh(doc, component)       # the thermal.steady3d kind's route choice
         conn.send(("step", "checking"))
-        if isinstance(built, Mesh3DResult):
-            mesh, route = built.mesh, ("meshloom" if built.complex is not None else "builder")
+        if isinstance(built, Mesh3DResult) and built.complex is None:
+            mesh, route = built.mesh, "builder"
+            used, triangles, faces, regions, names = _surface_shapes(built, shapes)
+            component_name, estimate, notes = shapes.component, float(built.estimate), built.diagnostics
+        elif isinstance(built, Mesh3DResult):
+            mesh, route = built.mesh, "meshloom"
             used, triangles, faces, regions, names = _surface(built)
             component_name, estimate, notes = built.complex.component, float(built.estimate), built.diagnostics
         else:

@@ -139,12 +139,17 @@ export function regionColor(view,name){
 
 /** Shading by face orientation, so the three visible sides of a box differ. */
 export const SHADE={x:0.78,y:0.62,z:1.0};
+/** The shade of a face: by its axis, or for a curved face (a cylinder or a sphere, axis null) one value. */
+export const CURVED_SHADE=0.9;
+export function shadeOf(face){return face.axis?SHADE[face.axis]:CURVED_SHADE;}
 
 /** The names panel's lines of a face. */
 export function faceLines(view,face){
  const unit=view.unit;
- return {title:`Face ${face.id} · ${face.axis} = ${Number(face.at.toPrecision(6))} ${unit}`,
-  detail:`area ${Number(face.area.toPrecision(6))} ${unit}² · ${face.exterior?'exterior':'interior'}${face.tag?' · tag '+face.tag:''}`,
+ const where=face.axis?`${face.axis} = ${Number(face.at.toPrecision(6))} ${unit}`:(face.shape||'curved');
+ return {title:`Face ${face.id} · ${where}`,
+  detail:`area ${Number(face.area.toPrecision(6))} ${unit}² · ${face.exterior?'exterior':'interior'}${face.tag?' · tag '+face.tag:''}`
+   +(view.display_note?` · ${view.display_note}`:''),
   sides:`${face.minus.length?face.minus.join(', '):'outside'} | ${face.plus.length?face.plus.join(', '):'outside'}`,
   names:face.names};
 }

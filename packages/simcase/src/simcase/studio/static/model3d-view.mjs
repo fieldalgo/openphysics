@@ -5,7 +5,7 @@
 // the server's display triangles, a section plane and hidden regions. three.js 0.186.1 is
 // vendored unmodified and served by Studio (docs/third-party.md, browser-served files).
 import * as THREE from '/vendor/three-0.186.1/three.module.js';
-import {SHADE,VIEWS,decode,drawn,faceRegion,faceShown,fit,frameOf,orbit,pan,pick,rayAt,regionColor,
+import {SHADE,VIEWS,shadeOf,decode,drawn,faceRegion,faceShown,fit,frameOf,orbit,pan,pick,rayAt,regionColor,
  toFrame,viewCamera,zoomBy} from '/model3d-assets/model3d-model.mjs';
 
 const STEP=Math.PI/12;                       // 15 degrees per arrow key
@@ -60,7 +60,7 @@ export class View3D{
   for(const f of v.faces){
    const region=faceRegion(f,this.regionsByName,this.hidden);
    c.set(f.id===this.selected?SELECTED:regionColor(v,region));
-   if(f.id!==this.selected)c.multiplyScalar(SHADE[f.axis]);
+   if(f.id!==this.selected)c.multiplyScalar(shadeOf(f));
    for(let t=f.first_triangle;t<f.first_triangle+f.triangle_count;t++)
     for(let k=0;k<3;k++){const i=this.indices[3*t+k];colors[3*i]=c.r;colors[3*i+1]=c.g;colors[3*i+2]=c.b;}
   }
