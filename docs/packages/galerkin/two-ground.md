@@ -56,8 +56,12 @@ under the same 1e-10 entrywise gate as before. Each x interval is 0.75 times
 the distance from its start to the nearest singularity of the density
 (xs ± i·d over all panel points), so it is at most three times that distance
 anywhere in it: intervals are fine only near conductors. Plane totals are the
-closed-form zero cosine mode, (1−y/H) and y/H. `ground_modes` is still
-admitted (64–4096) but no longer changes the Gram.
+closed-form zero cosine mode, (1−y/H) and y/H. `ground_modes` is kept for
+compatibility: it must still be an integer in 64–4096 and is refused otherwise,
+so existing calls and stored controls that include it
+keep working, but no result depends on it; a test checks that results are bit
+for bit equal for 64 and 4096. Removing it or giving it a new meaning would
+change the public signature or stored results, so neither is done here.
 
 A cosine (Parseval) sum, used before, leaves a small entry between two
 conductors that hardly overlap on a plane by cancellation, so rounding set its

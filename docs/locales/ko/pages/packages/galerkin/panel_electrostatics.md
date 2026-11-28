@@ -40,7 +40,7 @@
 |---|---|---|
 | `polygons`(위치 인자) | `polygons` | 도체 경계. 각각 꼭짓점 좌표(m)의 (n, 2) 배열이고 엄격히 볼록하며 닫는 중복점이 없다. |
 | `box_size`(키워드) | `width`, `height` | 직사각형의 두 변 길이 (너비, 높이), m. 직사각형은 [0, 너비] × [0, 높이]로, `galerkin.cavity`의 3차원 `box_size`처럼 원점에서 시작한다. 양면 접지 계산기에서 높이는 두 접지면 간격이다. |
-| `panels_per_edge`, `ground_modes`, `interpolation_degree` | 같음 | 이산화 개수. 기본값은 내부 계산기의 것이다. |
+| `panels_per_edge`, `ground_modes`, `interpolation_degree` | 같음 | 이산화 개수. 기본값은 내부 계산기의 것이다. `solve_two_ground_rectangle`과 `solve_two_ground_rectangle_edges`는 `ground_modes`를 여전히 검사하므로(64–4096 정수) 기존 호출과 저장된 제어값은 그대로 동작하지만, 결과는 이 값에 의존하지 않는다. 접지판 전류 Gram을 실공간에서 적분하기 때문이다. 코너 계산기는 여전히 이 값을 Fourier 개수로 쓴다. |
 | `ground_indices` | `grounds` | `solve_open_rectangle`: 전위 0으로 묶는 도체의 `polygons` 인덱스. |
 | `signal_indices` | `signals` | `solve_two_ground_harmonic_corner_guard_edges`: 활성 도체 두 개의 순서 있는 인덱스. |
 | `signal_index` | `signal` | `solve_two_ground_harmonic_corner_single_active_edges`: 활성 도체의 인덱스. |

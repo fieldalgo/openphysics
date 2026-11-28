@@ -122,9 +122,9 @@ def test_new_api_keeps_original_early_admission(monkeypatch,field,value):
 def test_new_api_keeps_original_ground_refinement_refusal(monkeypatch):
     original=module._factors;calls=[]
     def changed(*args,**kwargs):
-        calls.append(kwargs['modes']);value=original(*args,**kwargs)
-        if kwargs['modes']==256:value['ground_parts']*=1.001
+        calls.append(kwargs['order']);value=original(*args,**kwargs)
+        if kwargs['order']==16:value['ground_parts']*=1.001
         return value
     monkeypatch.setattr(module,'_factors',changed)
     with pytest.raises(ValueError,match='ground Fourier'):solve()
-    assert calls==[128,256]
+    assert calls==[12,16]
