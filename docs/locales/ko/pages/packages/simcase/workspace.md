@@ -269,15 +269,15 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 Si 100 µm)와 산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어
 있습니다. 원기둥이 오기 전까지 via는 정사각형입니다: *Square via (a round via needs cylinders, coming with the next
 geometry step)*. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
-그 모델로 돌아갑니다. 3D 모델에는 아직 메시, 실행, 결과가 없습니다. **Mesh**와 **Run**은 이유(*Meshing and heat come
+그 모델로 돌아갑니다. 3D 모델은 **Mesh 1**(아래)로 메시합니다. 아직 실행과 결과는 없으며, **Run**은 이유(*Heat comes
 in a later step of the 3D model.*)와 함께 꺼진 채 보입니다.
 
 **트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 적힌 그대로의 매개변수,
 *t_ox = 10 um · via_w = 20 um*), **Geometry 1**과 그 아래 **Domain**(*200 × 200 × 610 µm*, 또는 *200 × 200 µm, z from the
 features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*,
-*2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*3 regions · 22 faces*, 서버 검사에서), 그다음 **Materials**(*Si · SiO2 ·
-Cu*)가 있습니다. 덮임 말은 정확한 complex에서 옵니다: *covered in part by 2 (via)*, 또는 나중 특징이 전부 차지하면
-*covered by 2 (b), 3 (c); adds no region*. Heat transfer, Mesh, Study, Results는 다음 단계에서 옵니다. Geometry 1의
+*2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*3 regions · 22 faces*, 서버 검사에서), **Materials**(*Si · SiO2 ·
+Cu*), **Mesh 1**(*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, 서버의 추정)이 있습니다. 덮임 말은 정확한 complex에서 옵니다: *covered in part by 2 (via)*, 또는 나중 특징이 전부 차지하면
+*covered by 2 (b), 3 (c); adds no region*. Heat transfer, Study, Results는 다음 단계에서 옵니다. Geometry 1의
 **Add feature**는 **Box**와 **Layers**를 내놓고, **Extrude**, **Cylinder**, **Sphere**는 이유와 함께 흐리게 보입니다
 (*Extrude comes with a later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
 geometry step*). 특징 설정에는 **Move up**, **Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**(*via
@@ -300,7 +300,7 @@ deleted; Undo restores it.*)가 있고, layers 특징에는 **Add layer**와 **R
 
 거부한 값은 2D 빌더의 범위 문장을 쓰고(*Via x max must be between 90–200 µm.*, *Stack oxide thickness must be greater
 than 0 µm.*, *Via element size must be between 1.68–168 µm.*) **Restore last valid value**가 붙은 강조된 초안으로 남습니다.
-초안이 있는 동안 File › Save, Save As, Export는 꺼지고, Mesh와 Run은 초안을 이유로 밝힙니다. 특징의 조합은 서버만
+초안이 있는 동안 File › Save, Save As, Export는 꺼지고, Mesh는 초안을 이유로 밝힙니다. 특징의 조합은 서버만
 검사합니다. **Parameters** 표는 매개변수마다 이름, 값, 종류(length 또는 ratio), 범위(문서가 줄 때), SI 값, 그것을 쓰는 칸의
 수를 보이며, 매개변수에 관한 거부(E-DOMAIN, E-EXPRESSION-KIND, 순환)는 그 행에 보입니다. 쓰이는 매개변수는 지우지 않으며,
 거부는 쓰는 곳을 특징 순서로 밝힙니다: *t_ox is used by stack.oxide thickness.*(여럿이면 *w is used by domain xmax,
@@ -310,7 +310,22 @@ stack.oxide thickness, via xmin, via xmax.*).
 거부는 Messages에 엔진의 말 그대로 보이고, 그 코드와 경로는 **Details** 아래에 있습니다(예: *sphere 'ball' is not taken
 yet in a 3d component; boxes and slab layers are* · `geometry.components.c.features[2]`의 `E-3D-COMBINATION`). Studio는
 거기에 제 말을 더하지 않습니다. 트리는 거부가 가리키는 (나중) 특징을 표시하고, 보기는 만들 수 있었던 마지막 형상을 흐리게
-*Last shape that could be formed*라는 이름과 함께 유지하며, Mesh와 Run은 *Fix 1 problem in Messages to mesh*라고 말합니다.
+*Last shape that could be formed*라는 이름과 함께 유지하며, Mesh는 *Fix 1 problem in Messages to mesh*라고 말합니다.
+
+검사는 메시 추정(`simcase.estimate_mesh3d`)도 답하며, 형상은 만들어지지만 메시를 막는 거부도 답합니다: 한도를 넘는 요소 수
+(`E-MESH-ESTIMATE`), 메셔 허용 오차 아래의 조각(`E-CONTRACT`), 한 좌표로 반올림되는 두 값(*west.x1 and east.x0 round to the
+same coordinate 9000.000000000002 m*). 이런 거부도 Messages에 같은 방식으로 보이고, 트리는 경로가 가리키는 특징을, 없으면
+**Mesh 1**(*refused*)을 표시합니다. 형상은 만들어졌으므로 보기는 흐려지지 않으며, Mesh는 거부의 말을 이유로 꺼집니다.
+
+**Mesh 1.** 그 페이지는 추정과 문서 mesh 블록의 `element_size`(물리량; 수만 쓰면 구성 요소 단위; 특징처럼 대각선/400 ~
+대각선/4)를 보입니다. 그래픽 머리말의 **Mesh**는 Studio의 메시 작업([3D 보기의 메시 경로](studio_3d.md#보내는-것과-응답))을
+별도 프로세스로 실행합니다: 단계(*Forming geometry → Meshing (expected about 1 s) → Checking the mesh → Ready*), 경과 시간,
+추정의 두 배를 넘으면 *taking longer than the estimate*. 실행 중에는 버튼이 **Cancel meshing**이며, 취소는 프로세스를 끝내고
+아무것도 남기지 않습니다(Messages에 *Meshing cancelled; nothing kept.*). 끝나면 Messages가 *Meshed stack3d: 1551 nodes, 6774
+tetrahedra, 3 regions.*라고 말하고, 페이지가 메시 통계를 나열하며, 보기가 **Mesh view**(영역별 색, 메시 모서리; 같은 조작과
+면 고르기)로 바뀝니다. **Geometry**로 돌아갑니다. 형상과 mesh 블록이 바뀌지 않은 메시는 바로 재사용합니다. 편집한 뒤에는 메시
+보기가 흐려지고 *Mesh of an earlier geometry; mesh again to update it*라는 이름이 붙습니다. 메시는 보기 상태입니다: Undo에도,
+프로젝트나 세션 파일에도 없으며, 3D 모델을 떠나거나 닫으면 실행 중인 작업을 취소합니다.
 
 **보기와 선택.** 보기는 [3D 보기](studio_3d.md)와 그 조작입니다(보기에서 화살표는 회전, Shift+화살표는 이동, +와 −는
 확대·축소, F는 맞춤, 1–6은 축 방향 보기, 0은 등각). 보기에서 고르거나 **Faces** 목록에서 고른(Tab, Enter) 면은 그
@@ -337,10 +352,11 @@ geometry block.*, *The model3d session has an invalid view.* 3D 모델은 아직
 | 검사 | 무엇 | 기준 | 측정 | 위치 |
 |---|---|---|---|---|
 | W4 | 카드의 목록 면 10개(`stack.sub.domain.x0`, `stack.oxide.domain.y1`, `stack.top.domain.x1`, `stack.top.top`, `via.x0`, `via.x1`, `via.y0`, `via.y1`, `via.z0`, `via.z1`)를 골라 Use for → New selection; 쓴 선택과 손으로 친 목록 이름이 고른 면으로 풀림(서버: `build_mesh3d`를 거쳐 고른 면의 메시 면으로) | 10/10 | 10/10(서버와 브라우저; 보기에서 둘, 면 목록에서 여덟) | `tests/simcase/test_studio_model3d_check.py`, `tools/studio_browser/model3d_builder_browser.mjs` |
-| W5 | 검사가 내는 E-3D-COMBINATION 줄기마다 문서 하나(footprint layers만; 다른 특징 옆; extrude, cylinder, sphere 아직 받지 않음): Messages에 엔진의 말, Details에 코드, features[i]의 트리 표시, Mesh와 Run의 이유 | 100% | 5/5. 줄기 "… round to the same coordinate"와 circle_segments는 메시할 때 `build_mesh3d`에서 나옴(나중 단계) | 같음 |
+| W5 | 형상을 만들 때 검사가 내는 E-3D-COMBINATION 줄기마다(footprint layers만; 다른 특징 옆; extrude, cylinder, sphere 아직 받지 않음), 그리고 메시 전 거부마다(반올림 줄기, 허용 오차 아래의 E-CONTRACT, E-MESH-ESTIMATE) 문서 하나: Messages에 엔진의 말, Details에 코드, features[i]의 트리 표시(없으면 Mesh 1), Mesh의 이유 | 100% | 5/5와 3/3(서버와 브라우저). circle_segments는 해당 없음: 검사가 받는 3d 구성 요소에 곡면 특징이 없음 | 같음, 그리고 `tests/simcase/test_studio_model3d_check_mesh.py` |
+| W9(작업 공간) | Mesh 1이 메시 전에 추정을 보임; 한도의 1.5배에서 Mesh가 거부와 함께 꺼지고 메시 작업을 요청하지 않음; 추정이 `/api/model3d/mesh/estimate`와 같음 | 3/3 | 3/3(서버와 브라우저) | 같음 |
 | W11(실행 없음) | Save와 Open 뒤 문서 digest, 프로젝트와 세션; 3D 없는 버전 1 프로젝트는 전처럼 바이트까지 같게 씀 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음 | `tests/simcase/studio_model3d_files.cjs`, 브라우저 검사 |
-| W12 | Library와 카드를 연 Model, 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록에 닿음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 브라우저 검사 |
-| W13(B 부분) | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → New selection | 포인터 이벤트 없음 | 포인터 이벤트 0 | 브라우저 검사 |
+| W12 | Library, 카드를 연 Model과 그 메시 보기(Mesh 1, Mesh), 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록에 닿음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 브라우저 검사 |
+| W13 | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → New selection; 그다음 Mesh 1, 크기 8 µm, Mesh, Cancel meshing, Tab으로 Messages의 취소 줄에 닿음, 서버에서 작업이 *cancelled*, 크기 40 µm, 다시 Mesh해 메시 보기까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 브라우저 검사 |
 
 순수 도우미(`workspace-model3d.mjs`)는 `tests/simcase/studio_model3d_builder.cjs`가 검사하고, 브라우저 검사는 트리의 행과
 말도 서버 응답과 비교합니다. 브라우저 검사는 로컬입니다(실행 가능한 Chromium과 Playwright, CI에는 없음). 실행 중인

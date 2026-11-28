@@ -6,8 +6,8 @@ const test=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');
 const STATIC='../../packages/simcase/src/simcase/studio/static/';
 const STATIC_DIR=path.join(__dirname,'..','..','packages','simcase','src','simcase','studio','static');
-let M;
-test.before(async()=>{M=await import(STATIC+'workspace-model3d.mjs');});
+let M,W;
+test.before(async()=>{M=await import(STATIC+'workspace-model3d.mjs');const C=await import(STATIC+'model3d-mesh-model.mjs');W={estimateText:C.estimateText,meshBlocked:C.meshBlocked};});
 const card=()=>JSON.parse(fs.readFileSync(path.join(STATIC_DIR,'model3d-layer-stack-3d.json'),'utf8'));
 const comp=doc=>doc.geometry.components.stack3d;
 
@@ -24,21 +24,50 @@ test('the card is its own Library group, with the square-via note',()=>{
 });
 
 test('the tree (design 5.2): Component 1 with Parameters, Geometry 1 (Domain, numbered features, Form result) and Materials',()=>{
- const check={features:[{text:'covered in part by 2 (via)'},{text:''}],regions:[1,2,3,4],display:{faces:new Array(23).fill({})}};
- const rows=M.treeRows(card(),check);
+ const check={features:[{text:'covered in part by 2 (via)'},{text:''}],regions:[1,2,3,4],display:{faces:new Array(23).fill({})},
+  mesh:{ok:true,estimate:{tetrahedra:2402,seconds:1.4411},key:'k'}};
+ const rows=M.treeRows(card(),check,null,W);
  assert.deepEqual(rows.map(r=>[r.label,r.level,r.note]),[['Component 1 · 3D · µm',1,''],['Parameters',2,''],['Geometry 1',2,''],
   ['Domain',3,'200 × 200 × 610 µm'],['1 Layers stack',3,'sub · oxide · top (covered in part by 2 (via))'],['2 Box via',3,'20 × 20 × 10 µm'],
-  ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · SiO2 · Cu']]);
+  ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · SiO2 · Cu'],['Mesh 1',2,'size 40 µm · Estimate 2,400 tetrahedra · about 1 s']]);
  let doc=M.addParameter(M.addParameter(card(),'t_ox','10 um'),'via_w','20 um');
  const free=JSON.parse(JSON.stringify(doc));delete free.geometry.components.stack3d.domain.zmin;delete free.geometry.components.stack3d.domain.zmax;
  const r2=M.treeRows(free,null);
  assert.equal(r2.find(r=>r.key==='parameters').note,'t_ox = 10 um · via_w = 20 um');
  assert.equal(r2.find(r=>r.key==='domain').note,'200 × 200 µm, z from the features');
  assert.equal(r2.find(r=>r.key==='form').note,'');
+ assert.equal(r2.find(r=>r.key==='mesh').note,'size 40 µm');
+});
+
+test('a refusal before meshing marks features[i], else the Mesh node; the shape is not refused',()=>{
+ const base={features:[{text:''},{text:''}],regions:[1,2,3],display:{faces:[]}};
+ const at=mesh=>M.treeRows(card(),{...base,mesh});
+ const marked=rows=>rows.filter(r=>r.problem).map(r=>r.key);
+ assert.deepEqual(marked(at({ok:false,refused:'about 2402 tetrahedra …',code:'E-MESH-ESTIMATE',path:'mesh.element_count_limit',feature_index:null})),['mesh']);
+ assert.deepEqual(marked(at({ok:false,refused:'west.x1 and east.x0 round to the same coordinate',code:'E-3D-COMBINATION',feature_index:1})),['feature:1']);
+ const rows=at({ok:false,refused:'r',code:'E-CONTRACT',path:'geometry.components.c',feature_index:null});
+ assert.equal(rows.find(r=>r.key==='mesh').note,'refused');assert.equal(rows.find(r=>r.key==='form').note,'3 regions · 0 faces');
+ assert.equal(M.meshRefusal({...base,mesh:{ok:false,refused:'r',feature_index:null}}).refused,'r');
+ assert.equal(M.meshRefusal({...base,mesh:{ok:true}}),null);assert.equal(M.meshRefusal(null),null);
+});
+
+test('the refusal while forming marks the tree as before',()=>{
  const refused=M.treeRows(card(),null,{feature_index:1});
  assert.deepEqual(refused.filter(r=>r.problem).map(r=>r.key),['feature:1']);
  assert.equal(refused.find(r=>r.key==='form').note,'refused');
  assert.deepEqual(M.treeRows(card(),null,{feature_index:null}).filter(r=>r.problem).map(r=>r.key),['form']);
+});
+
+test('the mesh size: a quantity in the document mesh block, within the 5.2 range',()=>{
+ const f=M.fieldsOf(card(),'mesh');
+ assert.deepEqual(f.map(x=>[x.key,x.label]),[['mesh.element_size','element_size']]);
+ assert.equal(M.getField(card(),'mesh.element_size'),'40 um');
+ assert.equal(M.editField(card(),f[0],'20').doc.mesh.element_size,'20 um','a bare number takes the component unit');
+ assert.equal(M.editField(card(),f[0],'0.1 mm').doc.mesh.element_size,'0.1 mm');
+ assert.equal(M.editField(card(),f[0],'1').problem,'Mesh element size must be between 1.68–168 µm.');
+ assert.equal(M.editField(card(),f[0],'w').problem,'A mesh size is a number or a quantity such as 20 um.');
+ assert.equal(M.fieldNote(card(),'mesh.element_size'),'= 0.00004 m');
+ assert.deepEqual(M.editField(card(),f[0],'20').doc.geometry,card().geometry,'the geometry is unchanged');
 });
 
 test('field edits: numbers, quantities, names and expressions; a bad one is a draft problem',()=>{
@@ -146,7 +175,14 @@ test('refusals: the engine words as written, the code and path under Details; th
  assert.deepEqual(M.refusalMessage(r),{text:r.refused,details:'E-3D-COMBINATION at geometry.components.c.features[2]',feature:2});
  assert.equal(M.blockReason({drafts:2}),'Correct the highlighted fields or restore their last valid values first.');
  assert.equal(M.blockReason({refused:r}),'Fix 1 problem in Messages to mesh');
- assert.equal(M.blockReason(),'Meshing and heat come in a later step of the 3D model.');
+ assert.equal(M.blockReason(),'Heat comes in a later step of the 3D model.');
+ // Mesh: drafts, then the shape's refusal, then the mesh refusal's own words, then a running job
+ assert.equal(M.meshReason({drafts:1},W),'Correct the highlighted field or restore its last valid value first.');
+ assert.equal(M.meshReason({refused:r},W),'Fix 1 problem in Messages to mesh');
+ assert.equal(M.meshReason({check:{mesh:{ok:false,refused:'about 2402 tetrahedra; over the limit'}}},W),'about 2402 tetrahedra; over the limit');
+ assert.equal(M.meshReason({check:{mesh:{ok:true,estimate:{}}},running:true},W),'A mesh job is running; wait for it or cancel it.');
+ assert.equal(M.meshReason({check:{mesh:{ok:true,estimate:{}}}},W),null);
+ assert.equal(M.meshReason({check:null},W),'Show a 3d component first.');
  assert.equal(M.fieldWords(card(),'parameters.h'),'parameter h');
  assert.equal(M.deletedText(card(),1),'via deleted; Undo restores it.');
 });

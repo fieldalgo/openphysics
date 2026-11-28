@@ -199,7 +199,7 @@ const multiView=createMultiphysicsView({$,ui,notice:(text,more,action)=>notice(t
  recoveryState:()=>recoveryState==='kept'&&multiView.recoveryDropped()?'kept:'+multiView.recoveryDropped():recoveryState,applications:host=>{renderApplications(host,resumeOffer(),null,libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));library3d(host);}});
 // The 3D model (slice B of the Studio 3D view; workspace-model3d-view.mjs): its own page, tree and
 // Undo beside the workspace and multiphysics models, which stay as they are.
-const m3View=createModel3dView({$,ui,notice:text=>notice(text),render:()=>render(),request:(url,body)=>studioRequest('POST',url,body),
+const m3View=createModel3dView({$,ui,notice:text=>notice(text),render:()=>render(),request:(url,body)=>studioRequest('POST',url,body),get:url=>studioRequest('GET',url),
  onHistory:()=>{updateHistory();refreshPersistence();},projectLine:()=>projectLine(),
  applications:host=>{renderApplications(host,resumeOffer(),null,libraryOptions());host.querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>chooseTemplate(b.dataset.template));library3d(host);}});
 // The Library's 3D group: its own cards, after the application cards (not an application card).
@@ -569,7 +569,7 @@ function refreshInputIssues(){
  }
  for(const id of ['save-project','save-draft','save-session','open-session','restore-draft','menu-open','menu-save','menu-save-as','menu-export-session'])$(id).disabled=numericDrafts.invalid||m3View.drafts()>0||((multiView.active()||m3View.active())&&id==='save-draft');
  $('run-optical').disabled=solverBusy||!!pendingJob||!!opticalBlock()||!!retentionBlock()||numericDrafts.invalid;refreshRunOptions();
- if(m3View.active())$('status').textContent=m3View.blockText()||'3D geometry · Mesh and Run come in a later step';
+ if(m3View.active())$('status').textContent=m3View.blockText()||'3D geometry · Run comes in a later step';
  else if(!applicationChosen()&&!numericDrafts.invalid)$('status').textContent='Choose a model to start';
  else $('status').textContent=opticalHold()||opticalReadyStatus(opticalFreshness(current(),runs,viewedRun(),state.modeCount,state.groupIndex,pmlNow(),closedTargetNow()));
  refreshSequenceHeading();refreshPersistence();jouleView.refreshControls();
