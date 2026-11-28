@@ -158,17 +158,28 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
     }
 
     // the segments to look at in a round: at first all; then those with a missing piece
-    // in the last round and those with a vertex next to a point it inserted (an edge
-    // that an insertion removes has both ends on the new point's cavity, so both
-    // become its neighbours); the other pieces are still edges
+    // in the last round and those with a piece whose two ends are both next to a point
+    // it inserted (an edge that an insertion removes has both ends on the new point's
+    // cavity, so both become its neighbours); the other pieces are still edges
     let mut look: std::collections::BTreeSet<usize> = (0..segments.len()).collect();
+    // each piece's segment by its ends, for the pieces an insertion may have removed
     let mut seg_of_s: Vec<u32> = Vec::new();
+    let mut piece_seg: HashMap<(u32, u32), u32> = HashMap::new();
+    for (k, s) in segments.iter().enumerate() {
+        piece_seg.insert((s[0].min(s[1]), s[0].max(s[1])), k as u32);
+    }
+    // has_edge walks the star of its first vertex: start from the end with fewer
+    // segments (a fan's centre has thousands)
+    let degree = |x: u32| if (x as usize) < n { incident[x as usize].len() } else { 2 };
+    let edge = |mesh: &mut Mesh<MixedPoints>, a: u32, b: u32| {
+        if degree(a) <= degree(b) { mesh.has_edge(a, b) } else { mesh.has_edge(b, a) }
+    };
     loop {
         // the pieces that are not edges
         let mut missing: Vec<(usize, usize)> = Vec::new();
         for &k in &look {
             for (i, p) in pieces[k].iter().enumerate() {
-                if !mesh.has_edge(p.u, p.v) {
+                if !edge(&mut mesh, p.u, p.v) {
                     missing.push((k, i));
                 }
             }
@@ -182,11 +193,11 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
         // a piece that an earlier split of this round made an edge is left alone
         for &(k, i) in missing.iter().rev() {
             let p = pieces[k][i];
-            if mesh.has_edge(p.u, p.v) {
+            if edge(&mut mesh, p.u, p.v) {
                 continue;
             }
             let s = segments[k];
-            let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute);
+            let (t, rule) = split_parameter(&mut mesh, points, s, &p, &acute, [degree(p.u), degree(p.v)]);
             if !(t > p.t0 && t < p.t1) {
                 return Err(Error::Internal(format!(
                     "segment {}: a piece is too short to split (do segments cross?)", p.seg)));
@@ -198,13 +209,26 @@ pub fn recover(points: &[P3], segments: &[[u32; 2]], max_depth: u32) -> Result<R
             }
             let id = insert_s(&mut mesh, SPoint::seg(s[0], s[1], t), &mut stats)?;
             seg_of_s.push(k as u32);
-            for w in mesh.neighbours(id) {
-                if (w as usize) < n {
+            // a removed edge has both ends among the new point's neighbours: the
+            // segments at each neighbour, except that at a vertex with many segments (a
+            // fan's centre) only its pieces to other neighbours
+            let nb = mesh.neighbours(id);
+            for &w in &nb {
+                if (w as usize) >= n {
+                    next.insert(seg_of_s[w as usize - n] as usize);
+                } else if incident[w as usize].len() <= HUB {
                     next.extend(incident[w as usize].iter().map(|&j| j as usize));
                 } else {
-                    next.insert(seg_of_s[w as usize - n] as usize);
+                    for &x in &nb {
+                        if let Some(&j) = piece_seg.get(&(w.min(x), w.max(x))) {
+                            next.insert(j as usize);
+                        }
+                    }
                 }
             }
+            piece_seg.remove(&(p.u.min(p.v), p.u.max(p.v)));
+            piece_seg.insert((p.u.min(id), p.u.max(id)), k as u32);
+            piece_seg.insert((id.min(p.v), id.max(p.v)), k as u32);
             match rule {
                 Rule::Midpoint | Rule::Near => stats.bisection_points += 1,
                 Rule::Centre(c) => {
@@ -332,6 +356,10 @@ impl StageClock {
     }
 }
 
+/// More segments than this at an input vertex make it a hub (a fan's centre): its star is
+/// not walked for every piece at it.
+const HUB: usize = 32;
+
 #[derive(Clone, Copy, Debug)]
 enum Rule {
     /// the middle of the piece
@@ -344,7 +372,8 @@ enum Rule {
 
 /// Where to split a missing piece of segment a-b (Si–Gärtner's rules, as in Si's thesis
 /// and Diazzi et al. 2023). The reference point p is, among the mesh neighbours of the
-/// piece's ends that lie strictly inside its diametral ball (exactly), the one seeing
+/// piece's ends (not of an end with more than [`HUB`] segments, a fan's centre, whose
+/// star is not walked) that lie strictly inside its diametral ball (exactly), the one seeing
 /// the piece under the largest angle (in doubles; ties by index). With no such point,
 /// or when a rule's point falls outside the middle 62/64 of the piece, the middle.
 /// - Rule 1 (no acute end): the point at |u - p| from u when that is under half the
@@ -356,7 +385,8 @@ enum Rule {
 /// The parameter is a short dyadic within a relative 2^-24 of the piece around the
 /// target, preferring an exact double point (so points of one centre lie on a common
 /// sphere up to that).
-fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool]) -> (f64, Rule) {
+fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: &Piece, acute: &[bool],
+                   degree: [usize; 2]) -> (f64, Rule) {
     let _ = acute;
     let mid = (p.t0 + (p.t1 - p.t0) / 2.0, Rule::Midpoint);
     if p.toward == BOTH {
@@ -379,12 +409,16 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
         m.rounded(q)
     };
     let (xu, xv) = (rounded(&m, pu), rounded(&m, pv));
-    let mut cand = mesh.neighbours(p.u);
-    for w in mesh.neighbours(p.v) {
-        if !cand.contains(&w) {
-            cand.push(w);
+    // the neighbours of both ends; an end with more than HUB segments (a fan's centre)
+    // is not walked, its neighbours being thousands (only the other end's count)
+    let mut cand = Vec::new();
+    for (x, d) in [(p.u, degree[0]), (p.v, degree[1])] {
+        if d <= HUB {
+            cand.extend(mesh.neighbours(x));
         }
     }
+    cand.sort_unstable();
+    cand.dedup();
     let m = mesh.g.view();
     let mut best: Option<(f64, u32, P3)> = None;
     for w in cand {
