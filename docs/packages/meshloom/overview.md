@@ -80,9 +80,11 @@ mesh["region_names"]           # ['via', 'slab']
 A closed triangle surface (an STL-like input: points and triangles, with a tag per
 triangle) goes through `builder.triangle_surface(points, triangles, tags=...,
 region_points=...)`. **Experimental:** the 3D plan's import gate (V20, on the Thingi10K
-population C14) was not met at milestone M4, so meshing such inputs can fail or exceed
-the plan's time limits on real files. Version 1 supports polyhedral inputs and the
-builder's primitives; closed-surface import is gated again at M8, and V20 stays reported.
+population C14) was not evaluated at milestone M4. The readiness check run before the gate
+fell short, so the gated run is recorded as not evaluated, which never counts as passed, and
+M4 covers the builder's inputs only. Meshing such inputs can fail or exceed the plan's time
+limits on real files. Version 1 supports polyhedral inputs and the builder's primitives;
+closed-surface import is gated again at M8, and V20 and the other C14 rows stay reported.
 - **What it joins.** Two triangles are joined into one polygon facet when they:
   - share an edge that no other triangle uses;
   - carry the same tag;
@@ -397,7 +399,7 @@ See [third-party software](../../third-party.md).
   gift-wrapping fallback takes time quadratic in the cavity size; the Delaunay path
   filled every cavity side in the tests (a cavity of 25,979 tetrahedra in 0.26 s).
 - **Closed triangle surfaces (STL-like inputs) are experimental**: the import gate (V20
-  on C14) was not met at M4 and is run again at M8. A closed triangle surface given as one
+  on C14) was not evaluated at M4, which covers builder inputs only, and is taken again at M8. A closed triangle surface given as one
   facet per triangle meshes, small angles between its triangles included. Its quality is not guaranteed, and it
   can be slow. Every triangle edge is then a segment.
   - Inside an input angle too small for any triangle to meet the quality bound
