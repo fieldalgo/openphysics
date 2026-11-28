@@ -215,7 +215,10 @@ try {
       await page.keyboard.press('ArrowDown');                       // New selection → Fixed temperature
       const fixed = await page.evaluate(() => document.getElementById('m3-use').value === 'fixed');
       const name = await page.evaluate(() => document.getElementById('m3-use-name').value);
-      const onApply = await tabTo(page, () => document.activeElement?.id === 'm3-use-go', 10) !== null;
+      // V1: the temperature is typed in the Use row before Apply (by keyboard)
+      const onTemp = await tabTo(page, () => document.activeElement?.id === 'm3-use-temp', 10) !== null;
+      await page.keyboard.type('300');
+      const onApply = onTemp && await tabTo(page, () => document.activeElement?.id === 'm3-use-go', 10) !== null;
       await page.keyboard.press('Enter');
       return {onUse, fixed, name, onApply};
     };
@@ -366,6 +369,9 @@ try {
     await page.keyboard.press('ArrowDown');
     steps.fixed = await page.evaluate(() => document.getElementById('m3-use').value === 'fixed');
     steps.name = await page.evaluate(() => document.getElementById('m3-use-name').value);
+    // V1: the temperature is typed in the Use row before Apply (by keyboard)
+    steps.onTemp = await tabTo(page, () => document.activeElement?.id === 'm3-use-temp', 10) !== null;
+    await page.keyboard.type('300');
     steps.onApply = await tabTo(page, () => document.activeElement?.id === 'm3-use-go', 10) !== null;
     await page.keyboard.press('Enter');
     await page.waitForSelector('[data-m3-use-refusal]', {timeout: 30000});

@@ -489,6 +489,13 @@ export function setFixedTemperature(doc,name,raw){
  const value=quantity(raw,T_FIELD),out=withHeat(doc),h=out.physics.heat;
  h.prescribed_temperature={...(h.prescribed_temperature||{}),[name]:value};return out;
 }
+/** V1: why Use for → Fixed temperature cannot apply yet (no value, or the field's own problem), or null. */
+export function useTemperatureProblem(raw){
+ if(!String(raw??'').trim())return 'Type a temperature in K to apply.';
+ try{quantity(raw,T_FIELD);return null;}catch(e){return e.message;}
+}
+/** V1: the Messages line for a fixed temperature as the document holds it. */
+export const fixedNoticeText=(name,doc)=>`Fixed temperature ${heatOf(doc)?.prescribed_temperature?.[name]} on ${name}.`;
 export function removeFixedTemperature(doc,name){
  const out=copy(doc),h=heatOf(out);if(!h?.prescribed_temperature)return out;
  delete h.prescribed_temperature[name];return out;
