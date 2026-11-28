@@ -175,6 +175,11 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
     허용 오차 아래의 E-CONTRACT, 한 좌표로 반올림되는 두 값(`features[i]`의
     E-3D-COMBINATION). 어느 쪽이든 형상은 만들어지므로 응답은 `"ok": true`로 남습니다.
     카드에서는 검사의 8 ms에 약 7 ms를 더합니다.
+  - `run`: Run이 문서를 받을지 여부. `POST /api/model3d/run`이 무엇이든 시작하기 전에 읽는 대로
+    읽습니다(`thermal.steady3d` physics 항목 하나, 그다음 종류의 reader): `{"ok": true}` 또는
+    `{"ok": false, "refused": <reader의 말>, "code"}`, 예를 들어 *Fixed temperature needs an outer
+    face; via.z1 is inside*(`E-CONTRACT`). 실행, 메시 작업, 프로세스를 시작하지 않습니다(카드에서 약
+    10 ms). 고정 온도가 없는 연결된 영역 묶음은 메시에서만 찾을 수 있으므로, 그 거부는 실행에서 옵니다.
 - 형상을 만드는 중의 거부는 `{"ok": false, "refused": <엔진 메시지 그대로>, "code", "path",
   "feature_index"}`입니다. index는 경로가 가리키는 `features[i]`이거나 null이며, 빌더는
   그 기능을 표시합니다.
