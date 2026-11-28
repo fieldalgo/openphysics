@@ -389,7 +389,7 @@ nodes, 9,238 tetrahedra, 4 regions.*(보관한 메시면 *Meshed Component 1 (th
 줄을 둡니다. 안쪽 면은 *Interior face: hide Si (top), the region above it, with Regions in the view toolbar to see it.*를 덧붙입니다(x나
 y를 가로지르는 면은 +x나 +y 쪽 영역). 보기 도구 막대의
 **Regions**에는 영역마다 확인란이 있습니다. 해제한 영역은 형상, 메시, 결과 보기에서 숨겨지므로 안쪽 면을 고를 수 있습니다:
-+z 보기에서 `via.z1`은 그 위의 영역 *Si (top)*을 숨기면 골라집니다. 엔진의 이름은 바뀌지 않습니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
++z 보기에서 `via.z1`은 그 위의 영역 *Si (top)*을 숨기면 골라집니다. 영역을 숨긴 동안 그 컨트롤은 *Regions (1 hidden)*로 읽히고 보기 위의 줄이 *Hidden: Si (top). Faces shown where it was are interior.*라고 알립니다. 엔진의 이름은 바뀌지 않습니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
 `selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은
 선택으로 만들지 않고 그렇게 말합니다. **Use for → Fixed temperature**는 같은 줄에 **Temperature (K)** 상자(비어 있음, *e.g. 330*)를
 보이며, **Apply**는 올바른 온도를 기다리며 이유를 말하고(*Type a temperature in K to apply.* 또는 칸 자체의 이유), 서버 검사를 거친
@@ -432,7 +432,7 @@ removes heat shows a negative rate).*, galerkin의 반력 열률은 열을 넣�
 노드의 Tmax나 Tmin은 *336.05 K at the SiO2 / Si (top) interface, (38.5, 163, 510) µm*로 읽히고(`/api/model3d/runs/{id}/extremes`가 노드 둘레의
 영역을 밝힘), 파일에서 연 실행은 다시 계산할 때까지 *in SiO2*로 읽힙니다. **Result** 보기는 실행의 면 온도를 최소는 파랑,
 최대는 빨강으로, *Surface temperature*라는 제목의 색 막대와 함께 보입니다(그 범위는 면의 것이라 표의 모델 전체 범위보다 좁을 수
-있음). 도구 막대의 **Section**(x, y 또는 z = 구성 요소 단위의 위치, 단위는 상자 옆에 보임)은 형상 보기를 자르고,
+있음). 여기서 선택한 면은 온도 색을 그대로 두고 검정에 가까운 윤곽선으로 표시됩니다. 형상 보기와 메시 보기는 채움을 유지합니다. 도구 막대의 **Section**(x, y 또는 z = 구성 요소 단위의 위치, 단위는 상자 옆에 보임)은 형상 보기를 자르고,
 결과에서는 실행 장의 정확한 단면을 그립니다(*Cut z = 505 µm: 833.653–939.105 K.*). 단면은 그 자신의 범위와 채도 높은 제 지도(파랑, 청록,
 초록, 호박색, 빨강: 단면 온도는 흔히 범위 가운데에 몰리는데, 면 지도의 밝은 가운데는 흰색처럼 보임)로 칠하고, 면의 범례 아래에
 제 범례(*Cut z = 505 µm*, 최소와 최대)를 둡니다. 두 범례는 보기 위에 있어 늘 보입니다. 색은 렌더러에 선형 빛으로 넘겨지므로

@@ -308,6 +308,7 @@ export function createModel3dView(ctx){
    `<span class="m3-pane" role="group" aria-label="Shown"><button type="button" data-m3-pane="geometry" aria-pressed="${!onMesh&&!onResult}">Geometry</button><button type="button" data-m3-pane="mesh" aria-pressed="${onMesh}"${mesh.view?'':' disabled title="Mesh first"'}>Mesh view</button>`+
    `<button type="button" data-m3-pane="result" aria-pressed="${onResult}"${heat.records.length?'':' disabled title="Run first"'}>Result</button></span></div>`+
    (onResult?colourBar(heat.records[heat.shown]):'')+(cutShown?cutBar():'')+      // V8: the legends above the view, in sight
+   (hidden.size?`<p class="m3-notice" id="m3-hidden-note">Hidden: ${esc([...hidden].join(', '))}. Faces shown where ${hidden.size===1?'it was are':'they were are'} interior.</p>`:'')+   // X2
    `<div class="m3-stage${refused&&!onMesh&&!onResult?' stale':''}${(onMesh&&stale)||resultStale?' stale':''}"><div id="m3-canvas-slot"></div>${refused&&lastGood&&!onMesh&&!onResult?'<p class="m3-last">Last shape that could be formed</p>':''}`+
    `${onMesh&&stale?'<p class="m3-last">Mesh of an earlier geometry; mesh again to update it</p>':''}${resultStale?`<p class="m3-last">Run ${heat.shown+1}: inputs changed since this run</p>`:''}</div>`+
    `<section class="m3-faces"><h3 id="m3-faces-heading">Faces</h3><ul id="m3-faces" aria-labelledby="m3-faces-heading"></ul></section>`+
@@ -387,13 +388,16 @@ export function createModel3dView(ctx){
  /** U7: Regions in the view toolbar: a checkbox per region; unchecked hides it in every view (setHidden). */
  function regionsControl(){
   const rows=regionToggles(lastGood,hidden);if(!rows.length)return '';
-  return `<details class="m3-regions" id="m3-regions"${regionsOpen?' open':''}><summary>Regions</summary><fieldset><legend>Shown regions</legend>`+
+  const n=rows.filter(r=>!r.shown).length;
+  return `<details class="m3-regions" id="m3-regions"${regionsOpen?' open':''}><summary>${n?`Regions (${n} hidden)`:'Regions'}</summary><fieldset><legend>Shown regions</legend>`+
    rows.map(r=>`<label><input type="checkbox" data-m3-region="${esc(r.name)}"${r.shown?' checked':''}> ${esc(r.name)}</label>`).join('')+`</fieldset></details>`;
  }
  function showRegion(name,shown){
   if(shown)hidden.delete(name);else hidden.add(name);
   for(const v of [viewer,mesh.viewer,heat.viewer])v?.setHidden([...hidden]);
   if(face!==null&&viewer&&viewer.selected===null){face=null;renderFaces();renderNames();}
+  ctx.render();      // X2: the hidden-region line and the Regions count
+  document.querySelector(`#m3-regions [data-m3-region="${CSS.escape(name)}"]`)?.focus();
  }
  function colourBar(rec){
   const s=rec.surface,lo=s.temperature_min.value,hi=s.temperature_max.value,mid=(lo+hi)/2;

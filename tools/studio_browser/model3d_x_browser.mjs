@@ -7,6 +7,13 @@
 //      as forming ("cx = 0.69 m forms") is fed back to the server's check, which answers ok with a mesh
 //      estimate; the r value of the x1 case too; and cx = 0.7 (touching x1): plain words ("touches the
 //      domain side x = 1 m along a line") and a value that forms: 6/6.
+//  X2  card 1, P05's path (face 5 in the Faces list, Use for → Fixed temperature 330, Apply, Run, the
+//      Result view): the top face's projected centre pixel at Iso and at +z is within 12/255 per channel
+//      of the legend's 330 K colour; the bottom face's from −z within 12/255 of the 300 K colour;
+//      /surface at the top face's nodes is exactly 330 K; face 5 stays selected and its outline shows
+//      (≥ 20 near-black pixels): 5/5.
+//  X2b Si (top) hidden with Regions: "Hidden: Si (top). Faces shown where it was are interior." above
+//      the view and "Regions (1 hidden)"; shown again: neither: 2/2.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -103,6 +110,58 @@ try {
       byLabel.x1.fed.some(([f, , ok]) => f === 'r' && ok),
       /^Cylinder via touches the domain side x = 1 m along a line\. Keep cx < 0\.7 m/.test(byLabel['x1 touch'].text) && centreOk('x1 touch')];
     record('X1', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 6, results});
+    await ctx.close();
+  }
+  // ---- X2: a selected face keeps its temperature colours in the Result view (P05's path) ----
+  if (want('X2')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    let runId = null;
+    page.on('response', async r => { if (r.url().endsWith('/api/model3d/run') && r.request().method() === 'POST') { try { runId = (await r.json()).run; } catch {} } });
+    // P05: face 5 in the Faces list, Use for → Fixed temperature 330, Apply, Run, Result at Iso
+    await page.click('#m3-faces li[data-face="5"]'); await page.selectOption('#m3-use', 'fixed');
+    await page.fill('#m3-use-temp', '330'); await page.click('#m3-use-go'); await checked(page);
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(500);
+    const selected = await page.evaluate(() => document.getElementById('m3-names')?.dataset.face);
+    const sample = async view => { await page.click(`[data-m3-view="${view}"]`); await page.waitForTimeout(300);
+      return page.evaluate(async ([id, view]) => {
+        const M = await import('/model3d-assets/model3d-model.mjs'), W = await import('/workspace-assets/workspace-model3d.mjs');
+        const s = await (await fetch(`/api/model3d/runs/${id}/surface`)).json();
+        const pos = M.decode(s.positions, Float32Array), T = M.decode(s.temperature, Float32Array), idx = M.decode(s.indices, Uint32Array), own = M.decode(s.triangle_faces, Uint32Array);
+        const face = name => s.faces.find(f => f.names.includes(name)).id;
+        const nodesT = id => { const out = new Set(); for (let t = 0; t < idx.length / 3; t++) if (own[t] === id) for (let k = 0; k < 3; k++) out.add(T[idx[3 * t + k]]); return [...out]; };
+        const c = document.getElementById('m3-result-canvas'), w = c.width, h = c.height;
+        // the face's centroid on the canvas by the camera contract (the result view's display box: the half extents about origin_m)
+        const half = [0, 0, 0]; for (let i = 0; i < pos.length; i++) half[i % 3] = Math.max(half[i % 3], Math.abs(pos[i]));
+        const v = {...s, metres_per_unit: 1e-6, half_extent_m: half};
+        const centroid = id => { let q = [0, 0, 0], n = 0; for (let t = 0; t < idx.length / 3; t++) if (own[t] === id) for (let k = 0; k < 3; k++) { const i = idx[3 * t + k]; for (let a = 0; a < 3; a++) q[a] += pos[3 * i + a]; n++; } return q.map(x => x / n); };
+        const pixel = id => { const fr = M.frameOf(M.viewCamera(v, view), c.clientWidth, c.clientHeight), q = centroid(id);
+          const x = (M.dot(q, fr.x) / fr.halfWidth + 1) / 2 * w, y = (1 - M.dot(q, fr.y) / fr.halfHeight) / 2 * h;
+          const t = document.createElement('canvas'); t.width = w; t.height = h; const g = t.getContext('2d'); g.drawImage(c, 0, 0);
+          return [...g.getImageData(Math.round(x), Math.round(y), 1, 1).data].slice(0, 3); };
+        const lo = s.temperature_min.value, hi = s.temperature_max.value, colour = K => W.temperatureColor(K, lo, hi).map(x => Math.round(x * 255));
+        const t = document.createElement('canvas'); t.width = w; t.height = h; const g = t.getContext('2d'); g.drawImage(c, 0, 0); const d = g.getImageData(0, 0, w, h).data;
+        let dark = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 70 && d[i + 1] < 70 && d[i + 2] < 70) dark++;
+        const top = face('stack.top.top'), bottom = face('stack.sub.bottom');
+        return {top: view === '-z' ? null : pixel(top), bottom: view === '-z' ? pixel(bottom) : null, want330: colour(330), want300: colour(300), topT: nodesT(top), dark};
+      }, [runId, view]); };
+    const iso = await sample('iso'), pz = await sample('+z'), mz = await sample('-z');
+    const near = (p, q) => p && Math.max(...p.map((v, k) => Math.abs(v - q[k]))) <= 12;
+    await page.click('[data-m3-view="iso"]'); await page.waitForTimeout(300);
+    await page.screenshot({path: join(out, 'x2-result-iso.png')});
+    const rows = [near(iso.top, iso.want330), near(pz.top, pz.want330), near(mz.bottom, mz.want300),
+      iso.topT.length === 1 && iso.topT[0] === 330, selected === '5' && iso.dark >= 20];
+    record('X2', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 5, selected, iso, pz, mz});
+    // the hidden-region note: Si (top) hidden → the line and "Regions (1 hidden)"; shown again → neither
+    await page.evaluate(() => { document.getElementById('m3-regions').open = true; });
+    await page.click('#m3-regions [data-m3-region="Si (top)"]'); await page.waitForTimeout(200);
+    const hiddenNote = await page.evaluate(() => ({line: document.getElementById('m3-hidden-note')?.textContent || '', summary: document.querySelector('#m3-regions summary')?.textContent || ''}));
+    await page.click('#m3-regions [data-m3-region="Si (top)"]'); await page.waitForTimeout(200);
+    const shownNote = await page.evaluate(() => ({line: document.getElementById('m3-hidden-note')?.textContent ?? null, summary: document.querySelector('#m3-regions summary')?.textContent || ''}));
+    const rowsB = [hiddenNote.line === 'Hidden: Si (top). Faces shown where it was are interior.' && hiddenNote.summary === 'Regions (1 hidden)',
+      shownNote.line === null && shownNote.summary === 'Regions'];
+    record('X2b', rowsB.every(Boolean) && !seen.pageErrors.length, {passed: rowsB.filter(Boolean).length, of: 2, hiddenNote, shownNote});
     await ctx.close();
   }
 } finally {

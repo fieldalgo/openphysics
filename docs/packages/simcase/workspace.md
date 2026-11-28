@@ -479,6 +479,8 @@ picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names,
 face across x or y, the region on its +x or +y side). **Regions** in the view toolbar has a
 checkbox per region; an unchecked region is hidden in the geometry, mesh and result views, so an inner
 face can be picked: in the +z view `via.z1` is picked once *Si (top)*, the region above it, is hidden.
+While a region is hidden the control reads *Regions (1 hidden)* and a line above the view says so: *Hidden: Si (top).
+Faces shown where it was are interior.*
 The engine's names are unchanged. **Use for → New
 selection** with **Apply** writes `selections[<name>] = {"boundary": <name>}` with the first of the
 face's sorted names that selects that face alone (`POST /api/model3d/selection`). A face that no single
@@ -538,7 +540,8 @@ at a node shared by two regions reads *336.05 K at the SiO2 / Si (top) interface
 (`/api/model3d/runs/{id}/extremes` names the regions around the node); a run opened from a file reads *in SiO2*
 until it is recomputed. The **Result** view shows the run's
 surface temperature, blue at the minimum and red at the maximum, with its colour bar titled *Surface
-temperature* (its range is the surface's, which can be narrower than the whole model's in the table); the toolbar's
+temperature* (its range is the surface's, which can be narrower than the whole model's in the table). A face selected
+there keeps its temperature colours and is outlined in near-black; the geometry and mesh views keep their fill. The toolbar's
 **Section** (x, y or z = a position in the component's unit, shown beside the box) clips the geometry view and, on a result,
 draws the exact cut of the run's field (*Cut z = 505 µm: 833.653–939.105 K.*), coloured over the cut's
 own range in a saturated map of its own (blue, cyan, green, amber, red: a cut's temperatures often sit
