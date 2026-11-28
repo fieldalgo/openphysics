@@ -1,4 +1,4 @@
-// Real-browser checks of the 3D model in the workspace (slice B of the Studio 3D view).
+// Real-browser checks of the 3D model in the workspace (slices B and C of the Studio 3D view).
 // Copyright 2026 Yongha Kim (FieldAlgo)
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -10,22 +10,31 @@
 //  W4  each of 10 listed faces of the card layer-stack-3d picked (in the view where it is visible,
 //      else in the faces list), Use for → New selection; the selection the page writes and the
 //      listed name typed by hand resolve (server check) to the picked face: 10/10;
-//  W5  one model3d session per E-3D-COMBINATION stem the check raises: Messages shows the
-//      engine's words as written and the code under Details, and the tree marks features[i]: 100%;
+//  W5  one model3d session per stem the check raises: the E-3D-COMBINATION stems while forming and,
+//      before meshing, the rounding stem, a below-tolerance E-CONTRACT and E-MESH-ESTIMATE: Messages
+//      shows the engine's words as written and the code under Details, the tree marks features[i]
+//      (else Mesh 1 for a mesh refusal), and Mesh says why it is disabled: 100%;
+//  W9  through the workspace: Mesh 1 shows the estimate before meshing, equal to
+//      /api/model3d/mesh/estimate's; at 1.5 times the limit Mesh is disabled with the refusal and no
+//      mesh job is requested: 3/3;
 //  W11 without runs: the document digest is equal after Save and Open, for the project and for the
 //      session; a version 1 project without 3D opened and saved stays version 1 with its entries'
 //      bytes and digests unchanged (the byte-for-byte check is studio_model3d_files.cjs);
 //  W12 the Library, and the Model with the card, at 1440 × 900 and 390 × 844: no console error, no
 //      CSP violation, the canvas visible and not empty, no horizontal scroll at 390, the faces list
 //      reachable by Tab; screenshots stored;
+//      also the mesh view inside the workspace (Mesh 1, Mesh, the mesh canvas drawn);
 //  W13 keyboard only: open the card, rotate, view 5, select via.z1 from the list, Use for → New
-//      selection; no pointer event.
+//      selection; then Mesh 1, a small mesh size, Mesh, Cancel meshing, the cancel line reached in
+//      Messages by Tab and the job cancelled on the server, the size back, Mesh again to the mesh
+//      view; no pointer event.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
 
 const require = createRequire(import.meta.url);
 const {chromium} = require('playwright');
@@ -34,6 +43,7 @@ const out = process.argv[3] || 'model3d-builder-browser';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 await mkdir(out, {recursive: true});
 const CARD = JSON.parse(await readFile(join(ROOT, 'packages/simcase/src/simcase/studio/static/model3d-layer-stack-3d.json'), 'utf8'));
+const MESH = await import(pathToFileURL(join(ROOT, 'packages/simcase/src/simcase/studio/static/model3d-mesh-model.mjs')).href);
 const V1 = await readFile(join(ROOT, 'tests/simcase/studio_session_fixtures/project-v1.json'), 'utf8');
 const W4_NAMES = ['stack.sub.domain.x0', 'stack.oxide.domain.y1', 'stack.top.domain.x1', 'stack.top.top', 'via.x0', 'via.x1',
   'via.y0', 'via.y1', 'via.z0', 'via.z1'];
@@ -65,15 +75,16 @@ async function open(browser, viewport) {
 const checked = page => page.waitForFunction(() => { const box = document.getElementById('mp-messages');
   return box && !box.hidden && box.dataset.m3State === 'checked' && document.querySelector('#m3-faces li'); }, null, {timeout: 30000});
 const csp = page => page.evaluate(() => window.__csp);
-async function canvasState(page, selector) {
-  return page.evaluate(sel => {
+async function canvasState(page, selector, bg = 'fixed') {
+  return page.evaluate(([sel, bg]) => {
     const c = document.querySelector(sel), r = c.getBoundingClientRect(), probe = document.createElement('canvas');
     probe.width = c.width; probe.height = c.height; const g = probe.getContext('2d'); g.drawImage(c, 0, 0);
     const d = g.getImageData(0, 0, probe.width, probe.height).data; let drawn = 0;
-    for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - 0xfb) + Math.abs(d[i + 1] - 0xfc) + Math.abs(d[i + 2] - 0xfd) > 24) drawn++;
+    const [r0, g0, b0] = bg === 'corner' ? [d[0], d[1], d[2]] : [0xfb, 0xfc, 0xfd];
+    for (let i = 0; i < d.length; i += 4) if (Math.abs(d[i] - r0) + Math.abs(d[i + 1] - g0) + Math.abs(d[i + 2] - b0) > 24) drawn++;
     return {x: r.x, y: r.y, width: r.width, height: r.height, visible: r.width > 0 && r.height > 0 && getComputedStyle(c).display !== 'none',
       drawn, pixels: d.length / 4, scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth};
-  }, selector);
+  }, [selector, bg]);
 }
 async function tabTo(page, test, limit = 160) {
   for (let i = 1; i <= limit; i++) { await page.keyboard.press('Tab'); if (await page.evaluate(test)) return i; }
@@ -92,6 +103,10 @@ async function download(page, trigger) {
   if (asked) await page.click('#save-name-download');
   return readFile(await (await done).path(), 'utf8');
 }
+// select a tree node by pointer (W12) and wait for its settings
+async function node(page, key) { await page.click(`[data-m3-node="${key}"]`); await page.waitForSelector(`[data-m3-node="${key}"][aria-selected="true"]`); }
+const meshed = page => page.waitForFunction(() => /^Meshed /.test(document.getElementById('mp-messages')?.textContent || '')
+  && document.getElementById('m3-mesh-canvas'), null, {timeout: 120000});
 async function openFile(page, name, text) {
   await page.setInputFiles('#session-file', {name, mimeType: 'application/json', buffer: Buffer.from(text)});
 }
@@ -115,6 +130,19 @@ try {
       && state.visible && state.drawn > 0.02 * state.pixels && tabs !== null
       && (viewport.width !== 390 || (lib.scrollWidth <= lib.innerWidth && state.scrollWidth <= state.innerWidth));
     record(`W12 ${tag}`, ok, {library: lib, canvas: state, tabsToFacesList: tabs, console: seen.console, pageErrors: seen.pageErrors, csp: c, foreign: seen.foreign});
+    {
+      // the mesh view inside the workspace: Mesh 1, Mesh, the mesh canvas drawn
+      await node(page, 'mesh'); await page.click('#m3-mesh'); await meshed(page);
+      await page.waitForTimeout(300);
+      const meshState = await canvasState(page, '#m3-mesh-canvas', 'corner');
+      await page.screenshot({path: join(out, `w12-mesh-${tag}.png`), fullPage: true});
+      await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
+      const meshTabs = await tabTo(page, () => !!document.activeElement?.closest('#m3-faces'));
+      const c2 = await csp(page);
+      const ok2 = !seen.console.length && !seen.pageErrors.length && !c2.length && !seen.foreign.length && meshState.visible
+        && meshState.drawn > 0.02 * meshState.pixels && meshTabs !== null && (viewport.width !== 390 || meshState.scrollWidth <= meshState.innerWidth);
+      record(`W12 mesh view ${tag}`, ok2, {canvas: meshState, tabsToFacesList: meshTabs, console: seen.console, pageErrors: seen.pageErrors, csp: c2});
+    }
     if (viewport.width === 1440) {
       // the tree of design 5.2 for this step, with the server's coverage and Form result counts
       const tree = await page.evaluate(() => ({heading: document.querySelector('#tree .tree-heading')?.textContent || '', project: document.getElementById('project').textContent,
@@ -122,7 +150,8 @@ try {
       const notes = Object.fromEntries(tree.rows), answer = await serverCheck(page, CARD);
       tree.server = {regions: answer.regions.length, faces: answer.display.faces.length};
       const treeOk = tree.heading.endsWith('Component 1 · 3D · µm') && tree.project.startsWith('Untitled project · not saved to a file')
-        && JSON.stringify(tree.rows.map(r => r[0])) === JSON.stringify(['parameters', 'geometry', 'domain', 'feature:0', 'feature:1', 'form', 'materials'])
+        && JSON.stringify(tree.rows.map(r => r[0])) === JSON.stringify(['parameters', 'geometry', 'domain', 'feature:0', 'feature:1', 'form', 'materials', 'mesh'])
+        && notes.mesh === `size 40 µm · ${MESH.estimateText(answer.mesh.estimate)}`
         && notes['feature:0'] === 'sub · oxide · top (covered in part by 2 (via))' && notes['feature:1'] === '20 × 20 × 10 µm'
         && notes.form === `${tree.server.regions} regions · ${tree.server.faces} faces` && notes.materials === 'Si · SiO2 · Cu';
       record('Tree (design 5.2)', treeOk, tree);
@@ -218,6 +247,74 @@ try {
     await page.close();
   }
 
+  // ---- W5, before meshing: the rounding stem, below tolerance, E-MESH-ESTIMATE ----------------
+  {
+    // integers below 2^53 (a page holds them exactly): 9000 m + 1 pm and 9000 m + 2 pm round to one double
+    const K = 9000000000000001, X = 9007000000000000, Y = 10 ** 15, keys = ['xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax'];
+    const doc3 = (features, unit, domain, size, background = 'air') => ({openphysics: '0.3', materials: {Cu: {}, Al: {}, m1: {}, m2: {}, air: {}},
+      geometry: {version: 1, components: {c: {dimension: '3d', length_unit: unit, domain: Object.fromEntries(keys.map((k, i) => [k, domain[i]])),
+        background: {material: background}, features}}}, mesh: {element_size: size}});
+    const box = (name, x, y, z, material) => ({name, type: 'box', xmin: x[0], xmax: x[1], ymin: y[0], ymax: y[1], zmin: z[0], zmax: z[1], material});
+    const x = Number((5 + 2e-8 * Math.sqrt(10 ** 2 + 10 ** 2 + 2.5 ** 2)).toPrecision(12));
+    const limited = structuredClone(CARD); limited.mesh.element_count_limit = 1000;
+    const cases = {
+      'rounding': [doc3([box('west', [0, K], [0, Y], [0, Y], 'Cu'), box('east', [K + 1, X], [0, Y], [0, Y], 'Al')], 'pm', [0, X, 0, Y, 0, Y], '1 km', null), 'feature:1'],
+      'below tolerance': [doc3([box('a', [0, 5], [0, 10], [0, 2.5], 'm1'), box('b', [x, 10], [0, 10], [0, 2.5], 'm2')], 'mm', [0, 10, 0, 10, 0, 2.5], '2 mm'), 'mesh'],
+      'estimate limit': [limited, 'mesh'],
+    };
+    const {page, seen} = await open(browser, {width: 1440, height: 900});
+    const rows = [];
+    for (const [label, [doc, mark]] of Object.entries(cases)) {
+      const expected = (await serverCheck(page, doc)).mesh;
+      await openFile(page, 'stem.json', session(doc));
+      await page.waitForSelector('[data-m3-mesh-refusal]', {timeout: 30000});
+      await page.waitForFunction(() => document.getElementById('mp-messages').dataset.m3State === 'checked');
+      const shown = await page.evaluate(() => ({text: document.querySelector('[data-m3-mesh-refusal] p').textContent,
+        details: document.querySelector('[data-m3-mesh-refusal] details')?.textContent || '',
+        marked: [...document.querySelectorAll('[data-m3-node].has-problem')].map(b => b.dataset.m3Node),
+        block: document.getElementById('m3-block')?.textContent || '', meshDisabled: document.getElementById('m3-mesh')?.disabled === true,
+        stale: !!document.querySelector('.m3-stage.stale'), meshNote: document.querySelector('[data-m3-node="mesh"] .m3-note')?.textContent || ''}));
+      const ok = expected?.ok === false && shown.text === expected.refused && shown.details.includes(expected.code)
+        && JSON.stringify(shown.marked) === JSON.stringify([mark]) && shown.block === expected.refused && shown.meshDisabled && !shown.stale
+        && shown.meshNote === 'refused';
+      rows.push({label, code: expected?.code, mark, expected: expected?.refused, shown, ok});
+      await page.screenshot({path: join(out, `w5-mesh-${label.replace(/[^a-z0-9]+/gi, '-')}.png`)});
+    }
+    const passed = rows.filter(r => r.ok).length;
+    record('W5 before meshing', passed === rows.length && !seen.pageErrors.length, {passed, of: rows.length, rows, pageErrors: seen.pageErrors,
+      notApplicable: ['circle_segments: no curved feature in a 3d component the check takes']});
+    await page.close();
+  }
+
+  // ---- W9 through the workspace -----------------------------------------------------------------
+  {
+    const {page, seen} = await open(browser, {width: 1440, height: 900});
+    const meshPosts = [];
+    page.on('request', r => { if (r.method() === 'POST' && new URL(r.url()).pathname === '/api/model3d/mesh') meshPosts.push(r.url()); });
+    const direct = await page.evaluate(async d => (await fetch('/api/model3d/mesh/estimate', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({doc: d})})).json(), CARD);
+    await page.click('[data-model3d-card]'); await checked(page); await node(page, 'mesh');
+    const first = await page.evaluate(() => ({estimate: document.getElementById('m3-estimate')?.textContent || '',
+      note: document.querySelector('[data-m3-node="mesh"] .m3-note')?.textContent || '', meshEnabled: document.getElementById('m3-mesh')?.disabled === false}));
+    const t = direct.estimate.tetrahedra, over = structuredClone(CARD); over.mesh.element_count_limit = Math.round(t / 1.5);
+    const overDirect = await page.evaluate(async d => (await fetch('/api/model3d/mesh/estimate', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({doc: d})})).json(), over);
+    await openFile(page, 'over.json', session(over));
+    await page.waitForSelector('[data-m3-mesh-refusal]', {timeout: 30000});
+    await node(page, 'mesh');
+    const second = await page.evaluate(() => ({disabled: document.getElementById('m3-mesh')?.disabled === true, block: document.getElementById('m3-block')?.textContent || '',
+      estimate: document.getElementById('m3-estimate')?.textContent || ''}));
+    const cases = [
+      {name: 'estimate shown before meshing', ok: first.estimate === MESH.estimateText(direct.estimate) && first.note.endsWith(MESH.estimateText(direct.estimate)) && first.meshEnabled},
+      {name: '1.5 times the limit: Mesh disabled with the refusal, no job requested', ok: overDirect.ok === false && second.disabled
+        && second.block === overDirect.refused && second.estimate === 'Mesh is not available: ' + overDirect.refused && meshPosts.length === 0},
+      {name: 'the estimate equals /api/model3d/mesh/estimate', ok: first.estimate === MESH.estimateText(direct.estimate)},
+    ];
+    const passed = cases.filter(c => c.ok).length;
+    record('W9 through the workspace', passed === 3 && !seen.pageErrors.length, {passed, of: 3, cases, first, second, direct: direct.estimate, overRefused: overDirect.refused, meshPosts});
+    await page.close();
+  }
+
   // ---- W11: Save and Open, project and session -----------------------------------------------
   {
     const {page, seen} = await open(browser, {width: 1440, height: 900});
@@ -274,10 +371,47 @@ try {
     await page.keyboard.press('Enter');
     await page.waitForSelector('[data-m3-selection]', {timeout: 15000});
     steps.selection = await page.evaluate(() => document.querySelector('[data-m3-selection] .m3-sel-entry').textContent);
+    // mesh, then cancel, by keyboard: Mesh 1 in the tree, a small size (a long job), Mesh, Cancel meshing
+    let job = null;
+    page.on('response', async r => { if (r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/model3d/mesh') job = (await r.json().catch(() => ({}))).job || job; });
+    const setSize = async value => {
+      steps[`size${value}Focused`] = await tabTo(page, () => document.activeElement?.dataset?.m3Field === 'mesh.element_size', 80) !== null;
+      await page.keyboard.press('Control+A'); await page.keyboard.type(value); await page.keyboard.press('Enter');
+      await page.waitForFunction(v => document.getElementById('mp-messages').dataset.m3State === 'checked'
+        && document.querySelector('[data-m3-node="mesh"] .m3-note')?.textContent.startsWith(`size ${v} µm`), value, {timeout: 30000});
+    };
+    steps.treeFocused = await tabTo(page, () => !!document.activeElement?.closest('#tree [role=tree]') && document.activeElement.getAttribute('role') === 'treeitem', 200) !== null;
+    // in the tree the arrow keys move between nodes: End reaches the last node, Mesh 1
+    await page.keyboard.press('End');
+    steps.meshNodeFocused = await page.evaluate(() => document.activeElement?.dataset?.m3Node === 'mesh');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('[data-m3-node="mesh"][aria-selected="true"]');
+    await setSize('8');
+    steps.meshFocused = await tabTo(page, () => document.activeElement?.id === 'm3-mesh', 80) !== null;
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.activeElement?.id === 'm3-mesh-cancel', null, {timeout: 30000});
+    await page.waitForFunction(() => /Meshing|Forming/.test(document.getElementById('m3-mesh-progress')?.textContent || ''), null, {timeout: 30000});
+    await page.waitForTimeout(1500);
+    steps.cancelFocused = await page.evaluate(() => document.activeElement?.id === 'm3-mesh-cancel');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(c => (document.getElementById('mp-messages')?.textContent || '').includes(c), MESH.CANCELLED, {timeout: 30000});
+    steps.cancelLineByTab = await tabTo(page, () => !!document.activeElement?.closest('#mp-messages') && document.activeElement.textContent === 'Meshing cancelled; nothing kept.', 200) !== null;
+    steps.job = job;
+    steps.serverStatus = job ? await page.evaluate(async id => (await (await fetch(`/api/model3d/jobs/${id}`)).json()).status, job) : null;
+    await page.screenshot({path: join(out, 'w13-cancelled.png')});
+    // the size back, Mesh again to the mesh view
+    await page.keyboard.press('Shift+Tab');
+    await setSize('40');
+    steps.meshAgainFocused = await tabTo(page, () => document.activeElement?.id === 'm3-mesh', 80) !== null;
+    await page.keyboard.press('Enter');
+    await meshed(page);
+    steps.meshCanvasFocused = await tabTo(page, () => document.activeElement?.id === 'm3-mesh-canvas', 80) !== null;
     steps.pointerEvents = await page.evaluate(() => window.__pointer);
     await page.screenshot({path: join(out, 'w13-keyboard.png')});
     const ok = steps.cardFocused && steps.canvasFocused && steps.rotated && steps.view5 && steps.viaFocused && steps.viaSelected && steps.applyFocused
-      && steps.selection === '{"boundary":"via.z1"}' && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
+      && steps.selection === '{"boundary":"via.z1"}' && steps.treeFocused && steps.meshNodeFocused && steps.size8Focused && steps.meshFocused && steps.cancelFocused
+      && steps.cancelLineByTab && steps.serverStatus === 'cancelled' && steps.size40Focused && steps.meshAgainFocused && steps.meshCanvasFocused
+      && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
     record('W13', ok, {steps, console: seen.console, pageErrors: seen.pageErrors});
     await page.close();
   }
