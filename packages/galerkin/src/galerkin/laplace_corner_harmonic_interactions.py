@@ -83,7 +83,18 @@ def _rule(p, n):
 def _real_log1p(z):
     # Preserve the small real modulus increment; complex log1p may first
     # round the magnitude of 1+z. This is an exact algebraic identity.
-    return .5*np.log1p(2*z.real + z.real*z.real + z.imag*z.imag)
+    # Evaluated as .5*log1p((2*x + x*x) + y*y) with the same IEEE operations in
+    # the same order (2*x == x+x exactly; addition commutes exactly), in place
+    # to avoid six full-size temporaries.
+    x, y = z.real, z.imag
+    value = np.multiply(x, x)
+    work = np.add(x, x)
+    value += work
+    np.multiply(y, y, out=work)
+    value += work
+    np.log1p(value, out=value)
+    value *= .5
+    return value
 
 
 def _centered_block(first, second, offset, p, q, order):
@@ -91,10 +102,16 @@ def _centered_block(first, second, offset, p, q, order):
     u, left, mass0 = _rule(p, order)
     v, right, mass1 = _rule(q, order)
     s, t = a*u[:, None], b*v[None, :]
+    # The constant mode carries weight only on the first `order` nodes of each
+    # rule (_rule); its rows and columns are formed only there. The dropped
+    # entries were multiplied by exact zeros, and every node still enters the
+    # harmonic-harmonic block, so a non-finite node value is still refused.
+    s0, t0 = s[:order], t[:, :order]
+    left0, right0 = left[0, :order], right[0, :order]
     result = np.zeros((2, 2))
-    result[0, 0] = math.log(abs(o)) + left[0] @ _real_log1p((t-s)/o) @ right[0]
-    result[0, 1] = left[0] @ _real_log1p(t/(o-s)) @ right[1]
-    result[1, 0] = left[1] @ _real_log1p(-s/(o+t)) @ right[0]
+    result[0, 0] = math.log(abs(o)) + left0 @ _real_log1p((t0-s0)/o) @ right0
+    result[0, 1] = left0 @ _real_log1p(t/(o-s0)) @ right[1]
+    result[1, 0] = left[1] @ _real_log1p(-s/(o+t0)) @ right0
     result[1, 1] = left[1] @ _real_log1p(s*t/((o-s)*(o+t))) @ right[1]
     return result, max(mass0, mass1)
 
