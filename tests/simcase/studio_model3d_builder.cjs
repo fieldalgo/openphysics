@@ -29,7 +29,9 @@ test('the tree (design 5.2): Component 1 with Parameters, Geometry 1 (Domain, nu
  const rows=M.treeRows(card(),check,null,W);
  assert.deepEqual(rows.map(r=>[r.label,r.level,r.note]),[['Component 1 · 3D · µm',1,''],['Parameters',2,''],['Geometry 1',2,''],
   ['Domain',3,'200 × 200 × 610 µm'],['1 Layers stack',3,'sub · oxide · top (covered in part by 2 (via))'],['2 Box via',3,'20 × 20 × 10 µm'],
-  ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · Si (top) · SiO2 · Cu'],['Mesh 1',2,'size 40 µm · Estimate 2,400 tetrahedra · about 1 s']]);
+  ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · Si (top) · SiO2 · Cu'],
+  ['Heat transfer (3D)',2,''],['Thermal conductivity',3,'from Materials'],['Fixed temperature 1',3,'z0 · 300 K'],['Heat source 1',3,'Si (top) · 1e12 W/m³'],
+  ['Insulated',3,'every other outer face'],['Mesh 1',2,'size 40 µm · Estimate 2,400 tetrahedra · about 1 s'],['Study 1 · Steady',2,''],['Results',2,'no run yet']]);
  let doc=M.addParameter(M.addParameter(card(),'t_ox','10 um'),'via_w','20 um');
  const free=JSON.parse(JSON.stringify(doc));delete free.geometry.components.stack3d.domain.zmin;delete free.geometry.components.stack3d.domain.zmax;
  const r2=M.treeRows(free,null);

@@ -321,20 +321,21 @@ the oxide. The via is square until cylinders come: *Square via (a round via need
 with the next geometry step)*. The top silicon has its own material, `Si (top)`, with the properties
 of `Si`, only because a heat source names a region by its material today (a layer or feature name such
 as `stack.top` is not a region of the heat kind). Its physics is Heat transfer (3D): 300 K on `z0`, a
-heat source of 1e12 W/m³ in `Si (top)` (4 W in all), every other outer face insulated. Choosing the card adds the 3D model to the tab; the workspace and
+heat source of 1e12 W/m³ in `Si (top)` (4 W in all), every other outer face insulated. The source is a test value (it heats the card to
+about 1127 K); the 2 mW hot-spot variant is a later card. Choosing the card adds the 3D model to the tab; the workspace and
 multiphysics models stay as they are, and the card of another model returns to it. The 3D model is
-meshed by **Mesh 1** (below); it has no run or result yet, and **Run** is shown disabled with its
-reason (*Heat comes in a later step of the 3D model.*).
+meshed by **Mesh 1** and solved by **Run** (below).
 
 **The tree** (design §5.2, for this step). The group **Component 1 · 3D · µm** holds **Parameters**
 (beside it the parameters as written, *t_ox = 10 um · via_w = 20 um*), **Geometry 1** with **Domain**
 (*200 × 200 × 610 µm*, or *200 × 200 µm, z from the features*), the features numbered in order (later
 wins: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*, *2 Box via* · *20 × 20 × 10
 µm*) and **Form result** (*4 regions · 22 faces*, from the server's check), **Materials** (*Si ·
-Si (top) · SiO2 · Cu*) and **Mesh 1** (*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, the server's
-estimate). The coverage words come from the exact complex: *covered in part by 2 (via)*, or
-*covered by 2 (b), 3 (c); adds no region* when later features take all of it. Heat transfer, Study
-and Results come with the next step. Geometry 1 offers **Add feature** with **Box** and
+Si (top) · SiO2 · Cu*), **Heat transfer (3D)** with **Thermal conductivity** (*from Materials*), each
+**Fixed temperature N** (*z0 · 300 K*), each **Heat source N** (*Si (top) · 1e12 W/m³*) and **Insulated**
+(*every other outer face*), **Mesh 1** (*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, the server's
+estimate), **Study 1 · Steady** and **Results** with the kept runs. The coverage words come from the exact complex: *covered in part by 2 (via)*, or
+*covered by 2 (b), 3 (c); adds no region* when later features take all of it. Geometry 1 offers **Add feature** with **Box** and
 **Layers**; **Extrude**, **Cylinder** and **Sphere** are greyed with their reason (*Extrude comes with a
 later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
 geometry step*). A feature's settings have **Move up**, **Move down** (also Alt+Up and Alt+Down on its
@@ -402,7 +403,52 @@ view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views,
 picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names; **Use for → New
 selection** with **Apply** writes `selections[<name>] = {"boundary": <name>}` with the first of the
 face's sorted names that selects that face alone (`POST /api/model3d/selection`). A face that no single
-name selects is not made into a selection, and says so.
+name selects is not made into a selection, and says so. **Use for → Fixed temperature** writes 300 K
+on the face's name (the alone name of the latest feature, such as `via.z1` or `stack.top.top`) after
+the server's check: a face the heat kind refuses (an inner face) is not written, and Messages shows
+the kind's words (*Fixed temperature needs an outer face; via.z1 is inside*) with the document
+unchanged.
+
+**Heat transfer (3D).** Its page edits the document's `physics.heat` block (kind `thermal.steady3d`,
+[the kind](thermal_steady3d.md)): **Add fixed temperature** on a boundary name (1–2000 K, written
+`"300 K"`), **Add heat source** in a meshed region (−1e15 to 1e15 W/m³, written `"1e12 W/m^3"`), each
+with its own page (the value, **Delete**). **Thermal conductivity** (*from Materials*) edits each
+material's `thermal_conductivity` (0.001–10000 W/(m K)). **Insulated** (*every other outer face*) is
+derived: it lists nothing to edit. A rejected value is a draft with the range sentence, as for the
+geometry. On every edit the check also reads the document as Run reads it
+(`/api/model3d/check`'s `run` part): a refusal such as *Fixed temperature needs an outer face; via.z1
+is inside* (E-CONTRACT) marks Heat transfer (3D) and is shown in Messages in the kind's words; a
+model without a heat block shows *not set: Add a fixed temperature* and no mark.
+
+**Run.** **Run** in the graphics header meshes the component (Mesh 1's mesh is reused when the
+geometry and mesh block are unchanged) and solves the steady heat problem in a separate process
+(`POST /api/model3d/run`, [the run routes](studio_3d.md#what-it-sends-and-answers)): *Meshing →
+Solving → Done*, the elapsed time and *taking longer than the estimate*. While it runs the button is
+**Cancel run** (*Run cancelled; nothing kept.*). When Run cannot start, the reason beside it is, in
+this order: a draft (*Correct the highlighted field or restore its last valid value first.*), a
+shape refusal (*Fix 1 problem in Messages to run*), the refusal that blocks meshing, the check's run
+refusal, a run going (*Studio is already running one 3D heat model; wait for it or cancel it.*), and
+the refusal the last run of this same document ended with, in its words (for example *Fixed
+temperature is missing on the connected group of regions 'via': …*); an edit clears the last one.
+When the document equals a kept run's (key order aside, for the same result format
+`thermal-steady3d-run-v1`) the header says *No need to run: Run 1 already has these results.* with
+**Show Run 1**, and Run shows that run instead of computing it again. Done, Messages says *Run 1
+complete: maximum 1127.33 K in Si (top). Its results belong to that run; editing the model does not
+change them.*
+
+**Results.** **Study 1 · Steady** and **Results** follow Mesh 1 in the tree, and each kept run is a
+row **Run N · Temperature (surfaces)** (up to 10; the oldest goes first). A run's page has its values
+(*Temperature, max* with its region and position, *Temperature, min*, *Heat rate through* each fixed
+temperature, *Total heat source*, *Energy balance residual* with its ratio to the source), its mesh,
+**Use this run's inputs** (one Undo step) when the document differs, a **Probe** (x, y, z in the
+component's unit; also by clicking a surface of the result), and exports: **Surface (CSV)**, **Cut
+(CSV)** of the section shown and **Run (JSON)** (the record). The **Result** view shows the run's
+surface temperature, blue at the minimum and red at the maximum, with its colour bar; the toolbar's
+**Section** (x, y or z = a position in the component's unit) clips the geometry view and, on a result,
+draws the exact cut of the run's field (*Cut z = 505 µm: 833.653–939.105 K.*). A result whose inputs
+have changed is greyed (*Run 1: inputs changed since this run*). Cut, probe and CSV need the run on
+the server: a run opened from a file has its record only and says *Recompute this run to cut, probe or
+export CSV.* with **Recompute**, which runs its own inputs again into the same row.
 
 **Undo.** The 3D model has one history of documents, apart from the other models' (Ctrl+Z and Ctrl+Y
 follow the model shown). Each committed edit is one step: a field committed with Enter or on leaving
@@ -436,12 +482,18 @@ recovery yet.
 | W9 (workspace) | Mesh 1 shows the estimate before meshing; at 1.5 times the limit Mesh is disabled with the refusal and no mesh job is requested; the estimate equals `/api/model3d/mesh/estimate`'s | 3/3 | 3/3 (server and browser) | same |
 | W11 (no runs) | the document digest after Save and Open, project and session; a version 1 project without 3D written byte for byte as before | equal; unchanged | equal; unchanged | `tests/simcase/studio_model3d_files.cjs`, the browser check |
 | W12 | the Library, the Model with the card, and its mesh view (Mesh 1, Mesh), at 1440 × 900 and 390 × 844: no console error or CSP violation, canvas drawn, no horizontal scroll at 390, faces list reached by Tab; screenshots kept | all hold | all hold | the browser check |
+| W10 | *No need to run* shown exactly when the document equals a kept run's, in 6 states: after the run, an edit, Undo, Redo, *Use this run's inputs*, Save and Open of the project | 6/6 | 6/6 (and one Undo takes *Use this run's inputs* back) | `tests/simcase/studio_model3d_heat.cjs`, `tools/studio_browser/model3d_heat_browser.mjs` |
+| W11 (runs) | after Save and Open, project and session: the document digest, the run's values and its surface-map digest; a version 1 project without 3D written byte for byte as before | equal; unchanged | equal; unchanged | `tests/simcase/studio_model3d_files.cjs`, the heat browser check |
+| W12 (results) | Run 1 of the card in the Result view (surface temperature, colour bar, values table) at 1440 × 900 and 390 × 844: no console error or CSP violation, canvas drawn, no horizontal scroll at 390; screenshots kept | all hold | all hold | the heat browser check |
+| W13 (heat) | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → Fixed temperature (Messages: *Fixed temperature needs an outer face; via.z1 is inside*, the document unchanged), select `stack.top.top`, Use for → Fixed temperature, a section z = 300 µm, Run to completion | no pointer event | 0 pointer events | the heat browser check |
+| W14 | the time from Run to the drawn result, and of a cut, on the card | recorded only (SwiftShader here) | about 0.9 s and 0.1 s | the heat browser check |
 | W13 | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → New selection; then Mesh 1, size 8 µm, Mesh, Cancel meshing, the cancel line reached in Messages by Tab and the job *cancelled* on the server, size 40 µm, Mesh again to the mesh view | no pointer event | 0 pointer events | the browser check |
 
-The pure helpers (`workspace-model3d.mjs`) are checked by `tests/simcase/studio_model3d_builder.cjs`;
-the browser check also compares the tree's rows and notes with the server's answer. It is local
+The pure helpers (`workspace-model3d.mjs`) are checked by `tests/simcase/studio_model3d_builder.cjs`
+and, for heat, Run and Results, `tests/simcase/studio_model3d_heat.cjs`; the browser check also compares the tree's rows and notes with the server's answer. It is local
 (Playwright with a Chromium it can launch, not in CI); run it against a running Studio with
-`node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`.
+`node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`, and the heat
+checks with `node tools/studio_browser/model3d_heat_browser.mjs http://127.0.0.1:8765 out-dir`.
 
 ## First optical study
 

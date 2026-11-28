@@ -6,7 +6,10 @@
 // /api/model3d/check; the tree's coverage words and every refusal come from the server's exact
 // complex, and the check also answers the mesh estimate or the refusal that blocks meshing. Mesh 1
 // runs slice C's job (/api/model3d/mesh, /api/model3d/jobs/…) and shows its mesh view; the mesh is
-// view state, kept neither in Undo nor in files. One Undo history holds the documents. No run here.
+// view state, kept neither in Undo nor in files. One Undo history holds the documents.
+// Heat transfer (3D) edits the document's thermal.steady3d block; Run solves it with the run routes
+// (/api/model3d/run, /api/model3d/runs/…), and each finished run is kept as its record (up to 10, saved
+// with the model); Results show a run's surface temperature, a cut plane, a probe and its values.
 import {View3D} from '/model3d-assets/model3d-view.mjs';
 import {MeshView3D} from '/model3d-assets/model3d-mesh-view.mjs';
 import {CANCELLED,longer,meshBlocked,progressText,statsRows,stepList,estimateText} from '/model3d-assets/model3d-mesh-model.mjs';
@@ -14,8 +17,11 @@ import {faceLines,regionColor} from '/model3d-assets/model3d-model.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
- duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows} from './workspace-model3d.mjs';
-import {writeModel3dSession,documentDigest} from './workspace-model3d-session.mjs';
+ duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
+ heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
+ valuesRows,runProgress,boundaryNameFor,temperatureColor} from './workspace-model3d.mjs';
+import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
+import {TemperatureView3D} from './workspace-model3d-results.mjs';
 
 const WORDS={estimateText,meshBlocked};      // slice C's words, passed to the pure helpers
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -35,6 +41,10 @@ export function createModel3dView(ctx){
  let lastNotice=null;            // {text, undo}: a deletion's notice with its Undo
  // the mesh job of slice C: the running job, its last status, the mesh answer shown, the pane shown
  const mesh={job:null,timer:null,status:null,view:null,viewer:null,canvas:null,pane:'geometry'};
+ // the runs: the kept records (saved with the model), the server run of each record when this page
+ // ran it (cut, probe and CSV need it), the run going, the refusal the last run ended with, the run shown
+ const heat={records:[],live:[],run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
+ let section=null;              // the geometry view's section {axis, at} (document units), view state
 
  // ---- the document and the check ----
  async function runCheck(){
@@ -51,14 +61,15 @@ export function createModel3dView(ctx){
   doc=next;if(record&&history.record(doc))ctx.onHistory();
   drafts.clear();runCheck();if(shown)ctx.render();
  }
- function open(document,{asTitle=CARD3D.title}={}){
-  stopJob();mesh.status=null;mesh.view=null;mesh.pane='geometry';
+ function open(document,{asTitle=CARD3D.title,runs=[]}={}){
+  stopJob();stopRun();mesh.status=null;mesh.view=null;mesh.pane='geometry';
+  heat.records=runs.slice(-MAX_RUNS);heat.live=heat.records.map(()=>null);heat.status=null;heat.failure=null;heat.shown=null;heat.cut=null;heat.probe=null;section=null;
   doc=JSON.parse(JSON.stringify(document));title=asTitle;history=new Model3dHistory(doc);
   check=null;refused=null;lastGood=null;selection='geometry';face=null;hidden=new Set();drafts.clear();lastNotice=null;
   inProject=true;shown=true;ctx.ui.page='Model';runCheck();ctx.render();
  }
  // ---- the tree ----
- function rows(){return treeRows(doc,check,refused,WORDS);}
+ function rows(){return treeRows(doc,check,refused,WORDS,{runs:heat.records});}
  function drawTree(){
   const host=$('tree'),had=treeFocus(host,treeView);host.innerHTML=tree();
   host.querySelectorAll('[data-m3-node]').forEach(b=>{
@@ -73,18 +84,22 @@ export function createModel3dView(ctx){
  function tree(){
   const page=ctx.ui.page,all=rows();
   const item=r=>`<button type="button" data-m3-node="${esc(r.key)}" ${itemAttributes(r.level,page==='Model'&&selection===r.key)} class="${r.level>2?'tree-child':''}${r.problem?' has-problem':''}">`+
-   `<span class="tree-node-mark" aria-hidden="true">${r.key.startsWith('feature:')?'▣':r.key==='form'?'◆':r.key==='mesh'?'▦':'·'}</span>${esc(r.label)}`+
+   `<span class="tree-node-mark" aria-hidden="true">${r.key.startsWith('feature:')?'▣':r.key==='form'?'◆':r.key==='mesh'?'▦':r.key==='heat'?'∿':r.key==='study'?'▷':r.key.startsWith('run:')?'▤':'·'}</span>${esc(r.label)}`+
    (r.problem?`<span class="problem-badge" role="img" aria-label="problem: ${esc(problemText())}" title="${esc(problemText())}">!</span>`:'')+
    (r.note?`<span class="m3-note">${esc(r.note)}</span>`:'')+`</button>`;
   // Component 1 · 3D · <unit> is the group heading; Parameters, Geometry 1 and Materials sit in it
   const head=all.find(r=>r.key==='component'),name='Component 1';
   return `<div class="pane-title"><span>Model builder</span><span class="pane-detail">3D model</span></div>${treeOpen()}`+
    `<section class="tree-group" role="none">${groupHeading(name,!treeView.collapsed.has(name),head.label)}${all.filter(r=>r.key!=='component').map(item).join('')}</section></div>`+
-   `<div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>3D geometry (experimental)</strong><p>Boxes and slab layers, checked by the exact engine and meshed in a separate process. Heat comes in a later step.</p></div>`;
+   `<div class="capability-card"><span class="capability-dot" aria-hidden="true"></span><strong>3D steady heat (experimental)</strong><p>Boxes and slab layers, checked by the exact engine, meshed and solved in a separate process.</p></div>`;
  }
- function choose(key){selection=key;ctx.ui.page='Model';ctx.render();}
- // the refusal a tree mark stands for: the shape's, else the one that blocks meshing
- function problemText(){return refused?refusalMessage(refused).text:meshRefusal(check)?.refused||'';}
+ function choose(key){
+  selection=key;ctx.ui.page='Model';
+  const m=/^run:(\d+)$/.exec(key);if(m)showRun(+m[1]-1);
+  ctx.render();
+ }
+ // the refusal a tree mark stands for: the shape's, else the one that blocks meshing, else the reader's
+ function problemText(){return refused?refusalMessage(refused).text:meshRefusal(check)?.refused||(check?.run?.ok===false&&heatOf(doc)?check.run.refused:'');}
 
  // ---- edits ----
  function move(i,delta){try{commit(moveFeature(doc,i,delta));selection=`feature:${i+delta}`;ctx.render();focusRow(selection);}catch(e){ctx.notice(e.message);}}
@@ -133,7 +148,54 @@ export function createModel3dView(ctx){
     fieldsOf(doc,'mesh').map(fieldInput).join('')+
     (mesh.view?`<dl class="m3-mesh-stats">${statsRows(mesh.view).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:'');
   }
-  if(selection==='materials')return `<h3>Materials</h3><ul>${Object.entries(doc.materials||{}).map(([n,p])=>`<li><code>${esc(n)}</code> k = ${esc(p.thermal_conductivity??'—')}</li>`).join('')}</ul>`;
+  if(selection==='materials'||selection==='heat:k')return conductivityTable();
+  if(selection.startsWith('heat')||selection==='study'||selection==='results'||selection.startsWith('run:'))return heatSettings();
+  return '';
+ }
+ function heatField(kind,key,label,value){
+  const d=drafts.get(`${kind}:${key}`),id=`m3h-${kind}-${key.replace(/[^A-Za-z0-9]/g,'-')}`;
+  return `<label class="m3-field" for="${id}"><span>${esc(label)}</span><input id="${id}" data-m3-heat="${kind}" data-m3-key="${esc(key)}" value="${esc(d?d.raw:value)}" spellcheck="false"${d?' aria-invalid="true" class="invalid"':''}>`+
+   `<small class="m3-si">${esc(d?d.problem:'')}</small>${d?`<button type="button" data-m3-restore="${esc(kind+':'+key)}">Restore last valid value</button>`:''}</label>`;
+ }
+ function conductivityTable(){
+  return `<h3>${selection==='heat:k'?'Thermal conductivity':'Materials'}</h3><p class="muted">Heat transfer (3D) takes each region's thermal conductivity from its material.</p>`+
+   Object.entries(doc.materials||{}).map(([n,p])=>heatField('k',n,`${n}, k`,p.thermal_conductivity??'')).join('');
+ }
+ function heatSettings(){
+  const h=heatOf(doc),reason=runReason({drafts:drafts.size,refused,check,running:!!heat.run,doc,failure:heat.failure},WORDS);
+  if(selection==='heat'){
+   const regions=editableRegions(check);
+   return `<h3>Heat transfer (3D)</h3><p class="muted">Steady heat conduction (thermal.steady3d). Every outer face without a fixed temperature is insulated.</p>`+
+    (check?.run?.ok===false?`<p class="m3-refused">${esc(check.run.refused)}</p>`:'')+
+    `<form class="m3-heat-add" data-m3-add-fixed><label>Fixed temperature on <input name="name" value="z0" spellcheck="false" aria-label="boundary name"></label><label>at <input name="value" value="300 K" spellcheck="false"></label><button type="submit">Add fixed temperature</button></form>`+
+    `<form class="m3-heat-add" data-m3-add-source><label>Heat source in <select name="region" aria-label="region">${regions.map(r=>`<option>${esc(r)}</option>`).join('')}</select></label><label>of <input name="value" value="1e12 W/m^3" spellcheck="false"></label><button type="submit"${regions.length?'':' disabled'}>Add heat source</button></form>`+
+    (h?'':'<p>No heat physics yet: add a fixed temperature.</p>');
+  }
+  let m=/^heat:fixed:(.+)$/.exec(selection);
+  if(m&&h?.prescribed_temperature?.[m[1]]!==undefined)return `<h3>Fixed temperature</h3><p>On <code>${esc(m[1])}</code>.</p>`+heatField('fixed',m[1],'Temperature',h.prescribed_temperature[m[1]])+
+   `<div class="m3-actions"><button type="button" data-m3-unfixed="${esc(m[1])}">Delete</button></div>`;
+  m=/^heat:source:(.+)$/.exec(selection);
+  if(m&&h?.heat_source_density!==undefined){const v=typeof h.heat_source_density==='object'?h.heat_source_density[m[1]]:h.heat_source_density;
+   return `<h3>Heat source</h3><p>In <code>${esc(m[1])}</code>.</p>`+heatField('source',m[1],'Heat source density',v??'')+`<div class="m3-actions"><button type="button" data-m3-unsource="${esc(m[1])}">Delete</button></div>`;}
+  if(selection==='heat:insulated')return `<h3>Insulated</h3><p>Every outer face that no fixed temperature names is insulated (no heat crosses it).</p>`;
+  if(selection==='study'){const i=keptRunFor(doc,heat.records);
+   return `<h3>Study 1 · Steady</h3><p>Run meshes the component (Mesh 1, reused when unchanged) and solves Heat transfer (3D) in a separate process.</p>`+
+    `<p id="m3-study-why">${esc(i>=0?noNeedText(i):reason||'Ready to run.')}</p>`;}
+  if(selection==='results')return `<h3>Results</h3>`+(heat.records.length?`<ul>${heat.records.map((r,i)=>`<li>Run ${i+1}: ${esc(valuesRows(r.values,r.surface?.unit||'um')[0][1])}</li>`).join('')}</ul>`:'<p class="muted">No run yet: press Run.</p>')+
+   `<p class="muted">Up to ${MAX_RUNS} runs are kept with the model and saved with it.</p>`;
+  m=/^run:(\d+)$/.exec(selection);
+  if(m){const i=+m[1]-1,r=heat.records[i];if(!r)return '';
+   const unit=r.surface?.unit||'um',live=heat.live[i],u=shownUnit(unit);
+   const same=keptRunFor(doc,heat.records)===i;
+   return `<h3>Run ${i+1} · Temperature</h3>`+
+    `<table class="m3-values" id="m3-values"><tbody>${valuesRows(r.values,unit).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`+
+    `<p class="muted">Mesh: ${r.mesh.nodes.toLocaleString('en-US')} nodes, ${r.mesh.tetrahedra.toLocaleString('en-US')} tetrahedra (${esc(r.mesh.route)}).${same?' These are the current inputs.':' The inputs have changed since this run.'}</p>`+
+    `<div class="m3-actions">${same?'':'<button type="button" data-m3-run-act="inputs">Use this run\'s inputs</button>'}${live?'':'<button type="button" data-m3-run-act="recompute">Recompute</button>'}</div>`+
+    (live?'':`<p class="muted" id="m3-recompute-why">Recompute this run to cut, probe or export CSV.</p>`)+
+    `<form class="m3-probe" data-m3-probe><fieldset${live?'':' disabled'}><legend>Probe (${esc(u)})</legend>${['x','y','z'].map((a,k)=>`<label>${a} <input name="${a}" value="${esc(heat.probe?.point?.[k]??'')}" inputmode="decimal" aria-label="probe ${a}"></label>`).join('')}<button type="submit">Probe</button></fieldset></form>`+
+    `<p id="m3-probe-result" aria-live="polite">${esc(heat.probe?.text||'')}</p>`+
+    `<p class="m3-exports">Export: ${live?`<a href="/api/model3d/runs/${esc(live)}/export/surface.csv" download>Surface (CSV)</a> · ${heat.cut?`<a href="/api/model3d/runs/${esc(live)}/export/cut.csv?axis=${heat.cut.axis}&at=${encodeURIComponent(heat.cut.at)}" download>Cut (CSV)</a> · `:''}`:''}<button type="button" data-m3-run-act="json">Run (JSON)</button></p>`;
+  }
   return '';
  }
  function parametersTable(){
@@ -171,6 +233,25 @@ export function createModel3dView(ctx){
   });
   const form=host.querySelector('.m3-param-add');
   if(form)form.onsubmit=e=>{e.preventDefault();try{commit(addParameter(doc,form.elements.name.value.trim(),form.elements.value.value));}catch(err){ctx.notice(err.message);}};
+  host.querySelectorAll('[data-m3-heat]').forEach(input=>input.addEventListener('change',()=>{
+   const kind=input.dataset.m3Heat,key=input.dataset.m3Key,id=`${kind}:${key}`;
+   try{
+    const next=kind==='fixed'?setFixedTemperature(doc,key,input.value):kind==='source'?setHeatSource(doc,key,input.value):setConductivity(doc,key,input.value);
+    drafts.delete(id);commit(next);
+   }catch(e){drafts.set(id,{raw:input.value,problem:e.message});ctx.render();ctx.onHistory();}
+  }));
+  host.querySelectorAll('[data-m3-restore]').forEach(b=>{if(/^(fixed|source|k):/.test(b.dataset.m3Restore))b.onclick=()=>{drafts.delete(b.dataset.m3Restore);ctx.render();ctx.onHistory();};});
+  host.querySelectorAll('[data-m3-unfixed]').forEach(b=>b.onclick=()=>{commit(removeFixedTemperature(doc,b.dataset.m3Unfixed));selection='heat';lastNotice={text:`Fixed temperature on ${b.dataset.m3Unfixed} deleted; Undo restores it.`,undo:true};ctx.render();});
+  host.querySelectorAll('[data-m3-unsource]').forEach(b=>b.onclick=()=>{commit(removeHeatSource(doc,b.dataset.m3Unsource));selection='heat';lastNotice={text:`Heat source in ${b.dataset.m3Unsource} deleted; Undo restores it.`,undo:true};ctx.render();});
+  const addFixed=host.querySelector('[data-m3-add-fixed]');
+  if(addFixed)addFixed.onsubmit=e=>{e.preventDefault();const name=addFixed.elements.name.value.trim();
+   try{commit(setFixedTemperature(doc,name,addFixed.elements.value.value));selection=`heat:fixed:${name}`;ctx.render();}catch(err){ctx.notice(err.message);lastNotice={text:err.message,undo:false};renderDock();}};
+  const addSource=host.querySelector('[data-m3-add-source]');
+  if(addSource)addSource.onsubmit=e=>{e.preventDefault();const region=addSource.elements.region.value;
+   try{commit(setHeatSource(doc,region,addSource.elements.value.value));selection=`heat:source:${region}`;ctx.render();}catch(err){ctx.notice(err.message);lastNotice={text:err.message,undo:false};renderDock();}};
+  host.querySelectorAll('[data-m3-run-act]').forEach(b=>b.onclick=()=>runAction(b.dataset.m3RunAct));
+  const probe=host.querySelector('[data-m3-probe]');
+  if(probe)probe.onsubmit=e=>{e.preventDefault();probeAt(['x','y','z'].map(a=>Number(probe.elements[a].value)));};
   host.querySelectorAll('[data-m3-unselect]').forEach(b=>b.onclick=()=>{
    const next=JSON.parse(JSON.stringify(doc));delete next.geometry.components[componentName(doc)].selections[b.dataset.m3Unselect];
    if(!Object.keys(next.geometry.components[componentName(doc)].selections).length)delete next.geometry.components[componentName(doc)].selections;
@@ -189,32 +270,49 @@ export function createModel3dView(ctx){
  }
  function graphics(host){
   const comp=doc.geometry.components[componentName(doc)];
-  const why=meshReason({drafts:drafts.size,refused,check,running:!!mesh.job},WORDS),block=why||blockReason();
-  const onMesh=mesh.pane==='mesh'&&!!mesh.view,stale=!!(mesh.view&&check?.mesh?.ok&&check.mesh.key!==mesh.view.key);
+  const why=meshReason({drafts:drafts.size,refused,check,running:!!mesh.job||!!heat.run},WORDS),block=why||'';
+  const kept=keptRunFor(doc,heat.records),runWhy=runReason({drafts:drafts.size,refused,check,running:!!heat.run||!!mesh.job,doc,failure:heat.failure},WORDS);
+  const onResult=mesh.pane==='result'&&heat.shown!==null&&!!heat.records[heat.shown]?.surface;
+  const onMesh=!onResult&&mesh.pane==='mesh'&&!!mesh.view,stale=!!(mesh.view&&check?.mesh?.ok&&check.mesh.key!==mesh.view.key);
+  const resultStale=onResult&&keptRunFor(doc,heat.records)!==heat.shown;
   host.innerHTML=`<div class="m3-head"><h2>${esc(title)}</h2><div class="m3-run">`+
    (mesh.job?`<button type="button" id="m3-mesh-cancel">Cancel meshing</button>`:`<button type="button" id="m3-mesh"${why?' disabled aria-describedby="m3-block"':''}>Mesh</button>`)+
-   `<button type="button" disabled aria-describedby="m3-run-why">Run</button><small id="m3-block">${esc(block)}</small><small id="m3-run-why" class="visually-hidden">${esc(blockReason())}</small></div></div>`+
-   meshJob()+
+   (heat.run?`<button type="button" id="m3-run-cancel">Cancel run</button>`:`<button type="button" id="m3-run"${runWhy&&kept<0?' disabled':''} aria-describedby="m3-run-why">Run</button>`)+
+   `<small id="m3-block">${esc(block)}</small>`+
+   `<small id="m3-run-why">${kept>=0&&!heat.run?`${esc(noNeedText(kept))} <button type="button" data-m3-show-run="${kept}">Show Run ${kept+1}</button>`:esc(runWhy||'')}</small></div></div>`+
+   meshJob()+runJob()+
    `<div class="m3-views" role="toolbar" aria-label="3D view">${['iso','+x','-x','+y','-y','+z','-z'].map(v=>`<button type="button" data-m3-view="${v}">${v==='iso'?'Iso':v.toUpperCase().replace('-','−')}</button>`).join('')}<button type="button" data-m3-fit>Fit</button>`+
-   `<span class="m3-pane" role="group" aria-label="Shown"><button type="button" data-m3-pane="geometry" aria-pressed="${!onMesh}">Geometry</button><button type="button" data-m3-pane="mesh" aria-pressed="${onMesh}"${mesh.view?'':' disabled title="Mesh first"'}>Mesh view</button></span></div>`+
-   `<div class="m3-stage${refused&&!onMesh?' stale':''}${onMesh&&stale?' stale':''}"><div id="m3-canvas-slot"></div>${refused&&lastGood&&!onMesh?'<p class="m3-last">Last shape that could be formed</p>':''}`+
-   `${onMesh&&stale?'<p class="m3-last">Mesh of an earlier geometry; mesh again to update it</p>':''}</div>`+
+   `<span class="m3-section"><label>Section <select id="m3-section-axis" aria-label="section plane"><option value="">none</option>${['x','y','z'].map(a=>`<option value="${a}"${section?.axis===a?' selected':''}>${a} =</option>`).join('')}</select></label>`+
+   `<input id="m3-section-at" aria-label="section position" inputmode="decimal" value="${esc(section?.at??'')}"><button type="button" id="m3-section-go">Apply</button></span>`+
+   `<span class="m3-pane" role="group" aria-label="Shown"><button type="button" data-m3-pane="geometry" aria-pressed="${!onMesh&&!onResult}">Geometry</button><button type="button" data-m3-pane="mesh" aria-pressed="${onMesh}"${mesh.view?'':' disabled title="Mesh first"'}>Mesh view</button>`+
+   `<button type="button" data-m3-pane="result" aria-pressed="${onResult}"${heat.records.length?'':' disabled title="Run first"'}>Result</button></span></div>`+
+   `<div class="m3-stage${refused&&!onMesh&&!onResult?' stale':''}${(onMesh&&stale)||resultStale?' stale':''}"><div id="m3-canvas-slot"></div>${refused&&lastGood&&!onMesh&&!onResult?'<p class="m3-last">Last shape that could be formed</p>':''}`+
+   `${onMesh&&stale?'<p class="m3-last">Mesh of an earlier geometry; mesh again to update it</p>':''}${resultStale?`<p class="m3-last">Run ${heat.shown+1}: inputs changed since this run</p>`:''}</div>`+
+   (onResult?colourBar(heat.records[heat.shown]):'')+
    `<section class="m3-faces"><h3 id="m3-faces-heading">Faces</h3><ul id="m3-faces" aria-labelledby="m3-faces-heading"></ul></section>`+
    `<section class="m3-names" id="m3-names" aria-live="polite"></section>`+
    `<p class="muted">Lengths in ${esc(shownUnit(comp.length_unit))}. A face's names say which surface of which feature it lies on.</p>`;
+  const ramp=host.querySelector('.m3-ramp');if(ramp)ramp.style.background=ramp.dataset.ramp;   // CSSOM, not an inline style attribute (CSP)
   const v=ensureViewer(),slot=host.querySelector('#m3-canvas-slot');
-  if(onMesh){const mv=ensureMeshViewer();slot.append(mesh.canvas);if(mv.view!==mesh.view){mv.setHidden([...hidden]);mv.load(mesh.view);}mv.select(face);}
+  if(onResult){const rv=ensureResultViewer(),rec=heat.records[heat.shown];slot.append(heat.canvas);
+   if(rv.source!==rec){rv.source=rec;rv.setHidden([...hidden]);rv.load(rec.surface);rv.setCut(heat.cut&&heat.cut.run===heat.shown?heat.cut.answer:null);}rv.select(face);}
+  else if(onMesh){const mv=ensureMeshViewer();slot.append(mesh.canvas);if(mv.view!==mesh.view){mv.setHidden([...hidden]);mv.load(mesh.view);}mv.select(face);}
   else slot.append(canvas3d);
   if(lastGood){
    if(v.view!==lastGood){v.setHidden([...hidden]);v.load(lastGood,{keep:!!v.view});}
    v.select(face);
   }
-  const active=()=>onMesh?mesh.viewer:v;
+  if(!onResult&&!onMesh&&lastGood)v.setSection(section,section?.outline||null);
+  const active=()=>onResult?heat.viewer:onMesh?mesh.viewer:v;
   host.querySelectorAll('[data-m3-view]').forEach(b=>b.onclick=()=>active().setView(b.dataset.m3View));
   host.querySelector('[data-m3-fit]').onclick=()=>active().fit();
   host.querySelectorAll('[data-m3-pane]').forEach(b=>b.onclick=()=>{mesh.pane=b.dataset.m3Pane;ctx.render();document.querySelector(`[data-m3-pane="${mesh.pane}"]`)?.focus();});
   host.querySelector('#m3-mesh')?.addEventListener('click',()=>startMesh());
   host.querySelector('#m3-mesh-cancel')?.addEventListener('click',()=>cancelMesh());
+  host.querySelector('#m3-run')?.addEventListener('click',()=>startRun());
+  host.querySelector('#m3-run-cancel')?.addEventListener('click',()=>cancelRun());
+  host.querySelectorAll('[data-m3-show-run]').forEach(b=>b.onclick=()=>{selection=`run:${+b.dataset.m3ShowRun+1}`;showRun(+b.dataset.m3ShowRun);ctx.render();});
+  host.querySelector('#m3-section-go').onclick=()=>applySection(host.querySelector('#m3-section-axis').value,host.querySelector('#m3-section-at').value);
   renderFaces();renderNames();
  }
  function ensureMeshViewer(){
@@ -224,6 +322,123 @@ export function createModel3dView(ctx){
    mesh.viewer=new MeshView3D(mesh.canvas,{onPick:f=>{face=f;viewer?.select(f);renderNames();renderFaces();},onCamera:what=>{mesh.canvas.dataset.camera=what;}});
   }
   return mesh.viewer;
+ }
+ function ensureResultViewer(){
+  if(!heat.canvas){
+   heat.canvas=document.createElement('canvas');heat.canvas.id='m3-result-canvas';heat.canvas.tabIndex=0;
+   heat.canvas.setAttribute('aria-label','Temperature of the run on the surfaces, blue at the minimum and red at the maximum. Arrow keys rotate, Shift with arrow keys pans, plus and minus zoom, F fits, 1 to 6 choose the axis views, 0 the isometric view. Clicking a surface probes the temperature there.');
+   heat.viewer=new TemperatureView3D(heat.canvas,{onPick:f=>{face=f;viewer?.select(f);renderNames();renderFaces();
+    const hit=heat.viewer.lastHit;if(hit&&heat.live[heat.shown])probeAt(hit.point);},onCamera:what=>{heat.canvas.dataset.camera=what;}});
+  }
+  return heat.viewer;
+ }
+ function colourBar(rec){
+  const s=rec.surface,lo=s.temperature_min.value,hi=s.temperature_max.value,mid=(lo+hi)/2;
+  const css=[lo,mid,hi].map(t=>`rgb(${temperatureColor(t,lo,hi).map(c=>Math.round(c*255)).join(',')})`).join(',');
+  return `<div class="m3-colourbar" role="img" aria-label="Temperature from ${Number(lo.toPrecision(6))} K (blue) to ${Number(hi.toPrecision(6))} K (red)"><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${css})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`;
+ }
+ async function applySection(axis,raw){
+  const at=Number(raw);
+  if(!axis){section=null;heat.cut=null;heat.viewer?.setCut(null);ctx.render();return;}
+  if(raw===''||!Number.isFinite(at)){lastNotice={text:'Enter the section position as a number in the component\'s unit.',undo:false};renderDock();return;}
+  section={axis,at};
+  try{const outline=await ctx.request('/api/model3d/section',{doc,component:componentName(doc),axis,at});if(outline.ok!==false)section.outline=outline;}catch{}
+  if(mesh.pane==='result'&&heat.shown!==null&&heat.live[heat.shown]){
+   try{const cut=await ctx.request(`/api/model3d/runs/${encodeURIComponent(heat.live[heat.shown])}/cut`,{axis,at});
+    heat.cut={run:heat.shown,axis,at,answer:cut};heat.viewer?.setCut(cut);
+    lastNotice={text:`Cut ${axis} = ${at} ${shownUnit(heat.records[heat.shown].surface.unit)}: ${Number(cut.temperature_min.value.toPrecision(6))}–${Number(cut.temperature_max.value.toPrecision(6))} K.`,undo:false};}
+   catch(e){lastNotice={text:e.message,undo:false};}
+  }else if(mesh.pane==='result'&&heat.shown!==null)lastNotice={text:'Recompute this run to cut, probe or export CSV.',undo:false};
+  ctx.render();
+ }
+ // ---- the run: start, poll, cancel, keep the record ----
+ const RUN_STEPS=[['mesh','Meshing'],['solve','Solving'],['done','Done']];
+ function runJob(){
+  const s=heat.status;if(!s)return '';
+  const at=RUN_STEPS.findIndex(([k])=>k===(s.status==='done'?'done':s.step));
+  return `<div class="m3-mesh-job m3-run-job" aria-live="polite"><p id="m3-run-progress"${s.longer_than_estimate?' class="longer"':''}>${esc(runProgress(s))}</p>`+
+   (s.status==='running'||s.status==='done'?`<ol id="m3-run-steps">${RUN_STEPS.map(([k,l],i)=>`<li class="${s.status==='done'||i<at?'done':i===at?'current':'todo'}"${i===at&&s.status==='running'?' aria-current="step"':''}>${l}</li>`).join('')}</ol>`:'')+`</div>`;
+ }
+ function stopRun(){
+  clearTimeout(heat.timer);heat.timer=null;
+  const run=heat.run;heat.run=null;
+  if(run)ctx.request(`/api/model3d/runs/${encodeURIComponent(run.id)}/cancel`,{}).catch(()=>{});
+ }
+ function showRun(i){heat.shown=i;mesh.pane='result';if(heat.cut&&heat.cut.run!==i)heat.cut=null;heat.probe=null;}
+ async function startRun(document=null,replace=null){
+  const target=document||doc;
+  if(heat.run)return;
+  if(!document){
+   const kept=keptRunFor(doc,heat.records);
+   if(kept>=0){selection=`run:${kept+1}`;showRun(kept);ctx.render();return;}
+   if(runReason({drafts:drafts.size,refused,check,running:!!mesh.job,doc,failure:heat.failure},WORDS))return;
+  }
+  let body;
+  try{body=await ctx.request('/api/model3d/run',{doc:target,component:componentName(target)});}
+  catch(e){heat.failure={document:JSON.parse(JSON.stringify(target)),message:e.message};lastNotice={text:'Run not started: '+e.message,undo:false};ctx.render();return;}
+  heat.run={id:body.run,document:JSON.parse(JSON.stringify(target)),replace};heat.failure=null;
+  heat.status={status:'running',step:body.reused?'solve':'mesh',elapsed_s:0,expected_s:body.estimate.seconds};
+  ctx.render();pollRun(body.run);document===null&&globalThis.document.getElementById('m3-run-cancel')?.focus();
+ }
+ function pollRun(id){
+  clearTimeout(heat.timer);
+  heat.timer=setTimeout(async()=>{
+   if(heat.run?.id!==id)return;
+   let s;
+   try{s=await ctx.get(`/api/model3d/runs/${encodeURIComponent(id)}`);}
+   catch(e){if(heat.run?.id===id){heat.run=null;lastNotice={text:'Lost the run: '+e.message,undo:false};ctx.render();}return;}
+   if(heat.run?.id!==id)return;
+   heat.status=s;
+   if(s.status==='running'){const box=globalThis.document.querySelector('.m3-run-job');if(box)box.outerHTML=runJob();else if(shown)ctx.render();pollRun(id);return;}
+   if(s.status==='done'){await runDone(id);return;}
+   const run=heat.run;heat.run=null;
+   if(s.status==='error'){heat.failure={document:run.document,message:s.error?.message||'unknown error'};lastNotice=null;}
+   else lastNotice={text:runProgress(s),undo:false};
+   ctx.render();
+  },400);
+ }
+ async function runDone(id){
+  let record;
+  try{record=await ctx.get(`/api/model3d/runs/${encodeURIComponent(id)}/record?maps=kept`);}
+  catch(e){heat.run=null;lastNotice={text:'The run could not be read: '+e.message,undo:false};ctx.render();return;}
+  if(heat.run?.id!==id)return;
+  const run=heat.run;heat.run=null;
+  let i;
+  if(run.replace!==null&&heat.records[run.replace]){i=run.replace;heat.records[i]=record;heat.live[i]=id;}
+  else{heat.records.push(record);heat.live.push(id);
+   while(heat.records.length>MAX_RUNS){heat.records.shift();heat.live.shift();}
+   i=heat.records.length-1;}
+  selection=`run:${i+1}`;showRun(i);
+  const t=record.values.temperature_max;
+  lastNotice={text:`Run ${i+1} complete: maximum ${Number(t.value.toPrecision(6))} K in ${t.region}. Its results belong to that run; editing the model does not change them.`,undo:false};
+  ctx.onHistory();ctx.render();
+ }
+ async function cancelRun(){
+  const run=heat.run;if(!run)return;
+  clearTimeout(heat.timer);
+  let body;
+  try{body=await ctx.request(`/api/model3d/runs/${encodeURIComponent(run.id)}/cancel`,{});}
+  catch(e){lastNotice={text:'Cancel was refused: '+e.message,undo:false};renderDock();pollRun(run.id);return;}
+  if(heat.run?.id!==run.id)return;
+  if(body.cancelled===false&&body.status==='done'){await runDone(run.id);return;}
+  if(body.cancelled===false){pollRun(run.id);return;}
+  heat.run=null;heat.status={status:'cancelled'};lastNotice={text:body.message||'Run cancelled; nothing kept.',undo:false};
+  ctx.render();globalThis.document.getElementById('m3-run')?.focus();
+ }
+ async function probeAt(point){
+  const i=heat.shown,id=heat.live[i];if(i===null||!id)return;
+  const u=shownUnit(heat.records[i].surface.unit);
+  try{const a=await ctx.request(`/api/model3d/runs/${encodeURIComponent(id)}/probe`,{point});
+   heat.probe={point,text:a.ok===false?a.refused:`T = ${Number(a.temperature.value.toPrecision(6))} K at (${point.map(x=>Number(Number(x).toPrecision(4))).join(', ')}) ${u}, in ${a.region}.`};}
+  catch(e){heat.probe={point,text:e.message};}
+  ctx.render();
+ }
+ function runAction(act){
+  const i=heat.shown,rec=heat.records[i];if(!rec)return;
+  if(act==='inputs'){commit(JSON.parse(JSON.stringify(rec.document)));lastNotice={text:`The model now has Run ${i+1}'s inputs; Undo restores the earlier ones.`,undo:true};ctx.render();return;}
+  if(act==='recompute'){startRun(rec.document,i);return;}
+  if(act==='json'){const url=URL.createObjectURL(new Blob([JSON.stringify(rec,null,1)],{type:'application/json'}));
+   const a=globalThis.document.createElement('a');a.href=url;a.download=`run-${i+1}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
  }
  // ---- slice C's mesh job: start, poll, cancel, the result ----
  function meshJob(){
@@ -306,10 +521,28 @@ export function createModel3dView(ctx){
   if(!f){box.innerHTML='<h3>Names</h3><p class="muted">Pick a face in the view or in the faces list.</p>';return;}
   const lines=faceLines(lastGood,f),can=f.alone.length>0&&!refused;
   box.innerHTML=`<h3>Names</h3><p>${esc(lines.title)}</p><p class="muted">${esc(lines.detail)} · sides ${esc(lines.sides)}</p><ul>${lines.names.map(n=>`<li><code>${esc(n)}</code></li>`).join('')}</ul>`+
-   `<div class="m3-use"><label>Use for <select id="m3-use"><option value="new">New selection</option></select></label><input id="m3-use-name" aria-label="new selection name" value="${esc(suggestName(f))}" spellcheck="false"><button type="button" id="m3-use-go"${can?'':' disabled aria-describedby="m3-use-why"'}>Apply</button>`+
+   `<div class="m3-use"><label>Use for <select id="m3-use"><option value="new">New selection</option><option value="fixed">Fixed temperature</option></select></label><input id="m3-use-name" aria-label="new selection name" value="${esc(suggestName(f))}" spellcheck="false"><button type="button" id="m3-use-go"${can?'':' disabled aria-describedby="m3-use-why"'}>Apply</button>`+
    (can?'':`<small id="m3-use-why">${esc(refused?'The geometry cannot be formed; fix the problem in Messages first.':'No single name selects this face alone.')}</small>`)+`</div>`;
-  const go=box.querySelector('#m3-use-go');
-  go.onclick=()=>newSelection(f.id,box.querySelector('#m3-use-name').value.trim());
+  const go=box.querySelector('#m3-use-go'),use=box.querySelector('#m3-use'),nameInput=box.querySelector('#m3-use-name');
+  use.onchange=()=>{const fixed=use.value==='fixed';
+   nameInput.value=fixed?boundaryNameFor(f,doc.geometry.components[componentName(doc)].features.map(x=>x.name))||'':suggestName(f);
+   nameInput.setAttribute('aria-label',fixed?'boundary name of the fixed temperature':'new selection name');};
+  go.onclick=()=>{
+   if(use.value==='fixed'){fixedOn(nameInput.value.trim());return;}
+   newSelection(f.id,nameInput.value.trim());
+  };
+ }
+ // Use for → Fixed temperature: the edit goes to the server's check first, and a face the heat kind
+ // refuses (an inner face) is not written; Messages shows the kind's words, the document is unchanged
+ async function fixedOn(name){
+  let next;
+  try{next=setFixedTemperature(doc,name,'300 K');}catch(e){lastNotice={text:e.message,undo:false};renderDock();return;}
+  let a;
+  try{a=await ctx.request('/api/model3d/check',{doc:next,component:componentName(next)});}catch(e){lastNotice={text:e.message,undo:false};renderDock();return;}
+  if(a.ok&&a.run?.ok===false&&a.run.refused!==check?.run?.refused){
+   lastNotice={text:a.run.refused,undo:false,error:true,details:a.run.code||null};renderDock();
+   globalThis.document.querySelector('[data-m3-use-refusal] > p')?.focus();return;}
+  commit(next);lastNotice={text:`Fixed temperature 300 K on ${name}.`,undo:true};ctx.render();
  }
  function suggestName(f){
   const taken=new Set(Object.keys(doc.geometry.components[componentName(doc)].selections||{}));
@@ -335,7 +568,12 @@ export function createModel3dView(ctx){
   if(off){const m=refusalMessage(off),at=m.feature!==null?`feature:${m.feature}`:'mesh';
    parts.push(`<div class="mp-message error" data-m3-refusal data-m3-mesh-refusal><p>${esc(m.text)}</p><div class="mp-message-actions"><button type="button" data-m3-show="${at}">Show</button></div>`+
     (m.details?`<details><summary>Details</summary><code>${esc(off.code||'')}</code>${off.path?` at <code>${esc(off.path)}</code>`:''}</details>`:'')+`</div>`);}
-  if(lastNotice)parts.push(`<div class="mp-message info"><p>${esc(lastNotice.text)}</p><div class="mp-message-actions">${lastNotice.undo?'<button type="button" data-m3-undo>Undo</button>':''}</div>${lastNotice.details?`<details><summary>Details</summary><code>${esc(lastNotice.details)}</code></details>`:''}</div>`);
+  if(!refused&&!off&&check?.run?.ok===false&&heatOf(doc))
+   parts.push(`<div class="mp-message error" data-m3-refusal data-m3-run-refusal><p>${esc(check.run.refused)}</p><div class="mp-message-actions"><button type="button" data-m3-show="heat">Show</button></div>`+
+    (check.run.code?`<details><summary>Details</summary><code>${esc(check.run.code)}</code></details>`:'')+`</div>`);
+  if(heat.failure&&runReason({check,doc,failure:heat.failure},WORDS)===heat.failure.message)
+   parts.push(`<div class="mp-message error" data-m3-run-failure><p>${esc(heat.failure.message)}</p><div class="mp-message-actions"><button type="button" data-m3-show="heat">Show</button></div></div>`);
+  if(lastNotice)parts.push(`<div class="mp-message ${lastNotice.error?'error" data-m3-use-refusal':'info"'}><p>${esc(lastNotice.text)}</p><div class="mp-message-actions">${lastNotice.undo?'<button type="button" data-m3-undo>Undo</button>':''}</div>${lastNotice.details?`<details><summary>Details</summary><code>${esc(lastNotice.details)}</code></details>`:''}</div>`);
   if(drafts.size)parts.push(`<div class="mp-message warning"><p>${esc(blockReason({drafts:drafts.size}))}</p></div>`);
   box.innerHTML=parts.join('')||(checking?'<p class="muted">Checking the geometry…</p>':'<p class="muted">No problems: the geometry passes the check.</p>');
   box.querySelectorAll('.mp-message > p').forEach(p=>p.tabIndex=0);     // each message is reached by Tab
@@ -350,14 +588,14 @@ export function createModel3dView(ctx){
   $('view-title').textContent=page==='Applications'?'Model library':'Graphics';
   $('view-detail').textContent=page==='Applications'?(ctx.projectLine?.()||'Choose a model'):'Interactive 3D view';
   markPageTabs(document.querySelector('.page-tabs'),page==='Applications'?'Applications':'Model');
-  document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>choose(({Geometry:'geometry',Materials:'materials',Mesh:'form',Study:'form'})[b.dataset.commandNode]);});
+  document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>choose(({Geometry:'geometry',Materials:'materials',Mesh:'mesh',Study:'study'})[b.dataset.commandNode]);});
   document.querySelectorAll('[data-view]').forEach(b=>b.hidden=true);
   const toolbar=document.querySelector('.workspace > .toolbar');if(toolbar)toolbar.style.display=page==='Model'?'flex':'none';
   $('breadcrumb').textContent='Model / '+(rows().find(r=>r.key===selection)?.label||'Geometry 1');
-  document.querySelector('.workspace > .note').textContent='A 3D model of boxes and slab layers, meshed by Mesh 1. Heat comes in a later step.';
+  document.querySelector('.workspace > .note').textContent='A 3D model of boxes and slab layers: Mesh 1 meshes it, Run solves steady heat.';
   $('solver-log').hidden=true;$('workflow').hidden=true;
   for(const id of ['run-optical','run-heat','run-joule','run-multiphysics','run-multiphysics-reason','add-physics','add-coupling','run-options','run-baseline-option'])if($(id))$(id).hidden=true;
-  const steps=$('sequence');if(steps)steps.innerHTML='<span class="sequence-empty">No study steps yet: heat comes in a later step of the 3D model.</span>';
+  const steps=$('sequence');if(steps)steps.innerHTML='<span class="sequence-empty">Study 1 · Steady: Run meshes the component and solves Heat transfer (3D).</span>';
   drawTree();
   const inspector=$('inspector');inspector.innerHTML=settings();bindSettings(inspector);
   const host=$('canvas');
@@ -371,10 +609,10 @@ export function createModel3dView(ctx){
   active:()=>shown,inProject:()=>inProject,
   open,
   /** A model3d session read by parseSession: its document (and the title the project gives it). */
-  openSession:(session,{asTitle}={})=>open(session.document,{asTitle}),
+  openSession:(session,{asTitle}={})=>open(session.document,{asTitle,runs:session.runs||[]}),
   show(){if(!inProject)return;shown=true;ctx.ui.page='Model';ctx.render();},
-  leave(){stopJob();shown=false;const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();delete box.dataset.m3State;}},
-  close(){stopJob();mesh.view=null;mesh.status=null;shown=false;inProject=false;doc=null;history=null;check=null;refused=null;lastGood=null;},
+  leave(){stopJob();stopRun();shown=false;const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();delete box.dataset.m3State;}},
+  close(){stopJob();stopRun();heat.records=[];heat.live=[];mesh.view=null;mesh.status=null;shown=false;inProject=false;doc=null;history=null;check=null;refused=null;lastGood=null;},
   renderPage,
   canUndo:()=>!!history?.canUndo,canRedo:()=>!!history?.canRedo,
   undo(){if(!history?.canUndo)return;doc=history.undo();drafts.clear();runCheck();ctx.render();ctx.onHistory();},
@@ -382,10 +620,11 @@ export function createModel3dView(ctx){
   drafts:()=>drafts.size,
   blockText:()=>drafts.size?blockReason({drafts:drafts.size}):null,
   projectTitle:()=>title,
-  /** What "changed" counts for the project: the document only (no view state). */
-  contentStamp:()=>doc?documentDigest(doc):null,
-  sessionText:()=>writeModel3dSession(doc),
+  /** What "changed" counts for the project: the document and the kept runs (no view state). */
+  contentStamp:()=>doc?documentDigest(doc)+'|'+heat.records.map(r=>r.run).join(','):null,
+  sessionText:()=>writeModel3dSession(doc,null,heat.records),
   document:()=>doc,
-  state:()=>({check,refused,selection,face,mesh:{job:mesh.job,status:mesh.status?.status||null,view:!!mesh.view,pane:mesh.pane}}),
+  state:()=>({check,refused,selection,face,mesh:{job:mesh.job,status:mesh.status?.status||null,view:!!mesh.view,pane:mesh.pane},
+   heat:{runs:heat.records.length,live:heat.live.slice(),running:heat.run?.id||null,status:heat.status?.status||null,shown:heat.shown,failure:heat.failure?.message||null}}),
  };
 }
