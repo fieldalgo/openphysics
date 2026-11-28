@@ -169,12 +169,7 @@ def test_plane_scaled_matrix_equals_every_box_pair_computed():
 
 
 def box_grids(a, b, labels, degree):
-    grids = []
-    for label in np.unique(labels):
-        g = np.flatnonzero(labels == label)
-        points = np.concatenate((a[g], b[g]))
-        grids.append(module._projection(a[g], b[g], points.min(axis=0), points.max(axis=0), degree))
-    return grids
+    return [module._box(a[g], b[g], degree) for g in (np.flatnonzero(labels == label) for label in np.unique(labels))]
 
 
 @pytest.mark.parametrize('pair', [(1, 1), (1, 2), (2, 1)], ids=['diagonal', 'neighbour', 'neighbour-reversed'])
@@ -194,3 +189,35 @@ def test_raw_reciprocity_still_compares_independent_blocks(monkeypatch, pair):
     monkeypatch.setattr(module, '_smooth', skewed)
     with pytest.raises(ValueError, match='raw matrix reciprocity failed'):
         module._matrix(a, b, w, h, degree=12, order=8, images=images, labels=labels)
+
+
+def test_boxes_with_fewer_panels_than_the_degree_are_integrated_directly(monkeypatch):
+    """A box of n < degree panels uses n x degree panel Gauss points, fewer than the degree**2 grid."""
+    a, b, owners, w, h, images = layered_coupled(64)
+    labels = module._clusters(a, b, owners, w, h)
+    counts = np.bincount(labels)
+    used = {'direct': [], 'grid': []}
+    direct, projection = module._direct, module._projection
+    monkeypatch.setattr(module, '_direct', lambda a, b, d: used['direct'].append(len(a)) or direct(a, b, d))
+    monkeypatch.setattr(module, '_projection', lambda a, b, lo, hi, d: used['grid'].append(len(a)) or projection(a, b, lo, hi, d))
+    module._matrix(a, b, w, h, degree=14, order=8, images=images, labels=labels)
+    assert sorted(used['direct']) == sorted(counts[counts < 14].tolist()) and used['direct']
+    assert sorted(used['grid']) == sorted(counts[counts >= 14].tolist()) and used['grid']
+
+
+def test_direct_box_integral_matches_the_interpolated_one():
+    """Both integrate the same smooth kernel over the same panels; they differ only by interpolation error."""
+    a, b, owners, w, h, images = layered_coupled(64)
+    labels = module._clusters(a, b, owners, w, h)
+    counts = np.bincount(labels)
+    small = [np.flatnonzero(labels == label) for label in np.flatnonzero((counts >= 4) & (counts < 14))[:3]]
+    for rows in small:
+        for columns in small:
+            boxes = []
+            for g in (rows, columns):
+                points = np.concatenate((a[g], b[g]))
+                boxes.append((module._direct(a[g], b[g], 14),
+                              module._projection(a[g], b[g], points.min(axis=0), points.max(axis=0), 16)))
+            direct = boxes[0][0][1] @ module._smooth(boxes[0][0][0], boxes[1][0][0], w, h, images) @ boxes[1][0][1].T
+            grid = boxes[0][1][1] @ module._smooth(boxes[0][1][0], boxes[1][1][0], w, h, images) @ boxes[1][1][1].T
+            assert np.max(abs(direct - grid)) <= 1e-13 * np.max(abs(grid))

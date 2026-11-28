@@ -116,6 +116,29 @@ def _projection(a, b, lower, upper, degree):
         projection += weight * values
     return grid, projection
 
+def _direct(a, b, degree):
+    """Panel Gauss points and weights of one plane-scaled box: the smooth kernel
+    is integrated directly with ``degree`` points per panel instead of being
+    interpolated on a degree x degree tensor grid.
+
+    Used when the box has fewer panels than ``degree``, so it has fewer points
+    (panels x degree) than the grid (degree squared). The returned pair has
+    the shape of ``_projection``'s: points, and the (panels, points) weights.
+    """
+    nodes, weights = leggauss(degree)
+    points = (a[:, None] + ((nodes + 1) / 2)[None, :, None] * (b - a)[:, None]).reshape(-1, 2)
+    return points, np.kron(np.eye(len(a)), weights[None] / 2)
+
+def _box(a, b, degree):
+    """Points and panel weights of one plane-scaled box: panel Gauss points when
+    it has fewer panels than ``degree``, else the interpolation grid."""
+    box = np.concatenate((a, b))
+    if np.any(box.max(axis=0) <= box.min(axis=0)):
+        raise ValueError('plane-scaled interpolation box has zero extent')
+    if len(a) < degree:
+        return _direct(a, b, degree)
+    return _projection(a, b, box.min(axis=0), box.max(axis=0), degree)
+
 def _clusters(a, b, owners, width, height):
     """Panel groups of each conductor no wider than its distance to the nearest
     plane or side wall (kernel.wall_labels with the bottom plane included).
@@ -153,12 +176,7 @@ def _matrix(a, b, width, height, *, degree, order, images, labels=None):
         result = kernel.half_matrix(a, b, order=order) + projection @ _smooth(grid, grid, width, height, images) @ projection.T
     else:
         groups = [np.flatnonzero(labels == label) for label in np.unique(labels)]
-        boxes = []
-        for group in groups:
-            box = np.concatenate((a[group], b[group]))
-            if np.any(box.max(axis=0) <= box.min(axis=0)):
-                raise ValueError('plane-scaled interpolation box has zero extent')
-            boxes.append(_projection(a[group], b[group], box.min(axis=0), box.max(axis=0), degree))
+        boxes = [_box(a[group], b[group], degree) for group in groups]
         result = kernel.half_matrix(a, b, order=order)
         for i, j in _box_pairs(len(groups)):
             block = boxes[i][1] @ _smooth(boxes[i][0], boxes[j][0], width, height, images) @ boxes[j][1].T
