@@ -20,6 +20,12 @@
 //      inside" (the document unchanged); select stack.top.top from the list, Use for → Fixed
 //      temperature; set a section; Run to completion; no pointer event;
 //  W14 recorded only (SwiftShader here): the time from Run to the drawn result, and of a cut.
+// Card 2, Copper via through a slab (E2-UI), with the same thresholds: W12 (Library, Model, Mesh view,
+// Result at 1440 x 900 and 390 x 844, and the display note on the curved face via.side), W6-UI (Run 1's
+// values table equals /api/model3d/runs/{id}/values through the page's rows), W11 (Save and Open with
+// the run, the project naming card via-slab-3d), F2 (Add feature → Sphere shown refused in the engine's
+// words, not silently fixed), W13 (keyboard only: via.side → Use for → Fixed temperature gives "Fixed
+// temperature needs an outer face; via.side is inside" with the document unchanged, then Run) and W14.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -244,6 +250,132 @@ try {
       && JSON.stringify(steps.values.map(v => v[0])) === JSON.stringify(['Temperature, max', 'Temperature, min', 'Heat rate through z0',
         'Heat rate through stack.top.top', 'Total heat source', 'Energy balance residual']) && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
     record('W13', ok, {steps, console: seen.console, pageErrors: seen.pageErrors});
+    await page.close();
+  }
+
+  // ---- card 2, Copper via through a slab (E2-UI): W12, W6-UI, W14, F2, W11, W13 ----------------
+  const NOTE = 'Shape drawn for display; the mesh follows it to within its size';
+  for (const viewport of [{width: 1440, height: 900}, {width: 390, height: 844}]) {
+    const tag = `${viewport.width}x${viewport.height}`;
+    const {page, seen} = await open(browser, viewport);
+    let runId = null;
+    page.on('response', async r => { if (r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/model3d/run') runId = (await r.json().catch(() => ({}))).run || runId; });
+    const lib = await page.evaluate(() => ({card: !!document.querySelector('.library-3d [data-model3d-card="via-slab-3d"]'),
+      scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth}));
+    await page.click('[data-model3d-card="via-slab-3d"]'); await checked(page);
+    const geometry = await canvasState(page, '#m3-canvas');
+    await page.screenshot({path: join(out, `w12-card2-model-${tag}.png`), fullPage: true});
+    // the display note, on the curved face via.side (the names panel, as main shows it)
+    const side = await page.evaluate(() => [...document.querySelectorAll('#m3-faces li')].find(li => li.getAttribute('aria-label').endsWith(': via.side'))?.dataset.face);
+    await page.click(`#m3-faces li[data-face="${side}"]`);
+    const note = await page.evaluate(() => document.getElementById('m3-names').textContent);
+    await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
+    const tabs = await tabTo(page, () => !!document.activeElement?.closest('#m3-faces'));
+    // Mesh 1, Mesh: the mesh view
+    await page.click('[data-m3-node="mesh"]'); await page.click('#m3-mesh');
+    await page.waitForFunction(() => /^Meshed /.test(document.getElementById('mp-messages')?.textContent || '') && document.getElementById('m3-mesh-canvas'), null, {timeout: 180000});
+    await page.waitForTimeout(300);
+    const meshView = await canvasState(page, '#m3-mesh-canvas');
+    await page.screenshot({path: join(out, `w12-card2-mesh-${tag}.png`), fullPage: true});
+    // Run: the result
+    const t0 = Date.now();
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    const toResult = Date.now() - t0;
+    const result = await canvasState(page, '#m3-result-canvas');
+    await page.screenshot({path: join(out, `w12-card2-result-${tag}.png`), fullPage: true});
+    const c = await csp(page);
+    const ok = lib.card && !seen.console.length && !seen.pageErrors.length && !c.length && !seen.foreign.length
+      && [geometry, meshView, result].every(st => st.visible && st.drawn > 0.02 * st.pixels) && tabs !== null && note.includes(NOTE)
+      && (viewport.width !== 390 || [geometry, meshView, result].every(st => st.scrollWidth <= st.innerWidth) && lib.scrollWidth <= lib.innerWidth);
+    record(`W12 card 2 ${tag}`, ok, {library: lib, geometry, meshView, result, tabsToFacesList: tabs, note: note.includes(NOTE), console: seen.console,
+      pageErrors: seen.pageErrors, csp: c, foreign: seen.foreign});
+    if (viewport.width === 1440) {
+      // W6-UI: Run 1's values table equals the run route's /values, through the page's own rows
+      const values = await page.evaluate(async id => (await fetch(`/api/model3d/runs/${id}/values`)).json(), runId);
+      const table = await page.evaluate(() => [...document.querySelectorAll('#m3-values tr')].map(r => [r.querySelector('th').textContent, r.querySelector('td').textContent]));
+      const fromRoute = await page.evaluate(async v => (await import('/workspace-assets/workspace-model3d.mjs')).valuesRows(v, 'm'), values);
+      record('W6-UI card 2', JSON.stringify(table) === JSON.stringify(fromRoute) && table.length === 6, {run: runId, table, fromRoute,
+        heatRates: values.heat_rate_by_selection, relativeResidual: values.relative_balance_residual});
+      // W14 (recorded only)
+      const t1 = Date.now();
+      await page.selectOption('#m3-section-axis', 'x'); await page.fill('#m3-section-at', '0'); await page.click('#m3-section-go');
+      await page.waitForFunction(() => /^Cut x = 0/.test(document.querySelector('#mp-messages .mp-message.info p')?.textContent || ''), null, {timeout: 30000});
+      const cut = Date.now() - t1;
+      await page.screenshot({path: join(out, 'w14-card2-cut.png')});
+      report.checks['W14 card 2'] = {ok: true, recordedOnly: true, renderer: 'SwiftShader (headless Chromium)', runToDrawnResultMs: toResult, cutMs: cut};
+      console.log(`W14 card 2 recorded: run to result ${toResult} ms, cut ${cut} ms`);
+      // W11: Save and Open with the run, project and session
+      const first = await save(page);
+      await openFile(page, 'project.json', first); await checked(page);
+      const second = await save(page);
+      const a = entry(first), b = entry(second);
+      const projectOk = JSON.parse(first).version === 2 && a.card === 'via-slab-3d' && b.card === 'via-slab-3d' && a.digest === b.digest && a.session.runs?.length === 1
+        && sha(canonical(a.session.document)) === sha(canonical(b.session.document)) && JSON.stringify(runDigests(a.session)) === JSON.stringify(runDigests(b.session));
+      const s1 = await exportSession(page);
+      await openFile(page, 'card2-session.json', s1); await checked(page);
+      const s2 = await exportSession(page);
+      const sessionOk = s1 === s2 && JSON.parse(s1).runs?.length === 1 && JSON.stringify(runDigests(JSON.parse(s1))) === JSON.stringify(runDigests(a.session));
+      await openFile(page, 'project-v1.json', V1);
+      await page.waitForFunction(() => /Opened project/.test(document.getElementById('file-status').textContent), null, {timeout: 30000});
+      const v1Again = await save(page);
+      const strip = t => JSON.parse(t).models.map(m => [m.id, m.kind, m.bytes, m.digest]);
+      const v1Ok = JSON.parse(v1Again).version === 1 && JSON.stringify(strip(v1Again)[1]) === JSON.stringify(strip(V1)[1]);
+      await writeFile(join(out, 'w11-card2-project.json'), first);
+      record('W11 card 2', projectOk && sessionOk && v1Ok && !seen.pageErrors.length, {projectOk, sessionOk, v1Ok, card: a.card,
+        projectDigest: [a.digest, b.digest], runs: runDigests(a.session), sessionSha: [sha(s1), sha(s2)]});
+    }
+    await page.close();
+  }
+  // F2 on card 2: Add feature → Sphere is shown refused in the engine's words, not silently fixed
+  {
+    const {page, seen} = await open(browser, {width: 1440, height: 900});
+    await page.click('[data-model3d-card="via-slab-3d"]'); await checked(page);
+    await page.click('[data-m3-node="geometry"]');
+    const offered = await page.evaluate(() => [...document.querySelectorAll('[data-m3-add]')].map(b => b.textContent));
+    await page.click('[data-m3-add="sphere"]');
+    await page.waitForSelector('[data-m3-refusal]', {timeout: 30000});
+    const shown = await page.evaluate(() => ({text: document.querySelector('[data-m3-refusal] p').textContent,
+      rows: [...document.querySelectorAll('#tree [data-m3-node^="feature:"]')].map(b => b.textContent),
+      marked: [...document.querySelectorAll('[data-m3-node].has-problem')].map(b => b.dataset.m3Node)}));
+    const ok = JSON.stringify(offered) === JSON.stringify(['Box', 'Layers', 'Cylinder', 'Sphere'])
+      && shown.text === "sphere 'sphere' is not taken yet in a 3d component; boxes and slab layers are, and cylinders and spheres in meshloom's builder shapes only (one cylinder through the whole slab, one sphere, concentric spheres)"
+      && shown.rows.length === 2 && /2 Sphere sphere/.test(shown.rows[1]) && JSON.stringify(shown.marked) === '["feature:1"]' && !seen.pageErrors.length;
+    record('F2 card 2', ok, {offered, ...shown});
+    await page.close();
+  }
+  // W13 on card 2: keyboard only; Use for → Fixed temperature on via.side is the kind's refusal; Run
+  {
+    const {page, seen} = await open(browser, {width: 1440, height: 900});
+    const steps = {};
+    steps.cardFocused = await tabTo(page, () => document.activeElement?.dataset?.model3dCard === 'via-slab-3d') !== null;
+    await page.keyboard.press('Enter'); await checked(page);
+    steps.canvasFocused = await tabTo(page, () => document.activeElement?.id === 'm3-canvas') !== null;
+    await page.keyboard.press('ArrowLeft');
+    steps.rotated = await page.evaluate(() => document.getElementById('m3-canvas').dataset.camera) === 'rotate';
+    await page.keyboard.press('5');
+    steps.view5 = await page.evaluate(() => document.getElementById('m3-canvas').dataset.camera) === '+z';
+    steps.sideFocused = await tabTo(page, n => !!document.activeElement?.closest('#m3-faces') && document.activeElement.getAttribute('aria-label').split(': ')[1].split(', ').includes(n), 200, 'via.side') !== null;
+    await page.keyboard.press('Enter');
+    steps.onUse = await tabTo(page, () => document.activeElement?.id === 'm3-use', 60) !== null;
+    await page.keyboard.press('ArrowDown');
+    steps.fixed = await page.evaluate(() => document.getElementById('m3-use').value === 'fixed');
+    steps.name = await page.evaluate(() => document.getElementById('m3-use-name').value);
+    steps.onApply = await tabTo(page, () => document.activeElement?.id === 'm3-use-go', 10) !== null;
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('[data-m3-use-refusal]', {timeout: 30000});
+    steps.refusal = await page.evaluate(() => document.querySelector('[data-m3-use-refusal] > p').textContent);
+    steps.unchanged = await page.evaluate(() => [...document.querySelectorAll('#tree [data-m3-node^="heat:fixed:"]')].map(b => b.dataset.m3Node));
+    steps.runFocused = await tabTo(page, () => document.activeElement?.id === 'm3-run', 200) !== null;
+    await page.keyboard.press('Enter');
+    await completed(page, 1);
+    steps.values = await page.evaluate(() => document.querySelectorAll('#m3-values tr').length);
+    steps.pointerEvents = await page.evaluate(() => window.__pointer);
+    await page.screenshot({path: join(out, 'w13-card2-keyboard.png')});
+    const ok = steps.cardFocused && steps.canvasFocused && steps.rotated && steps.view5 && steps.sideFocused && steps.onUse && steps.fixed
+      && steps.name === 'via.side' && steps.onApply && steps.refusal === 'Fixed temperature needs an outer face; via.side is inside'
+      && JSON.stringify(steps.unchanged) === '["heat:fixed:z0","heat:fixed:z1"]' && steps.runFocused && steps.values === 6
+      && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
+    record('W13 card 2', ok, {steps, console: seen.console, pageErrors: seen.pageErrors});
     await page.close();
   }
 } finally {

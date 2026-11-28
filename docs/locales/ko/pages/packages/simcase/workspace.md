@@ -277,8 +277,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 요소로, 배경은 `slab`(k = 1 W/(m K))이고 원기둥 `via` 하나(x–y 중심에서 r = 0.3 m, 슬래브 전체를 지남, `copper`, k = 100
 W/(m K))가 있습니다: meshloom의 `via_in_slab` builder 형상([builder 형상](geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3)).
 물리는 `z0`에 300 K, `z1`에 301 K, 나머지 바깥 면은 모두 단열입니다. 트리는 *1 Cylinder via* · *r 0.3 m · z 0–1 m*와
-*Form result* · *2 regions · 9 faces*로 읽히고, 보기는 형상을 표시용으로 그립니다(Details: *Shape drawn for display; the mesh
-follows it to within its size*). Mesh 1과 Run은 카드 1처럼 받습니다. 프로젝트는 3D 모델 하나를 담습니다: 카드 1의 모델을 담고
+*Form result* · *2 regions · 9 faces*로 읽히고, 보기는 형상을 표시용으로 그립니다(`via.side` 같은 곡면의 이름에 *Shape drawn for display; the mesh
+follows it to within its size*가 붙음). Mesh 1과 Run은 카드 1처럼 받습니다. 프로젝트는 3D 모델 하나를 담습니다: 카드 1의 모델을 담고
 있는 동안 카드 2를 고르면 그대로 두고 *This project already holds the 3D model Via in a layer stack (3D heat); a project holds
 one 3D model. Open Copper via through a slab (3D heat) in a new browser tab.*라고 말합니다(반대도 같음). 프로젝트 파일은 카드
 (`layer-stack-3d` 또는 `via-slab-3d`)를 밝히고, Export › Model with runs는 카드의 파일 이름(`copper-via-through-a-slab-3d.json`)을
@@ -420,6 +420,13 @@ thermal-steady3d-run-v1 record.* 3D 모델은 아직 브라우저 복구에 보�
 | W12(결과) | 카드의 Run 1을 Result 보기로(면 온도, 색 막대, 값 표), 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 열 브라우저 검사 |
 | W13(열) | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → Fixed temperature(Messages: *Fixed temperature needs an outer face; via.z1 is inside*, 문서는 그대로), `stack.top.top` 고르기, Use for → Fixed temperature, 단면 z = 300 µm, Run을 끝까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
 | W14 | 카드에서 Run부터 그려진 결과까지의 시간, 단면 시간 | 기록만(여기서는 SwiftShader) | 약 0.9 s와 0.1 s | 열 브라우저 검사 |
+| F1 | Cylinder(축 *z (fixed)*, cx, cy, r, zmin, zmax)와 Sphere(cx, cy, cz, r) 양식; Studio의 검사는 r > 0과 zmin < zmax만 2D 말투로; 영역에 대한 중심이나 반지름은 서버에 맡김 | 나열한 경우 100% | 100% | `tests/simcase/studio_model3d_shapes.cjs` |
+| F2 | Add feature가 Box, Layers, Cylinder, Sphere를 내놓음(Extrude는 흐림); 카드 2에서 Add → Sphere는 엔진의 말(*sphere 'sphere' is not taken yet …*)로 거부된 채 보이고, 구는 남아 표시되며 몰래 고쳐지지 않음 | 충족 | 충족(단위와 브라우저) | 같음, 그리고 열 브라우저 검사 |
+| W6-UI | 카드 2: 작업 공간의 Run이 끝나고, Run 1의 값 표가 페이지의 행으로 `/api/model3d/runs/{id}/values`와 같음 | 1/1 | 1/1(z0 −31.7515 W, z1 31.7515 W; 1D 병렬 전도 추정은 31.99 W이며, 내접 n각형이 조금 작음) | 열 브라우저 검사 |
+| W11(카드 2) | 실행 하나를 가진 카드 2, 프로젝트(카드 `via-slab-3d`)와 세션의 Save와 Open: 문서, 값, 면 지도 digest; 3D 없는 버전 1 프로젝트는 그대로 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음 | 열 브라우저 검사 |
+| W12(카드 2) | 카드 2가 있는 Library, 그 Model, Mesh view, Result, 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록, `via.side`의 이름에 표시 안내; 스크린샷 보관 | 모두 충족 | 모두 충족 | 열 브라우저 검사 |
+| W13(카드 2) | 키보드만: 카드 2, 회전, 보기 5, 면 목록에서 `via.side`, Use for → Fixed temperature(*Fixed temperature needs an outer face; via.side is inside*, 고정 온도는 여전히 `z0`과 `z1`), Run을 끝까지. Use for는 곡면에도 나오며, 곡면으로 선택을 만드는 것은 전처럼 거부됨 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
+| W14(카드 2) | Run부터 그려진 결과까지, 단면 x = 0 | 기록만(여기서는 SwiftShader) | 약 0.8 s(Mesh 1이 이미 메시됨)와 0.1 s | 열 브라우저 검사 |
 | W13 | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → New selection; 그다음 Mesh 1, 크기 8 µm, Mesh, Cancel meshing, Tab으로 Messages의 취소 줄에 닿음, 서버에서 작업이 *cancelled*, 크기 40 µm, 다시 Mesh해 메시 보기까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 브라우저 검사 |
 
 순수 도우미(`workspace-model3d.mjs`)는 `tests/simcase/studio_model3d_builder.cjs`가, 열·Run·Results는
