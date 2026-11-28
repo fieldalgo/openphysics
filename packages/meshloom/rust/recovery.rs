@@ -534,14 +534,15 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
             let at = |t: f64| -> P3 { std::array::from_fn(|k| pa[k] + t * (pb[k] - pa[k])) };
             let xv0 = at(v0);
             let xfar = at(far);
-            // about a protected hub (radius rc), radii are rounded down to rc 2^-k, so
-            // the points of all its segments lie on common spheres (shells that differ by
-            // a rounding encroach each other's pieces without end in a thin fan); rounded
-            // down, the reference point stays farther from c
+            // about a protected hub (radius rc), radii are rounded down to a dyadic grid
+            // rc 2^k (1 + j 2^-m), the coarsest grid with a point in the piece's window,
+            // so the points of all its segments lie on common spheres: radii that differ
+            // by a rounding, such as those of float32 rim points, encroach each other's
+            // pieces without end in a thin fan. Rounded down, the reference point stays
+            // farther from c
             let rc = hub_radius[c as usize];
-            // (inside rc only: farther out, plain rule 2 cuts a piece at the radius of the
-            // input point that encroaches it, such as a neighbouring rim point)
-            let shell = |d: f64| if rc > 0.0 && d > 0.0 && d < rc { rc * 2f64.powi((d / rc).log2().floor() as i32) } else { d };
+            let (dlo, dhi) = { let (x, y) = (sd(lo), sd(hi)); (x.min(y), x.max(y)) };
+            let shell = |d: f64| if rc > 0.0 && d > 0.0 { grid_floor(rc, d.min(dhi), dlo).unwrap_or(d) } else { d };
             if dist(&xv0, &xfar) >= dist(&xv0, &xp) {
                 (to_t(shell(r)), Rule::Centre(c)) // rule 2
             } else {
@@ -563,6 +564,19 @@ fn split_parameter(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], p: 
     };
     let exact = |t: f64| exact_point(pa, pb, t);
     (pick_t((target - w).max(lo), (target + w).min(hi), exact), rule)
+}
+
+/// The largest point at most `d` and at least `lo` of the coarsest dyadic grid
+/// rc 2^k (1 + j 2^-m), m = 0..=20, that has one (k from d; the grids are nested).
+fn grid_floor(rc: f64, d: f64, lo: f64) -> Option<f64> {
+    if !(d > 0.0 && d >= lo) {
+        return None;
+    }
+    let base = rc * 2f64.powi((d / rc).log2().floor() as i32);
+    (0..=20).map(|m| {
+        let step = base * 2f64.powi(-m);
+        base + ((d - base) / step).floor() * step
+    }).find(|&g| g >= lo && g <= d)
 }
 
 fn sub(a: &P3, b: &P3) -> P3 {
