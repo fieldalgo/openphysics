@@ -92,7 +92,7 @@ test('temperature colours, the values table and the progress line',()=>{
  assert.deepEqual(M.temperatureColor(305,300,310),[0.865,0.865,0.865]);
  assert.deepEqual(M.temperatureColor(305,305,305),[0.865,0.865,0.865],'one temperature: the middle colour');
  const rows=M.valuesRows(record().values,'um');
- assert.deepEqual(rows.map(r=>r[0]),['Temperature, max','Temperature, min','Heat rate through z0','Total heat source','Energy balance residual']);
+ assert.deepEqual(rows.map(r=>r[0]),['Temperature, max (whole model)','Temperature, min (whole model)','Heat rate through z0','Total heat source','Energy balance residual']);
  assert.equal(rows[0][1],'1127.33 K in Si (top) at (179, 0, 610) µm');
  assert.equal(rows[1][1],'300 K in Si at (0, 0, 0) µm');
  assert.equal(rows[2][1],'-4 W');assert.equal(rows[3][1],'4 W');assert.equal(rows[4][1],'-1.35e-13 W (1.69e-14 of the summed heat rates)');

@@ -123,7 +123,7 @@ try {
     await page.screenshot({path: join(out, `w12-results-${tag}.png`), fullPage: true});
     const c = await csp(page);
     const ok = !seen.console.length && !seen.pageErrors.length && !c.length && !seen.foreign.length && state.visible && state.drawn > 0.02 * state.pixels
-      && /^Temperature from 300 K \(blue\) to 1127\.33 K \(red\)$/.test(shown.bar) && shown.values.length === 5 && shown.selected === 'run:1'
+      && /^Surface temperature from 300 K \(blue\) to 1127\.33 K \(red\)$/.test(shown.bar) && shown.values.length === 5 && shown.selected === 'run:1'
       && (viewport.width !== 390 || state.scrollWidth <= state.innerWidth);
     record(`W12 results ${tag}`, ok, {canvas: state, ...shown, console: seen.console, pageErrors: seen.pageErrors, csp: c, foreign: seen.foreign});
     if (viewport.width === 1440) {
@@ -249,7 +249,7 @@ try {
       && steps.refusal === INSIDE && steps.refusalFocused && steps.unchanged
       && steps.topSelected && steps.topUse.fixed && steps.topUse.name === 'stack.top.top' && steps.topUse.onApply
       && steps.sectionAxis && steps.section[0] === 'z' && steps.section[1] === '300' && steps.runFocused
-      && JSON.stringify(steps.values.map(v => v[0])) === JSON.stringify(['Temperature, max', 'Temperature, min', 'Heat rate through z0',
+      && JSON.stringify(steps.values.map(v => v[0])) === JSON.stringify(['Temperature, max (whole model)', 'Temperature, min (whole model)', 'Heat rate through z0',
         'Heat rate through stack.top.top', 'Total heat source', 'Energy balance residual']) && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
     record('W13', ok, {steps, console: seen.console, pageErrors: seen.pageErrors});
     await page.close();

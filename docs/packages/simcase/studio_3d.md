@@ -142,6 +142,7 @@ requests in the component's unit, as for sections):
 | Route | Answer |
 |---|---|
 | `values` | `heat_rate_by_selection` (W per `prescribed_temperature` name: the sum of `reaction_heat_rate` over its nodes, a node fixed by two names under the first), `total_source`, `balance_residual` (outward minus source, W) and `relative_balance_residual`, `temperature_min` and `temperature_max` with node, position and region, the mesh stats, route and reuse key, and `document_sha256` (of the canonical document) |
+| `extremes` | `{run, temperature_min: {node, regions}, temperature_max: {node, regions}}`: the distinct regions of the tetrahedra sharing each extreme node, in the mesh's region order, from the mesh the server holds (an HTTP view; `values`, the exports and the record are unchanged); a run the server does not hold is refused like the other run routes (404, *no such 3D heat run*) |
 | `surface` | the mesh answer's faces, regions, positions, triangles and face ids, and `temperature` (float32) at its nodes |
 | `cut {axis, at}` | the exact P1 slice by the plane: each tetrahedron's nodes on the plane and its edge crossings, T interpolated on the crossed edge; a face in the plane taken once; triangles facing +axis |
 | `probe {point}` | T of the P1 interpolant in the tetrahedron that holds the point, the region and the barycentric coordinates; outside the meshed regions a refusal |

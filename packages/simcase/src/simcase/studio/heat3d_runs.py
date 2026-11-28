@@ -313,6 +313,19 @@ class Heat3DRuns:
     def values(self, run_id: str) -> dict:
         return self.done(run_id).values
 
+    def extremes(self, run_id: str) -> dict:
+        """The regions around the nodes of Tmin and Tmax of a run this server holds: the distinct
+        regions of the tetrahedra sharing the node, in the mesh's region order. An HTTP view only:
+        the values answer, the exports and the stored record are unchanged."""
+        run = self.done(run_id)
+        mesh = run.result.mesh
+        out = {"run": run.id}
+        for key in ("temperature_min", "temperature_max"):
+            node = run.values[key]["node"]
+            ids = sorted({int(r) for r in mesh.regions[np.any(mesh.tets == node, axis=1)]})
+            out[key] = {"node": node, "regions": [mesh.region_names[i] for i in ids]}
+        return out
+
     def surface(self, run_id: str) -> dict:
         run = self.done(run_id)
         kept, T = run.kept, np.asarray(run.result.temperature)
@@ -480,6 +493,11 @@ def model3d_run_cancel(run_id: str):
 @router.get("/api/model3d/runs/{run_id}/values")
 def model3d_run_values(run_id: str):
     return _answer(runs.values, run_id)
+
+
+@router.get("/api/model3d/runs/{run_id}/extremes")
+def model3d_run_extremes(run_id: str):
+    return _answer(runs.extremes, run_id)
 
 
 @router.get("/api/model3d/runs/{run_id}/surface")

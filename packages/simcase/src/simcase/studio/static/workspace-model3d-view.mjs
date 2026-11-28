@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 
@@ -44,7 +44,7 @@ export function createModel3dView(ctx){
  const mesh={job:null,timer:null,status:null,view:null,viewer:null,canvas:null,pane:'geometry'};
  // the runs: the kept records (saved with the model), the server run of each record when this page
  // ran it (cut, probe and CSV need it), the run going, the refusal the last run ended with, the run shown
- const heat={records:[],live:[],fresh:null,run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
+ const heat={records:[],live:[],fresh:null,liveValues:new Map(),run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
  let section=null;              // the geometry view's section {axis, at} (document units), view state
  let pendingFocus=null;         // a Settings field to focus across the renders until the check has answered
 
@@ -68,7 +68,7 @@ export function createModel3dView(ctx){
  function open(document,{asTitle=CARD3D.title,runs=[],card:from}={}){
   card=from===undefined?card3dOf(document)?.id??null:from;
   stopJob();stopRun();mesh.status=null;mesh.view=null;mesh.pane='geometry';
-  heat.records=runs.slice(-MAX_RUNS);heat.live=heat.records.map(()=>null);heat.status=null;heat.failure=null;heat.shown=null;heat.cut=null;heat.probe=null;section=null;
+  heat.records=runs.slice(-MAX_RUNS);heat.live=heat.records.map(()=>null);heat.liveValues=new Map();heat.status=null;heat.failure=null;heat.shown=null;heat.cut=null;heat.probe=null;section=null;
   doc=JSON.parse(JSON.stringify(document));title=asTitle;history=new Model3dHistory(doc);
   check=null;refused=null;lastGood=null;selection='geometry';face=null;hidden=new Set();drafts.clear();lastNotice=null;
   inProject=true;shown=true;ctx.ui.page='Model';runCheck();ctx.render();
@@ -195,7 +195,8 @@ export function createModel3dView(ctx){
    const unit=r.surface?.unit||'um',live=heat.live[i],u=shownUnit(unit);
    const same=keptRunFor(doc,heat.records)===i;
    return `<h3>Run ${i+1} · Temperature</h3>`+
-    `<table class="m3-values" id="m3-values"><tbody>${valuesRows(r.values,unit,{expected:expectedHeatRate(r.document)}).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`+
+    `<table class="m3-values" id="m3-values"><tbody>${valuesRows(withExtremes(r.values,live&&heat.liveValues?.get(live)),unit,{expected:expectedHeatRate(r.document)}).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`+
+    `<p class="muted" id="m3-sign">${esc(HEAT_RATE_SIGN)}</p>`+
     `<p class="muted">Mesh: ${r.mesh.nodes.toLocaleString('en-US')} nodes, ${r.mesh.tetrahedra.toLocaleString('en-US')} tetrahedra (${esc(r.mesh.route)}).${same?' These are the current inputs.':' The inputs have changed since this run.'}</p>`+
     `<div class="m3-actions">${same?'':'<button type="button" data-m3-run-act="inputs">Use this run\'s inputs</button>'}${live?'':'<button type="button" data-m3-run-act="recompute">Recompute</button>'}</div>`+
     (live?'':`<p class="muted" id="m3-recompute-why">Recompute this run to cut, probe or export CSV.</p>`)+
@@ -344,10 +345,17 @@ export function createModel3dView(ctx){
   }
   return heat.viewer;
  }
+ // a kept record's values with the regions around its extreme nodes, when this server holds the run
+ function withExtremes(values,ext){
+  if(!ext)return values;
+  const out={...values};
+  for(const k of ['temperature_min','temperature_max'])if(ext[k]?.node===values[k]?.node)out[k]={...values[k],regions:ext[k].regions};
+  return out;
+ }
  function colourBar(rec){
   const s=rec.surface,lo=s.temperature_min.value,hi=s.temperature_max.value,mid=(lo+hi)/2;
   const css=[lo,mid,hi].map(t=>`rgb(${temperatureColor(t,lo,hi).map(c=>Math.round(c*255)).join(',')})`).join(',');
-  return `<div class="m3-colourbar" role="img" aria-label="Temperature from ${Number(lo.toPrecision(6))} K (blue) to ${Number(hi.toPrecision(6))} K (red)"><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${css})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`;
+  return `<div class="m3-colourbar" role="img" aria-label="${colourBarTitle} from ${Number(lo.toPrecision(6))} K (blue) to ${Number(hi.toPrecision(6))} K (red)"><span class="m3-cb-title">${colourBarTitle}</span><span>${Number(lo.toPrecision(6))} K</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${css})"></span><span>${Number(hi.toPrecision(6))} K</span></div>`;
  }
  async function applySection(axis,raw){
   const at=Number(raw);
@@ -416,6 +424,8 @@ export function createModel3dView(ctx){
   if(heat.run?.id!==id)return;
   const run=heat.run;heat.run=null;
   let i;
+  // the regions around Tmax's and Tmin's nodes of this live run (/extremes), beside its stored record
+  try{heat.liveValues.set(id,await ctx.get(`/api/model3d/runs/${encodeURIComponent(id)}/extremes`));}catch{}
   if(run.replace!==null&&heat.records[run.replace]){i=run.replace;heat.records[i]=record;heat.live[i]=id;}
   else{heat.records.push(record);heat.live.push(id);
    while(heat.records.length>MAX_RUNS){heat.records.shift();heat.live.shift();}
@@ -630,7 +640,7 @@ export function createModel3dView(ctx){
   openSession:(session,{asTitle,card:from}={})=>open(session.document,{asTitle,runs:session.runs||[],card:from}),
   show(){if(!inProject)return;shown=true;ctx.ui.page='Model';ctx.render();},
   leave(){stopJob();stopRun();shown=false;const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();delete box.dataset.m3State;}},
-  close(){stopJob();stopRun();card=null;heat.records=[];heat.live=[];mesh.view=null;mesh.status=null;shown=false;inProject=false;doc=null;history=null;check=null;refused=null;lastGood=null;},
+  close(){stopJob();stopRun();card=null;heat.records=[];heat.live=[];heat.liveValues=new Map();mesh.view=null;mesh.status=null;shown=false;inProject=false;doc=null;history=null;check=null;refused=null;lastGood=null;},
   renderPage,
   canUndo:()=>!!history?.canUndo,canRedo:()=>!!history?.canRedo,
   undo(){if(!history?.canUndo)return;doc=history.undo();drafts.clear();runCheck();ctx.render();ctx.onHistory();},

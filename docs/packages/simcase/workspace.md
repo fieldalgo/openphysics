@@ -485,13 +485,20 @@ change them.*
 
 **Results.** **Study 1 · Steady** and **Results** follow Mesh 1 in the tree, and each kept run is a
 row **Run N · Temperature (surfaces)** (up to 10; the oldest goes first). A run's page has its values
-(*Temperature, max* with its region and position, *Temperature, min*, *Heat rate through* each fixed
+(*Temperature, max (whole model)* with its region and position, *Temperature, min (whole model)*,
+*Heat rate through* each fixed
 temperature, *Total heat source*, *Energy balance residual* with its ratio to the summed absolute heat rates, the solver's
-relative conservation residual), its mesh,
+relative conservation residual), the sign of a heat rate in one line (*Heat rate: positive into the
+model, negative out of it (a fixed temperature that removes heat shows a negative rate).*, galerkin's
+reaction heat rate being positive when it injects heat), its mesh,
 **Use this run's inputs** (one Undo step) when the document differs, a **Probe** (x, y, z in the
 component's unit; also by clicking a surface of the result), and exports: **Surface (CSV)**, **Cut
-(CSV)** of the section shown and **Run (JSON)** (the record). The **Result** view shows the run's
-surface temperature, blue at the minimum and red at the maximum, with its colour bar; the toolbar's
+(CSV)** of the section shown and **Run (JSON)** (the record). On a run this Studio holds, Tmax or Tmin
+at a node shared by two regions reads *336.05 K at the SiO2 / Si (top) interface, (38.5, 163, 510) µm*
+(`/api/model3d/runs/{id}/extremes` names the regions around the node); a run opened from a file reads *in SiO2*
+until it is recomputed. The **Result** view shows the run's
+surface temperature, blue at the minimum and red at the maximum, with its colour bar titled *Surface
+temperature* (its range is the surface's, which can be narrower than the whole model's in the table); the toolbar's
 **Section** (x, y or z = a position in the component's unit) clips the geometry view and, on a result,
 draws the exact cut of the run's field (*Cut z = 505 µm: 833.653–939.105 K.*). A result whose inputs
 have changed is greyed (*Run 1: inputs changed since this run*). Cut, probe and CSV need the run on
