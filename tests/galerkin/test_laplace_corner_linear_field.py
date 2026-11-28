@@ -1,6 +1,12 @@
 # Copyright 2026 Yongha Kim (FieldAlgo)
 # SPDX-License-Identifier: Apache-2.0
-"""Physical invariants and numerical refusals of the explicit linear field."""
+"""Physical invariants and numerical refusals of the explicit linear field.
+
+The tests here share the cached 64-panel solves and their reflections (calculated(index) and
+calculated(index,reflect=True)), so each of those solves runs once per CI test part. The
+32-panel tests are in test_laplace_corner_linear_field_32_panel.py and the circular limit,
+which shares no cached solve, in test_laplace_corner_linear_field_circular.py.
+"""
 from functools import lru_cache
 
 import numpy as np
@@ -60,30 +66,12 @@ def test_cheapest_study_resolution_reproduces_the_recorded_values(index):
         assert matrix_relative(value,reference)<=1e-9
 
 
-def test_active_conductor_basis_permutation():
-    row=GEOMETRIES[1];a=calculated(1,32)
-    b=solve(row['polygons'][::-1],width=row['width'],height=row['height'],panels_per_edge=32)
-    assert relative(b.whole.capacitance_per_permittivity[::-1,::-1],a.whole.capacitance_per_permittivity)<=1e-10
-    assert relative(b.whole.current_gram[[1,0,2,3],::-1,::-1],a.whole.current_gram)<=1e-10
-    assert relative(b.edge_current_gram[[4,5,6,7,0,1,2,3],::-1,::-1],a.edge_current_gram)<=1e-10
-
-
 @pytest.mark.parametrize('index',range(2))
-def test_exact_face_partition_signed_current_and_positive_gram(index):
-    result=calculated(index,32);n=len(GEOMETRIES[index]['polygons'])
-    assert result.whole.panel_count==4*n*(32-6)
-    assert result.whole.condition_bound<1e10
-    for name in ('reciprocity_error','residual_error','current_error','matrix_refinement_error','ground_refinement_error'):
-        assert getattr(result.whole,name)<=1e-10
-    assert result.partition_error<=1e-10
-    for owner in range(n):
-        selected=result.edge_owners==owner
-        assert relative(result.edge_current_gram[selected].sum(axis=0),result.whole.current_gram[owner])<=1e-10
-        np.testing.assert_allclose(result.edge_current_integrals[selected].sum(axis=0),np.eye(n)[owner],rtol=0,atol=1e-10)
-    np.testing.assert_allclose(result.whole.current_integrals.sum(axis=0),0,rtol=0,atol=1e-10)
-    for part in np.concatenate((result.whole.current_gram,result.edge_current_gram)):
-        assert relative(part,part.T)<=1e-10
-        assert np.linalg.eigvalsh(part).min()/np.max(abs(part))>=-1e-10
+def test_horizontal_reflection_preserves_each_current_entry_without_floor(index):
+    original,reflected=calculated(index),calculated(index,reflect=True)
+    n=len(GEOMETRIES[index]['polygons']);cap,faces,whole=quantities(reflected)
+    faces=faces.reshape(n,4,n,n)[:,[2,1,0,3]].reshape(4*n,n,n)
+    assert max(relative(a,b) for a,b in zip(quantities(original),(cap,faces,whole)))<=1e-10
 
 
 def test_result_arrays_and_original_geometry_are_independent_immutable_snapshots():
@@ -153,26 +141,3 @@ def test_ground_quadrature_refusal_has_no_fallback(monkeypatch):
     monkeypatch.setattr(field,'_ground_integrated',changed)
     with pytest.raises(ValueError,match='ground'):
         solve(GEOMETRIES[0]['polygons'],width=.008,height=.002,panels_per_edge=16)
-
-
-def test_circular_limit_against_analytic_grounded_line(record_property):
-    # The finite upper plane remains explicit. Geometry refinement approaches
-    # the circle; the separate polygon/panel/outer study bounds that bias.
-    radius,center_height=.1,.5
-    width,height=256.,128.
-    b=np.sqrt(center_height**2-radius**2)
-    expected=np.array([2*np.pi/np.arccosh(center_height/radius),
-        center_height/(2*np.pi*radius*b),1/(2*np.pi*b)])
-    errors=[];values=[]
-    for vertices in (16,24):
-        angle=np.arange(vertices)*2*np.pi/vertices+np.pi/vertices
-        circumradius=radius/np.cos(np.pi/vertices)
-        polygon=np.column_stack((width/2+circumradius*np.cos(angle),
-                                 center_height+circumradius*np.sin(angle)))
-        result=solve([polygon],width=width,height=height,panels_per_edge=16,ground_modes=4096)
-        actual=np.array([result.whole.capacitance_per_permittivity[0,0],
-            result.whole.current_gram[0,0,0],result.whole.current_gram[1:,0,0].sum()])
-        values.append(actual.tolist());errors.append(abs(actual-expected)/abs(expected))
-    assert np.all(errors[1]<errors[0])
-    assert np.max(errors[1])<.005
-    record_property('linear_corner_circular_limit',repr((values,[x.tolist() for x in errors])))
