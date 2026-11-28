@@ -17,6 +17,14 @@
   },
   "geometry": {
     "version": 1,
+    "parameters": {
+      "t_ox": {
+        "value": "10 um"
+      },
+      "via_w": {
+        "value": "20 um"
+      }
+    },
     "components": {
       "stack3d": {
         "dimension": "3d",
@@ -45,7 +53,7 @@
               },
               {
                 "name": "oxide",
-                "thickness": 10,
+                "thickness": "t_ox",
                 "material": "SiO2"
               },
               {
@@ -58,12 +66,12 @@
           {
             "name": "via",
             "type": "box",
-            "xmin": 90,
-            "xmax": 110,
-            "ymin": 90,
-            "ymax": 110,
+            "xmin": "100 - via_w / 2",
+            "xmax": "100 + via_w / 2",
+            "ymin": "100 - via_w / 2",
+            "ymax": "100 + via_w / 2",
             "zmin": 500,
-            "zmax": 510,
+            "zmax": "500 + t_ox",
             "material": "Cu"
           }
         ]

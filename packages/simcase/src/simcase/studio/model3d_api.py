@@ -286,7 +286,8 @@ def _overlap(a, b) -> int:
 
 def _coverage(comp, cx) -> list:
     """Per feature: its volume inside the domain, the volume its own cells keep (from the complex),
-    and the later features that take part of it (their box overlaps it and they keep volume)."""
+    the later features that take part of it (their box overlaps it and they keep volume), and for a
+    box its evaluated size in the component's unit."""
     dom = comp.domain
     domain = tuple(dom[k] for k in ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax"))
     boxes = [_boxes(comp, f) for f in comp.features]
@@ -309,9 +310,12 @@ def _coverage(comp, cx) -> list:
             coverage, text = "partial", f"covered in part by {refs}"
         else:
             coverage, text = "full", ""
-        out.append({"index": i, "id": f.id, "type": f.type, "volume": float(Fraction(volume) / unit3),
-                    "owned": float(Fraction(owned[i]) / unit3), "coverage": coverage, "covered_by": by,
-                    "text": text})
+        entry = {"index": i, "id": f.id, "type": f.type, "volume": float(Fraction(volume) / unit3),
+                 "owned": float(Fraction(owned[i]) / unit3), "coverage": coverage, "covered_by": by, "text": text}
+        if f.type == "box":                  # the evaluated size in the component's unit (the tree's note)
+            x0, x1, y0, y1, z0, z1 = boxes[i][0]
+            entry["size"] = [float(Fraction(b - a) / comp.pm_per_unit) for a, b in ((x0, x1), (y0, y1), (z0, z1))]
+        out.append(entry)
     return out
 
 

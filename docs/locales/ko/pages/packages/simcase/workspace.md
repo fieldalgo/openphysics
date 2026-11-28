@@ -267,7 +267,10 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 (`layer-stack-3d`)가 응용 카드들 옆에, 그 사이가 아니라 따로 있습니다. µm 단위, 200 × 200 µm 영역(z는 0–610 µm)의 3d
 구성 요소이며, `layers` 특징 `stack` 하나(기판 Si 500 µm, k = 130 W/(m K); 산화막 SiO2 10 µm, k = 1.4 W/(m K); 위 실리콘
 `Si (top)` 100 µm, k = 130 W/(m K))와 산화막을 지나는 나중의 상자 `via`(x와 y는 [90, 110] µm, z는 [500, 510] µm, Cu, k = 400 W/(m K))로 되어
-있습니다. 여기서 via는 정사각형입니다: *Square via (the round via is the card Copper via through a slab)*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
+있습니다. 형상은 설계의 매개변수 둘을 담습니다: `t_ox` = 10 µm은 산화막
+두께이자 via의 높이(z는 500부터 `500 + t_ox`까지), `via_w` = 20 µm은 via의 너비(x와 y는 `100 - via_w / 2`부터 `100 + via_w / 2`까지)이므로
+via는 언제나 산화막만 지납니다. 산화막 두께 칸은 *= t_ox (10 µm)*로 읽히고, via 행은 서버 검사가 계산한 크기인
+*20 × 20 × 10 µm*를 그대로 보입니다. 여기서 via는 정사각형입니다: *Square via (the round via is the card Copper via through a slab)*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
 이름으로만 가리키기 때문입니다(`stack.top` 같은 층이나 특징 이름은 열 종류의 영역이 아님). 물리는 Heat transfer (3D)입니다:
 `z0`에 300 K, `Si (top)`에 열원 1e12 W/m³(모두 4 W), 나머지 바깥 면은 모두 단열. 열원은 시험 값이며(카드를
 약 1127 K까지 데움), 2 mW 열점 변형은 나중 카드입니다. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는

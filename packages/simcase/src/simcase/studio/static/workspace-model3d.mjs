@@ -210,10 +210,12 @@ export function editField(doc,field,raw){
 /** A feature's row label: "1 Layers stack", "2 Box via". */
 export const featureLabel=(f,i)=>`${i+1} ${TYPE_LABEL[f.type]||f.type} ${f.name}`;
 
-/** What a feature's row says beside its label: its layers, or a box's size. */
-function featureSummary(comp,f){
+/** What a feature's row says beside its label: its layers, or a box's size (from its numbers, else
+ * the size the server's check evaluated, for extents that are parameters or expressions). */
+function featureSummary(comp,f,checked=null){
  if(f.type==='layers')return f.layers.map(l=>l.name).join(' · ');
- if(f.type==='box'){const size=AXES.map(a=>{const lo=inUnit(f[a+'min'],comp.length_unit),hi=inUnit(f[a+'max'],comp.length_unit);return lo===null||hi===null?null:num(hi-lo);});
+ if(f.type==='box'){let size=AXES.map(a=>{const lo=inUnit(f[a+'min'],comp.length_unit),hi=inUnit(f[a+'max'],comp.length_unit);return lo===null||hi===null?null:num(hi-lo);});
+  if(size.includes(null)&&Array.isArray(checked?.size))size=checked.size.map(num);
   return size.includes(null)?'':`${size.join(' × ')} ${shownUnit(comp.length_unit)}`;}
  if(f.type==='cylinder'||f.type==='sphere'){
   const v=k=>{const x=inUnit(f[k],comp.length_unit);return x===null?null:num(x);},u=shownUnit(comp.length_unit),r=v('r');
@@ -240,7 +242,7 @@ export function treeRows(doc,check=null,refused=null,words=null,{runs=[]}={}){
  rows.push({key:'domain',label:'Domain',level:3,note:ext[0]===null||ext[1]===null?'':zFree?`${ext[0]} × ${ext[1]} ${u}, z from the features`:ext[2]===null?`${ext[0]} × ${ext[1]} ${u}`:`${ext.join(' × ')} ${u}`,problem:false});
  const meshOff=meshRefusal(check);
  comp.features.forEach((f,i)=>{
-  const cover=check?.features?.[i]?.text||'',summary=featureSummary(comp,f);
+  const cover=check?.features?.[i]?.text||'',summary=featureSummary(comp,f,check?.features?.[i]);
   rows.push({key:`feature:${i}`,label:featureLabel(f,i),level:3,note:[summary,cover&&`(${cover})`].filter(Boolean).join(' '),
    problem:refused?.feature_index===i||meshOff?.feature_index===i});
  });
