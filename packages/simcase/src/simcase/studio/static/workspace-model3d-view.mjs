@@ -13,7 +13,7 @@
 import {View3D} from '/model3d-assets/model3d-view.mjs';
 import {MeshView3D} from '/model3d-assets/model3d-mesh-view.mjs';
 import {CANCELLED,longer,meshBlocked,progressText,statsRows,stepList,estimateText} from '/model3d-assets/model3d-mesh-model.mjs';
-import {faceLines,regionColor} from '/model3d-assets/model3d-model.mjs';
+import {decode,faceLines,regionColor} from '/model3d-assets/model3d-model.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
@@ -22,6 +22,7 @@ import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,add
  valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
+import {NEEDS_TWO,SAME_INPUTS,compareRows,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
 
 const WORDS={estimateText,meshBlocked};      // slice C's words, passed to the pure helpers
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
@@ -45,6 +46,8 @@ export function createModel3dView(ctx){
  // the runs: the kept records (saved with the model), the server run of each record when this page
  // ran it (cut, probe and CSV need it), the run going, the refusal the last run ended with, the run shown
  const heat={records:[],live:[],fresh:null,liveValues:new Map(),run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
+ // C3: the Compare page's pair (the two records' run ids, view state; not in the file) and its ΔT view
+ const compare={a:null,b:null,canvas:null,viewer:null,source:null};
  let section=null;              // the geometry view's section {axis, at} (document units), view state
  let regionsOpen=false;         // U7: the Regions control is open (view state)
  let pendingFocus=null;         // a Settings field to focus across the renders until the check has answered
@@ -651,13 +654,54 @@ export function createModel3dView(ctx){
   box.querySelector('[data-m3-undo]')?.addEventListener('click',()=>{undo();lastNotice=null;renderDock();});
  }
 
+ // ---- C3: Compare, two runs of this 3D model ----
+ function comparePair(){
+  const ids=heat.records.map(r=>r.run),pair=defaultPair(ids.length);if(!pair)return null;
+  let a=ids.indexOf(compare.a),b=ids.indexOf(compare.b);
+  if(a<0||b<0){[a,b]=pair;compare.a=ids[a];compare.b=ids[b];}
+  return [a,b];
+ }
+ function comparePage(host){
+  const pair=comparePair();
+  if(!pair){host.innerHTML=`<h2>Compare</h2><p id="m3-compare-none">${esc(NEEDS_TWO)}</p>`;return;}
+  const [ia,ib]=pair,A=heat.records[ia],B=heat.records[ib],unit=B.surface?.unit||A.surface?.unit||doc.geometry.components[componentName(doc)].length_unit;
+  const pick=(id,label,at)=>`<label>${label} <select id="${id}">${heat.records.map((r,i)=>`<option value="${i}"${i===at?' selected':''}>Run ${i+1}</option>`).join('')}</select></label>`;
+  const rows=compareRows(A,B,unit),changes=inputChanges(A.document,B.document),notice=meshNotice(A,B);
+  // the surface ΔT: on a shared mesh, from both runs' surface maps (B − A per surface node)
+  let d=null,why='';
+  if(!notice){const ta=A.surface?.temperature,tb=B.surface?.temperature;
+   if(ta&&tb)d=surfaceDelta(decode(ta,Float32Array),decode(tb,Float32Array));
+   if(!d)why='Recompute to compare the surface.';}
+  host.innerHTML=`<h2>Compare</h2><div class="m3-compare-pick" role="group" aria-label="Runs compared">${pick('m3-compare-a','Run A',ia)}${pick('m3-compare-b','Run B',ib)}</div>`+
+   `<table class="m3-values m3-compare" id="m3-compare-values"><thead><tr><th scope="col">Quantity</th><th scope="col">Run ${ia+1} (A)</th><th scope="col">Run ${ib+1} (B)</th><th scope="col">B − A</th></tr></thead>`+
+   `<tbody>${rows.map(r=>`<tr><th scope="row">${esc(r[0])}</th><td>${esc(r[1])}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`).join('')}</tbody></table>`+
+   `<h3 id="m3-compare-inputs-heading">Inputs that differ</h3>`+(changes.length?`<ul id="m3-compare-inputs" aria-labelledby="m3-compare-inputs-heading">${changes.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:`<p id="m3-compare-inputs">${esc(SAME_INPUTS)}</p>`)+
+   `<h3>Surface temperature, B − A</h3>`+
+   (notice?`<p class="m3-notice" id="m3-compare-mesh" role="note">${esc(notice)}</p>`:why?`<p class="muted" id="m3-compare-recompute">${esc(why)}</p>`:
+    `<div class="m3-stage"><div id="m3-compare-slot"></div></div><div class="m3-colourbar" id="m3-compare-legend" role="img" aria-label="${esc(deltaLegend(d))}, blue to red"><span class="m3-cb-title">${esc(deltaLegend(d))}</span><span class="m3-ramp" data-ramp="linear-gradient(to right,${ramp(d.min,d.max)})"></span></div>`);
+  host.querySelectorAll('.m3-ramp').forEach(r=>{r.style.background=r.dataset.ramp;});
+  const choose2=(which,i)=>{compare[which]=heat.records[i]?.run??null;ctx.render();document.getElementById(`m3-compare-${which}`)?.focus();};
+  host.querySelector('#m3-compare-a').onchange=e=>choose2('a',+e.target.value);
+  host.querySelector('#m3-compare-b').onchange=e=>choose2('b',+e.target.value);
+  if(d){
+   if(!compare.canvas){compare.canvas=document.createElement('canvas');compare.canvas.id='m3-compare-canvas';compare.canvas.tabIndex=0;
+    compare.canvas.setAttribute('aria-label','Surface temperature difference B − A, blue at its minimum and red at its maximum. Arrow keys rotate, plus and minus zoom, F fits.');
+    compare.viewer=new TemperatureView3D(compare.canvas,{onPick:()=>{},onCamera:what=>{compare.canvas.dataset.camera=what;}});}
+   host.querySelector('#m3-compare-slot').append(compare.canvas);
+   const key=`${A.run}|${B.run}`;
+   if(compare.source!==key){compare.source=key;
+    compare.viewer.load({...B.surface,temperature:encodeF32(d.delta),temperature_min:{value:d.min,unit:'K'},temperature_max:{value:d.max,unit:'K'}});}
+  }
+ }
+
  // ---- the page ----
  function renderPage(){
   const page=ctx.ui.page,main=document.querySelector('main');
   main.dataset.page=page;main.classList.toggle('connecting',false);main.classList.toggle('choosing',page==='Applications');main.classList.remove('comparing');
   $('view-title').textContent=page==='Applications'?'Model library':'Graphics';
   $('view-detail').textContent=page==='Applications'?(ctx.projectLine?.()||'Choose a model'):'Interactive 3D view';
-  markPageTabs(document.querySelector('.page-tabs'),page==='Applications'?'Applications':'Model');
+  markPageTabs(document.querySelector('.page-tabs'),page==='Applications'?'Applications':page==='Compare'?'Compare':'Model');
+  if(page==='Compare'){$('view-title').textContent='Compare';$('view-detail').textContent='Two runs of this 3D model';}
   document.querySelectorAll('[data-command-node]').forEach(b=>{b.disabled=page==='Applications';b.onclick=()=>{const key=({Geometry:'geometry',Materials:'materials',Mesh:'mesh',Study:'study'})[b.dataset.commandNode];choose(key);if(key==='mesh')meshFromRibbon();};});
   document.querySelectorAll('[data-view]').forEach(b=>b.hidden=true);
   const toolbar=document.querySelector('.workspace > .toolbar');if(toolbar)toolbar.style.display=page==='Model'?'flex':'none';
@@ -670,6 +714,7 @@ export function createModel3dView(ctx){
   const inspector=$('inspector');inspector.innerHTML=settings();bindSettings(inspector);
   const host=$('canvas');
   if(page==='Applications')ctx.applications(host);
+  else if(page==='Compare')comparePage(host);
   else graphics(host);
   renderDock();
  }

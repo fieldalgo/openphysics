@@ -419,6 +419,18 @@ Messages가 *Cut (CSV) saved as …*라고 말합니다. 입력이 바뀐 결과
 inputs changed since this run*). 단면, 탐침, CSV는 서버의 실행이 필요합니다: 파일에서 연 실행은 기록만 있어 **Recompute**와
 함께 *Recompute this run to cut, probe or export CSV.*라고 말하며, Recompute는 그 입력을 다시 실행해 같은 행에 넣습니다.
 
+**Compare.** 3D 모델이 보일 때 **Compare** 탭은 보관한 실행 둘을 나란히 놓습니다: **Run A**와 **Run B**(처음에는 가장
+새로운 둘; 실행이 하나면 *Compare needs two runs of this 3D model.*). 표는 각 실행의 값을 그 Results 페이지처럼(Tmax,
+Tmin, 고정 온도마다의 열률, 전체 열원, 수지 잔차), 그리고 메시(노드, 사면체, 경로, 요소 크기)를 보이고, 수마다
+옆에 **B − A**를 둡니다. **Inputs that differ**는 다른 문서 칸을 트리의 말로 나열합니다(*Fixed temperature z1: 301 K →
+311 K*, *Parameter t_ox: 10 µm → 5 µm*, *Mesh element size: 0.1 m → 0.12 m*; 없으면 *Same inputs.*). 두 실행은 기록의
+메시 키(문서의 geometry와 mesh 블록의 다이제스트; 경계나 재료를 바꿔도 같음)와 노드·사면체 수가 같으면 메시를
+공유합니다. 노드 하나하나를 비교하는 것은 아닙니다. 메시를 공유하면 보기는 면 노드마다의 온도 차 B − A를 범례와
+함께 칠합니다(카드 2의 모든 고정 온도를 10 K 올리면 *ΔT (B − A): 10–10 K · largest |ΔT| 10 K*). 아니면 *The runs have
+different meshes (A: 5,267 nodes, size 0.1 m; B: 3,395 nodes, size 0.12 m). Values are compared; the surface temperature is
+not compared point by point.*라고 말합니다. 면 지도를 보관하지 않은 기록의 실행은 *Recompute to compare the surface.*라고
+말합니다. 모든 것은 두 기록에서 오며 서버에서 계산하지 않고, 짝은 보기 상태입니다(프로젝트 파일에 없음).
+
 **Undo.** 3D 모델은 다른 모델과 따로 문서 기록 하나를 갖습니다(Ctrl+Z와 Ctrl+Y는 보이는 모델을 따름). 확정한 편집마다
 한 단계입니다: Enter나 칸을 떠날 때 확정한 칸, 추가, 삭제, 복제, 이동, 층 추가·삭제, 매개변수, 골라서 만든 선택. 서버가
 거부한 편집도 기록에 남으므로 Undo로 되돌립니다. 페이지, 트리의 선택, 고른 면, 카메라는 기록에 없습니다.
@@ -459,13 +471,21 @@ thermal-steady3d-run-v1 record.* 3D 모델은 아직 브라우저 복구에 보�
 | W12(카드 2) | 카드 2가 있는 Library, 그 Model, Mesh view, Result, 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록, `via.side`의 이름에 표시 안내; 스크린샷 보관 | 모두 충족 | 모두 충족 | 열 브라우저 검사 |
 | W13(카드 2) | 키보드만: 카드 2, 회전, 보기 5, 면 목록에서 `via.side`, Use for → Fixed temperature(*Fixed temperature needs an outer face; via.side is inside*, 고정 온도는 여전히 `z0`과 `z1`), Run을 끝까지. Use for는 곡면에도 나오며, 곡면으로 선택을 만드는 것은 전처럼 거부됨 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
 | W14(카드 2) | Run부터 그려진 결과까지, 단면 x = 0 | 기록만(여기서는 SwiftShader) | 약 0.8 s(Mesh 1이 이미 메시됨)와 0.1 s | 열 브라우저 검사 |
+| C3-1 | Compare, 카드 2의 Run 1과 2: 값 표의 모든 칸이 두 실행의 `/values` 응답과 문서에 대한 짝 도우미(A, B, B − A)와 같음 | 100% | 40/40칸 | 비교 브라우저 검사 |
+| C3-2 | 다른 입력, 세 짝: 경계(Run 1 → 2), 메시 크기(2 → 3), 없음(1 → 1) | 목록이 정확히 같음 | 3/3 | 비교 브라우저 검사; node |
+| C3-3 | 메시가 다르다는 알림: 공유 메시면 없고 ΔT 지도; 다른 메시면 알림과 지도 없음 | 2/2 | 2/2 | 비교 브라우저 검사; node |
+| C3-4 | ΔT 범례가 두 `/surface` 응답에서 바로 계산한 것과 같음 | 같은 글 | 같음 | 비교 브라우저 검사 |
+| C3-5 | 중첩: 모든 고정 온도를 + 10 K한 카드 2; 노드 전체의 \|T_B − T_A − 10 K\| 최대와 \|q_B − q_A\|/\|q_A\| | ≤ 1e-8 K; ≤ 1e-9 | 9.1e-13 K; 6.2e-13과 4.0e-13(범례 *10–10 K*) | `test_studio_model3d_compare_superposition.py`; 비교 브라우저 검사 |
+| C3-6 | Compare에서 키보드만(탭은 Enter, 고르개는 화살표), 1440 × 900과 390 × 844, 실행 하나 | 포인터 이벤트 0; 콘솔 오류·CSP 위반·가로 스크롤 없음; *Compare needs two runs of this 3D model.* | 요구대로 | 비교 브라우저 검사 |
 | W13 | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → New selection; 그다음 Mesh 1, 크기 8 µm, Mesh, Cancel meshing, Tab으로 Messages의 취소 줄에 닿음, 서버에서 작업이 *cancelled*, 크기 40 µm, 다시 Mesh해 메시 보기까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 브라우저 검사 |
 
 순수 도우미(`workspace-model3d.mjs`)는 `tests/simcase/studio_model3d_builder.cjs`가, 열·Run·Results는
 `tests/simcase/studio_model3d_heat.cjs`가 검사하고, 브라우저 검사는 트리의 행과
 말도 서버 응답과 비교합니다. 브라우저 검사는 로컬입니다(실행 가능한 Chromium과 Playwright, CI에는 없음). 실행 중인
 Studio에 대해 `node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`로, 열 검사는
-`node tools/studio_browser/model3d_heat_browser.mjs http://127.0.0.1:8765 out-dir`로 실행합니다.
+`node tools/studio_browser/model3d_heat_browser.mjs http://127.0.0.1:8765 out-dir`로 실행합니다. Compare의 순수 도우미
+(`workspace-model3d-compare.mjs`)는 `tests/simcase/studio_model3d_compare.cjs`가 검사하고, 그 브라우저 검사는
+`node tools/studio_browser/model3d_compare_browser.mjs http://127.0.0.1:8765 out-dir`로 실행합니다.
 
 ## 첫 광학 해석
 
