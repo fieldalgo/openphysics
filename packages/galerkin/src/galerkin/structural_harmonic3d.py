@@ -6,7 +6,7 @@ from types import MappingProxyType
 
 import numpy as np
 from scipy import linalg, sparse
-from scipy.sparse.linalg import LinearOperator, onenormest, splu
+from scipy.sparse.linalg import LinearOperator, aslinearoperator, onenormest, splu
 
 from . import _elasticity3d
 from ._public import ResultSurface, refuse_text
@@ -53,10 +53,11 @@ def _inverse_one_norm(factor):
     # diagonal of unit phases preserves the inverse one-norm and gives that
     # first probe distinct phases on the DOFs without using global RNG state.
     phase = np.exp(2j * np.pi * np.random.default_rng(0).random(size))
-    inverse = LinearOperator(factor.shape, dtype=complex,
-                             matvec=lambda x: factor.solve(phase * x.ravel()),
-                             rmatvec=lambda x: phase.conj() * factor.solve(x.ravel(), trans="H"))
-    return onenormest(inverse, t=1)
+    inverse = LinearOperator(factor.shape, dtype=complex, matvec=factor.solve,
+                             rmatvec=lambda x: factor.solve(x, trans="H"))
+    # Operator composition also supplies the Hermitian adjoint to the estimator.
+    rotation = aslinearoperator(sparse.diags(phase, format="csr"))
+    return onenormest(inverse @ rotation, t=1)
 
 
 def _solve_free(stiffness, mass, k_weight, m_weight, force, hz):
