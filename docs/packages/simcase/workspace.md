@@ -494,7 +494,8 @@ When the document equals a kept run's (key order aside, for the same result form
 **Show Run 1**, and Run shows that run instead of computing it again. Right after a run, until the
 next edit, the same place says *Run 1 is up to date with these inputs.* instead. Done, Messages says *Run 1
 complete: maximum 1127.33 K in Si (top). Its results belong to that run; editing the model does not
-change them.*
+change them.*, with the place in the values table's words: a maximum at a node two regions share reads
+*… K at the SiO2 / Si (top) interface.*
 
 **Results.** **Study 1 · Steady** and **Results** follow Mesh 1 in the tree, and each kept run is a
 row **Run N · Temperature (surfaces)** (up to 10; the oldest goes first). A run's page has its values

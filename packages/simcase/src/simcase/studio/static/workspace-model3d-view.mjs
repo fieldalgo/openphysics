@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 import {NEEDS_TWO,SAME_INPUTS,compareRows,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
@@ -472,8 +472,7 @@ export function createModel3dView(ctx){
    while(heat.records.length>MAX_RUNS){heat.records.shift();heat.live.shift();}
    i=heat.records.length-1;}
   heat.fresh=i;selection=`run:${i+1}`;showRun(i);
-  const t=record.values.temperature_max;
-  lastNotice={text:`Run ${i+1} complete: maximum ${Number(t.value.toPrecision(6))} K in ${t.region}. Its results belong to that run; editing the model does not change them.`,undo:false};
+  lastNotice={text:runCompleteText(i,withExtremes(record.values,heat.liveValues.get(id))),undo:false};
   ctx.onHistory();ctx.render();
  }
  async function cancelRun(){
