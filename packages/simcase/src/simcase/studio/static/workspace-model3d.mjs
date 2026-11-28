@@ -489,6 +489,26 @@ export function setFixedTemperature(doc,name,raw){
  const value=quantity(raw,T_FIELD),out=withHeat(doc),h=out.physics.heat;
  h.prescribed_temperature={...(h.prescribed_temperature||{}),[name]:value};return out;
 }
+/**
+ * V10: a plain suggestion for "cylinder 'via' crosses the side domain.x1 …": keep the cylinder inside
+ * that side (beyond a domain side it leaves the model), from the side's coordinate (as written, or as
+ * the check evaluated it) and r: "Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or r ≤ 0.2 m." Null for other refusals.
+ */
+export function crossingAdvice(refused,doc,evaluated=null){
+ const m=/^cylinder '(.+?)' crosses the side domain\.([xy])([01]) /.exec(refused?.refused||'');
+ if(!m)return null;
+ const comp=component(doc),unit=comp.length_unit,u=shownUnit(unit),f=comp.features.find(x=>x.name===m[1]);
+ const axis=m[2],hi=m[3]==='1',key=`${axis}${hi?'max':'min'}`,c=`c${axis}`;
+ const X=inUnit(comp.domain?.[key],unit)??(typeof evaluated?.[key]==='number'?evaluated[key]:null);
+ if(!f||X===null)return null;
+ const t=x=>`${String(num(x)).replace('-','−')} ${u}`,r=inUnit(f.r,unit),centre=inUnit(f[c],unit);
+ const side=`Cylinder ${f.name} crosses the domain side ${axis} = ${t(X)}.`;
+ const keep=r===null?`Keep ${c} ${hi?'+':'−'} r ${hi?'≤':'≥'} ${t(X)}.`
+  :`Keep ${c} ${hi?'≤':'≥'} ${t(hi?X-r:X+r)} (${c} ${hi?'+':'−'} r ${hi?'≤':'≥'} ${t(X)})`;
+ if(r===null)return `${side} ${keep}`;
+ const room=centre===null?null:hi?X-centre:centre-X;
+ return `${side} ${keep}${room!==null&&room>0?`, or r ≤ ${t(room)}`:''}.`;
+}
 /** V1: why Use for → Fixed temperature cannot apply yet (no value, or the field's own problem), or null. */
 export function useTemperatureProblem(raw){
  if(!String(raw??'').trim())return 'Type a temperature in K to apply.';

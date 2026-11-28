@@ -62,3 +62,19 @@ test('V1: Use for → Fixed temperature takes its value: the reason while it is 
  assert.equal(d.physics.heat.prescribed_temperature['stack.top.top'],'330 K');
  assert.equal(M.fixedNoticeText('stack.top.top',d),'Fixed temperature 330 K on stack.top.top.');
 });
+
+test('V10: a cylinder crossing a domain side gets a plain suggestion, inside only; the engine text stays',()=>{
+ const doc=cx=>{const d=card2();d.geometry.components.c.features[0].cx=cx;return d;};
+ const off=side=>({ok:false,code:'E-3D-COMBINATION',path:'geometry.components.c.features[0]',feature_index:0,
+  refused:`cylinder 'via' crosses the side domain.${side} between z = 0 and 1 m; a cylinder must lie inside or outside every side it spans`});
+ assert.equal(M.crossingAdvice(off('x1'),doc(0.8)),'Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or r ≤ 0.2 m.');
+ assert.equal(M.crossingAdvice(off('x0'),doc(-0.8)),'Cylinder via crosses the domain side x = −1 m. Keep cx ≥ −0.7 m (cx − r ≥ −1 m), or r ≤ 0.2 m.');
+ const y=card2();y.geometry.components.c.features[0].cy=0.9;
+ assert.equal(M.crossingAdvice(off('y1'),y),'Cylinder via crosses the domain side y = 1 m. Keep cy ≤ 0.7 m (cy + r ≤ 1 m), or r ≤ 0.1 m.');
+ const y0=card2();y0.geometry.components.c.features[0].cy=-0.75;
+ assert.equal(M.crossingAdvice(off('y0'),y0),'Cylinder via crosses the domain side y = −1 m. Keep cy ≥ −0.7 m (cy − r ≥ −1 m), or r ≤ 0.25 m.');
+ // a centre or radius written as an expression: the inequality alone
+ const e=card2();e.geometry.components.c.features[0].cx='0.5 + 0.3';
+ assert.equal(M.crossingAdvice(off('x1'),e),'Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m).');
+ assert.equal(M.crossingAdvice({...off('x1'),refused:'something else'},doc(0.8)),null);
+});
