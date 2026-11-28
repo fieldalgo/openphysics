@@ -95,6 +95,20 @@ A box of zero extent, or a repeated comparison above 1e-10, is refused. With
 typical inputs this admitted all ten coupled, layered and broadside stripline
 templates of the SIPI catalog that previously failed this check.
 
+On plane-scaled boxes the smooth kernel is reciprocal (Δx changes sign, the
+target and source heights swap), so a block between boxes i and j > i+1 is
+computed once and its transpose fills the block (j, i). Diagonal blocks and
+both orders of each neighbouring pair (j = i+1, the nearest boxes in conductor
+and x order) are still computed independently, so the raw reciprocity check
+(1e-10) keeps comparing independently interpolated entries where boxes are
+closest; it no longer tests the remaining off-diagonal blocks. Tests check that
+the kernel is reciprocal to 1e-14 and that the assembled matrix equals the one
+with every block computed to 1e-14. On the three SIPI layered coplanar
+stripline sections (37–42 boxes, 64 panels per edge, degree 14) this cut a
+solve from 9.6–14.1 s to 6.3–10.1 s; capacitance changed by at most 6e-16 and
+the current Gram by at most 2e-14 of its largest entry, less than changing the
+interpolation degree from 14 to 16 (1e-15 and 3e-14).
+
 Internal matrix, reciprocity, residual, energy, current-conservation and ground
 refinement checks retain a 1e-10 gate. The matrix condition bound must be below
 1e10, and current Gram matrices must be positive semidefinite within the same

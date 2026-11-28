@@ -126,6 +126,17 @@ def _clusters(a, b, owners, width, height):
     """
     return kernel.wall_labels(a, b, owners, width, height, bottom=True)
 
+def _box_pairs(count):
+    """Box pairs (i, j) whose smooth block is computed on plane-scaled boxes.
+
+    The smooth kernel is reciprocal (dx changes sign, yt and ys swap), so a
+    block (i, j) with j > i + 1 also fills (j, i) by transposition. Diagonal
+    blocks and both orders of each neighbouring pair (j = i + 1, the nearest
+    boxes in conductor and x order) are computed independently, so the raw
+    reciprocity check still compares independently interpolated entries.
+    """
+    return [(i, j) for i in range(count) for j in range(max(0, i - 1), count)]
+
 def _matrix(a, b, width, height, *, degree, order, images, labels=None):
     points = np.concatenate((a, b))
     lower = points.min(axis=0)
@@ -149,9 +160,11 @@ def _matrix(a, b, width, height, *, degree, order, images, labels=None):
                 raise ValueError('plane-scaled interpolation box has zero extent')
             boxes.append(_projection(a[group], b[group], box.min(axis=0), box.max(axis=0), degree))
         result = kernel.half_matrix(a, b, order=order)
-        for i, rows in enumerate(groups):
-            for j, columns in enumerate(groups):
-                result[np.ix_(rows, columns)] += boxes[i][1] @ _smooth(boxes[i][0], boxes[j][0], width, height, images) @ boxes[j][1].T
+        for i, j in _box_pairs(len(groups)):
+            block = boxes[i][1] @ _smooth(boxes[i][0], boxes[j][0], width, height, images) @ boxes[j][1].T
+            result[np.ix_(groups[i], groups[j])] += block
+            if j > i + 1:
+                result[np.ix_(groups[j], groups[i])] += block.T
     reciprocity = _relative(result, result.T)
     if not np.isfinite(reciprocity) or reciprocity > 1e-10:
         raise ValueError('raw matrix reciprocity failed')
