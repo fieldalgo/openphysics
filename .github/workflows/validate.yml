@@ -473,7 +473,9 @@ jobs:
     # main pushes and manual dispatch only, so pull requests allocate no runner for it, and is in
     # the tests gate there. It also runs the cavity studies P4 and P5 of
     # tests/simcase/test_geometry_cavity3d.py (about 4 min locally, 2026-11-27), which pull
-    # requests skip. It installs the abi3 wheel meshloom-v26-wheel builds.
+    # requests skip, and the thin-layer estimate checks G-1 and G-2 of
+    # tests/simcase/test_mesh3d_estimate_thin.py (about 2 min). It installs the abi3 wheel
+    # meshloom-v26-wheel builds.
     needs: meshloom-v26-wheel
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
@@ -547,6 +549,26 @@ jobs:
                         "test_p5_slab_loaded_cavity_first_four_modes_converge"):
               assert check in names, (check, sorted(names))
           print(suite.get("tests"), "tests; P4 and P5 ran")
+          PY
+      # The thin-layer estimate checks (geometry_engine3d.md, Use): G-1's five slower card 1 cases and
+      # G-2 on G1 seeds 0-9 (about 2 min locally, 2026-11-28), which pull requests skip.
+      - name: Run the thin-layer estimate checks G-1 and G-2, and check that they ran
+        env:
+          OPENPHYSICS_GEOMETRY3D_FULL: "1"
+        run: |
+          cp tests/simcase/test_mesh3d_estimate_thin.py "$RUNNER_TEMP/g3d/"
+          cd "$RUNNER_TEMP/g3d"
+          python -m pytest -q -ra -s -p no:cacheprovider test_mesh3d_estimate_thin.py --junitxml="$RUNNER_TEMP/g3d-out/estimate-thin.xml"
+          python - "$RUNNER_TEMP/g3d-out/estimate-thin.xml" <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
+          counts = {k: int(suite.get(k)) for k in ("skipped", "failures", "errors")}
+          assert counts == {"skipped": 0, "failures": 0, "errors": 0}, counts
+          names = [c.get("name", "") for c in suite.iter("testcase")]
+          g1 = [n for n in names if n.startswith(("test_g1_card1_", "test_g1_full_card1_"))]
+          g2 = [n for n in names if n.startswith("test_g2_g1_box_sets_")]
+          assert (len(g1), len(g2)) == (9, 10), (g1, g2)
+          print(suite.get("tests"), "tests;", len(g1), "G-1 cases and", len(g2), "G-2 seeds ran")
           PY
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()

@@ -46,8 +46,14 @@ __all__ = ["Complex3D", "Cell3D", "Face3D", "Mesh3DResult", "Mesh3DError", "eval
 SIDE_TAGS = ("x0", "x1", "y0", "y1", "z0", "z1")
 #: the default tag of every other exterior face
 VOID_TAG = "void"
-#: tetrahedra per h^3 of volume in the estimate T = 6.3 * sum(V_r / h_r^3)
+#: tetrahedra per s^3 of volume in the estimate T = 6.3 * integral(dV / s^3)
 TETRAHEDRA_PER_VOLUME = 6.3
+#: the estimate's element size near thin features: s = min(h, LFS_SIZE_FACTOR * lfs), lfs the
+#: distance to the second-nearest meshed face along a grid line (calibrated; see ``_thin_excess``)
+LFS_SIZE_FACTOR = 1.2
+#: faces closer than this fraction of the domain diagonal count as one in ``_thin_excess``: such a
+#: sliver (above the mesher tolerance 3e-8) is where meshloom may not return, and no count applies
+LFS_FLOOR = 1e-6
 #: ``mesh.element_count_limit`` when the document gives none (the 2D estimate's default)
 DEFAULT_ELEMENT_COUNT_LIMIT = 600000
 CODE = "E-3D-COMBINATION"
@@ -1041,7 +1047,8 @@ def _mesh_options(document: dict, comp: Component) -> dict:
 
 
 def _sizes(cx: Complex3D, comp: Component, opts: dict):
-    """meshloom's ``h`` (metres: one number, or one per region) and the estimate T = 6.3 sum(V_r / h_r^3)."""
+    """meshloom's ``h`` (metres: one number, or one per region) and the estimate
+    T = 6.3 (sum(V_r / h_r^3) + ``_thin_excess``): 6.3 integral(dV / s^3), s = min(h, 1.2 lfs)."""
     size_of = {}
     for c in cx.cells:
         size_of[c.index] = c.mesh_size if c.mesh_size is not None else opts["size"]
@@ -1063,11 +1070,128 @@ def _sizes(cx: Complex3D, comp: Component, opts: dict):
                                 "mesh.element_size", path="mesh.element_size", code="E-KEY-MISSING")
         region_h[c.region] = min(region_h.get(c.region, h), h)
         volume[c.region] = volume.get(c.region, 0) + c.volume
-    estimate = TETRAHEDRA_PER_VOLUME * sum(float(Fraction(volume[r], region_h[r] ** 3)) for r in volume)
+    estimate = TETRAHEDRA_PER_VOLUME * (sum(float(Fraction(volume[r], region_h[r] ** 3)) for r in volume)
+                                        + _thin_excess(cx, region_h))
     hs = {r: _metres(h) for r, h in region_h.items()}
     if len(set(hs.values())) == 1:
         return next(iter(hs.values())), estimate
     return hs, estimate
+
+
+def _thin_excess(cx: Complex3D, region_h: dict) -> float:
+    """What thin features add to sum(V / h^3): the integral of 1 / s^3 - 1 / h^3 over the meshed
+    volume, s = min(h, LFS_SIZE_FACTOR * lfs), added up over the three axes.
+
+    meshloom takes one size per region, but its refinement (encroachment and the radius-edge
+    bound) makes tetrahedra as small as the local feature size near faces closer than h, graded
+    back to h away from them. The component is cut on the grid of every x, y plane and z level
+    (every feature is a box or a slab, so each grid block lies in one cell). Along each grid line
+    through a block, the meshed crossings are the block faces whose two sides differ in region
+    with one side meshed (``_Builder._exists``), the domain's bounds included, up to the first void or
+    outside block (refinement does not reach across void); lfs(u) there is the
+    distance to the second-nearest crossing: between t/2 and t inside a gap of width t, d + t at
+    a distance d outside it, which grades the size. Each axis counts its own lines and the three
+    are added, which counts high where two axes are thin at once; the grading around a small
+    feature is seen only along the lines through it. Faces closer than ``LFS_FLOOR`` of the domain
+    diagonal count as one: a sliver that thin may make meshloom not return (a meshloom backlog
+    item), which no count describes; Studio's job is cancellable there."""
+    xs, ys = _grid_lines(cx)
+    grid = _grid_cells(cx, xs, ys)
+    zs = cx.levels
+    cell_at = {(c.fine, c.slab): c for c in cx.cells}
+    nx, ny, nz = len(xs) - 1, len(ys) - 1, len(zs) - 1
+    key = {}                                       # block -> (region, h) of a meshed block, or None
+    for i in range(nx):
+        for j in range(ny):
+            fine = grid[i][j]
+            for k in range(nz):
+                c = None if fine is None else cell_at.get((fine, k))
+                key[(i, j, k)] = None if c is None or c.void else c.region
+    coords = (xs, ys, zs)
+    dom = cx.domain
+    floor = LFS_FLOOR * math.sqrt(sum((dom[f"{a}max"] - dom[f"{a}min"]) ** 2 for a in "xyz"))
+    total = 0.0
+    for a in range(3):
+        b, c = [d for d in range(3) if d != a]
+        n = (nx, ny, nz)
+        for ib in range(n[b]):
+            for ic in range(n[c]):
+                def at(m):
+                    idx = [0, 0, 0]
+                    idx[a], idx[b], idx[c] = m, ib, ic
+                    return key[tuple(idx)]
+                line = [at(m) for m in range(n[a])]
+                if all(r is None for r in line):
+                    continue
+                pos = coords[a]
+                area = float(coords[b][ib + 1] - coords[b][ib]) * float(coords[c][ic + 1] - coords[c][ic])
+                m = 0
+                while m < n[a]:                    # each run of meshed blocks: refinement does not cross void
+                    if line[m] is None:
+                        m += 1
+                        continue
+                    e = m
+                    while e < n[a] and line[e] is not None:
+                        e += 1
+                    cross = [pos[m]]
+                    for q in [q for q in range(m + 1, e) if line[q - 1] != line[q]] + [e]:
+                        if pos[q] - cross[-1] >= floor:   # a sliver below the floor is not counted
+                            cross.append(pos[q])
+                    for q in range(m, e):
+                        total += area * _line_excess(cross, pos[q], pos[q + 1], float(region_h[line[q]]))
+                    m = e
+    return total
+
+
+def _line_excess(cross: list, lo: int, hi: int, h: float) -> float:
+    """The integral over [lo, hi] of 1 / s(u)^3 - 1 / h^3, s = min(h, LFS_SIZE_FACTOR * lfs(u)) and
+    lfs(u) the distance to the second-nearest of the sorted crossings (none lies inside (lo, hi))."""
+    k = LFS_SIZE_FACTOR
+    i = bisect.bisect_right(cross, lo)
+    below = [float(x) for x in cross[max(0, i - 2):i]][::-1]            # nearest first
+    j = bisect.bisect_left(cross, hi)
+    above = [float(x) for x in cross[j:j + 2]]
+    lo, hi = float(lo), float(hi)
+    # lfs is the second smallest of the linear distances u - below, above - u: piecewise linear with
+    # breaks where two of them meet; split there and where k lfs = h, and integrate each linear piece
+    lines = [(1.0, -x) for x in below] + [(-1.0, x) for x in above]     # distance = slope u + offset
+    if len(lines) < 2:
+        return 0.0
+    breaks = {lo, hi}
+    for p in range(len(lines)):
+        for q in range(p + 1, len(lines)):
+            (s1, o1), (s2, o2) = lines[p], lines[q]
+            if s1 != s2:
+                u = (o2 - o1) / (s1 - s2)
+                if lo < u < hi:
+                    breaks.add(u)
+    pts = sorted(breaks)
+
+    def lfs_piece(u0, u1):
+        mid = 0.5 * (u0 + u1)
+        vals = sorted((s * mid + o, s, o) for s, o in lines)
+        return vals[1][1], vals[1][2]
+
+    out = 0.0
+    for u0, u1 in zip(pts, pts[1:]):
+        if u1 <= u0:
+            continue
+        sl, off = lfs_piece(u0, u1)
+        g0, g1 = sl * u0 + off, sl * u1 + off
+        cut = h / k                                # s < h where lfs < cut
+        if g0 >= cut and g1 >= cut:
+            continue
+        if sl == 0.0:
+            out += (u1 - u0) * (1.0 / (k * g0) ** 3 - 1.0 / h ** 3)
+            continue
+        # the sub-interval where g < cut
+        uc = (cut - off) / sl
+        a0, a1 = (u0, min(u1, uc)) if sl > 0 else (max(u0, uc), u1)
+        if a1 <= a0:
+            continue
+        ga, gb = sl * a0 + off, sl * a1 + off
+        out += (1.0 / ga ** 2 - 1.0 / gb ** 2) / (2.0 * sl * k ** 3) - (a1 - a0) / h ** 3
+    return out
 
 
 # ----------------------------------------------------------------------------- the mesh
@@ -1104,7 +1228,8 @@ def build_mesh3d(document, component: str | None = None) -> Mesh3DResult:
     ``document`` is a format 0.3 document (a dict, or a ``simcase.Document``) with a version 1
     geometry block and an optional ``mesh`` block: ``element_size`` (the size of regions that give
     none), ``element_count_limit`` (default 600000; checked against the estimate
-    T = 6.3 sum(V_r / h_r^3) before meshing, and passed to meshloom as its point cap) and
+    T = 6.3 integral(dV / s^3), s = min(h_r, 1.2 lfs), before meshing (``_thin_excess``: thin layers
+    and gaps mesh finer than h), and passed to meshloom as its point cap) and
     ``controls`` (``element_size`` on a region selection)."""
     return _build(document, component, through_meshloom=False)
 
@@ -1144,11 +1269,13 @@ def _prepare(document, component=None, *, through_meshloom: bool = False):
     from physmat.units import Diagnostic
     low, high = ho.estimate * 4e-4, ho.estimate * 6e-4
     info = Diagnostic("I-MESH-ESTIMATE", f"geometry.components.{comp.name}",
-                      f"about {ho.estimate:.0f} tetrahedra from the element sizes (T = 6.3 sum(V/h^3)); meshing takes "
+                      f"about {ho.estimate:.0f} tetrahedra from the element sizes "
+                      f"(T = 6.3 sum(V/s^3), s the element size, smaller in thin layers and gaps); meshing takes "
                       f"about {low:.3g}-{high:.3g} s at 0.4-0.6 ms per tetrahedron")
     if ho.estimate > opts["element_count_limit"]:
         raise GeometryError(f"component {comp.name!r}: about {ho.estimate:.0f} tetrahedra from the element sizes "
-                            f"(T = 6.3 sum(V/h^3)); the limit is {opts['element_count_limit']} "
+                            "(T = 6.3 sum(V/s^3), s the element size, smaller in thin layers and gaps); "
+                            f"the limit is {opts['element_count_limit']} "
                             "(mesh.element_count_limit)", path="mesh.element_count_limit", code="E-MESH-ESTIMATE")
     return cx, comp, ho, info
 
