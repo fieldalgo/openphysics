@@ -330,7 +330,7 @@ def _ground_gram(a, b, charges, width, height, *, order):
         result.append((density * dx_weights[:, None]).T @ density)
     return np.asarray(result)
 
-def _factors(solution, width, height, *, modes=256, order=16):
+def _factors(solution, width, height, *, order=16):
     a = solution['normalized_panel_starts']
     b = solution['normalized_panel_ends']
     owner = solution['owners']
@@ -361,8 +361,10 @@ def solve_two_ground_rectangle(polygons, *, width, height, panels_per_edge=32, g
     by at least the cluster extent. At most 2048 cubic-graded panels are used.
     Interpolation degree explicitly selects 10,12,14,16. The plane current
     Gram is integrated in physical space with 12- and 16-point rules on the
-    same intervals; ground_modes is admitted (64..4096) but no longer changes
-    it. No fallback occurs.
+    same intervals. ground_modes is kept for compatibility: it is still
+    required to be an integer in 64..4096 and refused otherwise, but no result
+    depends on it (results are bit for bit the same for every admitted value).
+    No fallback occurs.
 
     Matrix and ground refinement, reciprocity, charge conservation and energy
     checks use 1e-10; condition bound must be below 1e10. These internal checks
@@ -376,11 +378,13 @@ def solve_two_ground_rectangle(polygons, *, width, height, panels_per_edge=32, g
 def _rectangle_result(polygons, *, width, height, panels_per_edge, ground_modes, interpolation_degree):
     """One original checked solve; retain charges for optional edge output."""
     width, height = (_positive(width, 'width'), _positive(height, 'height'))
-    modes = _integer(ground_modes, 'ground_modes', 64, 4096)
+    # ground_modes stays admitted and range-checked for compatibility (stored
+    # controls pass it); the physical-space plane Gram does not use it.
+    _integer(ground_modes, 'ground_modes', 64, 4096)
     try:
         raw = _solve(polygons, width=width, height=height, panels_per_edge=panels_per_edge, interpolation_degree=interpolation_degree)
-        coarse = _factors(raw, width, height, modes=modes, order=12)
-        fine = _factors(raw, width, height, modes=2 * modes, order=16)
+        coarse = _factors(raw, width, height, order=12)
+        fine = _factors(raw, width, height, order=16)
     except np.linalg.LinAlgError as exc:
         raise ValueError('boundary system must be positive definite and nonsingular') from exc
     ground_error = _entrywise_relative(coarse['ground_parts'], fine['ground_parts'])

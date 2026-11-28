@@ -50,7 +50,7 @@ solver's, unchanged; the linked pages state them.
 |---|---|---|
 | `polygons` (positional) | `polygons` | The conductor boundaries: each an (n, 2) array of vertices in m, strictly convex, without a closing duplicate. |
 | `box_size` (keyword) | `width`, `height` | The rectangle's two side lengths (width, height) in m; the rectangle is [0, width] × [0, height], as `box_size` of `galerkin.cavity` starts at the origin in 3D. For the two-ground solvers the height is the separation of the grounded planes. |
-| `panels_per_edge`, `ground_modes`, `interpolation_degree` | same | Discretization counts; the defaults are the internal solver's. |
+| `panels_per_edge`, `ground_modes`, `interpolation_degree` | same | Discretization counts; the defaults are the internal solver's. `solve_two_ground_rectangle` and `solve_two_ground_rectangle_edges` still check `ground_modes` (an integer in 64–4096), so existing calls and stored controls keep working, but their results do not depend on it: the grounded planes' current Gram is integrated in physical space. The corner solvers still use it as their Fourier count. |
 | `ground_indices` | `grounds` | `solve_open_rectangle`: the indices into `polygons` of the conductors held at zero potential. |
 | `signal_indices` | `signals` | `solve_two_ground_harmonic_corner_guard_edges`: two ordered indices of the active conductors. |
 | `signal_index` | `signal` | `solve_two_ground_harmonic_corner_single_active_edges`: the index of the active conductor. |

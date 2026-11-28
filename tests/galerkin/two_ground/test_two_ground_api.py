@@ -89,13 +89,13 @@ def test_public_surface_transform(result,operation):
 def test_ground_refinement_failure_does_not_fallback(monkeypatch):
     original=module._factors; calls=[]
     def changed(*args,**kwargs):
-        calls.append(kwargs["modes"]); value=original(*args,**kwargs)
-        if kwargs["modes"]==256:value["ground_parts"]*=1.001
+        calls.append(kwargs["order"]); value=original(*args,**kwargs)
+        if kwargs["order"]==16:value["ground_parts"]*=1.001
         return value
     monkeypatch.setattr(module,"_factors",changed)
     with pytest.raises(ValueError,match="ground Fourier"):
         solve(polygons(),width=.008,height=.002,panels_per_edge=16)
-    assert calls==[128,256]
+    assert calls==[12,16]
 
 
 def test_ground_gate_preserves_small_entry_relative_scale(monkeypatch):
@@ -103,10 +103,24 @@ def test_ground_gate_preserves_small_entry_relative_scale(monkeypatch):
     def changed(*args,**kwargs):
         value=original(*args,**kwargs)
         value["ground_parts"]=np.array([[[1.,1e-12],[1e-12,1.]],[[1.,1e-12],[1e-12,1.]]])
-        if kwargs["modes"]==256:
+        if kwargs["order"]==16:
             value["ground_parts"][0,0,1]*=1.001
             value["ground_parts"][0,1,0]*=1.001
         return value
     monkeypatch.setattr(module,"_factors",changed)
     with pytest.raises(ValueError,match="ground Fourier"):
         solve(polygons(),width=.008,height=.002,panels_per_edge=16)
+
+
+@pytest.mark.parametrize("edges", [False, True], ids=["whole", "edges"])
+def test_ground_modes_is_checked_but_changes_no_result(edges):
+    """Kept for compatibility (stored controls pass it); the physical-space plane Gram does not use it."""
+    function = module.solve_two_ground_rectangle_edges if edges else solve
+    low, high = (function(polygons(), width=.008, height=.002, panels_per_edge=16, ground_modes=modes)
+                 for modes in (64, 4096))
+    for first, second in ((low, high),) + (((low.whole, high.whole),) if edges else ()):
+        for field in dataclasses.fields(first):
+            a, b = getattr(first, field.name), getattr(second, field.name)
+            if dataclasses.is_dataclass(a):
+                continue
+            assert np.array_equal(a, b) if isinstance(a, np.ndarray) else a == b, field.name
