@@ -33,6 +33,9 @@
 //  X6  card 1, Run 1, the Result view: the line under the surface bar reads "Colours span the surface,
 //      <lo>–<hi> K; the whole model reaches <Tmax> K (Tmax).", lo and hi the record's surface
 //      temperature_min and temperature_max and Tmax its values' temperature_max (6 significant digits): 1/1.
+//  X7  card 1, Run 1: the run table's row after Tmin reads "Heat source" with "4 W in Si (top)", equal to
+//      the record's total_source (its value and unit) and the regions of the record's document's
+//      heat_source_density: 1/1.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -319,6 +322,20 @@ try {
     const want = `Colours span the surface, ${six(rec.surface.temperature_min.value)}–${six(rec.surface.temperature_max.value)} K; the whole model reaches ${six(rec.values.temperature_max.value)} K (Tmax).`;
     const rows = [line === want];
     record('X6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, line, want});
+    await ctx.close();
+  }
+  if (want('X7')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    let runId = null;
+    page.on('response', async r => { if (r.url().endsWith('/api/model3d/run') && r.request().method() === 'POST') { try { runId = (await r.json()).run; } catch {} } });
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(500);
+    const rows3 = await page.evaluate(() => [...document.querySelectorAll('#m3-values tr')].map(r => [r.querySelector('th').textContent, r.querySelector('td').textContent]).slice(1, 3));
+    const rec = await page.evaluate(async id => (await fetch(`/api/model3d/runs/${id}/record?maps=kept`)).json(), runId);
+    const want = `${Number(rec.values.total_source.value.toPrecision(6))} ${rec.values.total_source.unit} in ${Object.keys(rec.document.physics.heat.heat_source_density).join(', ')}`;
+    const rows = [rows3[0]?.[0] === 'Temperature, min (whole model)' && rows3[1]?.[0] === 'Heat source' && rows3[1][1] === want && want === '4 W in Si (top)'];
+    record('X7', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, rows3, want});
     await ctx.close();
   }
 } finally {

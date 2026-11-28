@@ -65,3 +65,16 @@ test('X6: the line under the surface bar: the surface span and the whole model\'
  const values={temperature_max:{value:362.2991,unit:'K',region:'SiO2'},temperature_min:{value:300,unit:'K',region:'Si'}};
  assert.equal(M.surfaceSpanText(surface,values),'Colours span the surface, 300–362.244 K; the whole model reaches 362.299 K (Tmax).');
 });
+
+test('X7: the run table names the heat source after Tmin: total source in the regions of the record\'s document',()=>{
+ const values={temperature_max:{value:1127.33,unit:'K',region:'Si (top)',position_m:[1.79e-4,0,6.1e-4]},temperature_min:{value:300,unit:'K',region:'Si',position_m:[0,0,0]},
+  heat_rate_by_selection:{z0:{value:-4,unit:'W'}},total_source:{value:4,unit:'W'},balance_residual:{value:1e-12,unit:'W'},relative_balance_residual:{value:2e-13,unit:''}};
+ const doc=card1();
+ assert.deepEqual(M.heatSourceRegions(doc),['Si (top)']);
+ const rows=M.valuesRows(values,'um',{sources:M.heatSourceRegions(doc)});
+ assert.deepEqual(rows.map(r=>r[0]).slice(0,3),['Temperature, max (whole model)','Temperature, min (whole model)','Heat source']);
+ assert.deepEqual(rows[2],['Heat source','4 W in Si (top)']);
+ assert.deepEqual(M.valuesRows(values,'um',{sources:['Si (top)','Cu']})[2],['Heat source','4 W in Si (top), Cu']);
+ assert.deepEqual(M.heatSourceRegions(card2()),[]);
+ assert.deepEqual(M.valuesRows(values,'um',{sources:[]}),M.valuesRows(values,'um'),'no source: the rows of before');
+});

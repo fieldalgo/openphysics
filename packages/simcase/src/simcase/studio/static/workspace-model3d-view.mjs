@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,meshSizeOffers,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,surfaceSpanText,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,adviceText,cutColor} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,surfaceSpanText,heatSourceRegions,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,adviceText,cutColor} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 import {NEEDS_TWO,SAME_INPUTS,compareRows,heatRateNote,defaultPair,deltaLegend,encodeF32,inputChanges,meshNotice,surfaceDelta} from './workspace-model3d-compare.mjs';
@@ -200,7 +200,7 @@ export function createModel3dView(ctx){
    const unit=r.surface?.unit||'um',live=heat.live[i],u=shownUnit(unit);
    const same=keptRunFor(doc,heat.records)===i;
    return `<h3>Run ${i+1} · Temperature</h3>`+
-    `<table class="m3-values" id="m3-values"><tbody>${valuesRows(withExtremes(r.values,live&&heat.liveValues?.get(live)),unit,{expected:expectedHeatRate(r.document)}).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`+
+    `<table class="m3-values" id="m3-values"><tbody>${valuesRows(withExtremes(r.values,live&&heat.liveValues?.get(live)),unit,{expected:expectedHeatRate(r.document),sources:heatSourceRegions(r.document)}).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`+
     `<p class="muted" id="m3-sign">${esc(HEAT_RATE_SIGN)}</p>`+
     `<p class="muted">Mesh: ${r.mesh.nodes.toLocaleString('en-US')} nodes, ${r.mesh.tetrahedra.toLocaleString('en-US')} tetrahedra (${esc(r.mesh.route)}).${same?' These are the current inputs.':' The inputs have changed since this run.'}</p>`+
     `<div class="m3-actions">${same?'':'<button type="button" data-m3-run-act="inputs">Use this run\'s inputs</button>'}${live?'':'<button type="button" data-m3-run-act="recompute">Recompute</button>'}</div>`+

@@ -427,7 +427,8 @@ results belong to that run; editing the model does not change them.*라고 말�
 
 **Results.** 트리에서 Mesh 1 다음에 **Study 1 · Steady**와 **Results**가 오고, 보관한 실행마다 **Run N · Temperature (surfaces)**
 행이 있습니다(최대 10개; 가장 오래된 것이 먼저 빠짐). 실행의 페이지에는 값(영역과 위치를 가진 *Temperature, max (whole model)*,
-*Temperature, min (whole model)*, 고정 온도마다 *Heat rate through*, *Total heat source*, 절대 열률 합에 대한 비율(해석기의 상대 보존 잔차)을 가진
+*Temperature, min (whole model)*, 실행의 문서가 열원을 둘 때 *Heat source*(총 열원과 그 영역: *4 W in Si (top)*, 여럿이면
+*N W in A, B*), 고정 온도마다 *Heat rate through*, *Total heat source*, 절대 열률 합에 대한 비율(해석기의 상대 보존 잔차)을 가진
 *Energy balance residual*), 열률의 부호 한 줄(*Heat rate: positive into the model, negative out of it (a fixed temperature that
 removes heat shows a negative rate).*, galerkin의 반력 열률은 열을 넣을 때 양수), 메시, 문서가
 다를 때 **Use this run's inputs**(Undo 한 단계), **Probe**(구성 요소 단위의 x, y, z; 결과의 면을 클릭해도 됨), 내보내기

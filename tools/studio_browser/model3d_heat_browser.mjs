@@ -14,11 +14,13 @@
 //      and its surface-map digest are equal; a version 1 project without 3D is saved as before;
 //  W12 Results (Run 1 of the card: the surface temperature, the colour bar and the values table) at
 //      1440 × 900 and 390 × 844: no console error, no CSP violation, the result canvas visible and not
-//      empty, no horizontal scroll at 390; screenshots stored;
+//      empty, no horizontal scroll at 390; the table's 6 rows with (X7) "Heat source" after Tmin reading
+//      "4 W in Si (top)" from the record; screenshots stored;
 //  W13 keyboard only: open the card, rotate, view 5, select via.z1 from the faces list, Use for →
 //      Fixed temperature, and Messages shows "Fixed temperature needs an outer face; via.z1 is
 //      inside" (the document unchanged); select stack.top.top from the list, Use for → Fixed
-//      temperature; set a section; Run to completion; no pointer event;
+//      temperature; set a section; Run to completion (the table's rows, with X7's "Heat source" after
+//      Tmin reading "4 W in Si (top)" from the record); no pointer event;
 //  W14 recorded only (SwiftShader here): the time from Run to the drawn result, and of a cut.
 // Card 2, Copper via through a slab (E2-UI), with the same thresholds: W12 (Library, Model, Mesh view,
 // Result at 1440 x 900 and 390 x 844, and the display note on the curved face via.side), W6-UI (Run 1's
@@ -56,6 +58,9 @@ async function open(browser, viewport) {
   const seen = {console: [], pageErrors: [], foreign: []};
   page.on('console', m => { if (m.type() === 'error') seen.console.push(m.text()); });
   page.on('pageerror', e => seen.pageErrors.push(String(e)));
+  // X7: the runs started, so a check can read the last run's record
+  seen.runs = [];
+  page.on('response', async r => { if (r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/model3d/run') { const id = (await r.json().catch(() => ({}))).run; if (id) seen.runs.push(id); } });
   page.on('request', r => { if (/^(https?|wss?):/.test(r.url()) && new URL(r.url()).origin !== origin) seen.foreign.push(r.url()); });
   await page.addInitScript(() => {
     delete window.showSaveFilePicker; delete Window.prototype.showSaveFilePicker;
@@ -97,6 +102,11 @@ async function download(page, trigger) {
   if (asked) await page.click('#save-name-download');
   return readFile(await (await done).path(), 'utf8');
 }
+// X7: the run table's Heat source cell, built from the last run's record: total source and its document's regions
+async function sourceFromRecord(page, seen) {
+  const rec = await page.evaluate(async id => (await fetch(`/api/model3d/runs/${id}/record?maps=kept`)).json(), seen.runs.at(-1));
+  return `${Number(rec.values.total_source.value.toPrecision(6))} ${rec.values.total_source.unit} in ${Object.keys(rec.document.physics.heat.heat_source_density || {}).join(', ')}`;
+}
 async function openFile(page, name, text) {
   await page.setInputFiles('#session-file', {name, mimeType: 'application/json', buffer: Buffer.from(text)});
 }
@@ -122,8 +132,10 @@ try {
       selected: document.querySelector('#tree [aria-selected="true"]')?.dataset.m3Node}));
     await page.screenshot({path: join(out, `w12-results-${tag}.png`), fullPage: true});
     const c = await csp(page);
+    shown.source = await sourceFromRecord(page, seen);
     const ok = !seen.console.length && !seen.pageErrors.length && !c.length && !seen.foreign.length && state.visible && state.drawn > 0.02 * state.pixels
-      && /^Surface temperature from 300 K \(blue\) to 1127\.33 K \(red\)$/.test(shown.bar) && shown.values.length === 5 && shown.selected === 'run:1'
+      && /^Surface temperature from 300 K \(blue\) to 1127\.33 K \(red\)$/.test(shown.bar) && shown.values.length === 6 && shown.selected === 'run:1'
+      && shown.source === '4 W in Si (top)' && JSON.stringify(shown.values[2]) === JSON.stringify(['Heat source', shown.source])
       && (viewport.width !== 390 || state.scrollWidth <= state.innerWidth);
     record(`W12 results ${tag}`, ok, {canvas: state, ...shown, console: seen.console, pageErrors: seen.pageErrors, csp: c, foreign: seen.foreign});
     if (viewport.width === 1440) {
@@ -245,6 +257,7 @@ try {
     await completed(page, 1);
     // two fixed temperatures (z0 and stack.top.top): max, min, a heat rate through each, the source, the balance
     steps.values = await page.evaluate(() => [...document.querySelectorAll('#m3-values tr')].map(r => [r.querySelector('th').textContent, r.querySelector('td').textContent]));
+    steps.source = await sourceFromRecord(page, seen);
     steps.pointerEvents = await page.evaluate(() => window.__pointer);
     await page.screenshot({path: join(out, 'w13-keyboard.png')});
     const ok = steps.cardFocused && steps.canvasFocused && steps.rotated && steps.view5 && steps.viaSelected
@@ -252,8 +265,8 @@ try {
       && steps.refusal === INSIDE && steps.refusalFocused && steps.unchanged
       && steps.topSelected && steps.topUse.fixed && steps.topUse.name === 'stack.top.top' && steps.topUse.onApply
       && steps.sectionAxis && steps.section[0] === 'z' && steps.section[1] === '300' && steps.runFocused
-      && JSON.stringify(steps.values.map(v => v[0])) === JSON.stringify(['Temperature, max (whole model)', 'Temperature, min (whole model)', 'Heat rate through z0',
-        'Heat rate through stack.top.top', 'Total heat source', 'Energy balance residual']) && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
+      && JSON.stringify(steps.values.map(v => v[0])) === JSON.stringify(['Temperature, max (whole model)', 'Temperature, min (whole model)', 'Heat source', 'Heat rate through z0',
+        'Heat rate through stack.top.top', 'Total heat source', 'Energy balance residual']) && steps.source === '4 W in Si (top)' && steps.values[2][1] === steps.source && steps.pointerEvents === 0 && !seen.console.length && !seen.pageErrors.length;
     record('W13', ok, {steps, console: seen.console, pageErrors: seen.pageErrors});
     await page.close();
   }

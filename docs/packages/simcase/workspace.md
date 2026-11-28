@@ -532,7 +532,8 @@ change them.*, with the place in the values table's words: a maximum at a node t
 **Results.** **Study 1 · Steady** and **Results** follow Mesh 1 in the tree, and each kept run is a
 row **Run N · Temperature (surfaces)** (up to 10; the oldest goes first). A run's page has its values
 (*Temperature, max (whole model)* with its region and position, *Temperature, min (whole model)*,
-*Heat rate through* each fixed
+*Heat source* when the run's document sets one (its total source and regions: *4 W in Si (top)*, or
+*N W in A, B* for several), *Heat rate through* each fixed
 temperature, *Total heat source*, *Energy balance residual* with its ratio to the summed absolute heat rates, the solver's
 relative conservation residual), the sign of a heat rate in one line (*Heat rate: positive into the
 model, negative out of it (a fixed temperature that removes heat shows a negative rate).*, galerkin's
