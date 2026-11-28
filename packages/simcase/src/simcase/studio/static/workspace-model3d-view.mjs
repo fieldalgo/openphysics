@@ -694,7 +694,9 @@ export function createModel3dView(ctx){
  function comparePage(host){
   const pair=comparePair();
   if(!pair){host.innerHTML=`<h2>Compare</h2><p id="m3-compare-none">${esc(NEEDS_TWO)}</p>`;return;}
-  const [ia,ib]=pair,A=heat.records[ia],B=heat.records[ib],unit=B.surface?.unit||A.surface?.unit||doc.geometry.components[componentName(doc)].length_unit;
+  // X5: a run this server holds reads its Tmax and Tmin in the run table's /extremes words; a kept record keeps "in <region>"
+  const shownRecord=i=>{const r=heat.records[i],live=heat.live[i];return live&&heat.liveValues?.get(live)?{...r,values:withExtremes(r.values,heat.liveValues.get(live))}:r;};
+  const [ia,ib]=pair,A=shownRecord(ia),B=shownRecord(ib),unit=B.surface?.unit||A.surface?.unit||doc.geometry.components[componentName(doc)].length_unit;
   const pick=(id,label,at)=>`<label>${label} <select id="${id}">${heat.records.map((r,i)=>`<option value="${i}"${i===at?' selected':''}>Run ${i+1}</option>`).join('')}</select></label>`;
   const rows=compareRows(A,B,unit),changes=inputChanges(A.document,B.document),notice=meshNotice(A,B);
   // the surface ΔT: on a shared mesh, from both runs' surface maps (B − A per surface node)
