@@ -47,3 +47,15 @@ test('X3: the other 3D card opens a question naming the held model, what is lost
  assert.equal(M.OTHER_CARD_ACTION,'Open model');
  assert.equal(M.NOT_SAVED_NOT_REPLACED,'Not replaced: the project file was not saved.');
 });
+
+test('X4: the estimate refusal offers a Use button per size, the smallest first',()=>{
+ const OFF={ok:false,code:'E-MESH-ESTIMATE',tetrahedra:19215000,limit:600000,suggested_size:6.36,suggested_tetrahedra:597583,suggested_seconds:358.55,
+  suggested_minute:13.4,minute_tetrahedra:74210,minute_seconds:44.53};
+ assert.deepEqual(M.meshSizeOffers(OFF,'um'),[{size:6.36,label:'Use 6.36 µm'},{size:13.4,label:'Use 13.4 µm'}]);
+ assert.deepEqual(M.meshSizeOffers({...OFF,suggested_minute:6.36},'um'),[{size:6.36,label:'Use 6.36 µm'}],'one size does both: one button');
+ assert.deepEqual(M.meshSizeOffers({...OFF,suggested_minute:null},'um'),[{size:6.36,label:'Use 6.36 µm'}]);
+ assert.deepEqual(M.meshSizeOffers({...OFF,suggested_size:null,suggested_minute:null},'um'),[]);
+ assert.deepEqual(M.meshSizeOffers({ok:false,code:'E-OTHER',refused:'x'},'um'),[]);
+ // the time words: under 45 s in seconds, from 45 s in minutes
+ assert.match(M.meshRefusalText({...OFF,minute_seconds:44.4},'um'),/13\.4 µm: under a minute \(estimated about 44 s\)\.$/);
+});

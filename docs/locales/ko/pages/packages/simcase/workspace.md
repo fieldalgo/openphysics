@@ -364,9 +364,10 @@ yet in a 3d component; boxes and slab layers are* · `geometry.components.c.feat
 same coordinate 9000.000000000002 m*). 이런 거부도 Messages에 같은 방식으로 보이고, 트리는 경로가 가리키는 특징을, 없으면
 **Mesh 1**(*refused*)을 표시합니다. 형상은 만들어졌으므로 보기는 흐려지지 않으며, Mesh는 거부의 말을 이유로 꺼집니다.
 한도를 넘는 추정(`E-MESH-ESTIMATE`)은 Messages에 한 번, 쉬운 말로 보입니다: *Component 1 needs about 19,215,000 tetrahedra;
-the limit is 600,000. Element size 6.36 µm meshes about 597,583 tetrahedra (estimated about 6 min); 11.7 µm about 98,783 (estimated
-about 1 min).* 첫 크기는 같은 추정이 받는 세 유효 숫자 격자의 가장 작은 값이고, 둘째는 추정 시간이 60 s 이하인 가장 작은
-값입니다(엔진의 추정, 사면체당 0.6 ms이므로 약 100,000개; 잰 시간이 아님). 둘 다 검사가 찾으며(엔진의 `refused` 옆에
+the limit is 600,000. Element size 6.36 µm: about 597,583 tetrahedra (estimated about 6 min). 12.9 µm: under a minute (estimated
+about 45 s).* 첫 크기는 같은 추정이 받는 세 유효 숫자 격자의 가장 작은 값이고, 둘째는 추정 시간이 45 s 이하인 가장 작은
+값입니다(엔진의 추정, 사면체당 0.6 ms이므로 약 75,000개; 잰 시간이 아님). 크기마다 버튼(**Use 6.36 µm**, **Use 12.9 µm**)이
+있어 Mesh 1의 **Element size**를 그 값으로 둡니다(Undo 한 단계). 둘 다 검사가 찾으며(엔진의 `refused` 옆에
 `suggested_size`와 `suggested_minute`, 각각의 `…_tetrahedra`, `…_seconds`, 그리고 `tetrahedra`, `limit`), 트리의 Mesh 1 행은
 *too fine*으로 읽힙니다. 엔진의 문장과 그 키는 **Details** 아래에
 있습니다. Mesh와 Run은 *Fix 1 problem in Messages to mesh*(*… to run*), Mesh 1 페이지는 *Mesh is not available: see Messages.*라고

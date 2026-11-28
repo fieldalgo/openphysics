@@ -16,7 +16,7 @@ import {CANCELLED,longer,meshBlocked,progressText,statsRows,stepList,estimateTex
 import {decode,faceLines,regionColor} from '/model3d-assets/model3d-model.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {markPageTabs} from './workspace-tabs.mjs';
-import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
+import {CARD3D,CARDS3D,card3dOf,meshRefusalText,meshSizeOffers,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
  valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY,shownText,runCompleteText,meshDoneText,keptMeshLabel,nameScopes,interiorHint,useTemperatureProblem,fixedNoticeText,crossingAdvice,adviceText,cutColor} from './workspace-model3d.mjs';
@@ -662,8 +662,10 @@ export function createModel3dView(ctx){
   const off=refused?null:meshRefusal(check);
   if(off){const m=refusalMessage(off),at=m.feature!==null?`feature:${m.feature}`:'mesh';
    // an estimate refusal in plain words; the engine's sentence (with its formula) and key under Details
-   const plain=meshRefusalText(off,doc.geometry.components[componentName(doc)].length_unit),own=plain!==off.refused;
-   parts.push(`<div class="mp-message error" data-m3-refusal data-m3-mesh-refusal><p>${esc(own?plain:m.text)}</p><div class="mp-message-actions"><button type="button" data-m3-show="${at}">Show</button></div>`+
+   const unit=doc.geometry.components[componentName(doc)].length_unit,plain=meshRefusalText(off,unit),own=plain!==off.refused;
+   // X4: one button per size the refusal names; it sets Mesh 1's element size (one Undo step)
+   const uses=meshSizeOffers(off,unit).map(o=>`<button type="button" data-m3-use-size="${o.size}">${esc(o.label)}</button>`).join('');
+   parts.push(`<div class="mp-message error" data-m3-refusal data-m3-mesh-refusal><p>${esc(own?plain:m.text)}</p><div class="mp-message-actions">${uses}<button type="button" data-m3-show="${at}">Show</button></div>`+
     (m.details||own?`<details><summary>Details</summary><code>${esc(off.code||'')}</code>${off.path?` at <code>${esc(off.path)}</code>`:''}${own?`<p>${esc(off.refused)}</p>`:''}</details>`:'')+`</div>`);}
   if(!refused&&!off&&check?.run?.ok===false&&heatOf(doc))
    parts.push(`<div class="mp-message error" data-m3-refusal data-m3-run-refusal><p>${esc(check.run.refused)}</p><div class="mp-message-actions"><button type="button" data-m3-show="heat">Show</button></div>`+
@@ -675,6 +677,10 @@ export function createModel3dView(ctx){
   box.innerHTML=parts.join('')||(checking?'<p class="muted">Checking the geometry…</p>':'<p class="muted">No problems: the geometry passes the check.</p>');
   box.querySelectorAll('.mp-message > p').forEach(p=>p.tabIndex=0);     // each message is reached by Tab
   box.querySelectorAll('[data-m3-show]').forEach(b=>b.onclick=()=>choose(b.dataset.m3Show));
+  box.querySelectorAll('[data-m3-use-size]').forEach(b=>b.onclick=()=>{
+   const field=fieldsOf(doc,'mesh').find(f=>f.key==='mesh.element_size'),out=editField(doc,field,b.dataset.m3UseSize,{domain:check?.domain??null});
+   if(out.problem){ctx.notice(out.problem);return;}
+   drafts.delete(field.key);commit(out.doc);});
   box.querySelector('[data-m3-undo]')?.addEventListener('click',()=>{undo();lastNotice=null;renderDock();});
  }
 

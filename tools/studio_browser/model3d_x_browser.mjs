@@ -21,6 +21,11 @@
 //      /workspace?card=via-slab-3d&fresh=1 with card 2 while this tab keeps card 1; Save and replace saves
 //      the project file (holding card 1) and only then shows card 2, and Messages' Undo brings card 1
 //      back; Replace without saving shows card 2 with no download: 6/6.
+//  X4  card 1, Mesh element size 2 µm: Messages reads meshRefusalText of the server's reply, of the form
+//      "Element size N µm: about … tetrahedra (estimated about … min). M µm: under a minute (estimated
+//      about … s)."; it has the buttons "Use N µm" and "Use M µm"; Use M µm sets the Mesh field to M, and
+//      the server's check there is ok with an estimate of at most 45 s; Use N µm (after Undo) sets N and
+//      the check is ok within the limit: 3/3.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -223,6 +228,36 @@ try {
       downloads === 0,
     ];
     record('X3', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 6, card, q, afterCancel, fresh, keptAfterTab, savedCard: m3?.card, downloads, errors: seen.pageErrors});
+    await ctx.close();
+  }
+  if (want('X4')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    await page.click('[data-m3-node="mesh"]'); await setField(page, 'mesh.element_size', '2');
+    const doc = structuredClone(CARD); doc.mesh.element_size = '2 um';
+    const mesh = (await serverCheck(page, doc)).mesh;
+    const plain = await page.evaluate(async m => (await import('/workspace-assets/workspace-model3d.mjs')).meshRefusalText(m, 'um'), mesh);
+    await page.waitForSelector('[data-m3-mesh-refusal]');
+    const shown = await page.evaluate(() => ({text: document.querySelector('[data-m3-mesh-refusal] > p')?.textContent || '',
+      buttons: [...document.querySelectorAll('[data-m3-mesh-refusal] [data-m3-use-size]')].map(b => b.textContent)}));
+    const field = () => page.evaluate(() => document.querySelector('[data-m3-field="mesh.element_size"]')?.value ?? null);
+    const docSize = async () => { await page.waitForFunction(() => !document.querySelector('[data-m3-mesh-refusal]'), null, {timeout: 30000}).catch(() => {}); return field(); };
+    const at = async size => { const d = structuredClone(CARD); d.mesh.element_size = `${size} um`; return (await serverCheck(page, d)).mesh; };
+    const N = mesh.suggested_size, M = mesh.suggested_minute;
+    let useM = null, useN = null, thereM = null, thereN = null;
+    if (shown.buttons.length === 2) {
+      await page.click(`[data-m3-use-size="${M}"]`); await checked(page); useM = await docSize(); thereM = await at(M);
+      await page.click('#undo-edit'); await page.waitForSelector('[data-m3-mesh-refusal]', {timeout: 30000}).catch(() => {});
+      await page.click(`[data-m3-use-size="${N}"]`); await checked(page); useN = await docSize(); thereN = await at(N);
+    }
+    const rows = [
+      shown.text === plain && new RegExp(`Element size ${N} µm: about [\\d,]+ tetrahedra \\(estimated about \\d+ min\\)\\. ${M} µm: under a minute \\(estimated about \\d+ s\\)\\.$`).test(shown.text),
+      JSON.stringify(shown.buttons) === JSON.stringify([`Use ${N} µm`, `Use ${M} µm`]) && useM === `${M} um` && thereM?.ok === true && thereM.estimate.seconds <= 45,
+      useN === `${N} um` && thereN?.ok === true && thereN.estimate.tetrahedra <= mesh.limit,
+    ];
+    record('X4', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, shown, N, M, useM, useN,
+      server: {suggested_seconds: mesh.suggested_seconds, minute_seconds: mesh.minute_seconds}, thereM: thereM?.estimate, thereN: thereN?.estimate});
     await ctx.close();
   }
 } finally {
