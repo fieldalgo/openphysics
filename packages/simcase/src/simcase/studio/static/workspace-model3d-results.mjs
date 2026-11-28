@@ -8,7 +8,7 @@
 import * as THREE from '/vendor/three-0.186.1/three.module.js';
 import {View3D} from '/model3d-assets/model3d-view.mjs';
 import {SHADE,decode,pick,rayAt,viewCamera} from '/model3d-assets/model3d-model.mjs';
-import {temperatureColor,UNITS} from './workspace-model3d.mjs';
+import {temperatureColor,cutColor,srgbToLinear,UNITS} from './workspace-model3d.mjs';
 
 export class TemperatureView3D extends View3D{
  constructor(canvas,options){super(canvas,options);this.cut=null;this.lastHit=null;}
@@ -41,7 +41,7 @@ export class TemperatureView3D extends View3D{
    const s=f===this.selected?1:SHADE[v.faces[f].axis];
    for(let j=0;j<3;j++){
     const i=this.indices[3*t+j],c=f===this.selected?[0.82,0.14,0.18]:temperatureColor(this.temperature[i],this.tmin,this.tmax);
-    pos.set(this.positions.subarray(3*i,3*i+3),k);col[k]=c[0]*s;col[k+1]=c[1]*s;col[k+2]=c[2]*s;k+=3;
+    pos.set(this.positions.subarray(3*i,3*i+3),k);col[k]=srgbToLinear(c[0]*s);col[k+1]=srgbToLinear(c[1]*s);col[k+2]=srgbToLinear(c[2]*s);k+=3;   // V8: sRGB colours as linear
    }
   }
   const g=new THREE.BufferGeometry();
@@ -62,8 +62,8 @@ export class TemperatureView3D extends View3D{
   const pos=new Float32Array(3*ix.length),col=new Float32Array(3*ix.length);
   // the cut's own colour range (its own legend under the view), not the surface's
   const lo=cut.temperature_min.value,hi=cut.temperature_max.value;
-  for(let q=0;q<ix.length;q++){const i=ix[q],c=temperatureColor(T[i],lo,hi);
-   for(let a=0;a<3;a++){pos[3*q+a]=p[3*i+a]+shift[a];col[3*q+a]=c[a];}}
+  for(let q=0;q<ix.length;q++){const i=ix[q],c=cutColor(T[i],lo,hi);       // V8: the cut's saturated map, sRGB as linear
+   for(let a=0;a<3;a++){pos[3*q+a]=p[3*i+a]+shift[a];col[3*q+a]=srgbToLinear(c[a]);}}
   const g=new THREE.BufferGeometry();
   g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(col,3));
   this.cutMesh=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide}));
