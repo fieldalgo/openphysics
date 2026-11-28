@@ -522,6 +522,22 @@ have changed is greyed (*Run 1: inputs changed since this run*). Cut, probe and 
 the server: a run opened from a file has its record only and says *Recompute this run to cut, probe or
 export CSV.* with **Recompute**, which runs its own inputs again into the same row.
 
+**Compare.** With the 3D model shown, the **Compare** tab puts two of its kept runs side by side:
+**Run A** and **Run B** (the two newest at first; one run reads *Compare needs two runs of this 3D
+model.*). The table gives each run's values as its Results page writes them (Tmax, Tmin, each fixed
+temperature's heat rate, the total source, the balance residual) and its mesh (nodes, tetrahedra,
+route, element size), with **B − A** beside each number. **Inputs that differ** lists the document's
+fields in the tree's words (*Fixed temperature z1: 301 K → 311 K*, *Parameter t_ox: 10 µm → 5 µm*,
+*Mesh element size: 0.1 m → 0.12 m*; *Same inputs.* when none). Two runs share a mesh when their
+records have the same mesh key (the digest of the document's geometry and mesh blocks; a boundary or
+material change keeps it) and the same node and tetrahedron counts; this is not a node-by-node check.
+On a shared mesh the view colours the surface temperature difference B − A per surface node, with its
+legend (*ΔT (B − A): 10–10 K · largest |ΔT| 10 K* when every fixed temperature of card 2 is raised by
+10 K); otherwise it says *The runs have different meshes (A: 5,267 nodes, size 0.1 m; B: 3,395 nodes,
+size 0.12 m). Values are compared; the surface temperature is not compared point by point.* Runs whose
+records keep no surface map say *Recompute to compare the surface.* Everything comes from the two
+records; nothing is computed on the server, and the pair is view state (not in the project file).
+
 **Undo.** The 3D model has one history of documents, apart from the other models' (Ctrl+Z and Ctrl+Y
 follow the model shown). Each committed edit is one step: a field committed with Enter or on leaving
 it, add, delete, duplicate, move, a layer added or removed, a parameter, and a selection made by
@@ -567,13 +583,21 @@ recovery yet.
 | W12 (card 2) | the Library with card 2, its Model, Mesh view and Result at 1440 × 900 and 390 × 844: no console error or CSP violation, the canvases drawn, no horizontal scroll at 390, the faces list by Tab, the display note on `via.side`'s names; screenshots kept | all hold | all hold | the heat browser check |
 | W13 (card 2) | keyboard only: card 2, rotate, view 5, `via.side` in the faces list, Use for → Fixed temperature (*Fixed temperature needs an outer face; via.side is inside*, the fixed temperatures still `z0` and `z1`), Run to completion. Use for is offered on curved faces; a selection from one is refused, as before | no pointer event | 0 pointer events | the heat browser check |
 | W14 (card 2) | Run to the drawn result, and a cut x = 0 | recorded only (SwiftShader here) | about 0.8 s (Mesh 1 already meshed) and 0.1 s | the heat browser check |
+| C3-1 | Compare, card 2 Runs 1 and 2: every cell of the values table equals the pair helper on the two runs' `/values` answers and documents (A, B, B − A) | 100% | 40/40 cells | the compare browser check |
+| C3-2 | the inputs that differ, three pairs: boundary (Runs 1 → 2), mesh size (2 → 3), none (1 → 1) | exact lists | 3/3 | the compare browser check; node |
+| C3-3 | the mesh-differs notice: none and a ΔT map on a shared mesh; the notice and no map on another mesh | 2/2 | 2/2 | the compare browser check; node |
+| C3-4 | the ΔT legend equals the one computed directly from the two `/surface` answers | equal text | equal | the compare browser check |
+| C3-5 | superposition: card 2 with every fixed temperature + 10 K; max over the nodes of \|T_B − T_A − 10 K\| and \|q_B − q_A\|/\|q_A\| | ≤ 1e-8 K; ≤ 1e-9 | 9.1e-13 K; 6.2e-13 and 4.0e-13 (legend *10–10 K*) | `test_studio_model3d_compare_superposition.py`; the compare browser check |
+| C3-6 | keyboard only on Compare (tab by Enter, the pickers by arrow keys), 1440 × 900 and 390 × 844, one run | 0 pointer events; no console error, CSP violation or horizontal scroll; *Compare needs two runs of this 3D model.* | as required | the compare browser check |
 | W13 | keyboard only: open the card, rotate, view 5, select `via.z1` in the faces list, Use for → New selection; then Mesh 1, size 8 µm, Mesh, Cancel meshing, the cancel line reached in Messages by Tab and the job *cancelled* on the server, size 40 µm, Mesh again to the mesh view | no pointer event | 0 pointer events | the browser check |
 
 The pure helpers (`workspace-model3d.mjs`) are checked by `tests/simcase/studio_model3d_builder.cjs`
 and, for heat, Run and Results, `tests/simcase/studio_model3d_heat.cjs`; the browser check also compares the tree's rows and notes with the server's answer. It is local
 (Playwright with a Chromium it can launch, not in CI); run it against a running Studio with
 `node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`, and the heat
-checks with `node tools/studio_browser/model3d_heat_browser.mjs http://127.0.0.1:8765 out-dir`.
+checks with `node tools/studio_browser/model3d_heat_browser.mjs http://127.0.0.1:8765 out-dir`;
+Compare's pure helpers (`workspace-model3d-compare.mjs`) by `tests/simcase/studio_model3d_compare.cjs`, and
+its browser checks with `node tools/studio_browser/model3d_compare_browser.mjs http://127.0.0.1:8765 out-dir`.
 
 ## First optical study
 
