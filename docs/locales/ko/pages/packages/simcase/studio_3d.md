@@ -93,7 +93,9 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
   Studio가 메시에서 q를 계산합니다.
 - **경로**는 `thermal.steady3d` 종류의 것입니다(`simcase.build_thermal3d_mesh`). 판 `layers` 피처
   하나만 가진 구성 요소(E1)는 `meshine.extrude`로, 그 밖에는 `simcase.build_mesh3d`로 메시합니다.
-  추정은 정확한 복합체의 T입니다(`estimate_mesh3d`).
+  압출 경로의 추정은 그 경로의 개수로, 발자국 삼각형 10,000개까지는 정확하고 그 위로는 하한입니다. 하한일 때는
+  한도 확인이 자식 프로세스에서 발자국 메시 뒤, 압출 전에 추정과 같은 문구로 일어날 수 있습니다
+  ([추정](geometry_engine3d.md)). 추정 응답에 `route`와 `count`가 더해집니다.
 
 ## 실행
 

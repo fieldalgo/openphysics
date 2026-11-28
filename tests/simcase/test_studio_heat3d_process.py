@@ -86,3 +86,47 @@ def test_a_run_meshes_once_then_reuses_the_kept_mesh(runs):
     status = wait(runs, second["run"], lambda s: s["status"] != "running")
     assert status["status"] == "done" and runs.meshes.processes_started == started
     assert runs.values(second["run"])["temperature_max"]["value"] == pytest.approx(305.0, abs=1e-9)
+
+
+def e1_over_by_exact_count():
+    """E1 (three slab layers, 10 x 10 x 2.5 mm) at 0.14 mm with the limit at 700,000: its lower bound
+    (654,600) passes the estimate, its exact count (983,040) does not."""
+    layers = [{"name": n, "thickness": t, "material": n} for n, t in (("lower", 1), ("core", 0.5), ("upper", 1))]
+    return {"openphysics": "0.3",
+            "geometry": {"version": 1, "components": {"pkg": {
+                "dimension": "3d", "length_unit": "mm",
+                "domain": {"xmin": 0, "xmax": 10, "ymin": 0, "ymax": 10, "zmin": 0, "zmax": 2.5},
+                "background": {"material": None},
+                "features": [{"name": "stack", "type": "layers", "z0": 0, "layers": layers}]}}},
+            "mesh": {"element_size": "0.14 mm", "element_count_limit": 700000}}
+
+
+@needs_kernel
+def test_an_extrude_mesh_over_the_limit_is_refused_in_the_child_before_extruding():
+    meshes = mesh3d_jobs.Mesh3DJobs()
+    try:
+        reply = meshes.start(e1_over_by_exact_count(), None)
+        assert reply["estimate"]["count"] == "lower bound" and reply["estimate"]["route"] == "extrude"
+        job = meshes.jobs[reply["job"]]
+        t0 = time.monotonic()
+        while meshes.status(job.id)["status"] == "running":
+            assert time.monotonic() - t0 < WAIT
+            time.sleep(0.05)
+        status = meshes.status(job.id)
+        assert status["status"] == "error"
+        assert status["error"] == {"code": "E-MESH-ESTIMATE", "message": (
+            "component 'pkg': 983040 tetrahedra on the extrude route (3 x footprint triangles x sub-layers); "
+            "the limit is 700000 (mesh.element_count_limit)")}
+        assert meshes.kept == {} and not Path(job.tmpdir).exists() and not job.process.is_alive()
+    finally:
+        meshes.shutdown()
+
+
+def test_an_extrude_lower_bound_over_the_limit_is_refused_before_any_process():
+    meshes = mesh3d_jobs.Mesh3DJobs()
+    doc = e1_over_by_exact_count()
+    doc["mesh"] = {"element_size": "0.01 mm"}
+    with pytest.raises(mesh3d_jobs.Refused) as refused:
+        meshes.start(doc, None)
+    assert refused.value.status == 400 and refused.value.extra["code"] == "E-MESH-ESTIMATE"
+    assert "at least " in refused.value.message and meshes.processes_started == 0 and meshes.jobs == {}

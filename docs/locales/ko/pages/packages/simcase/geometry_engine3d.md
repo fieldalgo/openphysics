@@ -47,8 +47,16 @@ result.complex                                 # 3D 영역 구성(셀, 면, 출�
 막는 거부는 모두 같은 문구로 추정도 막습니다: 한도를 넘으면 `E-MESH-ESTIMATE`, 메셔 허용
 오차보다 작은 조각은 `E-CONTRACT`, 그리고 `E-3D-COMBINATION` 등. Studio는 한도를 넘는 문서를 메시 프로세스를
 시작하기 전에 거부하려고 이것을 부릅니다([3D 보기](studio_3d.md#메시)).
-`build_mesh3d`가 `meshine.extrude` 경로로 돌려 거부하는, 판 `layers` 피처 하나만 가진 구성 요소는 정확한
-복합체에서 같은 T를 받습니다. 압출 메시의 실제 개수는 다릅니다(0.8 mm의 E1: T 3,076, 만든 수 7,680).
+`build_mesh3d`가 `meshine.extrude` 경로로 돌려 거부하는, 판 `layers` 피처 하나만 가진 구성 요소는 그 경로의
+개수, 곧 3 × 발자국 삼각형 × 물질이 있는 하위 층을 받습니다(`route` `"extrude"`). 발자국의 하한
+A / (0.468 h²)가 삼각형 10,000개 이하이면 2D 발자국을 메시해 정확한 개수를 줍니다(0.8 mm의 E1은 만든 메시와 같은
+7,680개를 약 20 ms에, 0.4 mm는 49,152개를 약 40 ms에; `count` `"exact"`). 그보다 크면 그 하한을
+"at least N tetrahedra (extrude route; the exact count is known after the footprint mesh)"로 줍니다(`count`
+`"lower bound"`; 0.468 h²는 meshine 세분이 남기는 가장 큰 삼각형, 외접원 반지름 ≤ 0.6 h). 어느 쪽이든 한도는
+메시 전에 거부합니다. 하한만 알고 그것이 한도 아래이면 `build_thermal3d_mesh`가 발자국 메시 뒤, 압출 전에 정확한
+개수를 확인하고 같은 문구의 `E-MESH-ESTIMATE`로 거부하므로, 한도를 넘는 메시는 만들어지지 않습니다. 이 경로의
+초는 대략입니다(사면체당 시간은 meshloom 경로의 것). 그 밖에는 `route`가 `"meshloom"`이나 `"builder"`, `count`가
+`"estimate"`입니다.
 
 `simcase.geometry_engine3d.evaluate3d(model, component=None)`은 `simcase.geometry_document.parse`로 읽은
 모델의 영역 구성만 돌려줍니다. 압출 경로로 메시되는, `layers` 피처 하나만 가진 구성 요소는 거부합니다. 표시용(Studio)
