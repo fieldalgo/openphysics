@@ -270,16 +270,18 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 있습니다. 원기둥이 오기 전까지 via는 정사각형입니다: *Square via (a round via needs cylinders, coming with the next
 geometry step)*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
 이름으로만 가리키기 때문입니다(`stack.top` 같은 층이나 특징 이름은 열 종류의 영역이 아님). 물리는 Heat transfer (3D)입니다:
-`z0`에 300 K, `Si (top)`에 열원 1e12 W/m³(모두 4 W), 나머지 바깥 면은 모두 단열. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
-그 모델로 돌아갑니다. 3D 모델은 **Mesh 1**(아래)로 메시합니다. 아직 실행과 결과는 없으며, **Run**은 이유(*Heat comes
-in a later step of the 3D model.*)와 함께 꺼진 채 보입니다.
+`z0`에 300 K, `Si (top)`에 열원 1e12 W/m³(모두 4 W), 나머지 바깥 면은 모두 단열. 열원은 시험 값이며(카드를
+약 1127 K까지 데움), 2 mW 열점 변형은 나중 카드입니다. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
+그 모델로 돌아갑니다. 3D 모델은 **Mesh 1**로 메시하고 **Run**으로 풉니다(아래).
 
 **트리**(설계 §5.2, 이 단계 범위). **Component 1 · 3D · µm** 묶음에 **Parameters**(옆에 적힌 그대로의 매개변수,
 *t_ox = 10 um · via_w = 20 um*), **Geometry 1**과 그 아래 **Domain**(*200 × 200 × 610 µm*, 또는 *200 × 200 µm, z from the
 features*), 순서대로 번호 붙은 특징(나중 것이 이김: *1 Layers stack* · *sub · oxide · top (covered in part by 2 (via))*,
 *2 Box via* · *20 × 20 × 10 µm*)과 **Form result**(*4 regions · 22 faces*, 서버 검사에서), **Materials**(*Si · Si (top) · SiO2 ·
-Cu*), **Mesh 1**(*size 40 µm · Estimate 2,400 tetrahedra · about 1 s*, 서버의 추정)이 있습니다. 덮임 말은 정확한 complex에서 옵니다: *covered in part by 2 (via)*, 또는 나중 특징이 전부 차지하면
-*covered by 2 (b), 3 (c); adds no region*. Heat transfer, Study, Results는 다음 단계에서 옵니다. Geometry 1의
+Cu*), **Heat transfer (3D)**와 그 아래 **Thermal conductivity**(*from Materials*), **Fixed temperature N**마다(*z0 · 300 K*),
+**Heat source N**마다(*Si (top) · 1e12 W/m³*), **Insulated**(*every other outer face*), **Mesh 1**(*size 40 µm · Estimate 2,400
+tetrahedra · about 1 s*, 서버의 추정), **Study 1 · Steady**, 보관한 실행을 담은 **Results**가 있습니다. 덮임 말은 정확한 complex에서 옵니다: *covered in part by 2 (via)*, 또는 나중 특징이 전부 차지하면
+*covered by 2 (b), 3 (c); adds no region*. Geometry 1의
 **Add feature**는 **Box**와 **Layers**를 내놓고, **Extrude**, **Cylinder**, **Sphere**는 이유와 함께 흐리게 보입니다
 (*Extrude comes with a later geometry step*, *Cylinders come with the next geometry step*, *Spheres come with the next
 geometry step*). 특징 설정에는 **Move up**, **Move down**(트리 행에서 Alt+Up, Alt+Down도), **Duplicate**, **Delete**(*via
@@ -333,7 +335,39 @@ tetrahedra, 4 regions.*라고 말하고, 페이지가 메시 통계를 나열하
 확대·축소, F는 맞춤, 1–6은 축 방향 보기, 0은 등각). 보기에서 고르거나 **Faces** 목록에서 고른(Tab, Enter) 면은 그
 이름들을 보입니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
 `selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은
-선택으로 만들지 않고 그렇게 말합니다.
+선택으로 만들지 않고 그렇게 말합니다. **Use for → Fixed temperature**는 서버 검사를 거친 뒤 면의 이름(가장 나중 특징의 단독
+이름, 예: `via.z1`, `stack.top.top`)에 300 K를 씁니다: 열 종류가 거부하는 면(안쪽 면)은 쓰지 않고, Messages가 종류의 말(*Fixed
+temperature needs an outer face; via.z1 is inside*)을 보이며 문서는 그대로입니다.
+
+**Heat transfer (3D).** 그 페이지는 문서의 `physics.heat` 블록(종류 `thermal.steady3d`, [그 종류](thermal_steady3d.md))을
+편집합니다: 경계 이름에 **Add fixed temperature**(1–2000 K, `"300 K"`로 씀), 메시 영역에 **Add heat source**(−1e15 ~ 1e15
+W/m³, `"1e12 W/m^3"`로 씀), 각각 제 페이지(값, **Delete**)가 있습니다. **Thermal conductivity**(*from Materials*)는 재료마다
+`thermal_conductivity`(0.001–10000 W/(m K))를 편집합니다. **Insulated**(*every other outer face*)는 파생된 것이라 편집할 것이
+없습니다. 거부한 값은 형상처럼 범위 문장과 함께 초안으로 남습니다. 편집마다 검사는 Run이 읽는 대로 문서를 읽기도 합니다
+(`/api/model3d/check`의 `run` 부분): *Fixed temperature needs an outer face; via.z1 is inside*(E-CONTRACT) 같은 거부는 Heat
+transfer (3D)를 표시하고 Messages에 종류의 말 그대로 보입니다. 열 블록이 없는 모델은 *not set: Add a fixed temperature*를 보이고
+표시는 없습니다.
+
+**Run.** 그래픽 머리말의 **Run**은 구성 요소를 메시하고(형상과 mesh 블록이 같으면 Mesh 1의 메시를 재사용) 정상 열 문제를 별도
+프로세스로 풉니다(`POST /api/model3d/run`, [실행 경로](studio_3d.md#보내는-것과-응답)): *Meshing → Solving → Done*, 경과 시간,
+*taking longer than the estimate*. 실행 중에는 버튼이 **Cancel run**입니다(*Run cancelled; nothing kept.*). Run을 시작할 수 없을
+때 옆의 이유는 이 순서입니다: 초안(*Correct the highlighted field or restore its last valid value first.*), 형상 거부(*Fix 1
+problem in Messages to run*), 메시를 막는 거부, 검사의 run 거부, 진행 중인 실행(*Studio is already running one 3D heat model;
+wait for it or cancel it.*), 그리고 같은 문서의 마지막 실행이 끝난 거부를 그 말 그대로(예: *Fixed temperature is missing on the
+connected group of regions 'via': …*). 편집하면 마지막 것은 지워집니다. 문서가 보관한 실행의 문서와 같으면(키 순서는 무관,
+같은 결과 형식 `thermal-steady3d-run-v1`) 머리말이 **Show Run 1**과 함께 *No need to run: Run 1 already has these results.*라고
+말하고, Run은 다시 계산하지 않고 그 실행을 보입니다. 끝나면 Messages가 *Run 1 complete: maximum 1127.33 K in Si (top). Its
+results belong to that run; editing the model does not change them.*라고 말합니다.
+
+**Results.** 트리에서 Mesh 1 다음에 **Study 1 · Steady**와 **Results**가 오고, 보관한 실행마다 **Run N · Temperature (surfaces)**
+행이 있습니다(최대 10개; 가장 오래된 것이 먼저 빠짐). 실행의 페이지에는 값(영역과 위치를 가진 *Temperature, max*, *Temperature,
+min*, 고정 온도마다 *Heat rate through*, *Total heat source*, 원천에 대한 비율을 가진 *Energy balance residual*), 메시, 문서가
+다를 때 **Use this run's inputs**(Undo 한 단계), **Probe**(구성 요소 단위의 x, y, z; 결과의 면을 클릭해도 됨), 내보내기
+**Surface (CSV)**, 보이는 단면의 **Cut (CSV)**, **Run (JSON)**(기록)이 있습니다. **Result** 보기는 실행의 면 온도를 최소는 파랑,
+최대는 빨강으로 색 막대와 함께 보입니다. 도구 막대의 **Section**(x, y 또는 z = 구성 요소 단위의 위치)은 형상 보기를 자르고,
+결과에서는 실행 장의 정확한 단면을 그립니다(*Cut z = 505 µm: 833.653–939.105 K.*). 입력이 바뀐 결과는 흐려집니다(*Run 1:
+inputs changed since this run*). 단면, 탐침, CSV는 서버의 실행이 필요합니다: 파일에서 연 실행은 기록만 있어 **Recompute**와
+함께 *Recompute this run to cut, probe or export CSV.*라고 말하며, Recompute는 그 입력을 다시 실행해 같은 행에 넣습니다.
 
 **Undo.** 3D 모델은 다른 모델과 따로 문서 기록 하나를 갖습니다(Ctrl+Z와 Ctrl+Y는 보이는 모델을 따름). 확정한 편집마다
 한 단계입니다: Enter나 칸을 떠날 때 확정한 칸, 추가, 삭제, 복제, 이동, 층 추가·삭제, 매개변수, 골라서 만든 선택. 서버가
@@ -362,11 +396,18 @@ thermal-steady3d-run-v1 record.* 3D 모델은 아직 브라우저 복구에 보�
 | W9(작업 공간) | Mesh 1이 메시 전에 추정을 보임; 한도의 1.5배에서 Mesh가 거부와 함께 꺼지고 메시 작업을 요청하지 않음; 추정이 `/api/model3d/mesh/estimate`와 같음 | 3/3 | 3/3(서버와 브라우저) | 같음 |
 | W11(실행 없음) | Save와 Open 뒤 문서 digest, 프로젝트와 세션; 3D 없는 버전 1 프로젝트는 전처럼 바이트까지 같게 씀 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음 | `tests/simcase/studio_model3d_files.cjs`, 브라우저 검사 |
 | W12 | Library, 카드를 연 Model과 그 메시 보기(Mesh 1, Mesh), 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음, Tab으로 면 목록에 닿음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 브라우저 검사 |
+| W10 | 문서가 보관한 실행의 문서와 같을 때에만 *No need to run*을 보임, 6 상태: 실행 뒤, 편집, Undo, Redo, *Use this run's inputs*, 프로젝트 Save와 Open 뒤 | 6/6 | 6/6(Undo 한 번이 *Use this run's inputs*를 되돌림) | `tests/simcase/studio_model3d_heat.cjs`, `tools/studio_browser/model3d_heat_browser.mjs` |
+| W11(실행) | Save와 Open 뒤, 프로젝트와 세션: 문서 digest, 실행의 값과 면 지도 digest; 3D 없는 버전 1 프로젝트는 전처럼 바이트까지 같게 씀 | 같음; 바뀌지 않음 | 같음; 바뀌지 않음 | `tests/simcase/studio_model3d_files.cjs`, 열 브라우저 검사 |
+| W12(결과) | 카드의 Run 1을 Result 보기로(면 온도, 색 막대, 값 표), 1440 × 900과 390 × 844: 콘솔 오류·CSP 위반 없음, 캔버스 그려짐, 390에서 가로 스크롤 없음; 스크린샷 보관 | 모두 충족 | 모두 충족 | 열 브라우저 검사 |
+| W13(열) | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → Fixed temperature(Messages: *Fixed temperature needs an outer face; via.z1 is inside*, 문서는 그대로), `stack.top.top` 고르기, Use for → Fixed temperature, 단면 z = 300 µm, Run을 끝까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 열 브라우저 검사 |
+| W14 | 카드에서 Run부터 그려진 결과까지의 시간, 단면 시간 | 기록만(여기서는 SwiftShader) | 약 0.9 s와 0.1 s | 열 브라우저 검사 |
 | W13 | 키보드만: 카드 열기, 회전, 보기 5, 면 목록에서 `via.z1` 고르기, Use for → New selection; 그다음 Mesh 1, 크기 8 µm, Mesh, Cancel meshing, Tab으로 Messages의 취소 줄에 닿음, 서버에서 작업이 *cancelled*, 크기 40 µm, 다시 Mesh해 메시 보기까지 | 포인터 이벤트 없음 | 포인터 이벤트 0 | 브라우저 검사 |
 
-순수 도우미(`workspace-model3d.mjs`)는 `tests/simcase/studio_model3d_builder.cjs`가 검사하고, 브라우저 검사는 트리의 행과
+순수 도우미(`workspace-model3d.mjs`)는 `tests/simcase/studio_model3d_builder.cjs`가, 열·Run·Results는
+`tests/simcase/studio_model3d_heat.cjs`가 검사하고, 브라우저 검사는 트리의 행과
 말도 서버 응답과 비교합니다. 브라우저 검사는 로컬입니다(실행 가능한 Chromium과 Playwright, CI에는 없음). 실행 중인
-Studio에 대해 `node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`로 실행합니다.
+Studio에 대해 `node tools/studio_browser/model3d_builder_browser.mjs http://127.0.0.1:8765 out-dir`로, 열 검사는
+`node tools/studio_browser/model3d_heat_browser.mjs http://127.0.0.1:8765 out-dir`로 실행합니다.
 
 ## 첫 광학 해석
 

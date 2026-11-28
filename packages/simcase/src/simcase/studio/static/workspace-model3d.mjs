@@ -7,6 +7,7 @@
 // The ranges here are Studio's own guards against unusable sizes (design 5.2), not contract rules: a
 // document opened from a file with other values is read as written.
 import {betweenText} from './workspace-inputs.mjs';
+import {canonicalJson,RUN_RECORD} from './workspace-model3d-session.mjs';
 // Slice C's mesh words (estimateText, meshBlocked) live in /model3d-assets/model3d-mesh-model.mjs;
 // the page passes them in (words), so this module keeps to the workspace assets and Node tests it.
 
@@ -204,7 +205,7 @@ const plural=(n,one)=>`${n} ${one}${n===1?'':'s'}`;
  * answer for this document (or null); refused: the last refusal ({feature_index}) or null.
  * Each row: {key, label, level, note, problem}.
  */
-export function treeRows(doc,check=null,refused=null,words=null){
+export function treeRows(doc,check=null,refused=null,words=null,{runs=[]}={}){
  const comp=component(doc),rows=[],u=shownUnit(comp.length_unit),d=comp.domain||{};
  const params=Object.entries(doc.geometry.parameters||{});
  rows.push({key:'component',label:`Component 1 · 3D · ${u}`,level:1,note:'',problem:false});
@@ -225,8 +226,12 @@ export function treeRows(doc,check=null,refused=null,words=null){
  rows.push({key:'materials',label:'Materials',level:2,note:Object.keys(doc.materials||{}).join(' · '),problem:false});
  const size=doc.mesh?.element_size,sizeText=size===undefined?'':`size ${String(size).replace(/\bum\b/g,'µm')}`;
  const est=!refused&&check?.mesh?.ok&&words?words.estimateText(check.mesh.estimate):'';
+ rows.push(...heatRows(doc,check,refused));
  rows.push({key:'mesh',label:'Mesh 1',level:2,note:meshOff?'refused':[sizeText,est].filter(Boolean).join(' · '),
   problem:!!meshOff&&(meshOff.feature_index===null||meshOff.feature_index===undefined)});
+ rows.push({key:'study',label:'Study 1 · Steady',level:2,note:'',problem:false});
+ rows.push({key:'results',label:'Results',level:2,note:runs.length?`${runs.length} ${runs.length===1?'run':'runs'}`:'no run yet',problem:false});
+ runs.forEach((r,i)=>rows.push({key:`run:${i+1}`,label:`Run ${i+1} · Temperature (surfaces)`,level:3,note:'',problem:false}));
  return rows;
 }
 
@@ -366,4 +371,132 @@ export function blockReason({refused=null,drafts=0}={}){
  if(drafts)return `Correct the highlighted ${drafts===1?'field':'fields'} or restore ${drafts===1?'its':'their'} last valid ${drafts===1?'value':'values'} first.`;
  if(refused)return 'Fix 1 problem in Messages to mesh';
  return 'Heat comes in a later step of the 3D model.';
+}
+
+// ---- heat transfer (slice D): the thermal.steady3d block of the document ------------------------
+export const HEAT='thermal.steady3d';
+/** The document's thermal.steady3d block, or null. */
+export const heatOf=doc=>doc?.physics?.heat?.type===HEAT?doc.physics.heat:null;
+const shownQuantity=v=>String(v).replace(/W\/m\^3/g,'W/m³');
+function heatRows(doc,check,refused){
+ const h=heatOf(doc),off=!!h&&!refused&&check?.run&&check.run.ok===false;   // no heat block: the note says so, no mark
+ const rows=[{key:'heat',label:'Heat transfer (3D)',level:2,note:h?'':'not set: Add a fixed temperature',problem:!!off}];
+ if(!h)return rows;
+ rows.push({key:'heat:k',label:'Thermal conductivity',level:3,note:'from Materials',problem:false});
+ Object.entries(h.prescribed_temperature||{}).forEach(([name,v],i)=>
+  rows.push({key:`heat:fixed:${name}`,label:`Fixed temperature ${i+1}`,level:3,note:`${name} · ${shownQuantity(v)}`,problem:false}));
+ const src=h.heat_source_density;
+ if(src!==undefined){
+  const list=typeof src==='object'&&src!==null?Object.entries(src):[['every region',src]];
+  list.forEach(([region,v],i)=>rows.push({key:`heat:source:${region}`,label:`Heat source ${i+1}`,level:3,note:`${region} · ${shownQuantity(v)}`,problem:false}));
+ }
+ rows.push({key:'heat:insulated',label:'Insulated',level:3,note:'every other outer face',problem:false});
+ return rows;
+}
+const QNUM=/^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(?:\s*(\S.*))?$/;
+// a quantity typed in a heat field: a number (in the field's unit) or a number and that unit
+function quantity(raw,spec){
+ const {label,unit,aliases,min,max,shown}=spec;
+ const m=QNUM.exec(String(raw??'').trim());
+ if(!m)return fail(`Enter ${label.toLowerCase()} as a number or a quantity such as ${min>0?min*100:1} ${shown}.`);
+ const v=Number(m[1]);if(!Number.isFinite(v))return fail(`${m[1]} is not a finite number.`);
+ if(m[2]!==undefined&&!aliases.includes(m[2]))return fail(`${m[2]} is not a ${label==='Fixed temperature'?'temperature':label==='Heat source'?'heat source density':'conductivity'} unit (${shown}).`);
+ if(v<min||v>max)return fail(betweenText(label,spec.minText??min,spec.maxText??max,shown));
+ return `${m[1]} ${unit}`;
+}
+const T_FIELD={label:'Fixed temperature',unit:'K',aliases:['K'],min:1,max:2000,shown:'K'};
+const Q_FIELD={label:'Heat source',unit:'W/m^3',aliases:['W/m^3','W/m³'],min:-1e15,max:1e15,minText:'-1e15',maxText:'1e15',shown:'W/m³'};
+const K_FIELD={label:'Thermal conductivity',unit:'W/(m K)',aliases:['W/(m K)','W/(m·K)','W/m/K'],min:1e-3,max:1e4,shown:'W/(m K)'};
+function withHeat(doc){
+ const out=copy(doc);out.physics=out.physics||{};
+ if(!heatOf(out))out.physics.heat={type:HEAT};
+ return out;
+}
+/** Set (or add) the fixed temperature on a boundary name: "300" or "300 K", 1 to 2000 K. */
+export function setFixedTemperature(doc,name,raw){
+ const value=quantity(raw,T_FIELD),out=withHeat(doc),h=out.physics.heat;
+ h.prescribed_temperature={...(h.prescribed_temperature||{}),[name]:value};return out;
+}
+export function removeFixedTemperature(doc,name){
+ const out=copy(doc),h=heatOf(out);if(!h?.prescribed_temperature)return out;
+ delete h.prescribed_temperature[name];return out;
+}
+/** Set (or add) a heat source on a meshed region: W/m^3, -1e15 to 1e15. */
+export function setHeatSource(doc,region,raw){
+ const value=quantity(raw,Q_FIELD),out=withHeat(doc),h=out.physics.heat;
+ const src=typeof h.heat_source_density==='object'&&h.heat_source_density!==null?h.heat_source_density:{};
+ h.heat_source_density={...src,[region]:value};return out;
+}
+export function removeHeatSource(doc,region){
+ const out=copy(doc),h=heatOf(out);if(!h||h.heat_source_density===undefined)return out;
+ if(typeof h.heat_source_density==='object')delete h.heat_source_density[region];
+ if(typeof h.heat_source_density!=='object'||!Object.keys(h.heat_source_density).length)delete h.heat_source_density;
+ return out;
+}
+/** A material's thermal conductivity: W/(m K), 0.001 to 10000. */
+export function setConductivity(doc,material,raw){
+ const value=quantity(raw,K_FIELD),out=copy(doc);
+ out.materials={...(out.materials||{})};out.materials[material]={...(out.materials[material]||{}),thermal_conductivity:value};return out;
+}
+/** The meshed regions a heat source can name (the check's display regions). */
+export const editableRegions=check=>(check?.display?.regions||[]).map(r=>r.name);
+
+const BUSY='Studio is already running one 3D heat model; wait for it or cancel it.';
+/**
+ * Why Run is not offered, or null, in this order: a draft, the shape's refusal, the mesh refusal,
+ * the reader's refusal (the check's run part), a run going, and the refusal the last run of this
+ * very document ended with (the unanchored group, known only on the mesh).
+ */
+export function runReason({drafts=0,refused=null,check=null,running=false,doc=null,failure=null}={},words){
+ if(drafts)return blockReason({drafts});
+ if(refused)return 'Fix 1 problem in Messages to run';
+ if(!check)return 'Show a 3d component first.';
+ const off=meshRefusal(check);if(off)return off.refused;
+ if(check.run&&check.run.ok===false)return check.run.refused;
+ if(running)return BUSY;
+ if(failure&&doc&&canonicalJson(failure.document)===canonicalJson(doc))return failure.message;
+ return null;
+}
+/** The index of the latest kept run whose document equals doc (key order aside), or -1. */
+export function keptRunFor(doc,records){
+ const text=canonicalJson(doc);
+ for(let i=records.length-1;i>=0;i--)if(records[i].result===RUN_RECORD&&canonicalJson(records[i].document)===text)return i;
+ return -1;
+}
+export const noNeedText=i=>`No need to run: Run ${i+1} already has these results.`;
+
+// a diverging map (cool to warm): blue at the minimum, grey in the middle, red at the maximum
+const STOPS=[[0.231,0.298,0.753],[0.865,0.865,0.865],[0.706,0.016,0.150]];
+export function temperatureColor(t,tmin,tmax){
+ const u=tmax>tmin?Math.min(1,Math.max(0,(t-tmin)/(tmax-tmin))):0.5,x=u*2,i=Math.min(1,Math.floor(x)),f=x-i;
+ return STOPS[i].map((c,k)=>Number((c+(STOPS[i+1][k]-c)*f).toFixed(3)));
+}
+const sig=(v,n=6)=>Number(Number(v).toPrecision(n));
+const sci=v=>Math.abs(v)<1e-3&&v!==0?Number(v).toPrecision(3):String(sig(v));
+/** The values table of a run: [label, text] rows. */
+export function valuesRows(values,unit){
+ const per=UNITS[unit]||1,u=shownUnit(unit);
+ const place=t=>`${sig(t.value)} ${t.unit} in ${t.region} at (${t.position_m.map(x=>sig(x/per,3)).join(', ')}) ${u}`;
+ const rows=[['Temperature, max',place(values.temperature_max)],['Temperature, min',place(values.temperature_min)]];
+ for(const [name,q] of Object.entries(values.heat_rate_by_selection||{}))rows.push([`Heat rate through ${name}`,`${sig(q.value)} ${q.unit}`]);
+ rows.push(['Total heat source',`${sig(values.total_source.value)} ${values.total_source.unit}`]);
+ rows.push(['Energy balance residual',`${sci(values.balance_residual.value)} ${values.balance_residual.unit} (${sci(values.relative_balance_residual.value)} of the source)`]);
+ return rows;
+}
+const clock=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+/** The one-line progress of a run status answer. */
+export function runProgress(s){
+ if(s.status==='cancelled')return 'Run cancelled; nothing kept.';
+ if(s.status==='error')return 'Run failed: '+(s.error?.message||'unknown error');
+ if(s.status==='done')return 'Done';
+ return `${{mesh:'Meshing',solve:'Solving',done:'Done'}[s.step]||'Running'} · ${clock(s.elapsed_s||0)}`+(s.longer_than_estimate?' · taking longer than the estimate':'');
+}
+/**
+ * The boundary name "Use for → Fixed temperature" writes for a picked face: of the names that select
+ * it alone, the one of the latest feature (later features win where they meet), else the first.
+ */
+export function boundaryNameFor(face,featureIds){
+ const alone=face?.alone||[];if(!alone.length)return null;
+ const rank=n=>featureIds.indexOf(n.split('.')[0]);
+ return [...alone].sort((a,b)=>rank(b)-rank(a))[0];
 }

@@ -150,7 +150,8 @@ try {
       const notes = Object.fromEntries(tree.rows), answer = await serverCheck(page, CARD);
       tree.server = {regions: answer.regions.length, faces: answer.display.faces.length};
       const treeOk = tree.heading.endsWith('Component 1 · 3D · µm') && tree.project.startsWith('Untitled project · not saved to a file')
-        && JSON.stringify(tree.rows.map(r => r[0])) === JSON.stringify(['parameters', 'geometry', 'domain', 'feature:0', 'feature:1', 'form', 'materials', 'mesh'])
+        && JSON.stringify(tree.rows.map(r => r[0])) === JSON.stringify(['parameters', 'geometry', 'domain', 'feature:0', 'feature:1', 'form', 'materials',
+          'heat', 'heat:k', 'heat:fixed:z0', 'heat:source:Si (top)', 'heat:insulated', 'mesh', 'study', 'results'])
         && notes.mesh === `size 40 µm · ${MESH.estimateText(answer.mesh.estimate)}`
         && notes['feature:0'] === 'sub · oxide · top (covered in part by 2 (via))' && notes['feature:1'] === '20 × 20 × 10 µm'
         && notes.form === `${tree.server.regions} regions · ${tree.server.faces} faces` && notes.materials === 'Si · Si (top) · SiO2 · Cu';
@@ -381,8 +382,9 @@ try {
         && document.querySelector('[data-m3-node="mesh"] .m3-note')?.textContent.startsWith(`size ${v} µm`), value, {timeout: 30000});
     };
     steps.treeFocused = await tabTo(page, () => !!document.activeElement?.closest('#tree [role=tree]') && document.activeElement.getAttribute('role') === 'treeitem', 200) !== null;
-    // in the tree the arrow keys move between nodes: End reaches the last node, Mesh 1
-    await page.keyboard.press('End');
+    // in the tree the arrow keys move between nodes: End reaches the last node (Results), and two
+    // nodes up is Mesh 1
+    await page.keyboard.press('End'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp');
     steps.meshNodeFocused = await page.evaluate(() => document.activeElement?.dataset?.m3Node === 'mesh');
     await page.keyboard.press('Enter');
     await page.waitForSelector('[data-m3-node="mesh"][aria-selected="true"]');
