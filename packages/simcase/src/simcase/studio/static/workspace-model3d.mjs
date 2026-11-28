@@ -138,7 +138,7 @@ const AXES=['x','y','z'];
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 /** A length in the component's unit, when the field's text gives one here (a number or a quantity). */
 function inUnit(value,unit){const p=parseLength(value,unit);return p.problem||p.si===null?null:p.si/UNITS[unit];}
-function rangeProblem(doc,key,v){
+function rangeProblem(doc,key,v,evaluated=null){
  const comp=component(doc),unit=comp.length_unit,u=shownUnit(unit),d=comp.domain||{};
  const between=(label,lo,hi)=>{
   const below=lo!==null&&!(v>lo.v||(lo.eq&&v===lo.v)),above=hi!==null&&!(v<hi.v||(hi.eq&&v===hi.v));
@@ -146,7 +146,8 @@ function rangeProblem(doc,key,v){
   if(lo!==null&&hi!==null)return betweenText(label,num(lo.v),num(hi.v),u);
   return lo!==null?`${label} must be greater than ${num(lo.v)} ${u}.`:`${label} must be less than ${num(hi.v)} ${u}.`;
  };
- const at=k=>{const x=inUnit(d[k],unit);return x;};
+ // a bound written as a parameter or an expression: the domain the server's check evaluated, if any
+ const at=k=>{const x=inUnit(d[k],unit);return x!==null?x:typeof evaluated?.[k]==='number'?evaluated[k]:null;};
  let m=/^domain\.([xyz])(min|max)$/.exec(key);
  if(m){const other=at(m[1]+(m[2]==='min'?'max':'min'));if(other===null)return null;
   return between(`Domain ${m[1]} ${m[2]}`,m[2]==='max'?{v:other,eq:false}:null,m[2]==='min'?{v:other,eq:false}:null);}
@@ -176,7 +177,7 @@ const thicknessLabel=(doc,key)=>{const m=/^features\[(\d+)\]\.layers\[(\d+)\]/.e
  * One field edit: {doc} with the field set, or {problem} when the text cannot be stored (the page
  * keeps it as a highlighted draft, which blocks Save, Mesh and Run until it is fixed or restored).
  */
-export function editField(doc,field,raw){
+export function editField(doc,field,raw,{domain=null}={}){
  const unit=component(doc).length_unit;
  if(field.kind==='length'){
   if(field.optional&&String(raw??'').trim()==='')return {doc:setField(doc,field.key,undefined),si:null};
@@ -184,7 +185,7 @@ export function editField(doc,field,raw){
   if(p.problem==='positive')return {problem:`${thicknessLabel(doc,field.key)} must be greater than 0 ${shownUnit(unit)}.`};
   if(field.rule?.meshSize&&(p.problem||p.si===null))return {problem:'A mesh size is a number or a quantity such as 20 um.'};
   if(p.problem)return {problem:p.problem};
-  if(p.si!==null){const problem=rangeProblem(doc,field.key,p.si/UNITS[unit]);if(problem)return {problem};}
+  if(p.si!==null){const problem=rangeProblem(doc,field.key,p.si/UNITS[unit],domain);if(problem)return {problem};}
   // the document mesh block takes quantities: a bare number is in the component's unit
   const stored=field.rule?.meshSize&&typeof p.value==='number'?`${p.value} ${unit}`:p.value;
   return {doc:setField(doc,field.key,stored),si:p.si};
@@ -237,7 +238,9 @@ export function treeRows(doc,check=null,refused=null,words=null,{runs=[]}={}){
  rows.push({key:'component',label:`Component 1 · 3D · ${u}`,level:1,note:'',problem:false});
  rows.push({key:'parameters',label:'Parameters',level:2,note:params.map(([n,p])=>`${n} = ${p.value}`).join(' · '),problem:!!refused&&/^geometry\.parameters\b/.test(refused.path||'')});
  rows.push({key:'geometry',label:'Geometry 1',level:2,note:'',problem:false});
- const ext=AXES.map(a=>{const lo=inUnit(d[a+'min'],comp.length_unit),hi=inUnit(d[a+'max'],comp.length_unit);return lo===null||hi===null?null:num(hi-lo);});
+ // a bound written as a parameter or an expression: the domain the check evaluated, once it has answered
+ const bound=k=>{const x=inUnit(d[k],comp.length_unit);return x!==null?x:typeof check?.domain?.[k]==='number'?check.domain[k]:null;};
+ const ext=AXES.map(a=>{const lo=bound(a+'min'),hi=bound(a+'max');return lo===null||hi===null?null:num(hi-lo);});
  const zFree=d.zmin===undefined&&d.zmax===undefined;
  rows.push({key:'domain',label:'Domain',level:3,note:ext[0]===null||ext[1]===null?'':zFree?`${ext[0]} × ${ext[1]} ${u}, z from the features`:ext[2]===null?`${ext[0]} × ${ext[1]} ${u}`:`${ext.join(' × ')} ${u}`,problem:false});
  const meshOff=meshRefusal(check);
@@ -303,11 +306,13 @@ export function deleteFeature(doc,i){const out=copy(doc);component(out).features
  * a sphere at the centre (r a quarter of the smallest extent). Whether a builder takes it is the
  * check's answer, in the engine's words.
  */
-export function addFeature(doc,type){
+export function addFeature(doc,type,{domain=null}={}){
  const kind=FEATURE_TYPES.find(t=>t.type===type);
  if(!kind)fail(`Unknown feature type ${type}.`);
  if(!kind.available)fail(kind.reason);
- const out=copy(doc),comp=component(out),d=comp.domain;
+ // the domain's numbers: as written, else (a parameter or an expression) as the check evaluated them
+ const out=copy(doc),comp=component(out),d=Object.fromEntries(['xmin','xmax','ymin','ymax','zmin','zmax']
+  .map(k=>[k,typeof comp.domain?.[k]==='number'?comp.domain[k]:typeof domain?.[k]==='number'?domain[k]:comp.domain?.[k]]));
  const num=v=>typeof v==='number'?v:null;
  const mid=(a,b)=>num(d[a])!==null&&num(d[b])!==null?[(3*d[a]+d[b])/4,(d[a]+3*d[b])/4]:[0,1];
  const material=Object.keys(out.materials||{})[0]??null;

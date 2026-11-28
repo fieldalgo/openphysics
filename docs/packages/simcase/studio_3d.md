@@ -232,6 +232,8 @@ heat rate is Q = ΔT/L · (k_v πr² + k_s (A − πr²)) = 31.99159 W.
     element count limit, a below-tolerance E-CONTRACT, or two values that round to one
     coordinate (E-3D-COMBINATION at `features[i]`). The shape is formed either way, so the
     answer stays `"ok": true`; on the card it adds about 7 ms to the check's 8 ms.
+  - `domain`: the component's domain in its length unit, with parameters and expressions evaluated
+    (numbers), for the workspace's Domain row, size guards and Add feature's defaults.
   - `run`: whether Run would take the document, read as `POST /api/model3d/run` reads it before it
     starts anything (one `thermal.steady3d` physics entry, then the kind's reader): `{"ok": true}` or
     `{"ok": false, "refused": <the reader's words>, "code"}`, for example *Fixed temperature needs an

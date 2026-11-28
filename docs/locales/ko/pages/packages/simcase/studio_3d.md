@@ -203,6 +203,8 @@ display; the mesh follows it to within its size"가 붙고, 곡면은 꼭짓점 
     허용 오차 아래의 E-CONTRACT, 한 좌표로 반올림되는 두 값(`features[i]`의
     E-3D-COMBINATION). 어느 쪽이든 형상은 만들어지므로 응답은 `"ok": true`로 남습니다.
     카드에서는 검사의 8 ms에 약 7 ms를 더합니다.
+  - `domain`: 구성 요소의 길이 단위로 된 영역, 매개변수와 식을 계산한 수. 작업 공간의 Domain 행, 크기 범위, Add feature의
+    기본값에 씁니다.
   - `run`: Run이 문서를 받을지 여부. `POST /api/model3d/run`이 무엇이든 시작하기 전에 읽는 대로
     읽습니다(`thermal.steady3d` physics 항목 하나, 그다음 종류의 reader): `{"ok": true}` 또는
     `{"ok": false, "refused": <reader의 말>, "code"}`, 예를 들어 *Fixed temperature needs an outer

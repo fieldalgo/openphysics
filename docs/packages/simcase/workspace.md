@@ -378,7 +378,9 @@ regions and the selections, and the faces are listed under the view.
 name or an expression (`100 - w / 2`). Beside it: the SI value of a number or quantity (*= 0.00009 m*),
 or a parameter with its value as written (*= t_ox (10 µm)*); an expression is evaluated by the server.
 Studio's own guards, before the server (they keep sizes usable and are not contract rules: a document
-opened from a file with other values is read as written):
+opened from a file with other values is read as written). A domain bound written as a parameter or an
+expression is taken from the check's evaluated `domain` once it has answered, for these guards, the
+Domain row and Add feature's defaults; before that it is unknown, and the guards that need it wait:
 
 | Field | Allowed |
 |---|---|
