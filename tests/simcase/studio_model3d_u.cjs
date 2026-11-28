@@ -32,3 +32,19 @@ test('U4: the run just finished is up to date; another kept run means no need to
  assert.equal(M.keptRunText(1,null),'No need to run: Run 2 already has these results.');
  assert.equal(M.keptRunText(1,0),'No need to run: Run 2 already has these results.','the run just finished is another one');
 });
+
+const VALUES={heat_rate_by_selection:{z0:{value:-4,unit:'W'}},total_source:{value:4,unit:'W'},balance_residual:{value:-1e-13,unit:'W'},
+ relative_balance_residual:{value:2e-14,unit:'1'},temperature_min:{value:300,unit:'K',position_m:[0,0,0],region:'Si'},
+ temperature_max:{value:336.05,unit:'K',position_m:[3.85e-5,1.63e-4,5.1e-4],region:'SiO2'}};
+
+test('U3: the sign of a heat rate in one line; Tmax at an interface; whole model vs surface',()=>{
+ assert.equal(M.HEAT_RATE_SIGN,'Heat rate: positive into the model, negative out of it (a fixed temperature that removes heat shows a negative rate).');
+ const rows=M.valuesRows(VALUES,'um');
+ assert.deepEqual(rows.slice(0,2).map(r=>r[0]),['Temperature, max (whole model)','Temperature, min (whole model)']);
+ assert.equal(rows[0][1],'336.05 K in SiO2 at (38.5, 163, 510) µm','a record without regions: as before');
+ const live={...VALUES,temperature_max:{...VALUES.temperature_max,regions:['SiO2','Si (top)']},temperature_min:{...VALUES.temperature_min,regions:['Si']}};
+ const r2=M.valuesRows(live,'um');
+ assert.equal(r2[0][1],'336.05 K at the SiO2 / Si (top) interface, (38.5, 163, 510) µm');
+ assert.equal(r2[1][1],'300 K in Si at (0, 0, 0) µm','one region: in it');
+ assert.equal(M.colourBarTitle,'Surface temperature');
+});

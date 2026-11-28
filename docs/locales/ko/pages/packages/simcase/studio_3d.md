@@ -126,6 +126,7 @@ python -m simcase.studio            # 그다음 http://127.0.0.1:8765/geometry-l
 | 경로 | 응답 |
 |---|---|
 | `values` | `heat_rate_by_selection`(`prescribed_temperature` 이름마다 W: 그 노드의 `reaction_heat_rate` 합, 두 이름이 고정한 노드는 앞 이름에), `total_source`, `balance_residual`(바깥으로 나간 열에서 열원을 뺀 W)과 `relative_balance_residual`, 노드·위치·영역이 붙은 `temperature_min`과 `temperature_max`, 메시 통계, 경로, 재사용 키, `document_sha256`(정규화한 문서의 해시) |
+| `extremes` | `{run, temperature_min: {node, regions}, temperature_max: {node, regions}}`: 각 극값 노드를 나누는 사면체들의 서로 다른 영역, 메시의 영역 순서로, 서버가 가진 메시에서(HTTP 보기; `values`, 내보내기, 기록은 그대로). 서버가 갖지 않은 실행은 다른 실행 경로처럼 거부(404, *no such 3D heat run*) |
 | `surface` | 메시 응답의 면, 영역, 위치, 삼각형과 면 id, 그 노드의 `temperature`(float32) |
 | `cut {axis, at}` | 평면에 의한 정확한 P1 절단: 사면체마다 평면 위 노드와 모서리 교점, 교점의 T는 그 모서리에서 보간; 평면에 놓인 면은 한 번만; 삼각형은 +축을 봅니다 |
 | `probe {point}` | 점을 담은 사면체에서 P1 보간 T, 영역, 무게중심 좌표; 메시한 영역 밖이면 거부 |

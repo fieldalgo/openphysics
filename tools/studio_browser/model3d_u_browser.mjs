@@ -17,6 +17,10 @@
 //      beside the select has a label element as its accessible name: 4/4.
 //  U4  card 1, Run: right after Run 1 completes #m3-run-why reads "Run 1 is up to date with these
 //      inputs."; after an edit and Undo it reads "No need to run: Run 1 already has these results.": 2/2.
+//  U3  card 1 with 300 K on z0 and z1 (Tmax on the oxide's top), Run: Tmax's row reads "at the SiO2 /
+//      Si (top) interface" with "(whole model)" in its label, the sign line is shown, and the colour bar
+//      is titled "Surface temperature"; after Save and Open the reopened run (no mesh) reads "in SiO2"
+//      until Recompute: 4/4.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -63,6 +67,19 @@ async function setField(page, key, value) {
 // occurrences of a text in the page's rendered text (Details closed or open both count once)
 const occurrences = (page, text) => page.evaluate(t => document.body.innerText.split(t).length - 1 + [...document.querySelectorAll('details:not([open])')]
   .reduce((n, d) => n + ([...d.childNodes].filter(c => c.nodeName !== 'SUMMARY').map(c => c.textContent).join('').split(t).length - 1), 0), text);
+
+async function download(page, trigger) {
+  const done = page.waitForEvent('download', {timeout: 30000});
+  await trigger();
+  const asked = await page.waitForSelector('#save-name-dialog[open]', {timeout: 3000}).then(() => true, () => false);
+  if (asked) await page.click('#save-name-download');
+  return readFile(await (await done).path(), 'utf8');
+}
+const openFile = (page, name, text) => page.setInputFiles('#session-file', {name, mimeType: 'application/json', buffer: Buffer.from(text)});
+const session = doc => JSON.stringify({format: 'openphysics-studio-session', version: 1, application: 'model3d', document: doc});
+const save = page => download(page, async () => { await page.click('#file-menu-button'); await page.click('#menu-save'); });
+const completed = (page, n) => page.waitForFunction(n => (document.getElementById('mp-messages')?.textContent || '').includes(`Run ${n} complete`)
+  && document.getElementById('m3-result-canvas'), n, {timeout: 180000});
 
 const browser = await chromium.launch();
 try {
@@ -142,6 +159,28 @@ try {
     const undone = await why();
     const rows = [after === 'Run 1 is up to date with these inputs.', undone === 'No need to run: Run 1 already has these results.'];
     record('U4', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 2, after, undone});
+    await ctx.close();
+  }
+  // ---- U3: interface wording on a live run, the sign line, the surface legend; reopened: as before ----
+  {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card]');
+    const doc = structuredClone(CARD); doc.physics.heat.prescribed_temperature = {z0: '300 K', z1: '300 K'};
+    await openFile(page, 'u3.json', session(doc)); await checked(page);
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    const live = await page.evaluate(() => ({tmax: [...document.querySelectorAll('#m3-values tr')].map(r => [r.querySelector('th').textContent, r.querySelector('td').textContent])[0],
+      sign: document.getElementById('m3-sign')?.textContent || '', bar: document.querySelector('.m3-cb-title')?.textContent || ''}));
+    const text = await save(page);
+    await openFile(page, 'u3-project.json', text); await checked(page);
+    await page.click('[data-m3-node="run:1"]'); await page.waitForTimeout(300);
+    const reopened = await page.evaluate(() => [...document.querySelectorAll('#m3-values tr')].map(r => r.querySelector('td').textContent)[0]);
+    const rows = [
+      live.tmax[0] === 'Temperature, max (whole model)' && /^[\d.]+ K at the SiO2 \/ Si \(top\) interface, \(.*\) µm$/.test(live.tmax[1]),
+      live.sign === 'Heat rate: positive into the model, negative out of it (a fixed temperature that removes heat shows a negative rate).',
+      live.bar === 'Surface temperature',
+      /^[\d.]+ K in SiO2 at \(.*\) µm$/.test(reopened),
+    ];
+    record('U3', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, live, reopened});
     await ctx.close();
   }
 } finally {

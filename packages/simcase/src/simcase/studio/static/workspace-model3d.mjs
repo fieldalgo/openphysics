@@ -537,8 +537,11 @@ const sci=v=>Math.abs(v)<1e-3&&v!==0?Number(v).toPrecision(3):String(sig(v));
 /** The values table of a run: [label, text] rows. */
 export function valuesRows(values,unit,{expected=null}={}){
  const per=UNITS[unit]||1,u=shownUnit(unit);
- const place=t=>`${sig(t.value)} ${t.unit} in ${t.region} at (${t.position_m.map(x=>sig(x/per,3)).join(', ')}) ${u}`;
- const rows=[['Temperature, max',place(values.temperature_max)],['Temperature, min',place(values.temperature_min)]];
+ // a node on an interface (the live run's values name the regions around it): "at the A / B interface"
+ const at=t=>`(${t.position_m.map(x=>sig(x/per,3)).join(', ')}) ${u}`;
+ const place=t=>Array.isArray(t.regions)&&t.regions.length>1?`${sig(t.value)} ${t.unit} at the ${t.regions.join(' / ')} interface, ${at(t)}`
+  :`${sig(t.value)} ${t.unit} in ${t.region} at ${at(t)}`;
+ const rows=[['Temperature, max (whole model)',place(values.temperature_max)],['Temperature, min (whole model)',place(values.temperature_min)]];
  for(const [name,q] of Object.entries(values.heat_rate_by_selection||{})){
   rows.push([`Heat rate through ${name}`,`${sig(q.value)} ${q.unit}`]);
   if(name==='z0'&&expected)rows.push(['Expected heat rate',`${expected.shown} (parallel formula)`]);
@@ -547,6 +550,11 @@ export function valuesRows(values,unit,{expected=null}={}){
  rows.push(['Energy balance residual',`${sci(values.balance_residual.value)} ${values.balance_residual.unit} (${sci(values.relative_balance_residual.value)} of the summed heat rates)`]);
  return rows;
 }
+/** The sign of a heat rate (galerkin: a reaction heat rate is positive when it injects heat). */
+export const HEAT_RATE_SIGN='Heat rate: positive into the model, negative out of it (a fixed temperature that removes heat shows a negative rate).';
+/** The colour bar's title: it spans the surface temperatures; the table's Tmax and Tmin are the whole model's. */
+export const colourBarTitle='Surface temperature';
+
 // ---- card 2's expected heat rate (the parallel formula) ------------------------------------------
 /** A quantity "<number> <unit>" with exactly that unit (spaces aside), or null. */
 function quantityIn(text,unit){

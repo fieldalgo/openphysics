@@ -25,7 +25,7 @@ test('card 2: Expected heat rate 31.99 W (parallel formula), beside Heat rate th
  assert.equal(e.value,q);
  assert.equal(e.text,'Expected heat rate 31.99 W (parallel formula)');
  const rows=M.valuesRows(VALUES,'m',{expected:e});
- assert.deepEqual(rows.map(r=>r[0]),['Temperature, max','Temperature, min','Heat rate through z0','Expected heat rate','Heat rate through z1','Total heat source','Energy balance residual']);
+ assert.deepEqual(rows.map(r=>r[0]),['Temperature, max (whole model)','Temperature, min (whole model)','Heat rate through z0','Expected heat rate','Heat rate through z1','Total heat source','Energy balance residual']);
  assert.equal(line(rows).join(' '),'Expected heat rate 31.99 W (parallel formula)');
  assert.equal(rows[2][1],'-31.7515 W','the run\'s own value is unchanged');
  assert.deepEqual(M.valuesRows(VALUES,'m'),M.valuesRows(VALUES,'m',{expected:null}),'no expectation: the rows of before');

@@ -394,12 +394,16 @@ these inputs.*라고 말합니다. 끝나면 Messages가 *Run 1 complete: maximu
 results belong to that run; editing the model does not change them.*라고 말합니다.
 
 **Results.** 트리에서 Mesh 1 다음에 **Study 1 · Steady**와 **Results**가 오고, 보관한 실행마다 **Run N · Temperature (surfaces)**
-행이 있습니다(최대 10개; 가장 오래된 것이 먼저 빠짐). 실행의 페이지에는 값(영역과 위치를 가진 *Temperature, max*, *Temperature,
-min*, 고정 온도마다 *Heat rate through*, *Total heat source*, 절대 열률 합에 대한 비율(해석기의 상대 보존 잔차)을 가진
-*Energy balance residual*), 메시, 문서가
+행이 있습니다(최대 10개; 가장 오래된 것이 먼저 빠짐). 실행의 페이지에는 값(영역과 위치를 가진 *Temperature, max (whole model)*,
+*Temperature, min (whole model)*, 고정 온도마다 *Heat rate through*, *Total heat source*, 절대 열률 합에 대한 비율(해석기의 상대 보존 잔차)을 가진
+*Energy balance residual*), 열률의 부호 한 줄(*Heat rate: positive into the model, negative out of it (a fixed temperature that
+removes heat shows a negative rate).*, galerkin의 반력 열률은 열을 넣을 때 양수), 메시, 문서가
 다를 때 **Use this run's inputs**(Undo 한 단계), **Probe**(구성 요소 단위의 x, y, z; 결과의 면을 클릭해도 됨), 내보내기
-**Surface (CSV)**, 보이는 단면의 **Cut (CSV)**, **Run (JSON)**(기록)이 있습니다. **Result** 보기는 실행의 면 온도를 최소는 파랑,
-최대는 빨강으로 색 막대와 함께 보입니다. 도구 막대의 **Section**(x, y 또는 z = 구성 요소 단위의 위치)은 형상 보기를 자르고,
+**Surface (CSV)**, 보이는 단면의 **Cut (CSV)**, **Run (JSON)**(기록)이 있습니다. 이 Studio가 가진 실행에서 두 영역이 나누는
+노드의 Tmax나 Tmin은 *336.05 K at the SiO2 / Si (top) interface, (38.5, 163, 510) µm*로 읽히고(`/api/model3d/runs/{id}/extremes`가 노드 둘레의
+영역을 밝힘), 파일에서 연 실행은 다시 계산할 때까지 *in SiO2*로 읽힙니다. **Result** 보기는 실행의 면 온도를 최소는 파랑,
+최대는 빨강으로, *Surface temperature*라는 제목의 색 막대와 함께 보입니다(그 범위는 면의 것이라 표의 모델 전체 범위보다 좁을 수
+있음). 도구 막대의 **Section**(x, y 또는 z = 구성 요소 단위의 위치)은 형상 보기를 자르고,
 결과에서는 실행 장의 정확한 단면을 그립니다(*Cut z = 505 µm: 833.653–939.105 K.*). 입력이 바뀐 결과는 흐려집니다(*Run 1:
 inputs changed since this run*). 단면, 탐침, CSV는 서버의 실행이 필요합니다: 파일에서 연 실행은 기록만 있어 **Recompute**와
 함께 *Recompute this run to cut, probe or export CSV.*라고 말하며, Recompute는 그 입력을 다시 실행해 같은 행에 넣습니다.
