@@ -80,7 +80,7 @@ def e1(h_mm=0.8, *, physics=None, features=None):
 
 CARD_PHYSICS = {"type": "thermal.steady3d", "prescribed_temperature": {"z0": "300 K", "z1": "310 K"},
                 "heat_source_density": {"via": "1e12 W/m^3"}}
-CARD_KAPPA = {"Si": 130.0, "SiO2": 1.4, "via": 400.0}
+CARD_KAPPA = {"Si": 130.0, "Si (top)": 130.0, "SiO2": 1.4, "via": 400.0}
 
 
 def card(size=None):

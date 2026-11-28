@@ -29,7 +29,7 @@ test('the tree (design 5.2): Component 1 with Parameters, Geometry 1 (Domain, nu
  const rows=M.treeRows(card(),check,null,W);
  assert.deepEqual(rows.map(r=>[r.label,r.level,r.note]),[['Component 1 · 3D · µm',1,''],['Parameters',2,''],['Geometry 1',2,''],
   ['Domain',3,'200 × 200 × 610 µm'],['1 Layers stack',3,'sub · oxide · top (covered in part by 2 (via))'],['2 Box via',3,'20 × 20 × 10 µm'],
-  ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · SiO2 · Cu'],['Mesh 1',2,'size 40 µm · Estimate 2,400 tetrahedra · about 1 s']]);
+  ['Form result',3,'4 regions · 23 faces'],['Materials',2,'Si · Si (top) · SiO2 · Cu'],['Mesh 1',2,'size 40 µm · Estimate 2,400 tetrahedra · about 1 s']]);
  let doc=M.addParameter(M.addParameter(card(),'t_ox','10 um'),'via_w','20 um');
  const free=JSON.parse(JSON.stringify(doc));delete free.geometry.components.stack3d.domain.zmin;delete free.geometry.components.stack3d.domain.zmax;
  const r2=M.treeRows(free,null);
@@ -89,7 +89,7 @@ test('field edits: numbers, quantities, names and expressions; a bad one is a dr
  const mat=M.fieldsOf(card(),'feature:1').find(x=>x.kind==='material');
  assert.equal(comp(M.editField(card(),mat,'Si').doc).features[1].material,'Si');
  assert.equal(comp(M.editField(card(),mat,'').doc).features[1].material,null);
- assert.equal(M.editField(card(),mat,'Gold').problem,'Gold is not a material of this model (Si, SiO2, Cu).');
+ assert.equal(M.editField(card(),mat,'Gold').problem,'Gold is not a material of this model (Si, Si (top), SiO2, Cu).');
  assert.equal(M.siText(9.5e-5),'= 0.000095 m');assert.equal(M.siText(null),'');
  assert.deepEqual(M.fieldsOf(card(),'domain').map(x=>x.label),['xmin','xmax','ymin','ymax','zmin','zmax']);
 });

@@ -73,11 +73,11 @@ def test_the_card_is_the_slice_b_document():
                                                                "zmin": 0, "zmax": 610}
     stack, via = comp["features"]
     assert [(lay["name"], lay["thickness"], lay["material"]) for lay in stack["layers"]] == [
-        ("sub", 500, "Si"), ("oxide", 10, "SiO2"), ("top", 100, "Si")]
+        ("sub", 500, "Si"), ("oxide", 10, "SiO2"), ("top", 100, "Si (top)")]
     assert (via["type"], via["xmin"], via["xmax"], via["ymin"], via["ymax"], via["zmin"], via["zmax"]) == (
         "box", 90, 110, 90, 110, 500, 510)
     assert {k: v["thermal_conductivity"] for k, v in d["materials"].items()} == {
-        "Si": "130 W/(m K)", "SiO2": "1.4 W/(m K)", "Cu": "400 W/(m K)"}
+        "Si": "130 W/(m K)", "Si (top)": "130 W/(m K)", "SiO2": "1.4 W/(m K)", "Cu": "400 W/(m K)"}
 
 
 def test_check_answers_features_with_coverage_from_the_complex(client):
@@ -89,7 +89,7 @@ def test_check_answers_features_with_coverage_from_the_complex(client):
     assert stack["volume"] == pytest.approx(200 * 200 * 610) and stack["owned"] == pytest.approx(200 * 200 * 610 - 4000)
     assert via["coverage"] == "full" and via["covered_by"] == [] and via["text"] == ""
     assert via["owned"] == pytest.approx(20 * 20 * 10)
-    assert [r["name"] for r in view["regions"]] == ["Si", "SiO2", "via"]
+    assert [r["name"] for r in view["regions"]] == ["Si", "SiO2", "Si (top)", "via"]
     assert view["display"]["counts"]["faces"] == len(view["display"]["faces"])
 
 

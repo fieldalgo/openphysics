@@ -68,7 +68,7 @@ def test_a_document_the_kind_takes_is_ready_to_run(client):
 @pytest.mark.parametrize("heat, code, words", [
     ({"prescribed_temperature": {"via.z1": "300 K"}}, "E-CONTRACT", "Fixed temperature needs an outer face; via.z1 is inside"),
     ({"prescribed_temperature": {"z0": "300 K"}, "heat_source_density": {"stack.top": "1e12 W/m^3"}},
-     "E-SELECTION-UNKNOWN", "no meshed region of that name; expected one of ['Si', 'SiO2', 'via']"),
+     "E-SELECTION-UNKNOWN", "no meshed region of that name; expected one of ['Si', 'Si (top)', 'SiO2', 'via']"),
     ({"prescribed_temperature": {"z0": "300 K"}, "convection": {"z1": "10 W/(m^2 K)"}}, "E-KEY-UNKNOWN", "convection"),
 ])
 def test_the_kind_s_refusal_is_the_run_route_s_refusal(client, heat, code, words):
