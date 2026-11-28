@@ -510,15 +510,52 @@ export function temperatureColor(t,tmin,tmax){
 const sig=(v,n=6)=>Number(Number(v).toPrecision(n));
 const sci=v=>Math.abs(v)<1e-3&&v!==0?Number(v).toPrecision(3):String(sig(v));
 /** The values table of a run: [label, text] rows. */
-export function valuesRows(values,unit){
+export function valuesRows(values,unit,{expected=null}={}){
  const per=UNITS[unit]||1,u=shownUnit(unit);
  const place=t=>`${sig(t.value)} ${t.unit} in ${t.region} at (${t.position_m.map(x=>sig(x/per,3)).join(', ')}) ${u}`;
  const rows=[['Temperature, max',place(values.temperature_max)],['Temperature, min',place(values.temperature_min)]];
- for(const [name,q] of Object.entries(values.heat_rate_by_selection||{}))rows.push([`Heat rate through ${name}`,`${sig(q.value)} ${q.unit}`]);
+ for(const [name,q] of Object.entries(values.heat_rate_by_selection||{})){
+  rows.push([`Heat rate through ${name}`,`${sig(q.value)} ${q.unit}`]);
+  if(name==='z0'&&expected)rows.push(['Expected heat rate',`${expected.shown} (parallel formula)`]);
+ }
  rows.push(['Total heat source',`${sig(values.total_source.value)} ${values.total_source.unit}`]);
  rows.push(['Energy balance residual',`${sci(values.balance_residual.value)} ${values.balance_residual.unit} (${sci(values.relative_balance_residual.value)} of the summed heat rates)`]);
  return rows;
 }
+// ---- card 2's expected heat rate (the parallel formula) ------------------------------------------
+/** A quantity "<number> <unit>" with exactly that unit (spaces aside), or null. */
+function quantityIn(text,unit){
+ if(typeof text==='number')return null;
+ const m=/^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)\s*(.*?)\s*$/.exec(String(text??''));
+ return m&&m[2].replace(/\s+/g,' ')===unit?Number(m[1]):null;
+}
+/**
+ * The design's expected heat rate of a cylinder through a slab, from the document:
+ * Q = ΔT/L · (k_v·πr² + k_s·(A − πr²)), with A and L the domain's area and height, r the cylinder's
+ * radius, k_v and k_s the cylinder's and the background's conductivity and ΔT the difference of the
+ * fixed temperatures on z0 and z1. It applies only to one cylinder through the whole slab height,
+ * fixed temperatures on exactly z0 and z1 and no heat source, with every value a number or a
+ * quantity here (a parameter or an expression is the server's to evaluate): else null.
+ * {value (W), shown ("31.99 W"), text ("Expected heat rate 31.99 W (parallel formula)")}.
+ */
+export function expectedHeatRate(doc){
+ const h=heatOf(doc);if(!h||h.heat_source_density!==undefined)return null;
+ const fixed=h.prescribed_temperature||{},names=Object.keys(fixed).sort();
+ if(names.length!==2||names[0]!=='z0'||names[1]!=='z1')return null;
+ const comp=component(doc),unit=comp.length_unit,d=comp.domain||{},feats=comp.features||[];
+ if(feats.length!==1||feats[0].type!=='cylinder')return null;
+ const f=feats[0],len=v=>{const x=inUnit(v,unit);return x===null?null:x*UNITS[unit];};
+ if(typeof f.r!=='number'||[d.xmin,d.xmax,d.ymin,d.ymax,d.zmin,d.zmax,f.zmin,f.zmax].some(v=>typeof v!=='number'))return null;
+ if(f.zmin!==d.zmin||f.zmax!==d.zmax)return null;
+ const k=name=>quantityIn(doc.materials?.[name]?.thermal_conductivity,'W/(m K)');
+ const kv=k(f.material),ks=k(comp.background?.material);
+ const t0=quantityIn(fixed.z0,'K'),t1=quantityIn(fixed.z1,'K');
+ if([kv,ks,t0,t1].some(v=>v===null))return null;
+ const A=len(d.xmax-d.xmin)*len(d.ymax-d.ymin),L=len(d.zmax-d.zmin),disc=Math.PI*len(f.r)**2;
+ const value=Math.abs(t1-t0)/L*(kv*disc+ks*(A-disc)),shown=`${Number(value.toPrecision(4))} W`;
+ return {value,shown,text:`Expected heat rate ${shown} (parallel formula)`};
+}
+
 const clock=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
 /** The one-line progress of a run status answer. */
 export function runProgress(s){

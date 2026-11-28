@@ -278,7 +278,11 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 W/(m K))가 있습니다: meshloom의 `via_in_slab` builder 형상([builder 형상](geometry_engine3d.md#builder-모양의-원통과-구슬라이스-3)).
 물리는 `z0`에 300 K, `z1`에 301 K, 나머지 바깥 면은 모두 단열입니다. 트리는 *1 Cylinder via* · *r 0.3 m · z 0–1 m*와
 *Form result* · *2 regions · 9 faces*로 읽히고, 보기는 형상을 표시용으로 그립니다(`via.side` 같은 곡면의 이름에 *Shape drawn for display; the mesh
-follows it to within its size*가 붙음). Mesh 1과 Run은 카드 1처럼 받습니다. 프로젝트는 3D 모델 하나를 담습니다: 카드 1의 모델을 담고
+follows it to within its size*가 붙음). Mesh 1과 Run은 카드 1처럼 받습니다. 실행의 값에는 실행 자신의 *Heat rate through z0* 옆에
+*Expected heat rate 31.99 W (parallel formula)*가 보입니다: Q = ΔT/L · (k_v·πr² + k_s·(A − πr²)), 실행의 문서에서 계산(A와 L은
+영역의 면적과 높이, r은 원기둥의 반지름, k_v와 k_s는 구리와 슬래브의 열전도도, ΔT는 `z0`과 `z1`의 고정 온도에서). 식이 맞는
+경우(슬래브 높이 전체를 지나는 원기둥 하나, 정확히 `z0`과 `z1`의 고정 온도, 열원 없음, 모든 값이 수나 물리량)에만 보이고, 아니면
+줄이 없습니다. 실행의 31.75 W가 그보다 작은 것은 그려지고 메시된 원기둥이 내접 다각형이기 때문입니다. 프로젝트는 3D 모델 하나를 담습니다: 카드 1의 모델을 담고
 있는 동안 카드 2를 고르면 그대로 두고 *This project already holds the 3D model Via in a layer stack (3D heat); a project holds
 one 3D model. Open Copper via through a slab (3D heat) in a new browser tab.*라고 말합니다(반대도 같음). 프로젝트 파일은 카드
 (`layer-stack-3d` 또는 `via-slab-3d`)를 밝히고, Export › Model with runs는 카드의 파일 이름(`copper-via-through-a-slab-3d.json`)을
