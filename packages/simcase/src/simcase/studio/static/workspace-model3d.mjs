@@ -566,6 +566,10 @@ export function valuesRows(values,unit,{expected=null}={}){
 export const HEAT_RATE_SIGN='Heat rate: positive into the model, negative out of it (a fixed temperature that removes heat shows a negative rate).';
 /** The colour bar's title: it spans the surface temperatures; the table's Tmax and Tmin are the whole model's. */
 export const colourBarTitle='Surface temperature';
+/** U7: the view toolbar's Regions control: each region that is drawn (not void), shown unless hidden. */
+export const regionToggles=(view,hidden)=>(view?.regions||[]).filter(r=>!r.void).map(r=>({name:r.name,shown:!hidden.has(r.name)}));
+/** U7: the line under a face's names: each one picks this face (some also pick others). */
+export const NAMES_ANY='Any of these names selects this face.';
 const sig6=x=>Number(Number(x).toPrecision(6));
 /** U5: the cut's own legend, for its own colour range: "Cut z = 505 µm: 300–336.051 K". */
 export const cutLegend=(cut,unit)=>`Cut ${cut.axis} = ${cut.at} ${shownUnit(unit)}: ${sig6(cut.temperature_min.value)}–${sig6(cut.temperature_max.value)} K`;

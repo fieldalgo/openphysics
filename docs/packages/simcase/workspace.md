@@ -447,7 +447,11 @@ a running job.
 
 **The view and selections.** The view is the [3D view](studio_3d.md) with its controls (keys on the
 view: arrows rotate, Shift+arrows pan, + and − zoom, F fits, 1–6 axis views, 0 isometric). A face
-picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names; **Use for → New
+picked in the view or chosen in the **Faces** list (Tab, Enter) shows its names, with the line *Any of
+these names selects this face.* (some also select other faces). **Regions** in the view toolbar has a
+checkbox per region; an unchecked region is hidden in the geometry, mesh and result views, so an inner
+face can be picked: in the +z view `via.z1` is picked once *Si (top)*, the region above it, is hidden.
+The engine's names are unchanged. **Use for → New
 selection** with **Apply** writes `selections[<name>] = {"boundary": <name>}` with the first of the
 face's sorted names that selects that face alone (`POST /api/model3d/selection`). A face that no single
 name selects is not made into a selection, and says so. **Use for → Fixed temperature** writes 300 K

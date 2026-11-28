@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText,HEAT_RATE_SIGN,colourBarTitle,cutLegend,cutFileName,regionToggles,NAMES_ANY} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 
@@ -46,6 +46,7 @@ export function createModel3dView(ctx){
  // ran it (cut, probe and CSV need it), the run going, the refusal the last run ended with, the run shown
  const heat={records:[],live:[],fresh:null,liveValues:new Map(),run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
  let section=null;              // the geometry view's section {axis, at} (document units), view state
+ let regionsOpen=false;         // U7: the Regions control is open (view state)
  let pendingFocus=null;         // a Settings field to focus across the renders until the check has answered
 
  // ---- the document and the check ----
@@ -296,7 +297,7 @@ export function createModel3dView(ctx){
    `<small id="m3-block">${esc(block)}</small>`+
    `<small id="m3-run-why">${kept>=0&&!heat.run?`${esc(keptRunText(kept,heat.fresh))} <button type="button" data-m3-show-run="${kept}">Show Run ${kept+1}</button>`:esc(runWhy||'')}</small></div></div>`+
    meshJob()+runJob()+
-   `<div class="m3-views" role="toolbar" aria-label="3D view">${['iso','+x','-x','+y','-y','+z','-z'].map(v=>`<button type="button" data-m3-view="${v}">${v==='iso'?'Iso':v.toUpperCase().replace('-','−')}</button>`).join('')}<button type="button" data-m3-fit>Fit</button>`+
+   `<div class="m3-views" role="toolbar" aria-label="3D view">${['iso','+x','-x','+y','-y','+z','-z'].map(v=>`<button type="button" data-m3-view="${v}">${v==='iso'?'Iso':v.toUpperCase().replace('-','−')}</button>`).join('')}<button type="button" data-m3-fit>Fit</button>${regionsControl()}`+
    `<span class="m3-section"><label>Section <select id="m3-section-axis" aria-label="section plane"><option value="">none</option>${['x','y','z'].map(a=>`<option value="${a}"${section?.axis===a?' selected':''}>${a} =</option>`).join('')}</select></label>`+
    `<input id="m3-section-at" aria-label="section position" inputmode="decimal" value="${esc(section?.at??'')}"><span class="m3-unit" id="m3-section-unit">${esc(shownUnit(comp.length_unit))}</span><button type="button" id="m3-section-go">Apply</button>${cutShown?cutLink('m3-section-csv'):''}</span>`+
    `<span class="m3-pane" role="group" aria-label="Shown"><button type="button" data-m3-pane="geometry" aria-pressed="${!onMesh&&!onResult}">Geometry</button><button type="button" data-m3-pane="mesh" aria-pressed="${onMesh}"${mesh.view?'':' disabled title="Mesh first"'}>Mesh view</button>`+
@@ -321,6 +322,9 @@ export function createModel3dView(ctx){
   const active=()=>onResult?heat.viewer:onMesh?mesh.viewer:v;
   host.querySelectorAll('[data-m3-view]').forEach(b=>b.onclick=()=>active().setView(b.dataset.m3View));
   host.querySelector('[data-m3-fit]').onclick=()=>active().fit();
+  const regionsBox=host.querySelector('#m3-regions');
+  if(regionsBox){regionsBox.ontoggle=()=>{regionsOpen=regionsBox.open;};
+   regionsBox.querySelectorAll('[data-m3-region]').forEach(b=>b.onchange=()=>showRegion(b.dataset.m3Region,b.checked));}
   host.querySelectorAll('[data-m3-pane]').forEach(b=>b.onclick=()=>{mesh.pane=b.dataset.m3Pane;ctx.render();document.querySelector(`[data-m3-pane="${mesh.pane}"]`)?.focus();});
   host.querySelector('#m3-mesh')?.addEventListener('click',()=>startMesh());
   host.querySelector('#m3-mesh-cancel')?.addEventListener('click',()=>cancelMesh());
@@ -374,6 +378,17 @@ export function createModel3dView(ctx){
    lastNotice={text:`Cut (CSV) saved as ${name}.`,undo:false};}
   catch(e){lastNotice={text:e.message,undo:false};}
   renderDock();
+ }
+ /** U7: Regions in the view toolbar: a checkbox per region; unchecked hides it in every view (setHidden). */
+ function regionsControl(){
+  const rows=regionToggles(lastGood,hidden);if(!rows.length)return '';
+  return `<details class="m3-regions" id="m3-regions"${regionsOpen?' open':''}><summary>Regions</summary><fieldset><legend>Shown regions</legend>`+
+   rows.map(r=>`<label><input type="checkbox" data-m3-region="${esc(r.name)}"${r.shown?' checked':''}> ${esc(r.name)}</label>`).join('')+`</fieldset></details>`;
+ }
+ function showRegion(name,shown){
+  if(shown)hidden.delete(name);else hidden.add(name);
+  for(const v of [viewer,mesh.viewer,heat.viewer])v?.setHidden([...hidden]);
+  if(face!==null&&viewer&&viewer.selected===null){face=null;renderFaces();renderNames();}
  }
  function colourBar(rec){
   const s=rec.surface,lo=s.temperature_min.value,hi=s.temperature_max.value,mid=(lo+hi)/2;
@@ -565,7 +580,7 @@ export function createModel3dView(ctx){
   box.dataset.face=f?String(f.id):'';
   if(!f){box.innerHTML='<h3>Names</h3><p class="muted">Pick a face in the view or in the faces list.</p>';return;}
   const lines=faceLines(lastGood,f),can=f.alone.length>0&&!refused;
-  box.innerHTML=`<h3>Names</h3><p>${esc(lines.title)}</p><p class="muted">${esc(lines.detail)} · sides ${esc(lines.sides)}</p><ul>${lines.names.map(n=>`<li><code>${esc(n)}</code></li>`).join('')}</ul>`+
+  box.innerHTML=`<h3>Names</h3><p>${esc(lines.title)}</p><p class="muted">${esc(lines.detail)} · sides ${esc(lines.sides)}</p><ul>${lines.names.map(n=>`<li><code>${esc(n)}</code></li>`).join('')}</ul><p class="muted" id="m3-names-any">${esc(NAMES_ANY)}</p>`+
    `<div class="m3-use"><label>Use for <select id="m3-use"><option value="new">New selection</option><option value="fixed">Fixed temperature</option></select></label><label for="m3-use-name" id="m3-use-name-label">Selection name</label><input id="m3-use-name" value="${esc(suggestName(f))}" spellcheck="false"><button type="button" id="m3-use-go"${can?'':' disabled aria-describedby="m3-use-why"'}>Apply</button>`+
    (can?'':`<small id="m3-use-why">${esc(refused?'The geometry cannot be formed; fix the problem in Messages first.':'No single name selects this face alone.')}</small>`)+`</div>`;
   const go=box.querySelector('#m3-use-go'),use=box.querySelector('#m3-use'),nameInput=box.querySelector('#m3-use-name');

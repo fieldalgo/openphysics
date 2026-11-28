@@ -32,6 +32,10 @@
 //      first tab keeps card 1; with an optical run's recovery record from the first tab, the new tab
 //      offers no recovery (Recover disabled, its note says so) and, after an edit of its 3D model, the
 //      latest record (savedAt and session) reads the same; card 1's note has no "Copper via": 4/4.
+//  U7  card 1: the view toolbar's Regions control has a checkbox per drawn region of the server's check,
+//      all checked; in the +z view a click at via.z1's projected centroid does not pick via.z1 with
+//      every region shown, and picks it once Si (top) (the region above it) is unchecked; Names then
+//      reads "Any of these names selects this face." under its names, via.z1 among them: 3/3.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -270,6 +274,46 @@ try {
     ];
     record('U6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, note, refusal, fresh, original,
       same: before === after, before: before && before.slice(0, 80)});
+    await ctx.close();
+  }
+  // ---- U7: Regions in the view toolbar; hiding the regions above via.z1 lets a click find it ----
+  {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    const answer = await serverCheck(page, CARD);
+    const target = answer.display.faces.find(f => f.alone.includes('via.z1')).id;
+    const boxes = await page.evaluate(() => [...document.querySelectorAll('.m3-views #m3-regions [data-m3-region]')].map(b => [b.dataset.m3Region, b.checked]));
+    await page.click('[data-m3-view="+z"]'); await page.waitForTimeout(200);
+    // the face's centroid on the canvas in the +z view, by the camera contract (model3d-model.mjs)
+    const centroid = () => page.evaluate(async ({id, view}) => {
+      const M = await import('/model3d-assets/model3d-model.mjs');
+      const c = document.getElementById('m3-canvas'); c.scrollIntoView({block: 'center'}); const r = c.getBoundingClientRect();
+      const pos = M.decode(view.positions, Float32Array), idx = M.decode(view.indices, Uint32Array), f = view.faces[id];
+      let s = [0, 0, 0], n = 0;
+      for (let t = f.first_triangle; t < f.first_triangle + f.triangle_count; t++) for (let k = 0; k < 3; k++) { const v = idx[3 * t + k]; for (let a = 0; a < 3; a++) s[a] += pos[3 * v + a]; n++; }
+      s = s.map(x => x / n);
+      const fr = M.frameOf(M.viewCamera(view, '+z'), r.width, r.height);
+      const u = M.dot(s, fr.x) / fr.halfWidth, w = M.dot(s, fr.y) / fr.halfHeight;
+      return {x: r.x + (u + 1) * r.width / 2, y: r.y + (1 - w) * r.height / 2};
+    }, {id: target, view: answer.display});
+    const pickAt = async () => { const point = await centroid(); await page.mouse.click(point.x, point.y); await page.waitForTimeout(150);
+      const v = await page.evaluate(() => document.getElementById('m3-names').dataset.face); return v === '' ? null : Number(v); };
+    const hide = async names => { await page.evaluate(() => { const d = document.getElementById('m3-regions'); if (d && !d.open) d.querySelector('summary').click(); });
+      for (const [name] of boxes) { const box = page.locator(`#m3-regions [data-m3-region="${name}"]`); if (names.includes(name) === await box.isChecked()) await box.click(); }
+      await page.evaluate(() => { const d = document.getElementById('m3-regions'); if (d?.open) d.querySelector('summary').click(); });
+      await page.waitForTimeout(150); };
+    const shown = await pickAt();
+    await hide(['Si', 'SiO2']); const withoutSiSiO2 = await pickAt();
+    await hide(['Si', 'SiO2', 'Si (top)']); const withoutTop = await pickAt();
+    const names = await page.evaluate(() => ({any: document.getElementById('m3-names-any')?.textContent || '',
+      list: [...document.querySelectorAll('#m3-names li code')].map(c => c.textContent)}));
+    const rows = [
+      JSON.stringify(boxes) === JSON.stringify(answer.display.regions.filter(r => !r.void).map(r => [r.name, true])),
+      shown !== target && withoutTop === target,
+      names.any === 'Any of these names selects this face.' && names.list.includes('via.z1'),
+    ];
+    record('U7', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, boxes, target, shown, withoutSiSiO2, withoutTop, names});
     await ctx.close();
   }
 } finally {

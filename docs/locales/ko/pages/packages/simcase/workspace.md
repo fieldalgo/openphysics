@@ -367,7 +367,9 @@ tetrahedra, 4 regions.*라고 말하고, 페이지가 메시 통계를 나열하
 
 **보기와 선택.** 보기는 [3D 보기](studio_3d.md)와 그 조작입니다(보기에서 화살표는 회전, Shift+화살표는 이동, +와 −는
 확대·축소, F는 맞춤, 1–6은 축 방향 보기, 0은 등각). 보기에서 고르거나 **Faces** 목록에서 고른(Tab, Enter) 면은 그
-이름들을 보입니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
+이름들을 *Any of these names selects this face.* 줄과 함께 보입니다(어떤 이름은 다른 면도 고름). 보기 도구 막대의
+**Regions**에는 영역마다 확인란이 있습니다. 해제한 영역은 형상, 메시, 결과 보기에서 숨겨지므로 안쪽 면을 고를 수 있습니다:
++z 보기에서 `via.z1`은 그 위의 영역 *Si (top)*을 숨기면 골라집니다. 엔진의 이름은 바뀌지 않습니다. **Use for → New selection**과 **Apply**는 그 면만 고르는 정렬된 이름 중 첫째로
 `selections[<이름>] = {"boundary": <이름>}`을 씁니다(`POST /api/model3d/selection`). 어떤 이름 하나로도 고를 수 없는 면은
 선택으로 만들지 않고 그렇게 말합니다. **Use for → Fixed temperature**는 서버 검사를 거친 뒤 면의 이름(가장 나중 특징의 단독
 이름, 예: `via.z1`, `stack.top.top`)에 300 K를 씁니다: 열 종류가 거부하는 면(안쪽 면)은 쓰지 않고, Messages가 종류의 말(*Fixed

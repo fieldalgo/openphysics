@@ -79,3 +79,10 @@ test('U6: a second 3D card opens in a new tab at /workspace?card=…&fresh=1; ca
  assert.ok(!M.CARD3D.note.includes('Copper via'),M.CARD3D.note);
  assert.ok(!M.CARD3D_SLAB.note.includes('layer stack'),M.CARD3D_SLAB.note);
 });
+
+test('U7: a Regions control lists the shown regions to hide; Names says any name selects the face',()=>{
+ const view={regions:[{name:'Si',void:false},{name:'gap',void:true},{name:'SiO2',void:false},{name:'Cu',void:false}]};
+ assert.deepEqual(M.regionToggles(view,new Set(['SiO2'])),[{name:'Si',shown:true},{name:'SiO2',shown:false},{name:'Cu',shown:true}]);
+ assert.deepEqual(M.regionToggles(null,new Set()),[]);
+ assert.equal(M.NAMES_ANY,'Any of these names selects this face.');
+});
