@@ -418,7 +418,13 @@ meshing although the shape forms: the element count over its limit (`E-MESH-ESTI
 the mesher tolerance (`E-CONTRACT`), or two values that round to one coordinate (*west.x1 and east.x0
 round to the same coordinate 9000.000000000002 m*). Such a refusal is shown in Messages the same way;
 the tree marks the feature its path names, else **Mesh 1** (*refused*); the view is not greyed, since
-the shape is formed; and Mesh is disabled with the refusal's words.
+the shape is formed; and Mesh is disabled with the refusal's words. An estimate over the limit
+(`E-MESH-ESTIMATE`) is worded once, in Messages, in plain words: *Component 1 needs about 19,215,000
+tetrahedra; the limit is 600,000. Use an element size of at least 6.36 µm.* The size is the smallest
+on a three-significant-digit grid that the same estimate accepts, found by the check (`suggested_size`,
+with `tetrahedra` and `limit`, beside the engine's `refused`). The engine's sentence and its key are
+under **Details**. Mesh and Run say *Fix 1 problem in Messages to mesh* (*… to run*), and Mesh 1's page
+*Mesh is not available: see Messages.* The size field is labelled **Element size**.
 
 **Mesh 1.** Its page shows the estimate and the `element_size` of the document's mesh block (a
 quantity; a bare number is in the component's unit; diagonal/400 to diagonal/4 as for a feature).

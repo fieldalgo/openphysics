@@ -16,7 +16,7 @@ import {CANCELLED,longer,meshBlocked,progressText,statsRows,stepList,estimateTex
 import {faceLines,regionColor} from '/model3d-assets/model3d-model.mjs';
 import {treeOpen,groupHeading,itemAttributes,treeState,bindTree,treeFocus,restoreTreeFocus} from './workspace-tree.mjs';
 import {markPageTabs} from './workspace-tabs.mjs';
-import {CARD3D,CARDS3D,card3dOf,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
+import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
  valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate} from './workspace-model3d.mjs';
@@ -147,7 +147,7 @@ export function createModel3dView(ctx){
   }
   if(selection==='mesh'){
    const off=refused?null:meshRefusal(check),est=!refused&&check?.mesh?.ok?check.mesh.estimate:null;
-   return `<h3>Mesh 1</h3><p id="m3-estimate">${esc(off?'Mesh is not available: '+off.refused:est?estimateText(est):refused?'The geometry cannot be formed: fix the problem shown in Messages.':'Checking…')}</p>`+
+   return `<h3>Mesh 1</h3><p id="m3-estimate">${esc(off?(meshRefusalText(off,'')!==off.refused?'Mesh is not available: see Messages.':'Mesh is not available: '+off.refused):est?estimateText(est):refused?'The geometry cannot be formed: fix the problem shown in Messages.':'Checking…')}</p>`+
     `<p class="muted">The mesh runs in a separate process on the Studio server; Cancel meshing ends it and keeps nothing. The mesh is not saved in the project file: mesh again after opening it.</p>`+
     fieldsOf(doc,'mesh').map(fieldInput).join('')+
     (mesh.view?`<dl class="m3-mesh-stats">${statsRows(mesh.view).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`:'');
@@ -570,8 +570,10 @@ export function createModel3dView(ctx){
     (m.details?`<details><summary>Details</summary><code>${esc(refused.code||'')}</code>${refused.path?` at <code>${esc(refused.path)}</code>`:''}</details>`:'')+`</div>`);}
   const off=refused?null:meshRefusal(check);
   if(off){const m=refusalMessage(off),at=m.feature!==null?`feature:${m.feature}`:'mesh';
-   parts.push(`<div class="mp-message error" data-m3-refusal data-m3-mesh-refusal><p>${esc(m.text)}</p><div class="mp-message-actions"><button type="button" data-m3-show="${at}">Show</button></div>`+
-    (m.details?`<details><summary>Details</summary><code>${esc(off.code||'')}</code>${off.path?` at <code>${esc(off.path)}</code>`:''}</details>`:'')+`</div>`);}
+   // an estimate refusal in plain words; the engine's sentence (with its formula) and key under Details
+   const plain=meshRefusalText(off,doc.geometry.components[componentName(doc)].length_unit),own=plain!==off.refused;
+   parts.push(`<div class="mp-message error" data-m3-refusal data-m3-mesh-refusal><p>${esc(own?plain:m.text)}</p><div class="mp-message-actions"><button type="button" data-m3-show="${at}">Show</button></div>`+
+    (m.details||own?`<details><summary>Details</summary><code>${esc(off.code||'')}</code>${off.path?` at <code>${esc(off.path)}</code>`:''}${own?`<p>${esc(off.refused)}</p>`:''}</details>`:'')+`</div>`);}
   if(!refused&&!off&&check?.run?.ok===false&&heatOf(doc))
    parts.push(`<div class="mp-message error" data-m3-refusal data-m3-run-refusal><p>${esc(check.run.refused)}</p><div class="mp-message-actions"><button type="button" data-m3-show="heat">Show</button></div>`+
     (check.run.code?`<details><summary>Details</summary><code>${esc(check.run.code)}</code></details>`:'')+`</div>`);
