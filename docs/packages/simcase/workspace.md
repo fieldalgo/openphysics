@@ -322,7 +322,8 @@ the oxide. Its geometry holds the design's two parameters: `t_ox` = 10 µm, the 
 the via's height (z from 500 to `500 + t_ox`), and `via_w` = 20 µm, the via's width (x and y from
 `100 - via_w / 2` to `100 + via_w / 2`), so the via always crosses only the oxide. The oxide's
 thickness field reads *= t_ox (10 µm)*; the via's row still reads *20 × 20 × 10 µm*, the size the
-server's check evaluates. The via is square here: *Square via: a box through the oxide, in a layer stack*. The top silicon has its own material, `Si (top)`, with the properties
+server's check evaluates. The via is square here: *Square via: a box through the oxide, in a layer stack · Preset: heat source 1e12 W/m³ in Si (top) (4 W)*
+(the server's check gives Si (top) 4,000,000 µm³, so 4 W). The top silicon has its own material, `Si (top)`, with the properties
 of `Si`, only because a heat source names a region by its material today (a layer or feature name such
 as `stack.top` is not a region of the heat kind). Its physics is Heat transfer (3D): 300 K on `z0`, a
 heat source of 1e12 W/m³ in `Si (top)` (4 W in all), every other outer face insulated. The source is a test value (it heats the card to
@@ -408,7 +409,7 @@ and stays as a highlighted draft with **Restore last valid value**. While a draf
 Save, Save As and Export are disabled, and Mesh names the draft as its reason. Combinations
 of features are checked by the server only. The **Parameters** table lists each parameter's name,
 value, kind (length or ratio), range (when the document gives one), SI value and how many fields use
-it; a refusal about a parameter (E-DOMAIN, E-EXPRESSION-KIND, a cycle) is shown on its row. A used
+it, in two lines per parameter (name, value and Delete; then the rest), so nothing is clipped in the pane; a refusal about a parameter (E-DOMAIN, E-EXPRESSION-KIND, a cycle) is shown on its row. A used
 parameter is not deleted, and the refusal names its users in feature order: *t_ox is used by
 stack.oxide thickness.* (several: *w is used by domain xmax, stack.oxide thickness, via xmin, via
 xmax.*).
@@ -436,7 +437,8 @@ under **Details**. Mesh and Run say *Fix 1 problem in Messages to mesh* (*… to
 
 **Mesh 1.** Its page shows the estimate and the `element_size` of the document's mesh block (a
 quantity; a bare number is in the component's unit; diagonal/400 to diagonal/4 as for a feature).
-The ribbon's **Mesh** opens Mesh 1 and meshes, as the header's **Mesh** does, when meshing is allowed;
+The ribbon's **Run** (under Compute) runs as the header's **Run** does, or Messages gives its reason; the
+ribbon's **Mesh** opens Mesh 1 and meshes, as the header's **Mesh** does, when meshing is allowed;
 otherwise Messages gives the header's reason (a 2D model's ribbon Mesh is unchanged).
 **Mesh** in the graphics header runs Studio's mesh job (the [3D view's mesh routes](studio_3d.md#what-it-sends-and-answers))
 in a separate process: the steps (*Forming geometry → Meshing (expected about 1 s) → Checking the

@@ -14,7 +14,7 @@ import {canonicalJson,RUN_RECORD} from './workspace-model3d-session.mjs';
 /** The Library card of the 3D group (not an application card: it has its own group). */
 export const CARD3D=Object.freeze({id:'layer-stack-3d',kind:'model3d',title:'Via in a layer stack (3D heat)',
  asset:'/model3d-assets/model3d-layer-stack-3d.json',sessionFile:'via-in-a-layer-stack-3d.json',status:'3D steady heat (experimental)',
- note:'Square via: a box through the oxide, in a layer stack',
+ note:'Square via: a box through the oxide, in a layer stack · Preset: heat source 1e12 W/m³ in Si (top) (4 W)',
  description:'A silicon substrate, an oxide layer and top silicon, with a copper via through the oxide. Build the 3D geometry, mesh it and solve steady heat.'});
 /** Card 2: a copper via (one cylinder) through a slab, in meshloom's via_in_slab builder shape. */
 export const CARD3D_SLAB=Object.freeze({id:'via-slab-3d',kind:'model3d',title:'Copper via through a slab (3D heat)',
