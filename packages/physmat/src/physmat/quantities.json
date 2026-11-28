@@ -718,6 +718,29 @@
    "symbols": ["h", "htc"],
    "description": {"en": "Convective heat transfer coefficient h in q = h (T - T_ambient).", "ko": "대류 열전달 계수 h(q = h (T - T_ambient))."}
   },
+  "thermal_contact_conductance": {
+   "dimension": {"M": 1, "T": -3, "Theta": -1},
+   "unit": "W/(m^2 K)",
+   "menu": ["W/(m^2 K)", "kW/(m^2 K)", "W/(cm^2 K)"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": {"min": "0"},
+   "band": null,
+   "places": ["api"],
+   "description": {"en": "Heat flux per unit temperature difference between the two sides of a contact.", "ko": "접촉면 양쪽의 단위 온도 차당 전달 열유속."}
+  },
+  "contact_heat_rate": {
+   "dimension": {"M": 1, "L": 2, "T": -3},
+   "unit": "W",
+   "menu": ["W"],
+   "kind": "ordinary",
+   "rank": ["scalar"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "sign": {"contact_heat_rate": {"en": "Positive leaves the body at its contact node and enters the opposite body.", "ko": "접촉 절점에서 해당 물체를 떠나 반대편 물체로 들어가는 열이 양수."}},
+   "description": {"en": "Nodal heat transfer rate through a thermal contact.", "ko": "열접촉을 통해 전달되는 절점별 열전달률."}
+  },
   "emissivity": {
    "dimension": {},
    "unit": "1",
