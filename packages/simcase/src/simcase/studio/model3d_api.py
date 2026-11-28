@@ -385,12 +385,16 @@ def _domain(comp) -> dict:
             for k in ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax")}
 
 
+MINUTE_SECONDS = 45.0
+"""X4: the estimated time of the advice's "under a minute" size (the engine's estimate, not a measurement)."""
+
+
 def _estimate_advice(doc: dict, comp) -> dict:
     """What a plain E-MESH-ESTIMATE message needs (Studio's words; the engine's stay in ``refused``):
     ``tetrahedra`` (this document's estimate), ``limit``, ``suggested_size``: the smallest mesh element
     size on a grid of three significant digits in the component's unit that the same estimate accepts,
-    and (V3) ``suggested_minute``: the smallest such size whose estimated time is at most 60 s and within
-    the limit, each with its estimate (``suggested_tetrahedra``/``suggested_seconds``,
+    and (V3, X4) ``suggested_minute``: the smallest such size whose estimated time is at most
+    ``MINUTE_SECONDS`` (45 s, so it reads "under a minute") and within the limit, each with its estimate (``suggested_tetrahedra``/``suggested_seconds``,
     ``minute_tetrahedra``/``minute_seconds``). ``simcase.estimate_mesh3d`` is called, not changed; its
     seconds are the engine's estimate (0.6 ms per tetrahedron), not a measured time. The sizes are None
     when no single size is accepted (feature sizes, say); Studio's guard keeps a size at most the domain
@@ -458,8 +462,8 @@ def _estimate_advice(doc: dict, comp) -> dict:
     if found is None:
         return out
     out["suggested_size"], out["suggested_tetrahedra"], out["suggested_seconds"] = found[0], found[1].tetrahedra, found[1].seconds
-    minute = smallest(lambda e: e.tetrahedra <= limit and e.seconds <= 60,
-                      max(found[0], diag / 100 * (probe.seconds / 60) ** (1 / 3)))
+    minute = smallest(lambda e: e.tetrahedra <= limit and e.seconds <= MINUTE_SECONDS,
+                      max(found[0], diag / 100 * (probe.seconds / MINUTE_SECONDS) ** (1 / 3)))
     if minute is not None:
         out["suggested_minute"], out["minute_tetrahedra"], out["minute_seconds"] = minute[0], minute[1].tetrahedra, minute[1].seconds
     return out

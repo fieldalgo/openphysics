@@ -457,11 +457,18 @@ export function meshRefusalText(off,unit){
  let advice=typeof off.suggested_size==='number'?`Use an element size of at least ${size(off.suggested_size)}.`:'Increase the element size.';
  // V3: with the estimates of both sizes, the smallest the limit takes and one that meshes in about a minute
  if(typeof off.suggested_size==='number'&&typeof off.suggested_tetrahedra==='number'){
-  advice=`Element size ${size(off.suggested_size)} meshes about ${thousands(off.suggested_tetrahedra)} tetrahedra (estimated ${roughTime(off.suggested_seconds)})`;
-  advice+=typeof off.suggested_minute==='number'&&off.suggested_minute!==off.suggested_size
-   ?`; ${size(off.suggested_minute)} about ${thousands(off.minute_tetrahedra)} (estimated ${roughTime(off.minute_seconds)}).`:'.';
+  // X4: the second size is the server's "under a minute" one (estimated at most 45 s)
+  advice=`Element size ${size(off.suggested_size)}: about ${thousands(off.suggested_tetrahedra)} tetrahedra (estimated ${roughTime(off.suggested_seconds)}).`;
+  if(typeof off.suggested_minute==='number'&&off.suggested_minute!==off.suggested_size)
+   advice+=` ${size(off.suggested_minute)}: under a minute (estimated ${roughTime(off.minute_seconds)}).`;
  }
  return `Component 1 needs about ${thousands(off.tetrahedra)} tetrahedra; the limit is ${thousands(off.limit)}. ${advice}`;
+}
+/** X4: a "Use N µm" button per size the estimate refusal names (the smallest first); [] for any other refusal. */
+export function meshSizeOffers(off,unit){
+ if(!plainEstimate(off))return [];
+ const u=shownUnit(unit),sizes=[off.suggested_size,off.suggested_minute].filter(h=>typeof h==='number');
+ return [...new Set(sizes)].map(h=>({size:h,label:`Use ${Number(Number(h).toPrecision(3))} ${u}`}));
 }
 export function meshReason({drafts=0,refused=null,check=null,running=false}={},words){
  if(drafts||refused)return blockReason({drafts,refused});
