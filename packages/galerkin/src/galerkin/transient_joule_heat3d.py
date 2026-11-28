@@ -33,14 +33,15 @@ def solve_transient_joule_heat_3d(
     mesh, *, time, initial_temperature, electrical_conductivity, prescribed_electric_potential,
     thermal_conductivity, volumetric_heat_capacity, temperature_tolerance, relative_tolerance=1e-8,
     iteration_limit=50, relaxation_factor=1.0, prescribed_temperature=None,
-    inward_heat_flux=None, convection=None,
+    inward_heat_flux=None, convection=None, thermal_contact_conductance=None,
 ):
     """Couple interval-end temperature (K) to Joule generation (W/m³).
 
     Supply electrode potentials in V by face tag, or a callback of the interval
     midpoint in seconds. The callback runs once per interval. Include voltage
     switch times in the time grid. Positive inward electric power supplies Joule
-    heat. Thermal boundary conditions use the transient heat solver's convention.
+    heat. Thermal boundaries and finite contact conductance follow the transient
+    heat solver's convention. Interval-end contact heat rates are on the heat result.
     Electrical conductivity in S/m is a constant, a ConductivityModel with a
     valid Kelvin interval, or a material region mapping of those values.
 
@@ -105,7 +106,7 @@ def solve_transient_joule_heat_3d(
         mesh, time=time, initial_temperature=initial_temperature, thermal_conductivity=thermal_conductivity,
         volumetric_heat_capacity=volumetric_heat_capacity, prescribed_temperature=prescribed_temperature,
         inward_heat_flux=inward_heat_flux, convection=convection, heat_source_density=None,
-        coupled_step=coupled_step,
+        thermal_contact_conductance=thermal_contact_conductance, coupled_step=coupled_step,
     )
     iteration_count = np.asarray(counts, dtype=int)
     iteration_count.flags.writeable = False

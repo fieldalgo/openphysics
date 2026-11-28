@@ -39,3 +39,5 @@ Compare the integrated Joule input with the heat storage change, prescribed
 and convective export, and fixed-temperature reactions to audit energy.
 The tests include an insulated constant-voltage slab with a closed-form
 backward Euler update, an off switch, and a convective energy balance.
+
+A finite thermal contact uses matching, separately numbered thermal faces and a constant `thermal_contact_conductance` for each tag pair. Thermal coupling leaves the electrical terminal map independent. Give each electrically disconnected component a reference potential. The [heater pulse example](../../../examples/galerkin/transient_thermal_contact_3d.py) switches the voltage off and integrates the heat that continues to cross the interface from stored energy. Read interval-end rates from `result.heat.contact_heat_rate`. [Thermal signs, units and energy integration](transient_heat3d.md#finite-thermal-contact-during-a-pulse).
