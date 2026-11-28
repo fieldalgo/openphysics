@@ -26,8 +26,13 @@ def quantities(result):
             np.concatenate((parts[:n], parts[n:].sum(axis=0)[None])))
 
 
-@lru_cache(maxsize=32)
 def calculated(index, count=512, width=.008, reflect=False):
+    # Normalize the cache key: calculated(i) and calculated(i,512) are the same solve.
+    return _calculated(index, count, width, reflect)
+
+
+@lru_cache(maxsize=32)
+def _calculated(index, count, width, reflect):
     row = ROWS[index]
     polygons = [np.asarray(p)+[width/2, 0.] for p in row['centered_polygons']]
     if reflect:
