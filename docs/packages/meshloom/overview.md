@@ -381,6 +381,17 @@ See [third-party software](../../third-party.md).
   `ALPHA` (1.0) and the boundary's subfacet size (0.68 `alpha·h`) were chosen on V8's C2
   and C3 rows, so V8 does not check them independently. The curved surface edge
   (`SURFACE_EDGE` = 1) was set before V8 on C1 was measured.
+- **A mesh depends on how the input is numbered.** The same arrays give the same mesh,
+  bit for bit (V26). The same points and facets numbered differently can give a
+  different mesh, equally valid: cospherical ties in the Delaunay tetrahedralization
+  are broken by point index, and boundary recovery works through segments and split
+  points in an order that follows the numbering. Counts taken on the mesh, such as V3
+  bound failures on needle facets, can then differ. On synthetic surfaces of 5,000
+  triangles (2026-11-28), the generator's numbering, the C14 loader's numbering (in
+  order of first reference) and a random one gave 16,280, 16,308 and 20,325
+  tetrahedra for a needle surface, and 12,067, 12,463 and 17,018 for a coplanar one.
+  Compare results on the same arrays: C14 measures the loader's canonical arrays, so a
+  quick check against a C14 number has to use them too.
 - A graded size is one function for the whole domain; it cannot be combined with a
   mapping from region name to size. Curved surfaces are limited
   to the builder's primitives, sampled once, uniformly, at h, with no refinement on
