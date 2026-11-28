@@ -460,7 +460,8 @@ change them.*
 **Results.** **Study 1 · Steady** and **Results** follow Mesh 1 in the tree, and each kept run is a
 row **Run N · Temperature (surfaces)** (up to 10; the oldest goes first). A run's page has its values
 (*Temperature, max* with its region and position, *Temperature, min*, *Heat rate through* each fixed
-temperature, *Total heat source*, *Energy balance residual* with its ratio to the source), its mesh,
+temperature, *Total heat source*, *Energy balance residual* with its ratio to the summed absolute heat rates, the solver's
+relative conservation residual), its mesh,
 **Use this run's inputs** (one Undo step) when the document differs, a **Probe** (x, y, z in the
 component's unit; also by clicking a surface of the result), and exports: **Surface (CSV)**, **Cut
 (CSV)** of the section shown and **Run (JSON)** (the record). The **Result** view shows the run's

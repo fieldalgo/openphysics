@@ -515,7 +515,7 @@ export function valuesRows(values,unit){
  const rows=[['Temperature, max',place(values.temperature_max)],['Temperature, min',place(values.temperature_min)]];
  for(const [name,q] of Object.entries(values.heat_rate_by_selection||{}))rows.push([`Heat rate through ${name}`,`${sig(q.value)} ${q.unit}`]);
  rows.push(['Total heat source',`${sig(values.total_source.value)} ${values.total_source.unit}`]);
- rows.push(['Energy balance residual',`${sci(values.balance_residual.value)} ${values.balance_residual.unit} (${sci(values.relative_balance_residual.value)} of the source)`]);
+ rows.push(['Energy balance residual',`${sci(values.balance_residual.value)} ${values.balance_residual.unit} (${sci(values.relative_balance_residual.value)} of the summed heat rates)`]);
  return rows;
 }
 const clock=s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
