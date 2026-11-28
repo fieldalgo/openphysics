@@ -26,6 +26,10 @@
 //      about … s)."; it has the buttons "Use N µm" and "Use M µm"; Use M µm sets the Mesh field to M, and
 //      the server's check there is ok with an estimate of at most 45 s; Use N µm (after Undo) sets N and
 //      the check is ok within the limit: 3/3.
+//  X5  card 1, face 5 fixed at 330 K (P05), Run 1, Fixed temperature z0 310 K, Run 2, Compare Runs 1 and 2: the Tmax and Tmin cells of A
+//      and B equal each run's own run-table cells (the /extremes words: "… K at the SiO2 / Si (top)
+//      interface, (…) µm" for Tmax); after File › Save and opening that file in a new page (kept
+//      records, no live run), Compare's Tmax cells read "… K in <region> at (…) µm": 2/2.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -133,7 +137,8 @@ try {
     page.on('response', async r => { if (r.url().endsWith('/api/model3d/run') && r.request().method() === 'POST') { try { runId = (await r.json()).run; } catch {} } });
     // P05: face 5 in the Faces list, Use for → Fixed temperature 330, Apply, Run, Result at Iso
     await page.click('#m3-faces li[data-face="5"]'); await page.selectOption('#m3-use', 'fixed');
-    await page.fill('#m3-use-temp', '330'); await page.click('#m3-use-go'); await checked(page);
+    await page.fill('#m3-use-temp', '330'); await page.click('#m3-use-go');
+    await page.waitForFunction(() => /Fixed temperature 330 K on /.test(document.getElementById('mp-messages')?.textContent || ''), null, {timeout: 30000}); await checked(page);
     await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(500);
     const selected = await page.evaluate(() => document.getElementById('m3-names')?.dataset.face);
     const sample = async view => { await page.click(`[data-m3-view="${view}"]`); await page.waitForTimeout(300);
@@ -258,6 +263,43 @@ try {
     ];
     record('X4', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, shown, N, M, useM, useN,
       server: {suggested_seconds: mesh.suggested_seconds, minute_seconds: mesh.minute_seconds}, thereM: thereM?.estimate, thereN: thereN?.estimate});
+    await ctx.close();
+  }
+  if (want('X5')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    // P05's path (Tmax then sits on the SiO2 / Si (top) interface): face 5 fixed at 330 K
+    await page.click('#m3-faces li[data-face="5"]'); await page.selectOption('#m3-use', 'fixed');
+    await page.fill('#m3-use-temp', '330'); await page.click('#m3-use-go');
+    await page.waitForFunction(() => /Fixed temperature 330 K on /.test(document.getElementById('mp-messages')?.textContent || ''), null, {timeout: 30000}); await checked(page);
+    await page.click('#m3-run'); await completed(page, 1); await page.waitForTimeout(300);
+    await page.click('#tree [data-m3-node="heat:fixed:z0"]');
+    await page.fill('[data-m3-heat="fixed"][data-m3-key="z0"]', '310'); await page.press('[data-m3-heat="fixed"][data-m3-key="z0"]', 'Enter');
+    await page.waitForTimeout(150); await checked(page);
+    await page.click('#m3-run'); await completed(page, 2); await page.waitForTimeout(800);
+    const LABELS = ['Temperature, max (whole model)', 'Temperature, min (whole model)'];
+    const table = async n => { await page.click(`#tree [data-m3-node="run:${n}"]`); await page.waitForSelector('#m3-values');
+      return page.evaluate(L => Object.fromEntries([...document.querySelectorAll('#m3-values tr')].map(r => [r.querySelector('th').textContent, r.querySelector('td').textContent]).filter(([k]) => L.includes(k))), LABELS); };
+    const t1 = await table(1), t2 = await table(2);
+    const compareCells = async pg => { await pg.click('[data-page="Compare"]'); await pg.waitForSelector('#m3-compare-values');
+      await pg.selectOption('#m3-compare-a', '0'); await pg.waitForTimeout(100); await pg.selectOption('#m3-compare-b', '1'); await pg.waitForTimeout(300);
+      return pg.evaluate(L => Object.fromEntries([...document.querySelectorAll('#m3-compare-values tbody tr')].map(r => [r.querySelector('th').textContent, [...r.querySelectorAll('td')].map(t => t.textContent)]).filter(([k]) => L.includes(k))), LABELS); };
+    const live = await compareCells(page);
+    await page.click('[data-page="Model"]'); await checked(page);
+    const file = await save(page);
+    const second = await open(browser);
+    await second.page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await openFile(second.page, 'x5-project.json', file); await second.page.waitForSelector('.m3-head h2'); await checked(second.page);
+    const kept = await compareCells(second.page);
+    await second.ctx.close();
+    const tmax = LABELS[0], tmin = LABELS[1];
+    const rows = [
+      live[tmax]?.[0] === t1[tmax] && live[tmax]?.[1] === t2[tmax] && live[tmin]?.[0] === t1[tmin] && live[tmin]?.[1] === t2[tmin]
+        && / K at the SiO2 \/ Si \(top\) interface, \(/.test(live[tmax][0]) && / K at the SiO2 \/ Si \(top\) interface, \(/.test(live[tmax][1]),
+      kept[tmax]?.length === 3 && / K in [^,()]+ at \(/.test(kept[tmax][0]) && / K in [^,()]+ at \(/.test(kept[tmax][1]) && !/interface/.test(kept[tmax].join(' ')),
+    ];
+    record('X5', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 2, t1, t2, live, kept});
     await ctx.close();
   }
 } finally {

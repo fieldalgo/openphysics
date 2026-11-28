@@ -564,9 +564,10 @@ export CSV.* with **Recompute**, which runs its own inputs again into the same r
 **Run A** and **Run B** (the two newest at first; one run reads *Compare needs two runs of this 3D
 model.*). The table gives each run's values as its Results page writes them (Tmax, Tmin, each fixed
 temperature's heat rate, the total source, the balance residual) and its mesh (nodes, tetrahedra,
-route, element size), with **B − A** beside each number. Tmax and Tmin read *in <region>* there, not
-*at the A / B interface*: a run record keeps no region list for them (only a live run's Results page
-asks the server). One line under the table reads the heat rates' sign: *Heat rates keep the run table's
+route, element size), with **B − A** beside each number. For a run this server holds, Tmax and Tmin read
+as in its run table (*363.756 K at the SiO2 / Si (top) interface, (38.5, 163, 510) µm*, from
+`/api/model3d/runs/{id}/extremes`); a run opened from a file reads *in <region>*, since a run record keeps
+no region list for them. One line under the table reads the heat rates' sign: *Heat rates keep the run table's
 sign: positive into the model, negative out of it. B − A is run B minus run A, so −31.7515 W through z0
 means more heat leaves through z0 in run B.* (the example only when both rates have one sign and
 differ). **Inputs that differ** lists the document's
