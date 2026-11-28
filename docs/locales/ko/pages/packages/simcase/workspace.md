@@ -389,7 +389,8 @@ problem in Messages to run*), 메시를 막는 거부, 검사의 run 거부, 진
 wait for it or cancel it.*), 그리고 같은 문서의 마지막 실행이 끝난 거부를 그 말 그대로(예: *Fixed temperature is missing on the
 connected group of regions 'via': …*). 편집하면 마지막 것은 지워집니다. 문서가 보관한 실행의 문서와 같으면(키 순서는 무관,
 같은 결과 형식 `thermal-steady3d-run-v1`) 머리말이 **Show Run 1**과 함께 *No need to run: Run 1 already has these results.*라고
-말하고, Run은 다시 계산하지 않고 그 실행을 보입니다. 끝나면 Messages가 *Run 1 complete: maximum 1127.33 K in Si (top). Its
+말하고, Run은 다시 계산하지 않고 그 실행을 보입니다. 실행 직후부터 다음 편집 전까지는 같은 자리가 대신 *Run 1 is up to date with
+these inputs.*라고 말합니다. 끝나면 Messages가 *Run 1 complete: maximum 1127.33 K in Si (top). Its
 results belong to that run; editing the model does not change them.*라고 말합니다.
 
 **Results.** 트리에서 Mesh 1 다음에 **Study 1 · Steady**와 **Results**가 오고, 보관한 실행마다 **Run N · Temperature (surfaces)**

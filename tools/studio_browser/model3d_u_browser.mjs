@@ -15,6 +15,8 @@
 //      heat:fixed:stack.top.top, its Temperature input has the focus, typing 310 + Enter makes Messages
 //      read "Fixed temperature 310 K on stack.top.top." with no 300 K line left, and the name box
 //      beside the select has a label element as its accessible name: 4/4.
+//  U4  card 1, Run: right after Run 1 completes #m3-run-why reads "Run 1 is up to date with these
+//      inputs."; after an edit and Undo it reads "No need to run: Run 1 already has these results.": 2/2.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -119,6 +121,27 @@ try {
       label.aria === null && label.labels.length === 1 && label.labels[0].length > 0,
     ];
     record('U2', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, state, label, messages: messages.slice(0, 300)});
+    await ctx.close();
+  }
+  // ---- U4: the run just finished is up to date; after an edit and Undo: no need to run -------------
+  {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    await page.click('#m3-run');
+    await page.waitForFunction(() => (document.getElementById('mp-messages')?.textContent || '').includes('Run 1 complete'), null, {timeout: 180000});
+    await page.waitForTimeout(300);
+    const why = () => page.evaluate(() => (document.getElementById('m3-run-why')?.textContent || '').replace(/Show Run \d+$/, '').trim());
+    const after = await why();
+    await page.click('[data-m3-node="heat:fixed:z0"]');
+    await page.fill('[data-m3-heat="fixed"][data-m3-key="z0"]', '301'); await page.press('[data-m3-heat="fixed"][data-m3-key="z0"]', 'Enter');
+    await page.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
+    await page.click('#undo-edit');
+    await page.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
+    await page.waitForTimeout(300);
+    const undone = await why();
+    const rows = [after === 'Run 1 is up to date with these inputs.', undone === 'No need to run: Run 1 already has these results.'];
+    record('U4', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 2, after, undone});
     await ctx.close();
   }
 } finally {
