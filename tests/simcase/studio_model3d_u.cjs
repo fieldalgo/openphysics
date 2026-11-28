@@ -68,3 +68,14 @@ test('U5: the cut has its own legend and a file name with the model and the plan
  assert.equal(M.cutFileName('Copper via through a slab (3D heat)','x',-0.25,'m'),'copper-via-through-a-slab-3d-heat-cut-x--0.25m.csv');
  assert.equal(M.cutFileName('',"y",1,'mm'),'model-cut-y-1mm.csv');
 });
+
+test('U6: a second 3D card opens in a new tab at /workspace?card=…&fresh=1; card 1\'s note names no other card',()=>{
+ assert.equal(M.newTabUrl(M.CARD3D_SLAB),'/workspace?card=via-slab-3d&fresh=1');
+ assert.equal(M.freshCard('?card=via-slab-3d&fresh=1'),M.CARD3D_SLAB);
+ assert.equal(M.freshCard('?card=layer-stack-3d&fresh=1'),M.CARD3D);
+ assert.equal(M.freshCard('?card=via-slab-3d'),null,'without fresh=1 the page opens as before');
+ assert.equal(M.freshCard('?card=nothing&fresh=1'),null);
+ assert.equal(M.freshCard(''),null);
+ assert.ok(!M.CARD3D.note.includes('Copper via'),M.CARD3D.note);
+ assert.ok(!M.CARD3D_SLAB.note.includes('layer stack'),M.CARD3D_SLAB.note);
+});

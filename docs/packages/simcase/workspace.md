@@ -322,7 +322,7 @@ the oxide. Its geometry holds the design's two parameters: `t_ox` = 10 µm, the 
 the via's height (z from 500 to `500 + t_ox`), and `via_w` = 20 µm, the via's width (x and y from
 `100 - via_w / 2` to `100 + via_w / 2`), so the via always crosses only the oxide. The oxide's
 thickness field reads *= t_ox (10 µm)*; the via's row still reads *20 × 20 × 10 µm*, the size the
-server's check evaluates. The via is square here: *Square via (the round via is the card Copper via through a slab)*. The top silicon has its own material, `Si (top)`, with the properties
+server's check evaluates. The via is square here: *Square via: a box through the oxide, in a layer stack*. The top silicon has its own material, `Si (top)`, with the properties
 of `Si`, only because a heat source names a region by its material today (a layer or feature name such
 as `stack.top` is not a region of the heat kind). Its physics is Heat transfer (3D): 300 K on `z0`, a
 heat source of 1e12 W/m³ in `Si (top)` (4 W in all), every other outer face insulated. The source is a test value (it heats the card to
@@ -348,7 +348,11 @@ there is no line. The run's 31.75 W is below it because the drawn and meshed cyl
 polygon. A project holds one 3D model: while it holds one from
 card 1, choosing card 2 leaves it as it is and says *This project already holds the 3D model Via in a
 layer stack (3D heat); a project holds one 3D model. Open Copper via through a slab (3D heat) in a new
-browser tab.* (and the other way round). The project file names the card (`layer-stack-3d` or
+tab.* (and the other way round), with an **Open in a new tab** button. The button opens
+`/workspace?card=via-slab-3d&fresh=1`: a new tab whose own project starts with that card. Nothing is
+restored into it: it offers no browser recovery and writes none (*This tab was opened for one 3D
+model: it offers no browser recovery and keeps none.*), so the recovery of the tab it came from stays
+as it is. The project file names the card (`layer-stack-3d` or
 `via-slab-3d`), and Export › Model with runs suggests the card's file name
 (`copper-via-through-a-slab-3d.json`).
 

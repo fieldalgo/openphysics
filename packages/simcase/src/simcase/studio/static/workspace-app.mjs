@@ -44,7 +44,7 @@ import {DEFAULT_JOULE,validateJoule} from './workspace-joule.mjs';
 import {createJouleView,JOULE_NODES} from './workspace-joule-view.mjs';
 import {createMultiphysicsView} from './workspace-multiphysics-view.mjs';
 import {createModel3dView} from './workspace-model3d-view.mjs';
-import {CARD3D,CARDS3D,card3dOf} from './workspace-model3d.mjs';
+import {CARD3D,CARDS3D,card3dOf,freshCard,newTabUrl} from './workspace-model3d.mjs';
 import {ENVELOPE,matchesAgainText} from './workspace-multiphysics.mjs';
 import {checkSessionModels,isModelDocument,multiphysicsLoadText,sizeText} from './workspace-multiphysics-session.mjs';
 import {readProject,writeProject,projectEntry,projectFileName,nameFromFile,nameSource,savedProjectName,validateProjectName,isProjectDocument,projectSavedNotice,modelsText,modelParts,MAX_PROJECT_BYTES,PROJECT_FORMAT} from './workspace-project-file.mjs';
@@ -54,6 +54,9 @@ import {setupMenus} from './workspace-file-menu.mjs';
 (()=>{'use strict';const $=id=>document.getElementById(id);
 // A reload always opens the start page, so a restored scroll position would hide its top.
 if('scrollRestoration' in history)history.scrollRestoration='manual';
+// U6: a tab opened at /workspace?card=<3D card>&fresh=1 (Open in a new tab): it starts with that card,
+// offers no browser recovery and writes none, so the recovery of the tab it came from stays as it is.
+const FRESH_CARD=freshCard(location.search);
 const ui={page:'Applications',selection:'Geometry',view:'Perspective',body:'Core',shape:0,snap:5,reference:null};const state={height:220,width:500,wavelength:1550,coreMesh:30,modeCount:DEFAULT_MODE_COUNT,groupIndex:false,openBoundary:null,searchTarget:null,shapes:[{name:'Core',type:'rect',material:'Silicon',x:-250,y:0,w:500,h:220}],thermal:validateThermal(DEFAULT_THERMAL),joule:validateJoule(DEFAULT_JOULE),voltage:1,heat:true,structure:true,optics:true};const setup={materials:{Core:'Silicon',Oxide:'Silica',Heater:''},cooling:'',temperature:293.15,fixed:'',terminal:''};const pick={mode:'Bodies',boundary:null};const names=['Geometry','Materials','Electric currents','Heat transfer','Solid mechanics','Optical modes','Couplings','Mesh','Study'];
 // round 29 (L1): the count the slab shortcut replaced (shortcutModesMemory, workspace-closed-target.mjs)
 const shortcutModes=shortcutModesMemory();
@@ -226,12 +229,17 @@ async function choose3d(card){
  if(multiView.busy()){notice('Wait for the multiphysics run to finish, or stop it under Study.');return;}
  if(openingModel){notice('Wait until the model file has been opened.');return;}
  if(m3View.inProject()){
-  if(m3View.card()!==card.id){notice(`This project already holds the 3D model ${m3View.projectTitle()}; a project holds one 3D model. Open ${card.title} in a new browser tab.`);return;}
+  if(m3View.card()!==card.id){notice(`This project already holds the 3D model ${m3View.projectTitle()}; a project holds one 3D model. Open ${card.title} in a new tab.`,'',
+   {label:'Open in a new tab',data:{m3NewTab:card.id},run:()=>window.open(newTabUrl(card),'_blank','noopener')});return;}
   if(!leaveMultiphysics())return;m3View.show();topOfPage();return;}
  let doc;try{doc=await studioRequest('GET',card.asset);}catch(e){notice('The 3D model could not be loaded: '+e.message);return;}
  if(!leaveMultiphysics())return;fileScope++;projectId('model3d');m3View.open(doc,{asTitle:card.title,card:card.id});topOfPage();
  notice(`${card.title} added to this project; the other models stay as they were. Nothing was computed.`);
 }
+ // U6: /workspace?card=<3D card>&fresh=1 (the refusal's Open in a new tab): this tab starts with that card
+ // in its own project, once the page has loaded. Nothing is restored into it; the browser's recovery
+ // records are left as they are.
+ if(FRESH_CARD)setTimeout(()=>choose3d(FRESH_CARD),0);
 // Leaving a multiphysics model for a single-physics one (a card, an opened file, recovery,
 // Reset): refused while its run is going; false when refused.
 function leaveMultiphysics(){
@@ -1136,6 +1144,7 @@ const notebookAutosave=new NotebookAutosave(notebookStore,{onState:state=>{
  refreshSaveIndicator();
 }});
 async function loadNotebookRecovery(){
+ if(FRESH_CARD){$('recover-notebook').disabled=true;$('notebook-recovery-detail').textContent=FRESH_RECOVERY;return;}
  const version=notebookLoadVersion;
  try{const record=await notebookStore.load();const recovered=readNotebookRecovery(record);recoveryRead.latestRead();if(version!==notebookLoadVersion)return;notebookStore.adopt(record);notebookRecoveryRecord=record||null;ownLatest=false;$('recover-notebook').disabled=!recovered;$('retry-notebook').disabled=true;
   latestOffer=recovered?{runs:recovered.session.runs.length,savedAt:recovered.savedAt,model:recoveredModel(recovered),entry:recoveredEntry(recovered),recovered}:null;
@@ -1343,7 +1352,8 @@ function notebookStamp(){return JSON.stringify({input:workspaceInputs(),runs:run
 // The application the last recovery record was scheduled for: when the tab moves between an
 // optical and a multiphysics model, the stored record is kept as an earlier session.
 let recoveryKind=null;
-function scheduleRecovery(kind,stamp,makeText,extra){if(recoveryKind&&recoveryKind!==kind)notebookStore.keepPrevious();recoveryKind=kind;notebookAutosave.schedule(stamp,makeText,extra);}
+const FRESH_RECOVERY='This tab was opened for one 3D model: it offers no browser recovery and keeps none. Use File › Save for a file you can keep.';
+function scheduleRecovery(kind,stamp,makeText,extra){if(FRESH_CARD)return;if(recoveryKind&&recoveryKind!==kind)notebookStore.keepPrevious();recoveryKind=kind;notebookAutosave.schedule(stamp,makeText,extra);}
 function refreshNotebook(){
  if(multiView.active()){const rec=multiView.recovery();$('replace-notebook').disabled=!rec;if(rec)scheduleRecovery('multiphysics',rec.stamp+JSON.stringify(recordProjectNow()),rec.makeText,{savedFile:rec.savedFile,openedFile:rec.openedFile,openedCurrent:rec.openedCurrent,project:recordProjectNow()});
   $('notebook-status').textContent=multiView.runCount()?(multiView.unsavedRuns()?'Changed since the last session file · File › Save keeps it':'Matches the last session file opened or saved'):'No completed runs in this session';$('save-session').classList.toggle('unsaved-session',multiView.unsavedRuns()>0);return;}
