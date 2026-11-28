@@ -605,8 +605,10 @@ jobs:
           counts = {k: int(suite.get(k)) for k in ("tests", "skipped", "failures", "errors")}
           assert counts == {"tests": 2, "skipped": 0, "failures": 0, "errors": 0}, counts
           PY
-          grep '^W8 ' "$RUNNER_TEMP/w8-out/w8.log"
-          grep '^W8-run ' "$RUNNER_TEMP/w8-out/w8.log"
+          # the report lines, wherever they start: with -s, pytest's progress dot of the test before
+          # can share the line ('.W8-run {...}')
+          grep -o 'W8 {.*' "$RUNNER_TEMP/w8-out/w8.log"
+          grep -o 'W8-run {.*' "$RUNNER_TEMP/w8-out/w8.log"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
