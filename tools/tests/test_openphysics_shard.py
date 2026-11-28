@@ -132,3 +132,33 @@ def test_a_bad_shard_stops_the_run(small_suite):
     result = collect(small_suite, "--shard", "4/3")
     assert result.returncode == 4  # pytest's usage error
     assert "--shard" in result.stderr
+
+
+def junit(path, cases):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = "".join(f'<testcase classname="{c}" name="t{i}" time="{t}"/>' for i, (c, t) in enumerate(cases))
+    path.write_text(f'<?xml version="1.0"?><testsuites><testsuite>{body}</testsuite></testsuites>',
+                    encoding="utf-8")
+
+
+def test_slowest_keeps_each_files_longest_run(small_suite, tmp_path_factory):
+    # Two runs of the same suite on runners of different speed: per file, the run's sum of
+    # its test cases, then the longer of the two runs. A file seen in one run only keeps that time.
+    runs = tmp_path_factory.mktemp("runs")
+    junit(runs / "a" / "part-1.xml", [("test_one", 1.0), ("test_one", 2.0)])
+    junit(runs / "a" / "part-2.xml", [("sub.test_three", 9.0)])
+    junit(runs / "b" / "nested" / "part-1.xml", [("test_one", 4.0), ("test_two", 0.5)])
+    junit(runs / "b" / "part-2.xml", [("sub.test_three", 5.0)])
+    output = tmp_path_factory.mktemp("out") / "durations.json"
+    table = shard.update_slowest([runs / "a", runs / "b"], "runs a and b", output, root=small_suite)
+    assert table == {"source": "runs a and b", "seconds": {
+        "sub/test_three.py": 9.0, "test_one.py": 4.0, "test_two.py": 0.5}}
+    assert json.loads(output.read_text(encoding="utf-8")) == table
+    # One run's folder alone gives that run's sums, as --update does with its files.
+    assert shard.update_slowest([runs / "a"], "a", output, root=small_suite)["seconds"] == \
+        shard.update(sorted((runs / "a").glob("*.xml")), "a", output, root=small_suite)["seconds"]
+
+
+def test_slowest_refuses_a_folder_without_junit(tmp_path):
+    with pytest.raises(SystemExit, match="no JUnit XML"):
+        shard.update_slowest([tmp_path], "empty", tmp_path / "durations.json", root=tmp_path)

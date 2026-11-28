@@ -18,6 +18,12 @@ As a script, rebuild the table from the JUnit XML of a complete run (all parts):
 
     python tools/shards/openphysics_shard.py --update source-tests-*.xml --source "<run>"
 
+or, with ``--slowest``, from several complete runs, one folder of JUnit XML per run,
+keeping each file's longest time: a part runs on one runner, so balancing the parts by
+the slowest times seen bounds the longest part when it lands on a slow runner::
+
+    python tools/shards/openphysics_shard.py --slowest run-a run-b --source "<runs>"
+
 Run it from the repository root: test cases are mapped to files by their
 dotted class names.
 """
@@ -132,8 +138,8 @@ def _case_file(classname, root):
     return None
 
 
-def update(xml_paths, source, output=DURATIONS, root=Path(".")):
-    """Sum the JUnit test-case times per test file and write the table."""
+def file_seconds(xml_paths, root=Path(".")):
+    """Sum the JUnit test-case times per test file."""
     seconds = {}
     for xml_path in xml_paths:
         for case in ET.parse(xml_path).getroot().iter("testcase"):
@@ -142,19 +148,47 @@ def update(xml_paths, source, output=DURATIONS, root=Path(".")):
                 raise SystemExit(f"{xml_path}: no test file for class {case.get('classname')!r}; "
                                  "run from the repository root")
             seconds[name] = seconds.get(name, 0.0) + float(case.get("time", 0) or 0)
+    return seconds
+
+
+def _write(seconds, source, output):
     table = {"source": source, "seconds": {k: round(v, 1) for k, v in sorted(seconds.items())}}
     Path(output).write_text(json.dumps(table, indent=1) + "\n", encoding="utf-8")
     return table
 
 
+def update(xml_paths, source, output=DURATIONS, root=Path(".")):
+    """Sum the JUnit test-case times per test file and write the table."""
+    return _write(file_seconds(xml_paths, root), source, output)
+
+
+def update_slowest(run_dirs, source, output=DURATIONS, root=Path(".")):
+    """Write the table from several runs (one folder of JUnit XML each), keeping per test
+    file the longest of the runs' sums."""
+    seconds = {}
+    for run_dir in run_dirs:
+        xml_paths = sorted(Path(run_dir).rglob("*.xml"))
+        if not xml_paths:
+            raise SystemExit(f"{run_dir}: no JUnit XML files")
+        for name, value in file_seconds(xml_paths, root).items():
+            seconds[name] = max(seconds.get(name, 0.0), value)
+    return _write(seconds, source, output)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--update", nargs="+", metavar="JUNIT_XML", required=True,
-                        help="JUnit XML files of one complete run")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--update", nargs="+", metavar="JUNIT_XML",
+                      help="JUnit XML files of one complete run")
+    mode.add_argument("--slowest", nargs="+", metavar="RUN_DIR",
+                      help="one folder of JUnit XML per complete run; each file's longest time is kept")
     parser.add_argument("--source", required=True, help="where the times come from (run, commit)")
     parser.add_argument("--output", default=str(DURATIONS))
     args = parser.parse_args(argv)
-    table = update(args.update, args.source, args.output)
+    if args.slowest:
+        table = update_slowest(args.slowest, args.source, args.output)
+    else:
+        table = update(args.update, args.source, args.output)
     total = sum(table["seconds"].values())
     print(f"{len(table['seconds'])} test files, {total / 60:.1f} min, written to {args.output}")
 

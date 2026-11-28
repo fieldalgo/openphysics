@@ -290,6 +290,17 @@ folder), from the repository root:
 python tools/shards/openphysics_shard.py --update source-tests-*.xml --source "Validate packages run <id> (main <sha>)"
 ```
 
+A part runs on one runner, and the times of one run come from a mix of fast and slow
+runners, so a part balanced by them can take far longer than planned on a slow runner.
+`--slowest` instead keeps each file's longest time over several complete sets of sixteen
+parts, each unpacked in its own folder (the `source-tests-<k>-of-16` artifacts of one run,
+or its `installed-test-results-<k>-of-16`); the parts are then balanced for the slowest
+runner seen:
+
+```bash
+python tools/shards/openphysics_shard.py --slowest run-1-source run-1-installed run-2-source --source "<runs>"
+```
+
 **Distribution checks** (`tools/check_distributions.py`). Builds all nine packages
 (including the `openphysics` meta distribution), each wheel from its sdist,
 with pinned build tools, and checks metadata with `twine check --strict`.

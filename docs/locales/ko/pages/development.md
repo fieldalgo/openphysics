@@ -253,6 +253,16 @@ PYTHONPATH=tools/shards python -m pytest -q -p openphysics_shard --shard 2/16
 python tools/shards/openphysics_shard.py --update source-tests-*.xml --source "Validate packages run <id> (main <sha>)"
 ```
 
+한 부분은 러너 하나에서 돌고, 한 실행의 시간은 빠른 러너와 느린 러너가 섞인 것이라서 그 시간으로
+나눈 부분이 느린 러너에서는 계획보다 훨씬 오래 걸릴 수 있습니다. `--slowest`는 대신 열여섯 부분
+전체를 여러 벌(각각 자기 폴더에 푼 한 실행의 `source-tests-<k>-of-16` artifact, 또는 그 실행의
+`installed-test-results-<k>-of-16`) 받아 파일마다 가장 긴 시간을 남기며, 그러면 부분들이 지금까지 본
+가장 느린 러너 기준으로 나뉩니다.
+
+```bash
+python tools/shards/openphysics_shard.py --slowest run-1-source run-1-installed run-2-source --source "<runs>"
+```
+
 **배포 검사** (`tools/check_distributions.py`). 패키지 아홉 개(`openphysics` 메타
 배포판 포함)를 고정 빌드 도구로 빌드하며, 각 wheel은 자기 sdist에서 빌드합니다.
 `twine check --strict`로 메타데이터를 확인합니다. 배포물에는 패키지 코드만 들어갑니다.
