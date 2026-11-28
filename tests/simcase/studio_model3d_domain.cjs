@@ -23,9 +23,9 @@ const meshField=doc=>M.fieldsOf(doc,'mesh')[0];
 test('the Domain row: the evaluated domain where a bound is an expression',()=>{
  const check={features:[{text:''},{text:'',size:[20,20,10]}],regions:[],display:{faces:[]},domain:EVALUATED};
  const note=(doc,ch)=>M.treeRows(doc,ch,null,null).find(r=>r.key==='domain').note;
- assert.equal(note(numeric(),null),'200 × 200 × 610 µm');
- assert.equal(note(expr(),check),'200 × 200 × 610 µm');
- assert.equal(note(expr(),null),'200 × 200 µm','before the check has answered: as before');
+ assert.equal(note(numeric(),null),'x 0–200 · y 0–200 · z 0–610 µm');
+ assert.equal(note(expr(),check),'x 0–200 · y 0–200 · z 0–610 µm');
+ assert.equal(note(expr(),null),'x 0–200 · y 0–200 µm','before the check has answered: as before');
 });
 
 test("Studio's size guards use the evaluated domain's diagonal",()=>{

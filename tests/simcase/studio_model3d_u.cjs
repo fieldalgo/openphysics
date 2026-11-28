@@ -86,3 +86,21 @@ test('U7: a Regions control lists the shown regions to hide; Names says any name
  assert.deepEqual(M.regionToggles(null,new Set()),[]);
  assert.equal(M.NAMES_ANY,'Any of these names selects this face.');
 });
+
+test('U8: µm in the read-only notes; the Domain row gives coordinate ranges',()=>{
+ const note=(doc,key,check=null)=>M.treeRows(doc,check,null,null).find(r=>r.key===key).note;
+ // the Parameters row shows the values in µm; the document keeps "10 um" as written
+ assert.equal(note(card(),'parameters'),'t_ox = 10 µm · via_w = 20 µm');
+ assert.equal(card().geometry.parameters.t_ox.value,'10 um');
+ // card 1's z top is an expression: the range comes from the check's evaluated domain
+ const check={domain:{xmin:0,xmax:200,ymin:0,ymax:200,zmin:0,zmax:610},features:[],regions:[],display:{faces:[]}};
+ assert.equal(note(card(),'domain',check),'x 0–200 · y 0–200 · z 0–610 µm');
+ assert.equal(note(card(),'domain'),'x 0–200 · y 0–200 µm');
+ const card2=JSON.parse(fs.readFileSync(path.join(STATIC_DIR,'model3d-via-slab-3d.json'),'utf8'));
+ assert.equal(note(card2,'domain'),'x −1–1 · y −1–1 · z 0–1 m');
+ const free=card();delete free.geometry.components.stack3d.domain.zmin;delete free.geometry.components.stack3d.domain.zmax;
+ assert.equal(note(free,'domain'),'x 0–200 · y 0–200 µm, z from the features');
+ // a parameter's note in a field, and its range, in µm
+ assert.equal(M.fieldNote(card(),'features[0].layers[1].thickness'),'= t_ox (10 µm)');
+ assert.equal(M.shownText('["5 um","20 um"]'),'["5 µm","20 µm"]');
+});

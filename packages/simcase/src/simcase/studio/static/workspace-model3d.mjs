@@ -59,6 +59,8 @@ const component=doc=>doc.geometry.components[componentName(doc)];
 export const UNITS=Object.freeze({m:1,mm:1e-3,um:1e-6,'µm':1e-6,nm:1e-9});
 /** A unit as shown: um → µm. */
 export const shownUnit=unit=>unit==='um'?'µm':unit;
+/** U8: document text as shown where it cannot be edited (a note, a label): um → µm. Inputs keep what was written. */
+export const shownText=text=>String(text).replace(/\bum\b/g,'µm');
 const num=v=>Number(Number(v).toPrecision(6));
 const MAX_LAYERS=32;
 const NAME=/^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -100,7 +102,7 @@ export function siText(si){return si===null||si===undefined?'':`= ${Number(si.to
 export function fieldNote(doc,key){
  const value=getField(doc,key);if(value===null||value===undefined||value==='')return '';
  const params=doc.geometry.parameters||{},text=String(value).trim();
- if(NAME.test(text)&&text in params)return `= ${text} (${String(params[text].value).replace(/\bum\b/g,'µm')})`;
+ if(NAME.test(text)&&text in params)return `= ${text} (${shownText(params[text].value)})`;
  const p=parseLength(text,component(doc).length_unit);
  return p.problem?'':siText(p.si);
 }
@@ -248,13 +250,15 @@ export function treeRows(doc,check=null,refused=null,words=null,{runs=[]}={}){
  const comp=component(doc),rows=[],u=shownUnit(comp.length_unit),d=comp.domain||{};
  const params=Object.entries(doc.geometry.parameters||{});
  rows.push({key:'component',label:`Component 1 · 3D · ${u}`,level:1,note:'',problem:false});
- rows.push({key:'parameters',label:'Parameters',level:2,note:params.map(([n,p])=>`${n} = ${p.value}`).join(' · '),problem:!!refused&&/^geometry\.parameters\b/.test(refused.path||'')});
+ rows.push({key:'parameters',label:'Parameters',level:2,note:params.map(([n,p])=>`${n} = ${shownText(p.value)}`).join(' · '),problem:!!refused&&/^geometry\.parameters\b/.test(refused.path||'')});
  rows.push({key:'geometry',label:'Geometry 1',level:2,note:'',problem:false});
  // a bound written as a parameter or an expression: the domain the check evaluated, once it has answered
  const bound=k=>{const x=inUnit(d[k],comp.length_unit);return x!==null?x:typeof check?.domain?.[k]==='number'?check.domain[k]:null;};
- const ext=AXES.map(a=>{const lo=bound(a+'min'),hi=bound(a+'max');return lo===null||hi===null?null:num(hi-lo);});
+ // U8: each axis's coordinate range, "x 0–200 · y 0–200 · z 0–610 µm" (a minus sign for negative bounds)
+ const signed=x=>String(num(x)).replace('-','−');
+ const ranges=AXES.map(a=>{const lo=bound(a+'min'),hi=bound(a+'max');return lo===null||hi===null?null:`${a} ${signed(lo)}–${signed(hi)}`;});
  const zFree=d.zmin===undefined&&d.zmax===undefined;
- rows.push({key:'domain',label:'Domain',level:3,note:ext[0]===null||ext[1]===null?'':zFree?`${ext[0]} × ${ext[1]} ${u}, z from the features`:ext[2]===null?`${ext[0]} × ${ext[1]} ${u}`:`${ext.join(' × ')} ${u}`,problem:false});
+ rows.push({key:'domain',label:'Domain',level:3,note:ranges[0]===null||ranges[1]===null?'':zFree?`${ranges[0]} · ${ranges[1]} ${u}, z from the features`:ranges[2]===null?`${ranges[0]} · ${ranges[1]} ${u}`:`${ranges.join(' · ')} ${u}`,problem:false});
  const meshOff=meshRefusal(check);
  comp.features.forEach((f,i)=>{
   const cover=check?.features?.[i]?.text||'',summary=featureSummary(comp,f,check?.features?.[i]);
@@ -265,7 +269,7 @@ export function treeRows(doc,check=null,refused=null,words=null,{runs=[]}={}){
  rows.push({key:'form',label:'Form result',level:3,note:refused?'refused':check?`${plural(check.regions.length,'region')}${faces===undefined?'':' · '+plural(faces,'face')}`:'',
   problem:!!refused&&refused.feature_index===null&&!/^geometry\.parameters\b/.test(refused.path||'')});
  rows.push({key:'materials',label:'Materials',level:2,note:Object.keys(doc.materials||{}).join(' · '),problem:false});
- const size=doc.mesh?.element_size,sizeText=size===undefined?'':`size ${String(size).replace(/\bum\b/g,'µm')}`;
+ const size=doc.mesh?.element_size,sizeText=size===undefined?'':`size ${shownText(size)}`;
  const est=!refused&&check?.mesh?.ok&&words?words.estimateText(check.mesh.estimate):'';
  rows.push(...heatRows(doc,check,refused));
  rows.push({key:'mesh',label:'Mesh 1',level:2,note:meshOff?'refused':[sizeText,est].filter(Boolean).join(' · '),
