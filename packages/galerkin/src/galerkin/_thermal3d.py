@@ -11,6 +11,7 @@ from scipy.sparse.linalg import splu
 from ._heat_kernels import source_load_3d as _source_load_3d
 from ._public import refuse_text
 from ._tetra_materials import refuse_live_3d, region_property
+from ._thermal_contact3d import TransientContact, contact_faces
 from .assembly3d import assemble_mass_3d as _assemble_mass_3d
 from .assembly3d import assemble_stiffness_3d as _assemble_stiffness_3d
 from .core.checks import finite_scalar, real_array
@@ -130,13 +131,14 @@ def boundary_system(samples, labels, offsets):
 
 def solve_transient_fields(mesh, *, thermal_conductivity, volumetric_heat_capacity, time,
                            initial_temperature, prescribed_temperature, heat_source_density,
-                           inward_heat_flux, convection, coupled_step=None):
+                           inward_heat_flux, convection, thermal_contact_conductance=None, coupled_step=None):
     for name, value in (("thermal_conductivity", thermal_conductivity),
                         ("volumetric_heat_capacity", volumetric_heat_capacity), ("time", time),
                         ("initial_temperature", initial_temperature),
                         ("prescribed_temperature", prescribed_temperature),
                         ("heat_source_density", heat_source_density),
-                        ("inward_heat_flux", inward_heat_flux), ("convection", convection)):
+                        ("inward_heat_flux", inward_heat_flux), ("convection", convection),
+                        ("thermal_contact_conductance", thermal_contact_conductance)):
         refuse_text(name, value)
     if not isinstance(mesh, Mesh3D):
         raise TypeError("solve_transient_heat_3d takes a galerkin.Mesh3D")
@@ -166,17 +168,26 @@ def solve_transient_fields(mesh, *, thermal_conductivity, volumetric_heat_capaci
     k = region_property(mesh, thermal_conductivity, "thermal_conductivity", positive=True)
     capacity = region_property(mesh, volumetric_heat_capacity, "volumetric_heat_capacity", positive=True)
 
-    # One reference keeps a common absolute temperature out of the system.
-    reference = initial[0]
-    samples = natural_faces(mesh, exterior, prescribed, inward_heat_flux, convection)
-    robin, outward, ambient = boundary_system(samples, np.zeros(mesh.num_nodes, dtype=int), np.array([reference]))
+    samples = list(natural_faces(mesh, exterior, prescribed, inward_heat_flux, convection))
+    contact = contact_faces(mesh, thermal_contact_conductance, samples)
+    body = np.zeros(mesh.num_nodes, dtype=int)
+    offsets = initial[:1]
+    if contact is not None:
+        # Each solid can start at a different temperature. Removing its own
+        # constant keeps small heat rates across a weak interface resolvable.
+        edges = mesh.tets[:, [[0, 1], [0, 2], [0, 3]]].reshape(-1, 2)
+        graph = sp.csr_matrix((np.ones(len(edges), dtype=bool), edges.T), shape=(mesh.num_nodes,) * 2)
+        _, body = sp.csgraph.connected_components(graph, directed=False)
+        _, first = np.unique(body, return_index=True)
+        offsets = initial[first]
+    robin, outward, ambient = boundary_system(samples, body, offsets)
     stiffness = _assemble_stiffness_3d(mesh, k) + robin
     mass = _assemble_mass_3d(mesh, capacity)
     if not all(np.all(np.isfinite(a)) for a in (stiffness.data, mass.data, outward, ambient)):
         raise ValueError("assembled heat system exceeds floating-point range")
-    return _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffness,
+    return _integrate(mesh, times, steps, initial, offsets[body], free, fixed, mass, stiffness,
                       robin, outward, ambient, 0.0 if heat_source_density is None else heat_source_density,
-                      coupled_step)
+                      coupled_step, contact, body)
 
 
 def _source_load(mesh, value):
@@ -187,14 +198,20 @@ def _source_load(mesh, value):
 
 
 def _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffness,
-               robin, outward, ambient, source, coupled_step):
+               robin, outward, ambient, source, coupled_step, contact, body):
+    if contact is not None:
+        contact = TransientContact(contact, mass, initial, free, fixed, np.max(steps))
+
     @lru_cache(maxsize=8)
     def factor(dt):
         matrix = (mass_free / dt + stiffness_free).tocsc()
+        weak = None
+        if contact is not None:
+            matrix, weak = contact.system(dt, matrix)
         if not np.all(np.isfinite(matrix.data)):
             raise ValueError("time interval produces a nonfinite heat matrix")
         try:
-            return splu(matrix)
+            return (splu(matrix) if matrix.shape[0] else None), weak
         except RuntimeError as exc:
             raise ValueError("singular transient heat system") from exc
 
@@ -209,6 +226,8 @@ def _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffn
     if not np.isfinite(stored[0]):
         raise ValueError("initial stored heat exceeds floating-point range")
     histories = {name: np.empty((len(steps), mesh.num_nodes)) for name in RATE_FIELDS}
+    if contact is not None:
+        histories["contact_heat_rate"] = np.empty((len(steps), mesh.num_nodes))
     shifted = initial - reference
     for i, dt in enumerate(steps):
         midpoint = float(times[i] + dt / 2)
@@ -219,25 +238,35 @@ def _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffn
             if not np.all(np.isfinite(rhs)):
                 raise ValueError(f"nonfinite heat load on interval {i}")
             delta = np.zeros(mesh.num_nodes)
-            if free.size:
-                delta[free] = factor(float(dt)).solve(rhs[free])
-            return delta, rhs
+            next_jump, contact_rate = None, None
+            if contact is not None:
+                lu, weak = factor(float(dt))
+                delta[free], next_jump, contact_rate = contact.advance(lu, weak, rhs, i)
+            elif free.size:
+                lu, _ = factor(float(dt))
+                delta[free] = lu.solve(rhs[free])
+            return load, delta, rhs, next_jump, contact_rate
 
         if coupled_step is None:
             if dynamic:
                 load = _source_load(mesh, source(midpoint))
-            delta, rhs = solve_increment(load)
+            step = solve_increment(load)
         else:
             def trial(density):
                 trial_load = _source_load(mesh, density)
-                trial_delta, trial_rhs = solve_increment(trial_load)
-                next_temperature = shifted + trial_delta + reference
+                trial_step = solve_increment(trial_load)
+                next_temperature = shifted + trial_step[1] + reference
                 next_temperature[fixed] = initial[fixed]
-                return next_temperature, (trial_load, trial_delta, trial_rhs)
+                return next_temperature, trial_step
 
-            load, delta, rhs = coupled_step(i, midpoint, temperature[i], trial)
+            step = coupled_step(i, midpoint, temperature[i], trial)
+        load, delta, rhs, next_jump, contact_rate = step
         storage = (mass @ delta) / dt
         residual = storage + stiffness @ delta - rhs
+        if contact is not None:
+            contact.state = next_jump
+            residual += contact_rate
+            histories["contact_heat_rate"][i] = contact_rate
         shifted += delta
         temperature[i + 1] = shifted + reference
         temperature[i + 1, fixed] = initial[fixed]
@@ -245,12 +274,23 @@ def _integrate(mesh, times, steps, initial, reference, free, fixed, mass, stiffn
         convective = robin @ shifted - ambient
         if not all(np.all(np.isfinite(a)) for a in (temperature[i + 1], stored[i + 1], residual, convective)):
             raise ValueError(f"nonfinite transient heat solution on interval {i}")
-        scale = np.max(absolute_mass @ np.abs(delta) / dt
-                       + absolute_stiffness @ np.abs(delta) + np.abs(rhs))
+        nodal_scale = absolute_mass @ np.abs(delta) / dt + absolute_stiffness @ np.abs(delta) + np.abs(rhs)
+        if contact is not None:
+            nodal_scale += np.abs(contact_rate)
+        scale = np.max(nodal_scale)
         if not np.isfinite(scale) or np.max(np.abs(residual[free]), initial=0.) > 1e-10 * scale:
             raise ValueError(f"transient heat solve failed the free residual tolerance on interval {i}")
         reaction = np.zeros(mesh.num_nodes)
         reaction[fixed] = residual[fixed]
+        if contact is not None:
+            rates = (load, reaction, -outward, -convective, -contact_rate, -storage)
+            imbalance = sum(np.bincount(body, weights=r) for r in rates)
+            throughput = sum(np.bincount(body, weights=np.abs(r)) for r in rates)
+            roundoff = 32 * np.finfo(float).eps * np.bincount(body, weights=nodal_scale
+                                                              + absolute_stiffness @ np.abs(shifted))
+            if (not np.all(np.isfinite(imbalance) & np.isfinite(throughput) & np.isfinite(roundoff))
+                    or np.any(np.abs(imbalance) > 1e-10 * throughput + roundoff)):
+                raise ValueError(f"thermal contact failed the heat balance on a connected solid on interval {i}")
         for name, values in zip(RATE_FIELDS, (load, outward, convective, reaction, storage, residual)):
             histories[name][i] = values
     # All arrays are owned by this solve, including the validated time array.

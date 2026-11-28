@@ -24,7 +24,7 @@
 | 손실 유전·자성 직육면체 영역과 유한 전도도 벽을 갖는 3D 직육면체 공진기: 복소 주파수와 Q | `solve_material_cavity_box` | [재료 공진기](material_cavity.md) | — |
 | 영역별 손실 재료와 면 태그별 PEC·임피던스 벽을 갖는 외부 메시의 3D 공진기 | `solve_material_cavity` | [재료 공진기, 외부 메시](material_cavity.md#외부-메시) | — |
 | 사면체 메시의 정상 3D 열전도, 영역별 열전도율, 외부 열유속·대류 및 유한한 열접촉 | `galerkin.thermal3d.solve_steady_heat_3d` | [계약과 검증](thermal3d.md) | — |
-| 시간 구간별 발열을 적용하는 3D 과도 열전도 | `galerkin.transient_heat3d.solve_transient_heat_3d` | [입력과 열수지](transient_heat3d.md) | — |
+| 시간 구간별 발열과 유한한 열접촉을 적용하는 3D 과도 열전도 | `galerkin.transient_heat3d.solve_transient_heat_3d` | [입력과 열수지](transient_heat3d.md) | — |
 | 온도 의존 전도도와 정전압을 사용하는 3D 과도 줄 발열 | `galerkin.transient_joule_heat3d.solve_transient_joule_heat_3d` | [입력과 에너지 수지](transient_joule_heat3d.md) | — |
 | 등방성 정상 2D 열전도, Dirichlet·단열 경계 | `galerkin.thermal.solve_steady_heat` | [계약](thermal_steady2d.md), [검증](thermal_independent_validation.md) | [thermal_steady2d.py](../../../../../../examples/galerkin/thermal_steady2d.py) |
 | 정상 2D 전기전도: 등방 영역별 전기전도도, 전압·전류·절연 변과 명시적 Neumann 기준 전위, V·E·J와 요소별 Joule 발열 | `galerkin.electric.solve_steady_electric` | [계약과 검증](electric_steady2d.md) | [electric_steady2d.py](../../../../../../examples/galerkin/electric_steady2d.py) |
