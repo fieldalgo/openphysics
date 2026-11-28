@@ -627,14 +627,14 @@ fn split_parameter_si(mesh: &mut Mesh<MixedPoints>, points: &[P3], s: [u32; 2], 
     if !(target >= lo && target <= hi) {
         return mid;
     }
-    // the parameter: within 2^-24 of the piece, or about an acute end of the distance
-    // from it, so that points of one shell lie at one distance up to that; about a
-    // protected hub within 2^-30 (a thin fan's next segments are as close as its angle).
-    // A narrower window than a hub needs leaves few exact doubles: the rounded points of
-    // needle facets' long edges then move their sub-areas past V3(a)'s bound
+    // the parameter: within 2^-24 of the piece; about a protected hub within 2^-30 of
+    // the distance from it, so that points of one shell lie at one distance up to that
+    // (a thin fan's next segments are as close as its angle). A narrower window than
+    // needed leaves few exact doubles: the rounded points of needle facets' long edges
+    // then move their sub-areas past V3(a)'s bound
     let w = match rule {
-        Rule::Centre(c) => (if c == s[0] { target } else { 1.0 - target })
-            * 2f64.powi(if hub_radius.get(c as usize).is_some_and(|&r| r > 0.0) { -30 } else { -24 }),
+        Rule::Centre(c) if hub_radius.get(c as usize).is_some_and(|&r| r > 0.0) =>
+            (if c == s[0] { target } else { 1.0 - target }) * 2f64.powi(-30),
         _ => span * 2f64.powi(-24),
     };
     let exact = |t: f64| exact_point(pa, pb, t);
