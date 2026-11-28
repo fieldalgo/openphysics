@@ -30,6 +30,10 @@
 //      selected with its Temperature 330: 5/5.
 //  V10 card 2, cx = 0.8: Messages reads "Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m
 //      (cx + r ≤ 1 m), or r ≤ 0.2 m.", with the engine's sentence and code under Details: 1/1.
+//  V3  card 1 at 2 µm: Messages equals meshRefusalText of the server's refusal and names both sizes
+//      (the smallest the limit takes, and one estimated at about a minute, each with its estimate);
+//      the check at the minute size answers the refusal's tetrahedra and at most 60 s; the tree's Mesh 1
+//      note reads "too fine": 3/3. All numbers are the server's at test time.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -271,6 +275,30 @@ try {
     const rows = [shown.text === 'Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m), or r ≤ 0.2 m.'
       && shown.details.includes('E-3D-COMBINATION') && shown.details.includes("cylinder 'via' crosses the side domain.x1")];
     record('V10', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 1, shown});
+    await ctx.close();
+  }
+  // ---- V3: the estimate refusal gives two sizes with their estimates; the tree says "too fine" ----
+  if (want('V3')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    await page.click('[data-m3-node="mesh"]'); await setField(page, 'mesh.element_size', '2');
+    const doc = structuredClone(CARD); doc.mesh.element_size = '2 um';
+    const mesh = (await serverCheck(page, doc)).mesh;
+    const plain = await page.evaluate(async m => (await import('/workspace-assets/workspace-model3d.mjs')).meshRefusalText(m, 'um'), mesh);
+    const shown = await page.evaluate(() => ({text: document.querySelector('[data-m3-mesh-refusal] > p')?.textContent || '',
+      note: document.querySelector('[data-m3-node="mesh"] .m3-note')?.textContent || ''}));
+    // the minute size, typed: the check's estimate there is the refusal's, at most 60 s
+    const at = structuredClone(CARD); at.mesh.element_size = `${mesh.suggested_minute} um`;
+    const there = (await serverCheck(page, at)).mesh;
+    const rows = [
+      shown.text === plain && shown.text.includes(`${mesh.suggested_size} µm`) && shown.text.includes(`${mesh.suggested_minute} µm`) && /estimated about \d+ min\)/.test(shown.text),
+      there.ok === true && there.estimate.tetrahedra === mesh.minute_tetrahedra && there.estimate.seconds <= 60 && mesh.suggested_minute > mesh.suggested_size,
+      shown.note === 'too fine',
+    ];
+    record('V3', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, shown,
+      server: {suggested_size: mesh.suggested_size, suggested_tetrahedra: mesh.suggested_tetrahedra, suggested_seconds: mesh.suggested_seconds,
+        suggested_minute: mesh.suggested_minute, minute_tetrahedra: mesh.minute_tetrahedra, minute_seconds: mesh.minute_seconds}, there: there.estimate});
     await ctx.close();
   }
 } finally {

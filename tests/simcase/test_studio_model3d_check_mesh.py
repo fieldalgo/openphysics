@@ -113,9 +113,11 @@ def test_w5_a_refusal_before_meshing_comes_with_the_formed_shape(client, case):
     engine = ("ok", "refused", "code", "path", "feature_index")
     assert {k: answer["mesh"][k] for k in engine} == {"ok": False, "refused": str(expected), "code": code, "path": path,
                                                       "feature_index": index}
-    # an estimate refusal also answers the count, the limit and the smallest size (U1); no other does
+    # an estimate refusal also answers the count, the limit and the smallest size (U1), and a size that meshes
+    # in about a minute with both estimates (V3); no other does
     extra = set(answer["mesh"]) - set(engine)
-    assert extra == ({"tetrahedra", "limit", "suggested_size"} if code == "E-MESH-ESTIMATE" else set())
+    assert extra == ({"tetrahedra", "limit", "suggested_size", "suggested_tetrahedra", "suggested_seconds",
+                      "suggested_minute", "minute_tetrahedra", "minute_seconds"} if code == "E-MESH-ESTIMATE" else set())
     if code == "E-MESH-ESTIMATE":
         raised = make()
         raised["mesh"]["element_count_limit"] = 10 ** 12

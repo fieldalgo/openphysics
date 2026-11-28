@@ -78,3 +78,17 @@ test('V10: a cylinder crossing a domain side gets a plain suggestion, inside onl
  assert.equal(M.crossingAdvice(off('x1'),e),'Cylinder via crosses the domain side x = 1 m. Keep cx ≤ 0.7 m (cx + r ≤ 1 m).');
  assert.equal(M.crossingAdvice({...off('x1'),refused:'something else'},doc(0.8)),null);
 });
+
+test('V3: the estimate refusal gives the smallest accepted size and a size that meshes in about a minute',()=>{
+ const OFF={ok:false,code:'E-MESH-ESTIMATE',path:'mesh.element_count_limit',refused:'…',feature_index:null,tetrahedra:19215000,limit:600000,
+  suggested_size:6.36,suggested_tetrahedra:597583,suggested_seconds:358.55,suggested_minute:11.7,minute_tetrahedra:98783,minute_seconds:59.27};
+ assert.equal(M.meshRefusalText(OFF,'um'),'Component 1 needs about 19,215,000 tetrahedra; the limit is 600,000. Element size 6.36 µm meshes about 597,583 tetrahedra (estimated about 6 min); 11.7 µm about 98,783 (estimated about 1 min).');
+ // one size does both: a single sentence
+ assert.equal(M.meshRefusalText({...OFF,suggested_seconds:40,suggested_minute:6.36,minute_tetrahedra:597583,minute_seconds:40},'um'),'Component 1 needs about 19,215,000 tetrahedra; the limit is 600,000. Element size 6.36 µm meshes about 597,583 tetrahedra (estimated about 40 s).');
+ // no minute size found: the smallest size only, with its estimate
+ assert.equal(M.meshRefusalText({...OFF,suggested_minute:null},'um'),'Component 1 needs about 19,215,000 tetrahedra; the limit is 600,000. Element size 6.36 µm meshes about 597,583 tetrahedra (estimated about 6 min).');
+ // the tree's Mesh 1 note says what is wrong: too fine
+ const card=card1();
+ const rows=M.treeRows(card,{features:[{text:''},{text:''}],regions:[1],display:{faces:[]},mesh:OFF},null,null);
+ assert.equal(rows.find(r=>r.key==='mesh').note,'too fine');
+});

@@ -203,7 +203,10 @@ display; the mesh follows it to within its size"가 붙고, 곡면은 꼭짓점 
     (`/api/model3d/mesh/estimate`와 같은 말, `simcase.estimate_mesh3d`, 메시 작업의 재사용
     키), 또는 메시를 막는 거부(아래와 같은 형식): 요소 수 한도를 넘는 E-MESH-ESTIMATE,
     허용 오차 아래의 E-CONTRACT, 한 좌표로 반올림되는 두 값(`features[i]`의
-    E-3D-COMBINATION). 어느 쪽이든 형상은 만들어지므로 응답은 `"ok": true`로 남습니다.
+    E-3D-COMBINATION). E-MESH-ESTIMATE 거부에는 Studio의 조언도 붙습니다: `tetrahedra`, `limit`,
+    `suggested_size`(한도가 받는 가장 작은 크기), `suggested_minute`(추정 시간이 60 s 이하인 가장 작은 크기),
+    그리고 각각의 추정(`suggested_tetrahedra`, `suggested_seconds`, `minute_tetrahedra`, `minute_seconds`; 엔진의 추정이며
+    잰 시간이 아님). 어느 쪽이든 형상은 만들어지므로 응답은 `"ok": true`로 남습니다.
     카드에서는 검사의 8 ms에 약 7 ms를 더합니다.
   - `domain`: 구성 요소의 길이 단위로 된 영역, 매개변수와 식을 계산한 수. 작업 공간의 Domain 행, 크기 범위, Add feature의
     기본값에 씁니다.

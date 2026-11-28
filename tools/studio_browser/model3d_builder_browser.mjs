@@ -289,7 +289,7 @@ try {
       const own = plain !== expected?.refused;
       const ok = expected?.ok === false && shown.text === plain && shown.details.includes(expected.code) && (!own || shown.details.includes(expected.refused))
         && JSON.stringify(shown.marked) === JSON.stringify([mark]) && shown.block === (own ? 'Fix 1 problem in Messages to mesh' : expected.refused) && shown.meshDisabled && !shown.stale
-        && shown.meshNote === 'refused';
+        && shown.meshNote === (expected?.code === 'E-MESH-ESTIMATE' ? 'too fine' : 'refused');   // V3: an estimate refusal reads "too fine"
       rows.push({label, code: expected?.code, mark, expected: expected?.refused, shown, ok});
       await page.screenshot({path: join(out, `w5-mesh-${label.replace(/[^a-z0-9]+/gi, '-')}.png`)});
     }

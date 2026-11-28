@@ -272,7 +272,7 @@ export function treeRows(doc,check=null,refused=null,words=null,{runs=[]}={}){
  const size=doc.mesh?.element_size,sizeText=size===undefined?'':`size ${shownText(size)}`;
  const est=!refused&&check?.mesh?.ok&&words?words.estimateText(check.mesh.estimate):'';
  rows.push(...heatRows(doc,check,refused));
- rows.push({key:'mesh',label:'Mesh 1',level:2,note:meshOff?'refused':[sizeText,est].filter(Boolean).join(' · '),
+ rows.push({key:'mesh',label:'Mesh 1',level:2,note:meshOff?(meshOff.code==='E-MESH-ESTIMATE'?'too fine':'refused'):[sizeText,est].filter(Boolean).join(' · '),
   problem:!!meshOff&&(meshOff.feature_index===null||meshOff.feature_index===undefined)});
  rows.push({key:'study',label:'Study 1 · Steady',level:2,note:'',problem:false});
  rows.push({key:'results',label:'Results',level:2,note:runs.length?`${runs.length} ${runs.length===1?'run':'runs'}`:'no run yet',problem:false});
@@ -426,9 +426,18 @@ const thousands=n=>Number(n).toLocaleString('en-US');
  * A refusal that blocks meshing, as Messages shows it: an estimate refusal in plain words, with the
  * smallest element size the server's estimate accepts; any other refusal in the engine's words.
  */
+/** V3: an estimated time in round words: "about 40 s", "about 6 min" (the engine's estimate, not a measurement). */
+const roughTime=s=>s<45?`about ${Math.max(1,Math.round(s))} s`:`about ${Math.max(1,Math.round(s/60))} min`;
 export function meshRefusalText(off,unit){
  if(!plainEstimate(off))return off?.refused??'';
- const advice=typeof off.suggested_size==='number'?`Use an element size of at least ${Number(off.suggested_size.toPrecision(3))} ${shownUnit(unit)}.`:'Increase the element size.';
+ const u=shownUnit(unit),size=h=>`${Number(Number(h).toPrecision(3))} ${u}`;
+ let advice=typeof off.suggested_size==='number'?`Use an element size of at least ${size(off.suggested_size)}.`:'Increase the element size.';
+ // V3: with the estimates of both sizes, the smallest the limit takes and one that meshes in about a minute
+ if(typeof off.suggested_size==='number'&&typeof off.suggested_tetrahedra==='number'){
+  advice=`Element size ${size(off.suggested_size)} meshes about ${thousands(off.suggested_tetrahedra)} tetrahedra (estimated ${roughTime(off.suggested_seconds)})`;
+  advice+=typeof off.suggested_minute==='number'&&off.suggested_minute!==off.suggested_size
+   ?`; ${size(off.suggested_minute)} about ${thousands(off.minute_tetrahedra)} (estimated ${roughTime(off.minute_seconds)}).`:'.';
+ }
  return `Component 1 needs about ${thousands(off.tetrahedra)} tetrahedra; the limit is ${thousands(off.limit)}. ${advice}`;
 }
 export function meshReason({drafts=0,refused=null,check=null,running=false}={},words){

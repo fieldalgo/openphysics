@@ -124,7 +124,8 @@ try {
     const after = await page.evaluate(() => ({meshDisabled: document.getElementById('m3-mesh')?.disabled === true,
       refusal: !!document.querySelector('[data-m3-mesh-refusal]')}));
     const ok = mesh.code === 'E-MESH-ESTIMATE' && typeof mesh.suggested_size === 'number' && shown.text === plain
-      && /^Component 1 needs about [\d,]+ tetrahedra; the limit is 600,000\. Use an element size of at least [\d.]+ µm\.$/.test(plain)
+      // V3: the advice gives the smallest accepted size and a size estimated at about a minute, each with its estimate
+      && /^Component 1 needs about [\d,]+ tetrahedra; the limit is 600,000\. Element size [\d.]+ µm meshes about [\d,]+ tetrahedra \(estimated about \d+ (s|min)\); [\d.]+ µm about [\d,]+ \(estimated about \d+ (s|min)\)\.$/.test(plain)
       && shown.details.includes(mesh.refused) && shown.details.includes('E-MESH-ESTIMATE') && count === 1
       && shown.block === 'Fix 1 problem in Messages to mesh' && shown.runWhy === 'Fix 1 problem in Messages to run'
       && shown.estimate === 'Mesh is not available: see Messages.' && shown.meshDisabled && shown.label === 'Element size'
