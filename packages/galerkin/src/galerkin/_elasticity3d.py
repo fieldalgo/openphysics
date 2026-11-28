@@ -8,7 +8,8 @@ from scipy import sparse
 from scipy.sparse.csgraph import connected_components
 
 from ._public import refuse_text
-from .core.checks import finite_scalar, real_array
+from .assembly3d import assemble_mass_3d
+from .core.checks import finite_scalar, real_array, refuse_live
 from .core.solve import scipy_solve_dirichlet
 from .core.tets import tet_gradients as _tet_gradients
 from .mesh3d import Mesh3D
@@ -56,17 +57,36 @@ def _check_constraints(mesh, fixed):
         raise ValueError(f"component {label} has unconstrained rigid-body modes")
 
 
-def _vector(value, label):
-    vector = real_array(value, label)
+def supported_dofs(mesh, prescribed):
+    """Indices of prescribed (homogeneous) and free Cartesian displacement components."""
+    fixed = constrained_dofs(mesh, prescribed)
+    if any(value != 0 for value in fixed.values()):
+        raise ValueError("structural dynamics require zero prescribed displacement")
+    fixed = np.fromiter(fixed, dtype=int)
+    return fixed, np.setdiff1d(np.arange(3 * mesh.num_nodes), fixed)
+
+
+def _vector(value, label, complex_amplitude):
+    if complex_amplitude:
+        refuse_live(value, label)
+        vector = np.asarray(value)
+        if vector.dtype.kind not in "iufc" or (isinstance(value, (list, tuple))
+                and any(isinstance(v, (bool, np.bool_)) for v in value)):
+            raise ValueError(f"{label} must contain finite numeric amplitudes")
+        vector = np.asarray(vector, dtype=complex)
+        if not np.all(np.isfinite(vector)):
+            raise ValueError(f"{label} must contain finite numeric amplitudes")
+    else:
+        vector = real_array(value, label)
     if vector.shape != (3,):
         raise ValueError(f"{label} must be a Cartesian vector of three components")
     return vector
 
 
-def _applied_load(mesh, volumes, body_force_density, traction):
-    force = np.zeros((mesh.num_nodes, 3))
+def applied_load(mesh, volumes, body_force_density, traction, *, complex_amplitude=False):
+    force = np.zeros((mesh.num_nodes, 3), dtype=complex if complex_amplitude else float)
     if body_force_density is not None:
-        body = _vector(body_force_density, "body_force_density")
+        body = _vector(body_force_density, "body_force_density", complex_amplitude)
         np.add.at(force, mesh.tets, volumes[:, None, None] * body / 4)
     if traction is None:
         return force
@@ -79,7 +99,7 @@ def _applied_load(mesh, volumes, body_force_density, traction):
         points = mesh.nodes[faces]
         area = np.linalg.norm(np.cross(points[:, 1] - points[:, 0],
                                        points[:, 2] - points[:, 0]), axis=1) / 2
-        np.add.at(force, faces, area[:, None, None] * _vector(value, "traction") / 3)
+        np.add.at(force, faces, area[:, None, None] * _vector(value, "traction", complex_amplitude) / 3)
     return force
 
 
@@ -96,6 +116,11 @@ def stiffness_matrix(mesh, gradients, volumes, shear, lame):
     return sparse.coo_matrix((blocks.ravel(), (np.repeat(indices, 12, axis=1).ravel(),
                                                 np.tile(indices, (1, 12)).ravel())),
                              shape=(3 * mesh.num_nodes, 3 * mesh.num_nodes)).tocsr()
+
+
+def mass_matrix(mesh, density):
+    """Consistent vector mass with the same node-major Cartesian ordering as stiffness."""
+    return sparse.kron(assemble_mass_3d(mesh, density), sparse.eye(3), format="csr")
 
 
 def element_geometry(mesh):
@@ -123,6 +148,17 @@ def elastic_moduli(mesh, youngs_modulus, poisson_ratio):
     return young, poisson, shear, lame
 
 
+def strain_stress(mesh, displacement, gradients, shear, lame, thermal_strain=None):
+    gradient = np.einsum("tai,taj->tij", displacement[mesh.tets], gradients)
+    strain = (gradient + gradient.transpose(0, 2, 1)) / 2
+    elastic_strain = strain
+    if thermal_strain is not None:
+        elastic_strain = strain - thermal_strain[:, None, None] * np.eye(3)
+    stress = (2 * shear[:, None, None] * elastic_strain
+              + (lame * np.trace(elastic_strain, axis1=1, axis2=2))[:, None, None] * np.eye(3))
+    return strain, stress
+
+
 def solve_fields(mesh, *, youngs_modulus, poisson_ratio, prescribed_displacement,
                  body_force_density=None, traction=None, thermal_strain=None):
     """Internal solve with an optional (T,) isotropic eigenstrain in mesh order."""
@@ -134,7 +170,7 @@ def solve_fields(mesh, *, youngs_modulus, poisson_ratio, prescribed_displacement
     gradients, volumes = element_geometry(mesh)
     young, poisson, shear, lame = elastic_moduli(mesh, youngs_modulus, poisson_ratio)
     fixed = constrained_dofs(mesh, prescribed_displacement)
-    applied = _applied_load(mesh, volumes, body_force_density, traction)
+    applied = applied_load(mesh, volumes, body_force_density, traction)
     rhs = applied.copy()
     if thermal_strain is not None:
         thermal_strain = real_array(thermal_strain, "thermal_strain")
@@ -144,13 +180,7 @@ def solve_fields(mesh, *, youngs_modulus, poisson_ratio, prescribed_displacement
         np.add.at(rhs, mesh.tets, (pressure * volumes)[:, None, None] * gradients)
     stiffness = stiffness_matrix(mesh, gradients, volumes, shear, lame)
     displacement = scipy_solve_dirichlet(stiffness, rhs.ravel(), fixed, factor=True).reshape(-1, 3)
-    gradient = np.einsum("tai,taj->tij", displacement[mesh.tets], gradients)
-    strain = (gradient + gradient.transpose(0, 2, 1)) / 2
-    elastic_strain = strain
-    if thermal_strain is not None:
-        elastic_strain = strain - thermal_strain[:, None, None] * np.eye(3)
-    stress = (2 * shear[:, None, None] * elastic_strain
-              + (lame * np.trace(elastic_strain, axis1=1, axis2=2))[:, None, None] * np.eye(3))
+    strain, stress = strain_stress(mesh, displacement, gradients, shear, lame, thermal_strain)
     residual = (stiffness @ displacement.ravel() - rhs.ravel()).reshape(-1, 3)
     if not all(np.all(np.isfinite(value)) for value in (displacement, strain, stress, residual)):
         raise ValueError("elasticity solve produced nonfinite results")

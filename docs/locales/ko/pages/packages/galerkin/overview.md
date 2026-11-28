@@ -38,6 +38,7 @@
 | 정적 2D 선형탄성, 평면응력 또는 평면변형률 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity2d.md), [검증](elasticity2d_independent_validation.md) | [elasticity2d.py](../../../../../../examples/galerkin/elasticity2d.py) |
 | 정적 3D 선형탄성 | `galerkin.elasticity3d.solve_elasticity_3d` | [계약과 검증](elasticity3d.md) | |
 | 3D 구조 고유진동 | `galerkin.structural_modes3d.solve_structural_modes_3d` | [계약과 외팔보 검증](structural_modes3d.md) | |
+| 3D 구조 강제진동 | `galerkin.structural_harmonic3d.solve_structural_harmonic_3d` | [사용법과 검증](structural_harmonic3d.md) | |
 | 탄성의 전역 Cartesian 경계 표면하중 | `galerkin.elasticity.solve_elasticity` | [계약](elasticity_traction.md), [검증](elasticity_traction_independent_validation.md) | [elasticity_traction.py](../../../../../../examples/galerkin/elasticity_traction.py) |
 | 같은 메시의 처방 절점 Kelvin 장 아래 기계해석 | `galerkin.thermoelasticity.solve_thermoelasticity` | [계약](prescribed_temperature_thermoelasticity.md), [검증](prescribed_temperature_thermoelasticity_independent_validation.md) | [prescribed_temperature_thermoelasticity.py](../../../../../../examples/galerkin/prescribed_temperature_thermoelasticity.py) |
 | 같은 메시의 절점 온도를 사용하는 3D 열탄성 | `galerkin.thermoelasticity3d.solve_thermoelasticity_3d` | [계약과 검증](thermoelasticity3d.md) | — |

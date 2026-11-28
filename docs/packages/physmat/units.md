@@ -323,6 +323,7 @@ Two JSON files ship as package data next to the module:
   quantity of a dimension, false for one never named; `family`: `spectral`) and an
   English and Korean description. Where they apply it also gives `sign`, the sign
   sentence of each name (`inward_heat_flux`: "positive enters the body"),
+  `name_complex` for qualified names such as the real-valued `maximum_stress` of a complex stress phasor,
   `statistic_definitions` (`maximum_stress`), `name_rank`, the rank of a name that
   differs from its base (`inward_heat_flux` is a scalar normal component), and
   `scope`, the model a model parameter belongs to. It also holds the closed symbol

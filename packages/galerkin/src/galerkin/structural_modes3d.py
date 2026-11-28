@@ -11,7 +11,6 @@ from scipy.sparse.linalg import eigsh
 from . import _elasticity3d
 from ._public import ResultSurface, refuse_text
 from ._tetra_materials import region_property
-from .assembly3d import assemble_mass_3d as _assemble_mass_3d
 from .core.checks import positive_integer
 from .core.eigen import arpack_rng
 
@@ -86,14 +85,11 @@ def solve_structural_modes_3d(mesh, *, youngs_modulus, poisson_ratio, mass_densi
     gradients, volumes = _elasticity3d.element_geometry(mesh)
     _, _, shear, lame = _elasticity3d.elastic_moduli(mesh, youngs_modulus, poisson_ratio)
     density = region_property(mesh, mass_density, "mass_density", positive=True)
-    fixed = _elasticity3d.constrained_dofs(mesh, prescribed_displacement)
-    if any(value != 0 for value in fixed.values()):
-        raise ValueError("structural modes require zero prescribed displacement")
-    free = np.setdiff1d(np.arange(3 * mesh.num_nodes), list(fixed))
+    _, free = _elasticity3d.supported_dofs(mesh, prescribed_displacement)
     if count > free.size:
         raise ValueError(f"mode_count must not exceed the number of free displacement components ({free.size})")
     stiffness = _elasticity3d.stiffness_matrix(mesh, gradients, volumes, shear, lame)[free][:, free]
-    mass = sparse.kron(_assemble_mass_3d(mesh, density), sparse.eye(3), format="csr")[free][:, free]
+    mass = _elasticity3d.mass_matrix(mesh, density)[free][:, free]
 
     values, vectors = _lowest_modes(stiffness, mass, count)
     if not np.all(np.isfinite(values) & (values > 0)):

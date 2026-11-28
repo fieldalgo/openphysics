@@ -10,6 +10,7 @@
 
 - [3D 하중과 변위 구속](../packages/galerkin/elasticity3d.md)
 - [구속된 고체의 고유진동수와 모드 형상](../packages/galerkin/structural_modes3d.md)
+- [조화 하중에 대한 변위·응력의 크기와 위상](../packages/galerkin/structural_harmonic3d.md)
 - [전류가 흐르는 도체의 3D 열응력 계산](../packages/galerkin/electrothermomechanical_3d.md)
 - [3D 히터를 켜고 끌 때의 열응력 추적](../packages/galerkin/transient_heater_3d.md)
 

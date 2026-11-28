@@ -297,7 +297,7 @@ def quantity(name: str) -> Quantity:
     e, own = _ENTRIES[base], _OVERRIDES.get(name, {})
     found = Quantity(name=name, base=base, dimension=_frozen(e["dimension"]), unit=e["unit"],
                      menu=tuple(e["menu"]), kind=e["kind"], rank=tuple(own.get("rank", e["rank"])),
-                     complex=e.get("complex", False), domain=_frozen(e["domain"]), band=_frozen(e["band"]),
+                     complex=own.get("complex", e.get("complex", False)), domain=_frozen(e["domain"]), band=_frozen(e["band"]),
                      places=tuple(own.get("places", e["places"])), description=_frozen(e["description"]),
                      status=e.get("status"), sign=_frozen(e.get("sign", {}).get(name)),
                      definition=_frozen(e.get("statistic_definitions", {}).get(name)),

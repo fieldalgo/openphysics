@@ -1167,6 +1167,7 @@ DESIGN_MENUS = {
     **_menus("photon_energy plasma_energy damping_energy resonance_energy", ENERGY_EV),
     "vacuum_wavenumber": ("1/cm", "1/m"), "vacuum_angular_wavenumber": ("rad/m", "rad/um"),
     "propagation_loss": ("dB/m", "dB/cm", "dB/mm"), "bend_loss": ("dB/(90 deg)", "dB/(180 deg)"),
+    "mass_proportional_damping_coefficient": ("1/s",), "stiffness_proportional_damping_coefficient": ("s",),
     "phase_shift": ("rad", "deg", "mrad"),
     **_menus("confinement_factor overlap coupling_efficiency te_polarization_fraction relative_humidity", ("1", "%")),
     "co2_mole_fraction": ("1", "ppm", "%"),
@@ -1261,6 +1262,16 @@ def test_r11_every_menu_equals_the_design_table():
     for base, unit in {**OUTPUT_ONLY, **PHASE2_OUTPUT_ONLY, **PHASE3_OUTPUT_ONLY, **PHASE3_L3_OUTPUT_ONLY}.items():
         assert units.menu(base) == (unit,), (base, units.menu(base), unit)
         assert units.quantity(base).places == ("result",) or base in OUTPUT_AND_API, base
+
+
+def test_harmonic_phasors_and_static_mechanics_summaries():
+    for name in ("traction", "body_force_density", "stress", "stress_xx", "displacement", "reaction_force"):
+        assert units.quantity(name).complex
+    for name in ("maximum_stress", "minimum_stress", "maximum_displacement", "prescribed_displacement"):
+        assert not units.quantity(name).complex
+    for name in ("mass_proportional_damping_coefficient", "stiffness_proportional_damping_coefficient"):
+        assert units.quantity(name).places == ("api",)
+        assert convert(f"-1 {units.quantity(name).unit}", name).error.code == "E-DOMAIN"
 
 
 def test_r11_statistic_names_of_results():
@@ -1509,7 +1520,8 @@ def test_p2_names_are_legal_with_their_unit_and_places():
     # TE fraction added te_polarization_fraction (a result fraction), 260 and 387 until the single-point group
     # index added wavelength_step (the step of results.group_index), 261 and 388 until the open-boundary
     # search added pml_search_mode_count; structural modes then added mass_normalized_displacement.
-    assert len(units._ENTRIES) == 263 and len(names) == 390
+    # Frequency response adds two nonnegative Rayleigh damping coefficients.
+    assert len(units._ENTRIES) == 265 and len(names) == 392
 
 
 P3_L2_NAMES = {  # name: (canonical unit, places) for every name L2 commit 5 of the galerkin step makes legal
@@ -1994,6 +2006,7 @@ def test_p2_generator_refuses_broken_name_fields():
     broken(lambda s: s["quantities"]["heat_flux"]["sign"].update({"outward_heat_rate": {"en": "x", "ko": "x"}}))
     broken(lambda s: s["quantities"]["heat_flux"]["sign"].update({"inward_heat_flux": {"en": "x"}}))
     broken(lambda s: s["quantities"]["stress"]["statistic_definitions"].update({"stress_xx": {"en": "x", "ko": "x"}}))
+    broken(lambda s: s["quantities"]["stress"]["name_complex"].update({"maximum_stress": "no"}))
     broken(lambda s: s["quantities"]["heat_flux"]["name_rank"].update({"inward_heat_flux": ["field"]}))
     broken(lambda s: s["quantities"]["constant"].update({"hint": True}))
     broken(lambda s: s["quantities"]["constant"].update({"scope": {"quantity": "no_such", "model": "sellmeier"}}))

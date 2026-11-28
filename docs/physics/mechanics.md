@@ -10,6 +10,7 @@ Choose plane stress or plane strain and define displacement constraints and load
 
 - [3D loads and displacement constraints](../packages/galerkin/elasticity3d.md)
 - [Natural frequencies and mode shapes of a supported solid](../packages/galerkin/structural_modes3d.md)
+- [Displacement and stress under harmonic loading](../packages/galerkin/structural_harmonic3d.md)
 - [Compute 3D thermal stress in a powered conductor](../packages/galerkin/electrothermomechanical_3d.md)
 - [Track thermal stress as a 3D heater switches on and off](../packages/galerkin/transient_heater_3d.md)
 
