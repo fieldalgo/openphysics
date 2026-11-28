@@ -378,6 +378,10 @@ node tools/studio_browser/model3d_mesh_browser.mjs http://127.0.0.1:8765 out-dir
 
 ## Limits
 
+- A 3D model is not kept for recovery; save the project or session to keep it. Reloading the tab
+  loses unsaved 3D work. A tab opened with **Open in a new tab** (`/workspace?card=…&fresh=1`)
+  offers no browser recovery and writes none, so the recovery records of the tab it came from stay
+  as they are.
 - Boxes and slab layers only, as stage 5 slice 1; read-only (no feature editing in
   3D).
 - The mesh is meshloom's (experimental) and its quality is meshloom's. The estimate is

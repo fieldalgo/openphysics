@@ -14,7 +14,7 @@ import {canonicalJson,RUN_RECORD} from './workspace-model3d-session.mjs';
 /** The Library card of the 3D group (not an application card: it has its own group). */
 export const CARD3D=Object.freeze({id:'layer-stack-3d',kind:'model3d',title:'Via in a layer stack (3D heat)',
  asset:'/model3d-assets/model3d-layer-stack-3d.json',sessionFile:'via-in-a-layer-stack-3d.json',status:'3D steady heat (experimental)',
- note:'Square via (the round via is the card Copper via through a slab)',
+ note:'Square via: a box through the oxide, in a layer stack',
  description:'A silicon substrate, an oxide layer and top silicon, with a copper via through the oxide. Build the 3D geometry, mesh it and solve steady heat.'});
 /** Card 2: a copper via (one cylinder) through a slab, in meshloom's via_in_slab builder shape. */
 export const CARD3D_SLAB=Object.freeze({id:'via-slab-3d',kind:'model3d',title:'Copper via through a slab (3D heat)',
@@ -23,6 +23,13 @@ export const CARD3D_SLAB=Object.freeze({id:'via-slab-3d',kind:'model3d',title:'C
  description:'A copper via through a slab, 300 K at the bottom and 301 K at the top. The curved shape is drawn for display; the mesh follows it to within its size.'});
 /** The Library's 3D group, in order. */
 export const CARDS3D=Object.freeze([CARD3D,CARD3D_SLAB]);
+/** U6: the address that opens a 3D card in a fresh workspace (a new tab), beside a project that holds another. */
+export const newTabUrl=card=>`/workspace?card=${encodeURIComponent(card.id)}&fresh=1`;
+/** U6: the 3D card a fresh workspace's address asks for (?card=<id>&fresh=1), or null. */
+export function freshCard(search){
+ const q=new URLSearchParams(search||'');
+ return q.get('fresh')==='1'?CARDS3D.find(c=>c.id===q.get('card'))??null:null;
+}
 /** The card a document came from (its name is the card's title), or null. */
 export const card3dOf=doc=>CARDS3D.find(c=>c.title===doc?.name)||null;
 

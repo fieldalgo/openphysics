@@ -271,7 +271,7 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 있습니다. 형상은 설계의 매개변수 둘을 담습니다: `t_ox` = 10 µm은 산화막
 두께이자 via의 높이(z는 500부터 `500 + t_ox`까지), `via_w` = 20 µm은 via의 너비(x와 y는 `100 - via_w / 2`부터 `100 + via_w / 2`까지)이므로
 via는 언제나 산화막만 지납니다. 산화막 두께 칸은 *= t_ox (10 µm)*로 읽히고, via 행은 서버 검사가 계산한 크기인
-*20 × 20 × 10 µm*를 그대로 보입니다. 여기서 via는 정사각형입니다: *Square via (the round via is the card Copper via through a slab)*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
+*20 × 20 × 10 µm*를 그대로 보입니다. 여기서 via는 정사각형입니다: *Square via: a box through the oxide, in a layer stack*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
 이름으로만 가리키기 때문입니다(`stack.top` 같은 층이나 특징 이름은 열 종류의 영역이 아님). 물리는 Heat transfer (3D)입니다:
 `z0`에 300 K, `Si (top)`에 열원 1e12 W/m³(모두 4 W), 나머지 바깥 면은 모두 단열. 열원은 시험 값이며(카드를
 약 1127 K까지 데움), 2 mW 열점 변형은 나중 카드입니다. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
@@ -288,7 +288,10 @@ follows it to within its size*가 붙음). Mesh 1과 Run은 카드 1처럼 받�
 경우(슬래브 높이 전체를 지나는 원기둥 하나, 정확히 `z0`과 `z1`의 고정 온도, 열원 없음, 모든 값이 수나 물리량)에만 보이고, 아니면
 줄이 없습니다. 실행의 31.75 W가 그보다 작은 것은 그려지고 메시된 원기둥이 내접 다각형이기 때문입니다. 프로젝트는 3D 모델 하나를 담습니다: 카드 1의 모델을 담고
 있는 동안 카드 2를 고르면 그대로 두고 *This project already holds the 3D model Via in a layer stack (3D heat); a project holds
-one 3D model. Open Copper via through a slab (3D heat) in a new browser tab.*라고 말합니다(반대도 같음). 프로젝트 파일은 카드
+one 3D model. Open Copper via through a slab (3D heat) in a new tab.*라고 말하고 **Open in a new tab** 단추를 둡니다(반대도 같음).
+이 단추는 `/workspace?card=via-slab-3d&fresh=1`을 엽니다: 그 카드로 자기 프로젝트를 시작하는 새 탭입니다. 그 탭에는 아무것도
+복구되지 않습니다: 브라우저 복구를 제안하지도 쓰지도 않으며(*This tab was opened for one 3D model: it offers no
+browser recovery and keeps none.*), 그래서 그 탭을 연 탭의 복구는 그대로입니다. 프로젝트 파일은 카드
 (`layer-stack-3d` 또는 `via-slab-3d`)를 밝히고, Export › Model with runs는 카드의 파일 이름(`copper-via-through-a-slab-3d.json`)을
 제안합니다.
 

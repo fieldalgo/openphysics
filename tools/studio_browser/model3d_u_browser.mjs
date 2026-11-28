@@ -27,6 +27,11 @@
 //      top · 510–610 µm"; Cut (CSV) stands in the Section group; clicking it saves
 //      "via-in-a-layer-stack-3d-heat-cut-z-505um.csv" with the metre columns (F7); and Messages reads
 //      "Cut (CSV) saved as …": 6/6.
+//  U6  card 1 open, then card 2 from the Library: the refusal has "Open in a new tab"; it opens
+//      /workspace?card=via-slab-3d&fresh=1 in a new tab showing card 2 with no refusal, while the
+//      first tab keeps card 1; with an optical run's recovery record from the first tab, the new tab
+//      offers no recovery (Recover disabled, its note says so) and, after an edit of its 3D model, the
+//      latest record (savedAt and session) reads the same; card 1's note has no "Copper via": 4/4.
 // It writes report.json and screenshots to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -221,6 +226,50 @@ try {
       messages.includes(`Cut (CSV) saved as ${name}.`),
     ];
     record('U5', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 6, layers, shown, legend, name, messages: messages.slice(0, 300)});
+    await ctx.close();
+  }
+  // ---- U6: a second 3D card: Open in a new tab → a fresh workspace with that card; recovery untouched ----
+  {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForFunction(() => /^Connected/.test(document.getElementById('connection-status').textContent) && !!document.querySelector('[data-template=optical]'));
+    // the original tab: an optical run, so browser recovery holds a record (written 0.7 s after it)
+    await page.click('[data-template=optical]'); await page.waitForFunction(() => !document.getElementById('run-optical').disabled, null, {timeout: 30000});
+    await page.click('#run-optical');
+    await page.waitForFunction(() => /complete/i.test(document.getElementById('job-message').textContent), null, {timeout: 180000});
+    await page.waitForFunction(() => /^Browser recovery updated/.test(document.getElementById('notebook-recovery-detail').textContent), null, {timeout: 20000});
+    await page.click('[data-page="Applications"]');
+    const note = await page.evaluate(() => document.querySelector('[data-model3d-card="layer-stack-3d"] .card-scope')?.textContent || '');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    // the latest recovery record (savedAt and session), read from the store the tabs of this origin share
+    const latest = pg => pg.evaluate(() => new Promise((resolve, reject) => { const o = indexedDB.open('openphysics-studio-notebook', 1);
+      o.onsuccess = () => { const r = o.result.transaction('snapshots', 'readonly').objectStore('snapshots').get('latest');
+        r.onsuccess = () => { o.result.close(); const v = r.result; resolve(v ? JSON.stringify({savedAt: v.savedAt, session: v.session ?? v.text ?? null}) : null); };
+        r.onerror = () => reject(r.error); }; o.onerror = () => reject(o.error); }));
+    const before = await latest(page);
+    await page.click('[data-page="Applications"]'); await page.click('[data-model3d-card="via-slab-3d"]');
+    const refusal = await page.evaluate(() => ({text: document.getElementById('file-status')?.textContent || '',
+      button: document.querySelector('#file-status button[data-m3-new-tab="via-slab-3d"]')?.textContent || ''}));
+    const popup = ctx.waitForEvent('page', {timeout: 30000});
+    await page.click('#file-status button[data-m3-new-tab="via-slab-3d"]');
+    const tab = await popup; await tab.waitForLoadState();
+    await tab.waitForFunction(() => document.getElementById('mp-messages')?.dataset.m3State === 'checked', null, {timeout: 30000});
+    const fresh = await tab.evaluate(() => ({url: location.pathname + location.search, title: document.querySelector('.m3-head h2')?.textContent || '',
+      status: document.getElementById('file-status')?.textContent || '', recover: document.getElementById('recover-notebook')?.disabled === true,
+      detail: document.getElementById('notebook-recovery-detail')?.textContent || ''}));
+    // the new tab's 3D work: an edit, then time for any recovery write (0.7 s after a change)
+    await tab.click('[data-m3-node="mesh"]'); await setField(tab, 'mesh.element_size', '0.2'); await tab.waitForTimeout(2000);
+    const after = await latest(tab);
+    await page.click('[data-page="Model"]').catch(() => {});
+    const original = await page.evaluate(() => document.querySelector('.m3-head h2')?.textContent || '');
+    const rows = [
+      refusal.button === 'Open in a new tab' && refusal.text.includes('a project holds one 3D model'),
+      fresh.url === '/workspace?card=via-slab-3d&fresh=1' && fresh.title === 'Copper via through a slab (3D heat)' && !/already holds/.test(fresh.status)
+        && original === 'Via in a layer stack (3D heat)',
+      before !== null && before === after && fresh.recover && fresh.detail.startsWith('This tab was opened for one 3D model: it offers no browser recovery'),
+      note !== '' && !note.includes('Copper via'),
+    ];
+    record('U6', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, note, refusal, fresh, original,
+      same: before === after, before: before && before.slice(0, 80)});
     await ctx.close();
   }
 } finally {

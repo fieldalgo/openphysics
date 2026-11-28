@@ -18,7 +18,7 @@ test('the 3D group holds two cards, in order, each with its asset and session fi
  assert.equal(M.CARDS3D[0],M.CARD3D,'card 1 is the card of before');
  assert.deepEqual(M.CARDS3D.map(c=>c.status),['3D steady heat (experimental)','3D steady heat (experimental)']);
  assert.equal(M.CARDS3D[1].note,'Round via: one cylinder through the slab, in a meshloom builder shape');
- assert.equal(M.CARD3D.note,'Square via (the round via is the card Copper via through a slab)');
+ assert.equal(M.CARD3D.note,'Square via: a box through the oxide, in a layer stack');
 });
 
 test("each card's document is its asset, named by the card's title",()=>{
