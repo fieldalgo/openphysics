@@ -12,6 +12,10 @@
 //      earlier stats "Kept mesh (before the last change)"; the run status line is gone after the new
 //      mesh; Messages reads "Meshed Component 1 …" (no "stack3d"); the line gives the elapsed time
 //      ("… in 1.2 s: …"): 4/4.
+//  V11 at 1440 × 900: card 1's Parameters table has no Use cell clipped and no horizontal scroll in
+//      its pane; the ribbon's Compute shows Run for the 3D model and it runs (Run 1 completes), while
+//      the optical model shows none; card 1's note says "Preset: heat source 1e12 W/m³ in Si (top)
+//      (4 W)": 3/3.
 // It writes report.json to out-dir and exits non-zero if a check fails.
 import {createRequire} from 'node:module';
 import {mkdir, readFile, writeFile} from 'node:fs/promises';
@@ -133,6 +137,36 @@ try {
     ];
     record('V7', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 4, first, second, runLine, afterMesh, kept});
     await ctx.close();
+  }
+  // ---- V11: the Parameters table's Use column not clipped; the ribbon's Run; card 1's preset source ----
+  if (want('V11')) {
+    const {page, seen, ctx} = await open(browser);
+    await page.waitForSelector('[data-model3d-card="layer-stack-3d"]');
+    const note = await page.evaluate(() => document.querySelector('[data-model3d-card="layer-stack-3d"] .card-scope')?.textContent || '');
+    await page.click('[data-model3d-card="layer-stack-3d"]'); await checked(page);
+    await page.click('[data-m3-node="parameters"]'); await page.waitForTimeout(200);
+    const table = await page.evaluate(() => { const t = document.querySelector('.m3-params'), pane = document.getElementById('inspector');
+      const cells = [...document.querySelectorAll('.m3-params .m3-param-use')];
+      const box = c => c.getBoundingClientRect(), pb = box(pane);
+      return {tableWidth: t?.scrollWidth, pane: pane.clientWidth, paneScroll: pane.scrollWidth - pane.clientWidth,
+        use: cells.map(c => c.textContent), clipped: cells.filter(c => c.scrollWidth > c.clientWidth + 1 || box(c).right > pb.right + 1).length}; });
+    // the ribbon's Run in a 3D model: shown, and it starts the run (Run 1 completes)
+    const ribbon = await page.evaluate(() => { const b = document.getElementById('run-model3d'); return {shown: !!b && !b.hidden && b.offsetParent !== null, text: b?.textContent || ''}; });
+    let ran = false;
+    if (ribbon.shown) { await page.click('#run-model3d'); ran = await completed(page, 1).then(() => true, () => false); }
+    await ctx.close();
+    // a 2D model: no 3D Run in the ribbon
+    const d2 = await open(browser);
+    await d2.page.waitForFunction(() => !!document.querySelector('[data-template=optical]'));
+    await d2.page.click('[data-template=optical]'); await d2.page.waitForTimeout(500);
+    const flat = await d2.page.evaluate(() => { const b = document.getElementById('run-model3d'); return !b || b.hidden || b.offsetParent === null; });
+    await d2.ctx.close();
+    const rows = [
+      table.use.length === 2 && table.clipped === 0 && table.paneScroll <= 0,
+      ribbon.shown && ribbon.text === 'Run' && ran && flat,
+      note.includes('Preset: heat source 1e12 W/m³ in Si (top) (4 W)'),
+    ];
+    record('V11', rows.every(Boolean) && !seen.pageErrors.length, {passed: rows.filter(Boolean).length, of: 3, table, ribbon, ran, flat, note});
   }
 } finally {
   await writeFile(join(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');

@@ -558,7 +558,8 @@ dialog::backdrop{background:#162a4b66}
 .m3-refused{color:#a33a2c}
 .m3-params{border-collapse:collapse;width:100%}
 .m3-params td,.m3-params th{padding:2px 4px;text-align:left}
-.m3-params input{width:100%;min-width:6em}
+.m3-params input{width:100%;min-width:5em;box-sizing:border-box}
+.m3-params .m3-param-facts td{padding-top:0;color:#5b6573;overflow-wrap:anywhere}
 .m3-param-add{display:flex;flex-wrap:wrap;gap:6px;align-items:end;margin-top:8px}
 .m3-note{font-size:11px;color:#8a5a00;white-space:normal;overflow-wrap:anywhere}
 #tree [data-m3-node]{flex-wrap:wrap;height:auto;min-height:28px;white-space:normal}#tree [data-m3-node] .m3-note{flex-basis:100%;padding-left:22px}

@@ -215,12 +215,13 @@ export function createModel3dView(ctx){
   const params=doc.geometry.parameters||{},info=new Map((check?.parameters||[]).map(p=>[p.name,p]));
   // a refusal about a parameter (E-DOMAIN, E-EXPRESSION-KIND, a cycle) is shown on its row
   const rowProblem=n=>refused&&new RegExp(`^geometry\\.parameters\\.${n}\\b`).test(refused.path||'')?refused.refused:'';
+  // V11: two lines per parameter (name, value, Delete; then kind · range · SI value · use), so nothing is clipped in the pane
   const rowsHtml=Object.entries(params).map(([n,p])=>{const i=info.get(n),used=i?.used_by||[],problem=rowProblem(n);
+   const facts=[i?.kind||'',p.range?shownText(JSON.stringify(p.range)):'',i?`= ${Number(i.value.toPrecision(6))} ${i.unit}`:''].filter(Boolean);
    return `<tr${problem?' class="has-problem"':''}><th scope="row"><code>${esc(n)}</code></th><td><input data-m3-param="${esc(n)}" value="${esc(p.value)}" aria-label="value of ${esc(n)}"${problem?' aria-invalid="true"':''}>${problem?`<small class="m3-si">${esc(problem)}</small>`:''}</td>`+
-    `<td>${esc(i?.kind||'')}</td><td>${esc(p.range?shownText(JSON.stringify(p.range)):'')}</td><td>${i?esc(`= ${Number(i.value.toPrecision(6))} ${i.unit}`):''}</td><td>${used.length?esc(`used by ${used.length}`):'unused'}</td>`+
-    `<td><button type="button" data-m3-unparam="${esc(n)}">Delete</button></td></tr>`;}).join('');
-  return `<h3>Parameters</h3><table class="m3-params"><thead><tr><th>Name</th><th>Value</th><th>Kind</th><th>Range</th><th>SI value</th><th>Use</th><th></th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="7" class="muted">No parameters.</td></tr>'}</tbody></table>`+
-   `<form class="m3-param-add"><label>Name <input name="name" spellcheck="false"></label><label>Value <input name="value" spellcheck="false" placeholder="20 um"></label><button type="submit">Add parameter</button></form>`;
+    `<td><button type="button" data-m3-unparam="${esc(n)}">Delete</button></td></tr>`+
+    `<tr class="m3-param-facts"><td></td><td colspan="2"><small>${esc(facts.join(' · '))}${facts.length?' · ':''}<span class="m3-param-use">${used.length?esc(`used by ${used.length}`):'unused'}</span></small></td></tr>`;}).join('');
+  return `<h3>Parameters</h3><table class="m3-params"><thead><tr><th>Name</th><th>Value</th><th></th></tr></thead><tbody>${rowsHtml||'<tr><td colspan="3" class="muted">No parameters.</td></tr>'}</tbody></table>`+   `<form class="m3-param-add"><label>Name <input name="name" spellcheck="false"></label><label>Value <input name="value" spellcheck="false" placeholder="20 um"></label><button type="submit">Add parameter</button></form>`;
  }
  function bindSettings(host){
   if(pendingFocus){const target=pendingFocus;queueMicrotask(()=>host.querySelector(target)?.focus());}
@@ -515,6 +516,13 @@ export function createModel3dView(ctx){
   const job=mesh.job;mesh.job=null;
   if(job)ctx.request(`/api/model3d/jobs/${encodeURIComponent(job)}/cancel`,{}).catch(()=>{});
  }
+ /** V11: the ribbon's Run: as the header's Run when it is allowed (or a kept run answers), else the header's reason in Messages. */
+ function runFromRibbon(){
+  if(heat.run)return;
+  const why=runReason({drafts:drafts.size,refused,check,running:!!mesh.job,doc,failure:heat.failure},WORDS);
+  if(why&&keptRunFor(doc,heat.records)<0){lastNotice={text:why,undo:false};renderDock();return;}
+  startRun();
+ }
  /** U8: the ribbon's Mesh in a 3D model meshes when Mesh is allowed; otherwise Messages gives the header's reason. */
  function meshFromRibbon(){
   const why=meshReason({drafts:drafts.size,refused,check,running:!!mesh.job||!!heat.run},WORDS);
@@ -710,6 +718,11 @@ export function createModel3dView(ctx){
   document.querySelector('.workspace > .note').textContent='A 3D model of boxes, slab layers, cylinders and spheres: Mesh 1 meshes it, Run solves steady heat.';
   $('solver-log').hidden=true;$('workflow').hidden=true;
   for(const id of ['run-optical','run-heat','run-joule','run-multiphysics','run-multiphysics-reason','add-physics','add-coupling','run-options','run-baseline-option'])if($(id))$(id).hidden=true;
+  // V11: the ribbon's Compute has Run for the 3D model (it runs, or Messages gives the header's reason)
+  let run3=$('run-model3d');
+  if(!run3){run3=document.createElement('button');run3.type='button';run3.id='run-model3d';run3.textContent='Run';
+   document.querySelector('.solve-commands .ribbon-commands')?.prepend(run3);}
+  run3.hidden=page==='Applications';run3.disabled=!!heat.run;run3.onclick=()=>runFromRibbon();
   const steps=$('sequence');if(steps)steps.innerHTML='<span class="sequence-empty">Study 1 · Steady: Run meshes the component and solves Heat transfer (3D).</span>';
   drawTree();
   const inspector=$('inspector');inspector.innerHTML=settings();bindSettings(inspector);
@@ -729,7 +742,7 @@ export function createModel3dView(ctx){
   /** A model3d session read by parseSession: its document (and the title the project gives it). */
   openSession:(session,{asTitle,card:from}={})=>open(session.document,{asTitle,runs:session.runs||[],card:from}),
   show(){if(!inProject)return;shown=true;ctx.ui.page='Model';ctx.render();},
-  leave(){stopJob();stopRun();shown=false;const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();delete box.dataset.m3State;}},
+  leave(){stopJob();stopRun();shown=false;if($('run-model3d'))$('run-model3d').hidden=true;const box=$('mp-messages');if(box){box.hidden=true;box.replaceChildren();delete box.dataset.m3State;}},
   close(){stopJob();stopRun();card=null;heat.records=[];heat.live=[];heat.liveValues=new Map();mesh.view=null;mesh.status=null;shown=false;inProject=false;doc=null;history=null;check=null;refused=null;lastGood=null;},
   renderPage,
   canUndo:()=>!!history?.canUndo,canRedo:()=>!!history?.canRedo,

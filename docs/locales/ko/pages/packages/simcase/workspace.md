@@ -271,7 +271,8 @@ V-P13), 기억한 이름으로 다시 Save(V-P11), `window.showSaveFilePicker`�
 있습니다. 형상은 설계의 매개변수 둘을 담습니다: `t_ox` = 10 µm은 산화막
 두께이자 via의 높이(z는 500부터 `500 + t_ox`까지), `via_w` = 20 µm은 via의 너비(x와 y는 `100 - via_w / 2`부터 `100 + via_w / 2`까지)이므로
 via는 언제나 산화막만 지납니다. 산화막 두께 칸은 *= t_ox (10 µm)*로 읽히고, via 행은 서버 검사가 계산한 크기인
-*20 × 20 × 10 µm*를 그대로 보입니다. 여기서 via는 정사각형입니다: *Square via: a box through the oxide, in a layer stack*. 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
+*20 × 20 × 10 µm*를 그대로 보입니다. 여기서 via는 정사각형입니다: *Square via: a box through the oxide, in a layer stack · Preset: heat source 1e12 W/m³ in Si (top) (4 W)*
+(서버 검사가 Si (top)을 4,000,000 µm³로 주므로 4 W). 위 실리콘은 `Si`와 같은 물성의 제 재료 `Si (top)`을 갖는데, 이는 오늘 열원이 영역을 재료
 이름으로만 가리키기 때문입니다(`stack.top` 같은 층이나 특징 이름은 열 종류의 영역이 아님). 물리는 Heat transfer (3D)입니다:
 `z0`에 300 K, `Si (top)`에 열원 1e12 W/m³(모두 4 W), 나머지 바깥 면은 모두 단열. 열원은 시험 값이며(카드를
 약 1127 K까지 데움), 2 mW 열점 변형은 나중 카드입니다. 카드를 고르면 3D 모델이 탭에 더해지고, 작업 공간 모델과 다중물리 모델은 그대로이며, 다른 모델의 카드는
@@ -337,7 +338,7 @@ deleted; Undo restores it.*)가 있고, layers 특징에는 **Add layer**와 **R
 than 0 µm.*, *Via element size must be between 1.68–168 µm.*) **Restore last valid value**가 붙은 강조된 초안으로 남습니다.
 초안이 있는 동안 File › Save, Save As, Export는 꺼지고, Mesh는 초안을 이유로 밝힙니다. 특징의 조합은 서버만
 검사합니다. **Parameters** 표는 매개변수마다 이름, 값, 종류(length 또는 ratio), 범위(문서가 줄 때), SI 값, 그것을 쓰는 칸의
-수를 보이며, 매개변수에 관한 거부(E-DOMAIN, E-EXPRESSION-KIND, 순환)는 그 행에 보입니다. 쓰이는 매개변수는 지우지 않으며,
+수를 매개변수마다 두 줄(이름, 값, Delete; 그다음 나머지)로 보여 창에서 잘리지 않으며, 매개변수에 관한 거부(E-DOMAIN, E-EXPRESSION-KIND, 순환)는 그 행에 보입니다. 쓰이는 매개변수는 지우지 않으며,
 거부는 쓰는 곳을 특징 순서로 밝힙니다: *t_ox is used by stack.oxide thickness.*(여럿이면 *w is used by domain xmax,
 stack.oxide thickness, via xmin, via xmax.*).
 
@@ -358,7 +359,7 @@ the limit is 600,000. Use an element size of at least 6.36 µm.* 크기는 같�
 말합니다. 크기 칸의 이름은 **Element size**입니다.
 
 **Mesh 1.** 그 페이지는 추정과 문서 mesh 블록의 `element_size`(물리량; 수만 쓰면 구성 요소 단위; 특징처럼 대각선/400 ~
-대각선/4)를 보입니다. 리본의 **Mesh**는 메시할 수 있으면 머리말의 **Mesh**처럼 Mesh 1을 열고 메시하며, 아니면
+대각선/4)를 보입니다. 리본 Compute의 **Run**은 머리말의 **Run**처럼 실행하거나 Messages가 그 이유를 말합니다. 리본의 **Mesh**는 메시할 수 있으면 머리말의 **Mesh**처럼 Mesh 1을 열고 메시하며, 아니면
 Messages가 머리말의 이유를 말합니다(2D 모델의 리본 Mesh는 그대로). 그래픽 머리말의 **Mesh**는 Studio의 메시 작업([3D 보기의 메시 경로](studio_3d.md#보내는-것과-응답))을
 별도 프로세스로 실행합니다: 단계(*Forming geometry → Meshing (expected about 1 s) → Checking the mesh → Ready*), 경과 시간,
 추정의 두 배를 넘으면 *taking longer than the estimate*. 실행 중에는 버튼이 **Cancel meshing**이며, 취소는 프로세스를 끝내고
