@@ -111,9 +111,10 @@ closest; it no longer tests the remaining off-diagonal blocks. Tests check that
 the kernel is reciprocal to 1e-14 and that the assembled matrix equals the one
 with every block computed to 1e-14. On the three SIPI layered coplanar
 stripline sections (37–42 boxes, 64 panels per edge, degree 14) this cut a
-solve from 9.6–14.1 s to 6.3–10.1 s; capacitance changed by at most 6e-16 and
-the current Gram by at most 2e-14 of its largest entry, less than changing the
-interpolation degree from 14 to 16 (1e-15 and 3e-14).
+solve from 11.1–14.2 s to 7.7–10.3 s on one 4-core machine; capacitance changed
+by at most 9e-16 and the current Gram by at most 1e-14 of its largest entry,
+rounding level, while changing the interpolation degree from 14 to 16 changes
+them by up to 6e-16 and 8e-14.
 
 A plane-scaled box with fewer panels than the interpolation degree is not
 interpolated: the smooth kernel is integrated directly at `degree` Gauss points
@@ -125,10 +126,10 @@ boxes no interpolation is left for the raw reciprocity check to compare: it
 then compares only rounding of the same reciprocal integrals. Tests check that
 a direct box agrees with a degree-16 interpolated box to 1e-13. On the three
 sections (34 of 42 boxes direct in the coupled one) this cut a solve to
-3.9–7.2 s, 2.1–2.5 times faster than before both steps; against the solver
-before both steps capacitance changed by at most 1.5e-15 and the current Gram
-by at most 3e-14 of its largest entry, the size of the change from degree 14
-to 16.
+4.4–7.4 s, 1.8–2.5 times faster than before both steps; against the solver
+before both steps capacitance changed by at most 1.1e-15 and the current Gram
+by at most 1.6e-14 of its largest entry, no more than the change from degree
+14 to 16.
 
 Internal matrix, reciprocity, residual, energy, current-conservation and ground
 refinement checks retain a 1e-10 gate. The matrix condition bound must be below
