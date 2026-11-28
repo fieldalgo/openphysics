@@ -153,6 +153,15 @@ def _elasticity_3d():
                                      traction={"x1": (1e3, 0., 0.)})
 
 
+def _structural_modes_3d():
+    from galerkin.structural_modes3d import solve_structural_modes_3d
+    from galerkin.mesh3d import box_mesh
+    mesh = box_mesh(1, 1, 1, 1, 1, 1)
+    fixed = {(node, axis): 0.0 for node in mesh.boundary["x0"] for axis in range(3)}
+    return solve_structural_modes_3d, dict(mesh=mesh, youngs_modulus=1e6, poisson_ratio=.25,
+                                          mass_density=1000., prescribed_displacement=fixed, mode_count=2)
+
+
 def _snapshot():
     import numpy as np
     from galerkin.thermoelasticity import TemperatureSnapshot
@@ -374,6 +383,7 @@ STRING_CASES = {"galerkin.thermal:solve_steady_heat": _steady_heat,
                 # parameters are all structural)
                 "galerkin.elasticity:constitutive_matrix": _constitutive_matrix,
                 "galerkin.elasticity:solve_elasticity": _elasticity,
+                "galerkin.structural_modes3d:solve_structural_modes_3d": _structural_modes_3d,
                 "galerkin.elasticity3d:solve_elasticity_3d": _elasticity_3d,
                 "galerkin.thermoelasticity:TemperatureSnapshot": _snapshot,
                 "galerkin.thermoelasticity:freeze_temperature": _freeze,

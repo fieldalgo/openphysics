@@ -24,6 +24,7 @@
     {"module": "galerkin.laplace_open_box", "class": "OpenRectangleResult", "reason": "returned by galerkin.panel_electrostatics.solve_open_rectangle (re-exported there)"},
     {"module": "galerkin.temperature_joule_heating", "class": "JouleIteration", "reason": "one iteration record of solve_temperature_joule_heat's history"},
     {"module": "galerkin.elasticity", "class": "ElasticityResult", "reason": "returned by solve_elasticity"},
+    {"module": "galerkin.structural_modes3d", "class": "StructuralModes3DResult", "reason": "returned by solve_structural_modes_3d"},
     {"module": "galerkin.elasticity3d", "class": "Elasticity3DResult", "reason": "returned by solve_elasticity_3d"},
     {"module": "galerkin.transient_thermoelasticity3d", "class": "ThermoelasticityHistory3DResult", "reason": "returned by solve_thermoelasticity_history_3d"},
     {"module": "galerkin.thermoelasticity", "class": "ThermoelasticResult", "reason": "returned by solve_thermoelasticity"},

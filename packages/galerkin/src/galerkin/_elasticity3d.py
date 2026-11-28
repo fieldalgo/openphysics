@@ -14,7 +14,8 @@ from .core.tets import tet_gradients as _tet_gradients
 from .mesh3d import Mesh3D
 from ._tetra_materials import region_property
 
-def _fixed_dofs(mesh, prescribed):
+
+def constrained_dofs(mesh, prescribed):
     if not isinstance(prescribed, Mapping):
         raise ValueError("prescribed_displacement must map (node, component) to metres")
     fixed = {}
@@ -26,6 +27,7 @@ def _fixed_dofs(mesh, prescribed):
         if not 0 <= node < mesh.num_nodes or not 0 <= axis < 3:
             raise ValueError("prescribed_displacement node or component is out of range")
         fixed[3 * node + axis] = finite_scalar(value, "prescribed_displacement")
+    _check_constraints(mesh, fixed)
     return fixed
 
 
@@ -81,7 +83,7 @@ def _applied_load(mesh, volumes, body_force_density, traction):
     return force
 
 
-def _stiffness(mesh, gradients, volumes, shear, lame):
+def stiffness_matrix(mesh, gradients, volumes, shear, lame):
     """Assemble C acting on the symmetric gradients of the 12 local vector bases."""
     direct = np.einsum("tai,tbj->taibj", gradients, gradients)
     swapped = direct.transpose(0, 1, 4, 3, 2)
@@ -96,6 +98,31 @@ def _stiffness(mesh, gradients, volumes, shear, lame):
                              shape=(3 * mesh.num_nodes, 3 * mesh.num_nodes)).tocsr()
 
 
+def element_geometry(mesh):
+    if not isinstance(mesh, Mesh3D):
+        raise TypeError("3D elasticity takes a galerkin.Mesh3D")
+    mesh.check()
+    if not mesh.num_tets:
+        raise ValueError("elasticity needs at least one tetrahedron")
+    try:
+        gradients, volumes = _tet_gradients(mesh)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("elasticity needs nondegenerate tetrahedra") from exc
+    if not np.all(np.isfinite(gradients)) or not np.all(np.isfinite(volumes) & (volumes > 0)):
+        raise ValueError("elasticity needs finite tetrahedra with positive volumes")
+    return gradients, volumes
+
+
+def elastic_moduli(mesh, youngs_modulus, poisson_ratio):
+    young = region_property(mesh, youngs_modulus, "youngs_modulus", positive=True)
+    poisson = region_property(mesh, poisson_ratio, "poisson_ratio", positive=False)
+    if np.any((poisson <= -1) | (poisson >= 0.5)):
+        raise ValueError("poisson_ratio must lie strictly between -1 and 0.5")
+    shear = young / (2 * (1 + poisson))
+    lame = young * poisson / ((1 + poisson) * (1 - 2 * poisson))
+    return young, poisson, shear, lame
+
+
 def solve_fields(mesh, *, youngs_modulus, poisson_ratio, prescribed_displacement,
                  body_force_density=None, traction=None, thermal_strain=None):
     """Internal solve with an optional (T,) isotropic eigenstrain in mesh order."""
@@ -104,25 +131,9 @@ def solve_fields(mesh, *, youngs_modulus, poisson_ratio, prescribed_displacement
                         ("body_force_density", body_force_density), ("traction", traction),
                         ("thermal_strain", thermal_strain)):
         refuse_text(name, value)
-    if not isinstance(mesh, Mesh3D):
-        raise TypeError("solve_elasticity_3d takes a galerkin.Mesh3D")
-    mesh.check()
-    if not mesh.num_tets:
-        raise ValueError("elasticity needs at least one tetrahedron")
-    young = region_property(mesh, youngs_modulus, "youngs_modulus", positive=True)
-    poisson = region_property(mesh, poisson_ratio, "poisson_ratio", positive=False)
-    if np.any((poisson <= -1) | (poisson >= 0.5)):
-        raise ValueError("poisson_ratio must lie strictly between -1 and 0.5")
-    fixed = _fixed_dofs(mesh, prescribed_displacement)
-    _check_constraints(mesh, fixed)
-    try:
-        gradients, volumes = _tet_gradients(mesh)
-    except np.linalg.LinAlgError as exc:
-        raise ValueError("elasticity needs nondegenerate tetrahedra") from exc
-    if not np.all(np.isfinite(gradients)) or not np.all(np.isfinite(volumes) & (volumes > 0)):
-        raise ValueError("elasticity needs finite tetrahedra with positive volumes")
-    shear = young / (2 * (1 + poisson))
-    lame = young * poisson / ((1 + poisson) * (1 - 2 * poisson))
+    gradients, volumes = element_geometry(mesh)
+    young, poisson, shear, lame = elastic_moduli(mesh, youngs_modulus, poisson_ratio)
+    fixed = constrained_dofs(mesh, prescribed_displacement)
     applied = _applied_load(mesh, volumes, body_force_density, traction)
     rhs = applied.copy()
     if thermal_strain is not None:
@@ -131,7 +142,7 @@ def solve_fields(mesh, *, youngs_modulus, poisson_ratio, prescribed_displacement
             raise ValueError("thermal_strain must have shape (T,) in tetrahedron order")
         pressure = young / (1 - 2 * poisson) * thermal_strain
         np.add.at(rhs, mesh.tets, (pressure * volumes)[:, None, None] * gradients)
-    stiffness = _stiffness(mesh, gradients, volumes, shear, lame)
+    stiffness = stiffness_matrix(mesh, gradients, volumes, shear, lame)
     displacement = scipy_solve_dirichlet(stiffness, rhs.ravel(), fixed, factor=True).reshape(-1, 3)
     gradient = np.einsum("tai,taj->tij", displacement[mesh.tets], gradients)
     strain = (gradient + gradient.transpose(0, 2, 1)) / 2

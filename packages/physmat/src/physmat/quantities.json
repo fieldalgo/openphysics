@@ -2747,6 +2747,17 @@
    "places": ["api", "result"],
    "description": {"en": "Line integral of the tangential unnormalized_electric_field along a mesh edge (output; also an argument of the public mode functions).", "ko": "메시 모서리를 따른 접선 unnormalized_electric_field의 선적분(출력. 공개 모드 함수의 인수이기도 함)."}
   },
+  "mass_normalized_displacement": {
+   "dimension": {"M": -0.5},
+   "unit": "1/kg^(1/2)",
+   "menu": ["1/kg^(1/2)"],
+   "kind": "ordinary",
+   "rank": ["vector"],
+   "domain": null,
+   "band": null,
+   "places": ["result"],
+   "description": {"en": "Nodal displacement mode normalized to unit generalized mass.", "ko": "일반화 질량이 1이 되도록 정규화한 절점 변위 모드."}
+  },
   "mass_normalized_electric_field": {
    "dimension": {"L": -1.5},
    "unit": "1/m^(3/2)",
