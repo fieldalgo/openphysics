@@ -26,3 +26,9 @@ test('U1: shown once: Mesh and Run point to Messages; the label reads Element si
  assert.equal(M.fieldsOf(card(),'mesh')[0].label,'Element size');
  assert.equal(M.fieldsOf(card(),'feature:1').find(f=>f.key==='features[1].element_size').label,'Element size');
 });
+
+test('U4: the run just finished is up to date; another kept run means no need to run',()=>{
+ assert.equal(M.keptRunText(0,0),'Run 1 is up to date with these inputs.');
+ assert.equal(M.keptRunText(1,null),'No need to run: Run 2 already has these results.');
+ assert.equal(M.keptRunText(1,0),'No need to run: Run 2 already has these results.','the run just finished is another one');
+});

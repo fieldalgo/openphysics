@@ -478,7 +478,8 @@ the refusal the last run of this same document ended with, in its words (for exa
 temperature is missing on the connected group of regions 'via': …*); an edit clears the last one.
 When the document equals a kept run's (key order aside, for the same result format
 `thermal-steady3d-run-v1`) the header says *No need to run: Run 1 already has these results.* with
-**Show Run 1**, and Run shows that run instead of computing it again. Done, Messages says *Run 1
+**Show Run 1**, and Run shows that run instead of computing it again. Right after a run, until the
+next edit, the same place says *Run 1 is up to date with these inputs.* instead. Done, Messages says *Run 1
 complete: maximum 1127.33 K in Si (top). Its results belong to that run; editing the model does not
 change them.*
 

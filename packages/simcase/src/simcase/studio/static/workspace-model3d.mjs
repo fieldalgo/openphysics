@@ -520,6 +520,11 @@ export function keptRunFor(doc,records){
  return -1;
 }
 export const noNeedText=i=>`No need to run: Run ${i+1} already has these results.`;
+/**
+ * What Run's reason says when the document equals kept run i: "Run N is up to date with these inputs."
+ * when it is the run just finished here (fresh: its index, cleared by any edit), else noNeedText.
+ */
+export const keptRunText=(i,fresh)=>i===fresh?`Run ${i+1} is up to date with these inputs.`:noNeedText(i);
 
 // a diverging map (cool to warm): blue at the minimum, grey in the middle, red at the maximum
 const STOPS=[[0.231,0.298,0.753],[0.865,0.865,0.865],[0.706,0.016,0.150]];

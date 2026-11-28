@@ -73,7 +73,8 @@ const checked = page => page.waitForFunction(() => { const box = document.getEle
 const csp = page => page.evaluate(() => window.__csp);
 const completed = (page, n) => page.waitForFunction(n => (document.getElementById('mp-messages')?.textContent || '').includes(`Run ${n} complete`)
   && document.getElementById('m3-result-canvas'), n, {timeout: 180000});
-const noNeed = page => page.evaluate(() => (document.getElementById('m3-run-why')?.textContent || '').startsWith('No need to run'));
+// the document equals a kept run: "No need to run: …", or for the run just finished "Run N is up to date …" (U4)
+const noNeed = page => page.evaluate(() => /^(No need to run|Run \d+ is up to date with these inputs)/.test(document.getElementById('m3-run-why')?.textContent || ''));
 async function canvasState(page, selector) {
   return page.evaluate(sel => {
     const c = document.querySelector(sel), r = c.getBoundingClientRect(), probe = document.createElement('canvas');

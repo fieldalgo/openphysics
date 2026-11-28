@@ -19,7 +19,7 @@ import {markPageTabs} from './workspace-tabs.mjs';
 import {CARD3D,CARDS3D,card3dOf,meshRefusalText,FEATURE_TYPES,Model3dHistory,addFeature,addLayer,addParameter,blockReason,componentName,deleteFeature,deleteParameter,deletedText,
  duplicateFeature,editField,featureLabel,fieldNote,fieldsOf,getField,meshReason,meshRefusal,moveFeature,refusalMessage,removeLayer,setParameter,shownUnit,treeRows,
  heatOf,setFixedTemperature,removeFixedTemperature,setHeatSource,removeHeatSource,setConductivity,editableRegions,runReason,keptRunFor,noNeedText,
- valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate} from './workspace-model3d.mjs';
+ valuesRows,runProgress,boundaryNameFor,temperatureColor,expectedHeatRate,keptRunText} from './workspace-model3d.mjs';
 import {writeModel3dSession,documentDigest,MAX_RUNS} from './workspace-model3d-session.mjs';
 import {TemperatureView3D} from './workspace-model3d-results.mjs';
 
@@ -44,7 +44,7 @@ export function createModel3dView(ctx){
  const mesh={job:null,timer:null,status:null,view:null,viewer:null,canvas:null,pane:'geometry'};
  // the runs: the kept records (saved with the model), the server run of each record when this page
  // ran it (cut, probe and CSV need it), the run going, the refusal the last run ended with, the run shown
- const heat={records:[],live:[],run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
+ const heat={records:[],live:[],fresh:null,run:null,timer:null,status:null,failure:null,shown:null,viewer:null,canvas:null,cut:null,probe:null};
  let section=null;              // the geometry view's section {axis, at} (document units), view state
  let pendingFocus=null;         // a Settings field to focus across the renders until the check has answered
 
@@ -61,6 +61,7 @@ export function createModel3dView(ctx){
   pendingFocus=null;
  }
  function commit(next,{record=true}={}){
+  heat.fresh=null;                 // an edit: the run just finished is no longer "up to date" news
   doc=next;if(record&&history.record(doc))ctx.onHistory();
   drafts.clear();runCheck();if(shown)ctx.render();
  }
@@ -186,7 +187,7 @@ export function createModel3dView(ctx){
   if(selection==='heat:insulated')return `<h3>Insulated</h3><p>Every outer face that no fixed temperature names is insulated (no heat crosses it).</p>`;
   if(selection==='study'){const i=keptRunFor(doc,heat.records);
    return `<h3>Study 1 · Steady</h3><p>Run meshes the component (Mesh 1, reused when unchanged) and solves Heat transfer (3D) in a separate process.</p>`+
-    `<p id="m3-study-why">${esc(i>=0?noNeedText(i):reason||'Ready to run.')}</p>`;}
+    `<p id="m3-study-why">${esc(i>=0?keptRunText(i,heat.fresh):reason||'Ready to run.')}</p>`;}
   if(selection==='results')return `<h3>Results</h3>`+(heat.records.length?`<ul>${heat.records.map((r,i)=>`<li>Run ${i+1}: ${esc(valuesRows(r.values,r.surface?.unit||'um')[0][1])}</li>`).join('')}</ul>`:'<p class="muted">No run yet: press Run.</p>')+
    `<p class="muted">Up to ${MAX_RUNS} runs are kept with the model and saved with it.</p>`;
   m=/^run:(\d+)$/.exec(selection);
@@ -290,7 +291,7 @@ export function createModel3dView(ctx){
    (mesh.job?`<button type="button" id="m3-mesh-cancel">Cancel meshing</button>`:`<button type="button" id="m3-mesh"${why?' disabled aria-describedby="m3-block"':''}>Mesh</button>`)+
    (heat.run?`<button type="button" id="m3-run-cancel">Cancel run</button>`:`<button type="button" id="m3-run"${runWhy&&kept<0?' disabled':''} aria-describedby="m3-run-why">Run</button>`)+
    `<small id="m3-block">${esc(block)}</small>`+
-   `<small id="m3-run-why">${kept>=0&&!heat.run?`${esc(noNeedText(kept))} <button type="button" data-m3-show-run="${kept}">Show Run ${kept+1}</button>`:esc(runWhy||'')}</small></div></div>`+
+   `<small id="m3-run-why">${kept>=0&&!heat.run?`${esc(keptRunText(kept,heat.fresh))} <button type="button" data-m3-show-run="${kept}">Show Run ${kept+1}</button>`:esc(runWhy||'')}</small></div></div>`+
    meshJob()+runJob()+
    `<div class="m3-views" role="toolbar" aria-label="3D view">${['iso','+x','-x','+y','-y','+z','-z'].map(v=>`<button type="button" data-m3-view="${v}">${v==='iso'?'Iso':v.toUpperCase().replace('-','−')}</button>`).join('')}<button type="button" data-m3-fit>Fit</button>`+
    `<span class="m3-section"><label>Section <select id="m3-section-axis" aria-label="section plane"><option value="">none</option>${['x','y','z'].map(a=>`<option value="${a}"${section?.axis===a?' selected':''}>${a} =</option>`).join('')}</select></label>`+
@@ -419,7 +420,7 @@ export function createModel3dView(ctx){
   else{heat.records.push(record);heat.live.push(id);
    while(heat.records.length>MAX_RUNS){heat.records.shift();heat.live.shift();}
    i=heat.records.length-1;}
-  selection=`run:${i+1}`;showRun(i);
+  heat.fresh=i;selection=`run:${i+1}`;showRun(i);
   const t=record.values.temperature_max;
   lastNotice={text:`Run ${i+1} complete: maximum ${Number(t.value.toPrecision(6))} K in ${t.region}. Its results belong to that run; editing the model does not change them.`,undo:false};
   ctx.onHistory();ctx.render();
