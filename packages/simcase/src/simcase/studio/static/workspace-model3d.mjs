@@ -414,7 +414,8 @@ export const HEAT='thermal.steady3d';
 export const heatOf=doc=>doc?.physics?.heat?.type===HEAT?doc.physics.heat:null;
 const shownQuantity=v=>String(v).replace(/W\/m\^3/g,'W/m³');
 function heatRows(doc,check,refused){
- const h=heatOf(doc),off=!!h&&!refused&&check?.run&&check.run.ok===false;   // no heat block: the note says so, no mark
+ // no heat block: the note says so, no mark; a shape or mesh refusal comes first in Run's reasons, so it is not marked here
+ const h=heatOf(doc),off=!!h&&!refused&&!meshRefusal(check)&&check?.run&&check.run.ok===false;
  const rows=[{key:'heat',label:'Heat transfer (3D)',level:2,note:h?'':'not set: Add a fixed temperature',problem:!!off}];
  if(!h)return rows;
  rows.push({key:'heat:k',label:'Thermal conductivity',level:3,note:'from Materials',problem:false});

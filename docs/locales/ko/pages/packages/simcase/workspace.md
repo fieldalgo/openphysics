@@ -362,7 +362,8 @@ W/m³, `"1e12 W/m^3"`로 씀), 각각 제 페이지(값, **Delete**)가 있습�
 없습니다. 거부한 값은 형상처럼 범위 문장과 함께 초안으로 남습니다. 편집마다 검사는 Run이 읽는 대로 문서를 읽기도 합니다
 (`/api/model3d/check`의 `run` 부분): *Fixed temperature needs an outer face; via.z1 is inside*(E-CONTRACT) 같은 거부는 Heat
 transfer (3D)를 표시하고 Messages에 종류의 말 그대로 보입니다. 열 블록이 없는 모델은 *not set: Add a fixed temperature*를 보이고
-표시는 없습니다.
+표시는 없습니다. 형상 거부나 메시 전 거부가 Run의 이유에서 먼저이므로, reader가 같은 문서를 거부해도(예: 허용 오차 아래의
+특징) 특징이나 Mesh 1만 표시하고 Heat transfer (3D)는 표시하지 않습니다.
 
 **Run.** 그래픽 머리말의 **Run**은 구성 요소를 메시하고(형상과 mesh 블록이 같으면 Mesh 1의 메시를 재사용) 정상 열 문제를 별도
 프로세스로 풉니다(`POST /api/model3d/run`, [실행 경로](studio_3d.md#보내는-것과-응답)): *Meshing → Solving → Done*, 경과 시간,

@@ -36,6 +36,10 @@ test('Heat transfer (3D): the tree rows after Materials, then Mesh 1, Study 1 an
  // without a heat block the reader's refusal (no thermal.steady3d entry) marks nothing: the note says it
  const noPhysics={...check,run:{ok:false,refused:"Run takes a thermal.steady3d document (one physics entry of type 'thermal.steady3d')",code:null}};
  assert.deepEqual(M.treeRows(bare(),noPhysics,null,W,{runs:[]}).filter(r=>r.problem).map(r=>r.key),[]);
+ // a refusal before meshing comes first in Run's reasons: the reader's copy of it marks Mesh 1 only
+ const tol="geometry.components.c: feature 'via' is 40000 pm across, 1.33e-08 of the component's diagonal, below the mesher tolerance 3e-08";
+ const both={...check,mesh:{ok:false,refused:tol,code:'E-CONTRACT',path:'geometry.components.c',feature_index:null},run:{ok:false,refused:tol,code:'E-CONTRACT'}};
+ assert.deepEqual(M.treeRows(doc,both,null,W,{runs:[]}).filter(r=>r.problem).map(r=>r.key),['mesh']);
 });
 
 test('fixed temperatures, heat sources and conductivities: quantities in range, in the 2D range sentence',()=>{
