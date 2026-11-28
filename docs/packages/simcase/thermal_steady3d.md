@@ -53,6 +53,31 @@ The result's `route` (and the summary's `mesh_route`) says which route ran. A lo
 feature with footprint layers is not taken yet. On the extrude route the faces carry their
 tags only, so `selections` and `boundary_tags` are refused there.
 
+## On an existing mesh
+
+The mesh and the solve can run apart, for example the mesh in another process (Studio's
+[3D heat run](studio_3d.md#run) does this):
+
+- `simcase.build_thermal3d_mesh(document, component=None)` makes the mesh the kind solves on, by
+  the route table above: the `meshine.extrude` `galerkin.Mesh3D` for a lone slab `layers`
+  component, otherwise `build_mesh3d`'s `Mesh3DResult`. The document needs no physics block;
+  on the extrude route the size is `mesh.element_size` converted as the document reader
+  converts it.
+- `simcase.solve_thermal3d(doc, mesh, verbose=True)` solves a `thermal.steady3d` document on
+  that mesh and returns the result `simcase.run` returns, bit for bit (nodes, tetrahedra,
+  temperature, reaction heat rate and every summary value), with no mesh time. `run` itself
+  is now the mesh step and then this same solve. A mesh of the other route or of another
+  component is refused by name (`E-CONTRACT`).
+- `simcase.mesh3d_to_arrays(mesh)` and `simcase.mesh3d_from_arrays(arrays, document=None)` write a
+  `Mesh3DResult` or a `galerkin.Mesh3D` as a flat `{name: ndarray}` of numeric and string arrays
+  (format `openphysics-mesh3d-arrays-v1` in the `meta` array; names carry an index, never a tag),
+  which `numpy.savez` writes and `numpy.load(..., allow_pickle=False)` reads, and read it back bit
+  for bit. On the meshloom route the exact complex is rebuilt from the document's geometry; the
+  hand-off and meshloom's raw output are not kept.
+
+`tests/simcase/test_thermal_steady3d_on_mesh.py` checks the solve against `simcase.run` and the
+array round trip, both bitwise, on all three routes.
+
 ## Keys
 
 | Key | Meaning |

@@ -29,7 +29,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from simcase import GeometryError, display_complex3d, parse_geometry
 from .bodies import RequestRefused, diagnostics, exact_json, read_envelope
-from . import mesh3d_jobs
+from . import heat3d_runs, mesh3d_jobs
 
 STATIC = Path(__file__).parent / "static"
 PM = 10 ** 12
@@ -45,7 +45,7 @@ ASSETS = {name: (STATIC / name, mime) for name, mime in (
 
 def install(app) -> None:
     """Add the routes to ``app`` as plain routes (as ``geometry_api.install`` does)."""
-    for route in router.routes:
+    for route in [*router.routes, *heat3d_runs.router.routes]:     # the 3D heat run's routes too
         app.add_api_route(route.path, route.endpoint, methods=list(route.methods),
                           include_in_schema=route.include_in_schema)
 
@@ -531,6 +531,7 @@ async def model3d_selection(request: Request):
 
 jobs = mesh3d_jobs.Mesh3DJobs()
 _JOB_ID = re.compile(r"m3d-[0-9a-f]{12}")
+runs = heat3d_runs.bind(jobs)               # the 3D heat run (heat3d_runs): its routes, the same child slot
 
 
 def _job_refusal(exc: mesh3d_jobs.Refused):

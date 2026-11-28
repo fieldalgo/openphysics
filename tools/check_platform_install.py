@@ -27,7 +27,8 @@ project file and opens it after a server restart in a new browser profile: the s
 run started, the refusals of damaged files and the save dialog stubbed at its boundary.
 Since 2026-11-27 it runs the Studio 3D mesh job's process tests (tests/simcase/test_studio_mesh3d_process.py,
 no HTTP client: the Studio pins have no httpx) on every platform: the spawn child, Cancel's termination
-and the temporary directory's removal.
+and the temporary directory's removal; since the 3D heat run, also its mesh step's
+(tests/simcase/test_studio_heat3d_process.py).
 """
 import argparse
 from email.parser import BytesParser
@@ -231,6 +232,8 @@ def main():
             # directory removed, on every platform (W8 itself runs on Linux in validate.yml);
             # driven without HTTP, since the Studio pins have no httpx for TestClient
             ROOT / "tests/simcase/test_studio_mesh3d_process.py": tests / "test_studio_mesh3d_process.py",
+            # and the 3D heat run's mesh step: Cancel ends that child too (W8-run is Linux-only)
+            ROOT / "tests/simcase/test_studio_heat3d_process.py": tests / "test_studio_heat3d_process.py",
             ROOT / "tests/simcase/model3d_fixtures.py": tests / "model3d_fixtures.py"}
         for source, destination in copies.items():
             shutil.copy2(source, destination)
@@ -277,6 +280,7 @@ def main():
             tests / "test_meshloom_generate3d.py",
             tests / "test_export_regions.py",
             tests / "test_studio_mesh3d_process.py",
+            tests / "test_studio_heat3d_process.py",
             str(tests / "original_scalar.py")+"::test_slab_te_matches_refsol_through_the_whole_chain",
             cwd=work)
         # Installed save/I-O robustness: every transient and steady-boundary platform

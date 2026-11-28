@@ -50,6 +50,28 @@ result.save("out/")                               # summary.json, fields.npz, mo
 결과의 `route`(요약의 `mesh_route`)가 어느 경로였는지 알려 줍니다. 발자국 층이 있는 단독 `layers` 피처는 아직
 받지 않습니다. 압출 경로의 면은 태그만 가지므로 그 경로에서는 `selections`와 `boundary_tags`를 거부합니다.
 
+## 이미 있는 메시에서
+
+메시와 풀이를 따로 돌릴 수 있습니다. 예를 들어 메시를 다른 프로세스에서 만듭니다(Studio의
+[3D 열 실행](studio_3d.md#실행)이 이렇게 합니다).
+
+- `simcase.build_thermal3d_mesh(document, component=None)`는 이 종류가 풀 메시를 위 경로 표대로 만듭니다.
+  판 `layers` 하나만 가진 구성 요소는 `meshine.extrude`의 `galerkin.Mesh3D`, 그 밖에는 `build_mesh3d`의
+  `Mesh3DResult`입니다. 문서에 physics 블록이 없어도 됩니다. 압출 경로의 크기는 문서 읽기가 바꾸는 대로
+  바꾼 `mesh.element_size`입니다.
+- `simcase.solve_thermal3d(doc, mesh, verbose=True)`는 `thermal.steady3d` 문서를 그 메시에서 풀고,
+  `simcase.run`이 주는 결과를 비트까지 같게(노드, 사면체, 온도, 반작용 열유량, 요약 값 전부) 메시 시간 없이
+  돌려줍니다. 이제 `run` 자체가 메시 단계 다음에 이 풀이를 돌립니다. 다른 경로나 다른 구성 요소의 메시는
+  이름을 들어 거부합니다(`E-CONTRACT`).
+- `simcase.mesh3d_to_arrays(mesh)`와 `simcase.mesh3d_from_arrays(arrays, document=None)`는 `Mesh3DResult`나
+  `galerkin.Mesh3D`를 숫자·문자열 배열만 담은 평평한 `{이름: ndarray}`로 쓰고(형식은 `meta` 배열의
+  `openphysics-mesh3d-arrays-v1`, 이름에는 태그가 아닌 번호만 들어갑니다) 비트까지 같게 되읽습니다.
+  `numpy.savez`로 쓰고 `numpy.load(..., allow_pickle=False)`로 읽을 수 있습니다. meshloom 경로에서는 정확한
+  복합체를 문서의 형상에서 다시 만들고, 넘겨주기와 meshloom 원본 출력은 남기지 않습니다.
+
+`tests/simcase/test_thermal_steady3d_on_mesh.py`가 세 경로 모두에서 `simcase.run`과의 풀이 비교와 배열
+왕복을 비트 단위로 확인합니다.
+
 ## 키
 
 | 키 | 뜻 |

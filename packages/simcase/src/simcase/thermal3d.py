@@ -284,13 +284,16 @@ def extrude_mesh(doc):
     """The ``meshine.extrude`` mesh of a lone slab ``layers`` component, as a ``galerkin.Mesh3D`` in metres:
     the domain rectangle meshed by meshine at the size, extruded through the layer levels with
     sub-layers at most that size thick."""
+    return _extrude(doc.geometry_model, doc.component, doc.si["mesh"]["element_size"])
+
+
+def _extrude(model, comp, element_size):
     from galerkin import from_mesher
     from meshine import Domain, box_sides, extrude, generate, rectangle
     from .geometry_document import layer_stack
-    comp = doc.component
-    stack = layer_stack(doc.geometry_model, comp.name)
+    stack = layer_stack(model, comp.name)
     f = comp.features[0]
-    h = _metres(f.mesh_size) if f.mesh_size is not None else float(doc.si["mesh"]["element_size"])
+    h = _metres(f.mesh_size) if f.mesh_size is not None else float(element_size)
     d = comp.domain
     x0, x1, y0, y1 = (_metres(d[k]) for k in ("xmin", "xmax", "ymin", "ymax"))
     plate = Domain(size=h)
@@ -298,6 +301,35 @@ def extrude_mesh(doc):
     footprint = generate(plate, box_sides(x0, x1, y0, y1))
     mesh = extrude(footprint, [_metres(z) for z in stack.levels], stack.table_for(footprint.region_names), size=h)
     return from_mesher(mesh)
+
+
+def build_thermal3d_mesh(document, component: str | None = None):
+    """The mesh ``thermal.steady3d`` solves a document's ``3d`` component on, by the kind's own route
+    choice: for a component holding only one slab ``layers`` feature the ``meshine.extrude`` mesh
+    (a ``galerkin.Mesh3D`` in metres), otherwise ``build_mesh3d``'s ``Mesh3DResult`` (meshloom, or
+    meshloom's builder shapes). ``document`` is a format 0.3 document (a dict or a
+    ``simcase.Document``) with a version 1 geometry block and a ``mesh`` block; it needs no physics
+    block. ``solve_thermal3d`` solves on the result; ``mesh3d_to_arrays`` writes it as arrays."""
+    from .geometry_document import GeometryError, _pick, parse
+    from .geometry_engine3d import build_mesh3d
+    data = getattr(document, "data", document)
+    model = parse(data)
+    comp = _pick(model, component)
+    if comp.dimension != "3d" or not is_extrude_route(comp):
+        return build_mesh3d(data, component)
+    size = None
+    if comp.features[0].mesh_size is None:
+        mesh = data.get("mesh") if isinstance(data.get("mesh"), dict) else {}
+        if "element_size" not in mesh:
+            raise GeometryError("mesh.element_size: the meshine.extrude route needs an element size",
+                                path="mesh.element_size", code="E-CONTRACT")
+        from physmat import units
+        c = units.convert(mesh["element_size"], "element_size", path="mesh.element_size")
+        if not c.ok:
+            raise GeometryError(f"mesh.element_size: {c.diagnostics[0].message if c.diagnostics else 'not a size'}",
+                                path="mesh.element_size", code="E-VALUE-FORM")
+        size = c.value
+    return _extrude(model, comp, size)
 
 
 def build(doc):
@@ -385,21 +417,63 @@ def _region_materials(doc, mesh):
 
 
 def run_thermal3d(doc, verbose=True):
-    from galerkin.thermal3d import solve_steady_heat_3d
     doc.validate()
     doc = doc.copy()
     doc.validate()
-    name, _p = doc.sole_physics()
     t0 = time.perf_counter()
     from .geometry_document import GeometryError
     try:
         mesh, route, built = build(doc)
     except GeometryError as exc:
         raise DocumentError(str(exc), path=exc.path, code=exc.code) from exc
+    return _solve(doc, mesh, route, built, time.perf_counter() - t0, verbose)
+
+
+def solve_thermal3d(doc, mesh, verbose=True):
+    """Solve a ``thermal.steady3d`` document on an existing mesh: ``build_thermal3d_mesh``'s result
+    for the document (a ``Mesh3DResult``, or the ``galerkin.Mesh3D`` of the ``meshine.extrude``
+    route), or that mesh read back by ``mesh3d_from_arrays``. The result is ``simcase.run``'s,
+    bit for bit, with no mesh time. A mesh of the other route, or of another component, is refused."""
+    doc.validate()
+    if doc.sole_physics()[1].get("type") != PHYSICS:
+        raise DocumentError(f"solve_thermal3d takes a {PHYSICS} document", path="physics", code="E-CONTRACT")
+    doc = doc.copy()
+    doc.validate()
+    mesh, route, built = _accept(doc, mesh)
+    return _solve(doc, mesh, route, built, 0.0, verbose)
+
+
+def _accept(doc, mesh):
+    """``(galerkin mesh, route, Mesh3DResult or None)`` of a given mesh, checked against the route
+    ``build`` would take for the document."""
+    from galerkin.mesh3d import Mesh3D
+    from . import geometry_builders3d as builders
+    from .geometry_engine3d import Mesh3DResult
+    comp = doc.component
+    where = f"geometry.components.{comp.name}"
+    if is_extrude_route(comp):
+        if not isinstance(mesh, Mesh3D):
+            _refuse(f"{where}: a component holding only one layers feature is solved on its meshine.extrude mesh "
+                    "(build_thermal3d_mesh), not on a build_mesh3d result", where)
+        return mesh, "extrude", None
+    curved = builders.has_curved(comp)
+    route = "builder" if curved else "meshloom"
+    if not isinstance(mesh, Mesh3DResult) or (mesh.complex is None) != curved:
+        _refuse(f"{where}: this component takes the {route} route; solve it on its build_mesh3d result "
+                "(build_thermal3d_mesh), not on a meshine.extrude mesh or another route's", where)
+    if mesh.complex is not None and mesh.complex.component != comp.name:
+        _refuse(f"{where}: the mesh is of component {mesh.complex.component!r}", where)
+    return mesh.mesh, route, mesh
+
+
+def _solve(doc, mesh, route, built, t_mesh, verbose):
+    from galerkin.thermal3d import solve_steady_heat_3d
+    name, _p = doc.sole_physics()
     if built is not None:
         doc.diagnostics.extend(built.diagnostics)          # I-MESH-ESTIMATE (and I-SURFACE-SAMPLED)
+    t0 = time.perf_counter()
     kwargs, by_key = solver_inputs(doc, mesh, built)
-    t_mesh = time.perf_counter() - t0
+    t_mesh += time.perf_counter() - t0
     t0 = time.perf_counter()
     try:
         solution = solve_steady_heat_3d(mesh, **kwargs)

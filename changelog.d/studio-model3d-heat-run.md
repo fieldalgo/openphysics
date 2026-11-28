@@ -1,0 +1,9 @@
+# Added
+
+## English
+
+- `simcase`: **Studio runs 3D steady heat on the server (experimental).** `POST /api/model3d/run` solves a `thermal.steady3d` document in two steps: the mesh step reuses the component's kept mesh when its key matches, else it is the 3D mesh job in its cancellable child process; the solve runs `simcase.solve_thermal3d` on a server thread, so the result equals `simcase.run`'s bit for bit. Refusals come before any process (the reader's words, the estimate limit); a connected region group with no fixed temperature is refused naming its regions; one run at a time, sharing the child slot with Mesh. The answers keep the tetrahedra on the server: values (heat rate per fixed-temperature name, total source, balance residual, T min and max with locations, mesh stats), the surface map with T, an exact P1 cut by an axis plane, a probe, `cut.csv`, `surface.csv` and `run.json` exports and the `thermal-steady3d-run-v1` record. Mesh now meshes a lone slab `layers` component on the kind's extrude route. Checks W6-E1, W6-card, W7, W17 and W8-run pass; W14 is recorded. [3D view, Run](docs/packages/simcase/studio_3d.md#run).
+
+## 한국어
+
+- `simcase`: **Studio가 서버에서 3D 정상 열을 풉니다(실험적).** `POST /api/model3d/run`은 `thermal.steady3d` 문서를 두 단계로 풉니다. mesh 단계는 키가 같으면 구성 요소의 보관 메시를 다시 쓰고, 아니면 취소할 수 있는 자식 프로세스의 3D 메시 작업입니다. solve 단계는 서버 스레드에서 `simcase.solve_thermal3d`를 돌리므로 결과가 `simcase.run`과 비트까지 같습니다. 거부는 프로세스 전에 옵니다(읽기의 문구, 추정 한도). 고정 온도가 없는 연결된 영역 묶음은 영역 이름을 들어 거부합니다. 실행은 한 번에 하나이며 Mesh와 자식 프로세스 자리를 같이 씁니다. 응답은 사면체를 서버에 둡니다: 값(고정 온도 이름별 열유량, 전체 열원, 수지 잔차, 위치가 붙은 T 최솟값·최댓값, 메시 통계), T가 붙은 겉면 지도, 축 평면에 의한 정확한 P1 단면, 탐침, `cut.csv`·`surface.csv`·`run.json` 내보내기, `thermal-steady3d-run-v1` 기록. 이제 Mesh가 판 `layers` 하나만 가진 구성 요소를 이 종류의 압출 경로로 메시합니다. W6-E1, W6-card, W7, W17, W8-run 검사가 통과하고 W14를 기록했습니다. [3D 보기, 실행](packages/simcase/studio_3d.md#실행).

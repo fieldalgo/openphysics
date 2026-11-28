@@ -52,6 +52,9 @@ refusal that blocks meshing blocks the estimate too, in the same words:
 `E-MESH-ESTIMATE` above the limit, `E-CONTRACT` (a piece below the mesher tolerance),
 `E-3D-COMBINATION` and the others. Studio calls it to refuse an
 over-limit document before it starts a meshing process ([3D view](studio_3d.md#mesh)).
+A component holding only one slab `layers` feature, which `build_mesh3d` refuses for the
+`meshine.extrude` route, gets the same T from its exact complex; the extrude mesh's own count
+differs (E1 at 0.8 mm: T 3,076, 7,680 made).
 
 `simcase.geometry_engine3d.evaluate3d(model, component=None)` returns the complex alone,
 for a model from `simcase.geometry_document.parse`. It refuses a component holding one

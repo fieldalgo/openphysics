@@ -559,7 +559,10 @@ jobs:
     # Check W8 of the Studio 3D mesh job (docs/packages/simcase/studio_3d.md): a real Studio server
     # meshes the card at an estimate of about 69 s and is cancelled 3 s after the job starts; the
     # child process must have exited 2 s after Cancel, nothing is kept and the server's RSS stays
-    # within 50 MB. Without OPENPHYSICS_STUDIO_W8=1 the test is not collected; this job runs it
+    # within 50 MB. Since the 3D heat run (studio_3d.md, W8-run) it also starts a run of the card at
+    # an estimate of about 69 s and cancels it 3 s in, during its mesh step: the child must have
+    # exited 2 s after Cancel and the run keeps nothing.
+    # Without OPENPHYSICS_STUDIO_W8=1 the tests are not collected; this job runs them
     # on main pushes and manual dispatch only, so pull requests allocate no runner for it, and is
     # in the tests gate there. It installs the abi3 wheel meshloom-v26-wheel builds.
     needs: meshloom-v26-wheel
@@ -591,17 +594,19 @@ jobs:
           OPENPHYSICS_STUDIO_W8: "1"
         run: |
           mkdir -p "$RUNNER_TEMP/w8" "$RUNNER_TEMP/w8-out"
-          cp tests/simcase/test_studio_mesh3d_job.py tests/simcase/model3d_fixtures.py "$RUNNER_TEMP/w8/"
+          cp tests/simcase/test_studio_mesh3d_job.py tests/simcase/test_studio_heat3d_run.py \
+            tests/simcase/model3d_fixtures.py "$RUNNER_TEMP/w8/"
           cd "$RUNNER_TEMP/w8"
           python -c "import meshloom, simcase, sys; assert meshloom.kernel_available(), meshloom.__file__; print(sys.version, meshloom.__file__, simcase.__file__)"
-          python -m pytest -q -ra -s -p no:cacheprovider test_studio_mesh3d_job.py -k w8 --junitxml="$RUNNER_TEMP/w8-out/w8.xml" | tee "$RUNNER_TEMP/w8-out/w8.log"
+          python -m pytest -q -ra -s -p no:cacheprovider test_studio_mesh3d_job.py test_studio_heat3d_run.py -k w8 --junitxml="$RUNNER_TEMP/w8-out/w8.xml" | tee "$RUNNER_TEMP/w8-out/w8.log"
           python - "$RUNNER_TEMP/w8-out/w8.xml" <<'PY'
           import sys, xml.etree.ElementTree as ET
           suite = ET.parse(sys.argv[1]).getroot().find("testsuite")
           counts = {k: int(suite.get(k)) for k in ("tests", "skipped", "failures", "errors")}
-          assert counts == {"tests": 1, "skipped": 0, "failures": 0, "errors": 0}, counts
+          assert counts == {"tests": 2, "skipped": 0, "failures": 0, "errors": 0}, counts
           PY
           grep '^W8 ' "$RUNNER_TEMP/w8-out/w8.log"
+          grep '^W8-run ' "$RUNNER_TEMP/w8-out/w8.log"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
